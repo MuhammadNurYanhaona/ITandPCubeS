@@ -1,0 +1,40 @@
+Tuple ValueCoordinatePair:
+	value: Real single-precision
+	row, column: Integer
+
+Task "COO Matrix Vector Multiplication":
+	Define:
+		m: 1D Array of ValueCoordinatePair
+		v, w: 1D Array of Real single-precision
+		w_local: 2D Array of Real single-precision
+	Environment:
+		m, v: link
+		w: create
+	Initialize:
+		w.dimension = m.dimension1
+		w_local.dimension1.length = partition.p
+		w_local.dimension2 = w.dimension
+	Compute:
+		"Local Multiplications" (Space A) {
+			do {	
+				index_value_pair = m[i]
+				value = index_value_pair.value
+				row = index_value_pair.row
+				column = index_value_pair.column
+				w_local[p][row] += value * v[column]
+			} for k in m; p in w_local
+		}
+		"Accumulate Parts" (Space B) {
+			do { 
+				w[i] += w_local[k][i]
+			} for i in w; k in w_local
+		}	
+	Partition(p, r):
+		Space A <1D> {
+			w_local<dim1>: block_size(1)
+			m: block_count(p)
+			v: replicated
+		}
+		Space B <1D> {
+			w, w_local<dim2>: block_size(r)
+		}

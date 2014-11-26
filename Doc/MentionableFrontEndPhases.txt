@@ -1,0 +1,4 @@
+1. Multiple scopes per task and creation of task specific tuples
+2. Construction of coordinate systems for partition validation
+3. Insertion of synchronization stages in between user stages
+4. Establishing dependency arcs and deducing spans of individual arcs

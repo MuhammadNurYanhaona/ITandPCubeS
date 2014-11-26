@@ -1,0 +1,37 @@
+Task "Red Black SOR":
+	Define:
+		plate: 2D Array of Real single-precision
+		t: Epoch
+		total_iterations, red_or_black: Integer
+	Environment:
+		plate: link
+	Initialize (iterations):
+		total_iterations = iterations
+		t.begin = 1
+	Compute:
+		"Synchronize" (Space A) {
+			"Refine Estimate" (Space B) {
+				localRows = plate.local.dimension1.range
+				localCols = plate.local.dimension2.range
+				do {
+					do { plate[i][j] = 1/4 * (plate[i-1][j] 		\
+						   + plate[i+1][j] 				\
+						   + plate[i][j-1]				\
+						   + plate[i][j+1])				
+					} for i, j in plate 					\
+					   and (i > localRows.start and i < localRows.end)	\ 
+					   and (j > localCols.start and j < localCols.end)	\
+					   and (i + j) % 2 == red_or_black at (t)
+					red_or_black at (t) = (red_or_black at (t - 1) + 1) % 2
+				} while t.current % partition.n != 0
+			} 
+			Repeat: from "Refine Estimate" while t.current % partition.m != 0
+		} 
+		Repeat: from "Synchronize" while t.current < total_iterations
+	Partition (p, k, l, m, n):
+		Space A <1D> { 
+			plate: block_size(p) padding(m)
+		}
+		Space B <2D> divides Space A partitions { 
+			plate: block_size(k, l) padding(n, n)
+		}

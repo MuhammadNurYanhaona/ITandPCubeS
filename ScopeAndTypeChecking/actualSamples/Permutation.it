@@ -1,0 +1,18 @@
+Task "Permutation":
+	Define:
+		p: 1D Array of Integer
+		u, v: 1D Array of Real single-precision
+	Environment:
+		p, u: link
+		v: create
+	Initialize:
+		v.dimension = u.dimension
+	Compute:
+		"Permute" (Space A) {
+			do {	
+				v[p[i]] = u[i]
+			} for i in u
+		}	
+	Partition(n):
+		Space A <1D> { p, u, v: block_count(n) }	
+		

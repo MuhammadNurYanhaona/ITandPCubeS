@@ -1,0 +1,14 @@
+Task "Name of the task":
+Define:
+
+Environment:
+	a
+	b
+Compute:
+	if {
+
+		hello
+
+	} else {
+
+	}

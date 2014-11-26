@@ -1,0 +1,37 @@
+Task "Substitution":
+	Define:
+		m: 2D Array of Real single-precision
+		v: 1D Array of Real single-precision
+		index_range: Range
+		v_element: Real single-precision
+	Environment:
+		m, v: link
+	Initialize (lower_triangular_system):
+		if (lower_triangular_system) {
+			index_range = v.dimension.range
+		} else {
+			index_range.start = v.dimension.range.end
+			index_range.end = 0
+		}
+	Compute:
+		"Calculate Next Element" (Space A) 
+		Activate if k in v.local.dimension {
+			v_element = v[k] / m[k][k]
+			v[k] = v_element
+		}
+		"Column Sweep" (Space A) {
+			if (begin < end) { 
+				do {
+					result += m[i][k] * v_element
+					v[k] = v[k] - result
+				} for i in m and i > k
+			} else {
+				do {
+					result += m[i][k] * v_element
+					v[k] = v[k] - result
+				} for i in m and i < k
+			}
+		}
+		Repeat: from "Calculate Next Element" for k in index_range
+	Partition (n): 
+		Space A <1D> { m<dim2>, v: stride() }	 	
