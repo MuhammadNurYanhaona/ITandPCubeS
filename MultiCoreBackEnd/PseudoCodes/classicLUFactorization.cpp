@@ -5,7 +5,7 @@
 
 /* Comparing mapping configuration file with the PCubeS description of the multicore CPU, we
    should get a set of thread counts for different spaces. This is possible because the policy
-   is to have one thread per core regardless of the number PCUs in individual spaces.
+   is to have one thread per core regardless of the number LPUs in individual spaces.
 */
 // assuming Space A is mapped to the CPU
 #define SPACE_A_THREADS 1
@@ -54,8 +54,8 @@ struct LUArrayMetadata {
 /* There should be a data structure for metadata and content of variables that are linked
    in the task environment. This is easy to generate, as we know variable types from scope 
    analysis and if they are linked from the abstract syntax tree.
-   Thess variables and their metadata will be load from external files in the main program
-   based on the command line arguments.
+   These variables and their metadata will be loaded from external files in the main program
+   based on command line arguments.
    NOTE: we store all multi-dimensional IT arrays as uni-dimensional C arrays	 
 */
 
@@ -65,7 +65,7 @@ struct LUEnvironmentLinks {
 } links;
 
 /* There should be a data structure holding all task-global scalar variables that are neither
-   an epoch or a repeat loop index variable. Any update on element of this structure should
+   an epoch or a repeat loop index variable. Any update on a element of this structure should
    protected by barrier/semaphore. 
    Epoch and repeat loop indexes will have thread specific instances.
    We can generate this structure by examining the Define scope of a task and filtering out 
@@ -81,11 +81,11 @@ struct LUTaskGlobalVars {
    should be inside another data structure. Each thread should have a personal copy of this
    structure.
    NOTE: having only one copy for these scalar variables indicate an execution strategy for 
-   all PCUs (parallel computational units) a particular thread handles (remember that a thread
+   all LPUs (logical processing units) a particular thread handles (remember that a thread
    is a composite PPU (parallel processing unit) executing codes from possibly different 
-   spaces). That is, all PCUs multiplexed in a thread first completes a single phase of 
+   spaces). That is, all LPUs multiplexed in a thread first completes a single phase of 
    execution; then the thread updates its task-global scalar variables.
-   During executing the initialization section n the main thread, any assignment to underlying
+   During executing the initialization section in the main thread, any assignment to underlying
    variable should be repeated for each thread's version of the structure.
 */
 
@@ -95,9 +95,9 @@ typedef struct {
 } LUThreadGlobalVars;
 
 /* A data structure is needed to demarcate the region of a dimension of an array that falls inside
-   a single PCU. The Dimension data structure created above is not adequate in this regard as 
-   sometimes we may have a single memory block allocated for a sequence of PCUs where each 
-   working on a different region of the allocated structure.
+   a single LPU. The Dimension data structure created above is not adequate in this regard as 
+   sometimes we may have a single memory block allocated for a sequence of LPUs where each working 
+   on a different region of the allocated structure.
    This data structure should be a part of the compiler data structures library too.  
 */
 
@@ -111,22 +111,22 @@ typedef struct {
    structures can be generated easily by examining the partition hierarchy that we got during
    semantic analysis phase.
    Each thread will ask some partition specific library routine with its thread ID and the ID 
-   of the PCU it just executed (that should be -1 for the first invocation). The routine will 
+   of the LPU it just executed (that should be -1 for the first invocation). The routine will 
    generate a new instance of the structure on the fly and return it.
-   This strategy ensures that space consumption for PCU descriptions is negligeable. Furthermore,
-   later on for the optimized compiler, the routine may choose a ordering of PCUs that will
+   This strategy ensures that space consumption for LPU descriptions is negligeable. Furthermore,
+   later on for the optimized compiler, the routine may choose a ordering of LPUs that will
    reduce data transfers.
    NOTE: the number of PartitionDimension references per array is equal to the number of 
    dimensions along with the array is been partitioned in corresponding space.    	   
 */
 
 typedef struct {
-	int pcuId;
+	int lpuId;
 	int *p;
-} SpaceA_PCU;
+} SpaceA_LPU;
 
 typedef struct {
-	int pcuId;
+	int lpuId;
 	float *a;
 	PartitionDimension[1] aPartDims;
 	float *u;
@@ -134,31 +134,31 @@ typedef struct {
 	float *l;
 	PartitionDimension[1] lPartDims;
 	float *l_column;
-} SpaceB_PCU;
+} SpaceB_LPU;
 
 typedef struct {
-	int pcuId;
+	int lpuId;
 	float *u;
 	PartitionDimension[1] uPartDims;
 	float *l;
 	PartitionDimension[1] lPartDims;
 	float *l_column;
-} SpaceC_PCU;
+} SpaceC_LPU;
 
 typedef struct {
-	int pcuId;
+	int lpuId;
 	float *u;
 	PartitionDimension[1] uPartDims;
 	float *l;
 	PartitionDimension[1] lPartDims;
-} SpaceD_PCU;
+} SpaceD_LPU;
 
 /* A set of inline index-transformation functions are needed for strided partitioning. These will
    become part of the partition function definition in the library. In the future, if we allow 
    programmer defined partition functions then similar transformation functions will be needed. 
    Before we enable such a feature, we have to finalize the set of function headers that will suffice
    accurate interpretation of indexes inside the compute block.
-   NOTE: all partition function should not need to implement all transformation functions. For 
+   NOTE: all partition functions may not need to implement all transformation functions. For 
    example, neither block_size nor block_count involves any transformation.      
 */
 
@@ -174,13 +174,13 @@ inline bool stride_isIndexIncluded(int originalIndex, int strideId) {
 	return (originalIndex % strideId == 0);
 }
 
-/* Definition for function that loads all linked environment variables from external file. The
+/* Definition for the function that loads all linked environment variables from external file. The
    main function should pass all command line arguments to this function at the very beginning.
    Each file should have dimentionality information for a specific array followed by the actual
    data. File names in the command line should follow the same sequence as corresponding arrays
    are listed in the Environment section.
    NOTE: we are loading data with metadata as simplified initial implementation. Our broader
-   goal is to develop a space and partition oriented IO paradigm in the future. 	  
+   goal is to develop a space and partition oriented I/O paradigm in the future. 	  
 */
 LUEnvironmentLinks *LU_loadEnvironmentLinks(int argc, char *argv);
 
@@ -197,9 +197,9 @@ void LU_initializeTask(LUEnvironmentLinks *links,
 		LUTaskGlobalVars *taskGlobals, 
 		LUThreadGlobalVars *threadGlobals[THREAD_COUNT]);
 
-/* Given that PCU descriptions are generated on the fly, a separate mechanism is needed to hold
+/* Given that LPU descriptions are generated on the fly, a separate mechanism is needed to hold
    references to arrays used by the task. Given that we adopt the policy of contiguously layout
-   the regions of different PCUs of a space, we need only one reference per array per space.
+   the regions of different LPUs of a space, we need only one reference per array per space.
    NOTE: these references need to be allocated new memories only in case the underlying arrays 
    are (1) not allocated at all, or (2) used multiple times in a space that reorder the arrays
    from its previous arrangement. Otherwise, these references will point to some earlier 
@@ -224,8 +224,8 @@ struct SpaceB_Content {
 } spaceB;
 
 /* Allocation for the dynamic portion of the partition hierarchy is done at runtime by the thread
-   which will have some dynamic PCUs to execute. So there should be one structure instance per 
-   thread that is assigned to process PCUs of a dynamic space. These threads are decided by comparing
+   which will have some dynamic LPUs to execute. So there should be one structure instance per 
+   thread that is assigned to process LPUs of a dynamic space. These threads are decided by comparing
    mapping configuration file with the PCubeS description of the hardware.
 */
 
@@ -240,7 +240,7 @@ typedef struct {
 	float *l;
 } SpaceD_Content;
 
-/* There should be a single data structure instance to be maintained the PCU generation library to
+/* There should be a single data structure instance to be maintained the LPU generation library to
    different space contents. For static portion of the hierarchy, this instance should have one 
    reference per space. For any dynamic portion, there should be one reference per possible dynamic 
    root threads. In case of LU factorization Space C is a dynamic root that is mapped to the two NUMA 
@@ -285,13 +285,13 @@ void LU_initializeStaticReferences(LUTask_Environment *environment,
    case multiple entrances exist, as in LU factorization, entrance specific allocation and reference
    assignment code are separated by case conditions on the entranceId. 
    NOTE: allocations here do not need zero filling as data transfers from static spaces take place before 
-   any entrance to a dynamic code bock.
+   any entrance to a dynamic code block.
    NOTE: LU factorization does not involve any dynamic allocation.
 */
 void spaceC_InitializeDynamicReferences(int ppuId, 
 		int entranceId, 
 		LUTask_Environment *environment, 
-		LUArrayMetadata *arrayMetaData, List<int> *activePCUIds);
+		LUArrayMetadata *arrayMetaData, List<int> *activeLPUIds);
 
 /* As dynamic spaces are cleaned up at every exit, there should be corresponding teardown dynamic
    references methods for each dynamic space. This methods should just need the ppuId and spaceId to 
@@ -300,12 +300,12 @@ void spaceC_InitializeDynamicReferences(int ppuId,
 */
 void teardownDynamicReferences(int ppuId, char spaceId);
 
-/* One important efficiency concern is the identification of the dynamic PCUs that get activated in any
+/* One important efficiency concern is the identification of the dynamic LPUs that get activated in any
    point of task execution. Without the aid of any helper function, this will boil down to checking 
-   activating condition against each possible PCU. In spaces with a large number of PCUs such as Space C 
+   activating condition against each possible LPU. In spaces with a large number of LPUs such as Space C 
    in LU factorization this comparision may take considerable time to complete.
    To expedite this computation, each partition function should provide its own implementation of three
-   index comparison tests of PCUs against any given index. All these comparison tests will return a PCU
+   index comparison tests of LPUs against any given index. All these comparison tests will return a LPU
    range. The function for actual activation condition will be generated by joining the results of 
    individual subconditions (here an OR will do a union of two ranges and an AND will do intersection).
 
@@ -313,24 +313,24 @@ void teardownDynamicReferences(int ppuId, char spaceId);
    activation conditions in 'Select Pivot' and 'Update Lower' flow stages are direct application of one
    of these tests.
 
-   NOTE: these function definitions and the PcuIDRange data structure will be part of compiler libraries.  
+   NOTE: these function definitions and the LpuIDRange data structure will be part of compiler libraries.  
 */
 typedef struct {
 	int startId;
 	int endId;
-} PcuIdRange;
+} LpuIdRange;
 
-// For PCUs whose data ranges are above the compared index
-inline PcuIdRange *block_size_getUpperRange(int comparedIndex, int dimensionLength, int blockSize);
-// For PCUs whose data ranges are below the compared index 
-inline PcuIdRange *block_size_getLowerRange(int comparedIndex, int dimensionLength, int blockSize);
-// For PCUs whose data ranges include the given index (there should be at most one such PCU but we
+// For LPUs whose data ranges are above the compared index
+inline LpuIdRange *block_size_getUpperRange(int comparedIndex, int dimensionLength, int blockSize);
+// For LPUs whose data ranges are below the compared index 
+inline LpuIdRange *block_size_getLowerRange(int comparedIndex, int dimensionLength, int blockSize);
+// For LPUs whose data ranges include the given index (there should be at most one such LPU but we
 // maintain a function signature similarity with the others to make composition easier)
-inline PcuIdRange *block_size_getInclusiveRange(int comparedIndex, int dimensionLength, int blockSize);
+inline LpuIdRange *block_size_getInclusiveRange(int comparedIndex, int dimensionLength, int blockSize);
 
 /* Definition of the activation control function for Space C entrance in LU decomposition. Internally
    this function should invoke block_size_getInclusiveRange with appropriate parameters and generate a
-   list of PCU ids (there should be just one PCU in the list at a time).
+   list of LPU ids (there should be just one LPU in the list at a time).
    NOTE: in the function definition, we get to know that only column dimension and block size are needed
    along with the compared index by examining the 1D partitioning in Space A and the variable dimensions
    been compared in the activation conditions.
@@ -357,7 +357,7 @@ typedef struct {
 List<LPU_Group*> *groupLPUsUnderPPUs(char spaceId, List<int> *activeLPUList);
 
 /* A structure is needed to hold the PPU (parallel processing unit) Id of a thread for a space when it 
-   is executing PCUs from that space. For higher level spaces a PPU group Id is also needed to determine 
+   is executing LPUs from that space. For higher level spaces a PPU group Id is also needed to determine 
    if the thread will enter any composite computation stage (such as "Update Lower" in LU factorization) 
    or not.
    NOTE: if a thread is a PPU for a space it should have nonnegative ppuId; otherwise, its ppuId will 
@@ -386,18 +386,17 @@ typedef struct {
 
 /* Function definitions of the computation stages of LU factorization. The name of the functions are 
    translated into camel-case notations from their original names. Each function should take 1) a 
-   reference to the PCU it is going to execute, 2) PPU ids for the executing thread, 3) the structure
+   reference to the LPU it is going to execute, 2) PPU ids for the executing thread, 3) the structure
    referring to the task-global scalar variables, and 4) a reference to the thread-local global global
-   scalar variables. The return type is always void as all updates are done through the pcu variable.   
+   scalar variables. The return type is always void as all updates are done through the lpu variable.   
 */
-
-void prepare(SpaceB_PCU *pcu, LU_threadIds *threadIds, 
+void prepare(SpaceB_LPU *lpu, LU_threadIds *threadIds, 
 		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
-void selectPivot(SpaceC_PCU *pcu, LU_threadIds *threadIds, 
+void selectPivot(SpaceC_LPU *lpu, LU_threadIds *threadIds, 
 		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
-void storePivot(SpaceA_PCU *pcu, LU_threadIds *threadIds, 
+void storePivot(SpaceA_LPU *lpu, LU_threadIds *threadIds, 
 		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
-void interchangeRows(SpaceB_PCU *pcu, LU_threadIds *threadIds, 
+void interchangeRows(SpaceB_LPU *lpu, LU_threadIds *threadIds, 
 		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
 
 /* NOTE: there is no function defition for composite stage "Update Lower"; rather there are definitions
@@ -406,25 +405,25 @@ void interchangeRows(SpaceB_PCU *pcu, LU_threadIds *threadIds,
    broken down and the run method of each thread will emulate the logic of those stages by calling their
    internal stages in appropriate places.  
 */
-void calculatePivotColumn(SpaceD_PCU *pcu, LU_threadIds *threadIds, 
+void calculatePivotColumn(SpaceD_LPU *lpu, LU_threadIds *threadIds, 
 		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
-void updateSharedStructure(SpaceC_PCU *pcu, LU_threadIds *threadIds, 
-		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
-
-void updateUpper(SpaceB_PCU *pcu, LU_threadIds *threadIds, 
+void updateSharedStructure(SpaceC_LPU *lpu, LU_threadIds *threadIds, 
 		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
 
-/* TODO Interface definition to the PCU management library for retrieving the next PCU a thread going to
+void updateUpper(SpaceB_LPU *lpu, LU_threadIds *threadIds, 
+		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals);
+
+/* TODO Interface definition to the LPU management library for retrieving the next LPU a thread going to
    execute for any space code it is responsible for. There is a lot to be thought about regarding the
    implementation of this library. Hopefully a large part of it can be made generic. For now, I do not
    have any concrete plan for this. At any rate, the following interface definition should be adequate
 
-   The function returns a void PCU pointer that is casted to appropriate PCU type based on the context.
-   To be able to determine which PCU to return it needs to know 1) the ID of the space currently under
-   concern, 2) PPU group Id of the invoking thread for current space, and 3) the id of the previous PCU
+   The function returns a void LPU pointer that is casted to appropriate LPU type based on the context.
+   To be able to determine which LPU to return it needs to know 1) the ID of the space currently under
+   concern, 2) PPU group Id of the invoking thread for current space, and 3) the id of the previous LPU
    the thread just executed in this space.  	
 */
-void *getNextPCU(char spaceId, int groupId, int previousPCU_id);
+void *getNextLPUchar spaceId, int groupId, int previousLPU_id);
 
 /* For each communication between a pair of spaces that do not have any order relationship between them,
    we need to determine if a pair of LPUs taken from opposite spaces have overlapping data regions. The
@@ -443,7 +442,6 @@ void *getNextPCU(char spaceId, int groupId, int previousPCU_id);
 
    For LU factorization, only one such method is required to check transitions between Space C and B   	 	 	  	
 */
-
 bool *doLPUsOverlap(SpaceB_LPU *lpu1, SpaceC_LPU *lpu2, char *variableName);
 
 /* Above methods are utilized to determine if two PPUs have overlapping in any pair of LPUs multiplexed
@@ -454,7 +452,6 @@ bool *doLPUsOverlap(SpaceB_LPU *lpu1, SpaceC_LPU *lpu2, char *variableName);
    In case of LU factorization, Space C is dynamic. Therefore we have the following signature for the 
    sole method that does intersection checking.      
 */
-
 bool *doPPUsOverlap(int SpaceB_id, int SpaceC_id, List<int> *SpaceC_LPUs, char *variableName);
 
 /* Definition of the run method for a thread. It takes 1) the structure instace containing thread's PPU
@@ -486,7 +483,7 @@ void run(LU_threadIds *threadIds,
 
 	//********************************* Repeat Cycle ********************************************/
 
-	// Space A is unpartitioned so there is no need for going through the library for next PCU in
+	// Space A is unpartitioned so there is no need for going through the library for next LPU in
         // this case: we know all threads should enter this repeat cycle.
 
         // Translation of the repeat loop into a for loop can be done by checking the repeat condition.
