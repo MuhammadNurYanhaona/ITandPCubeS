@@ -288,11 +288,17 @@ void LU_initializeStaticReferences(LUTask_Environment *environment,
    any entrance to a dynamic code bock.
    NOTE: LU factorization does not involve any dynamic allocation.
 */
-
 void spaceC_InitializeDynamicReferences(int ppuId, 
 		int entranceId, 
 		LUTask_Environment *environment, 
 		LUArrayMetadata *arrayMetaData, List<int> *activePCUIds);
+
+/* As dynamic spaces are cleaned up at every exit, there should be corresponding teardown dynamic
+   references methods for each dynamic space. This methods should just need the ppuId and spaceId to 
+   cleanup all references and, therefore, can have a generic interface. Probably the implementation can
+   also be generalized here. 	 
+*/
+void teardownDynamicReferences(int ppuId, char spaceId);
 
 /* One important efficiency concern is the identification of the dynamic PCUs that get activated in any
    point of task execution. Without the aid of any helper function, this will boil down to checking 
@@ -309,7 +315,6 @@ void spaceC_InitializeDynamicReferences(int ppuId,
 
    NOTE: these function definitions and the PcuIDRange data structure will be part of compiler libraries.  
 */
-
 typedef struct {
 	int startId;
 	int endId;
@@ -329,12 +334,27 @@ inline PcuIdRange *block_size_getInclusiveRange(int comparedIndex, int dimension
    NOTE: in the function definition, we get to know that only column dimension and block size are needed
    along with the compared index by examining the 1D partitioning in Space A and the variable dimensions
    been compared in the activation conditions.
-   NOTE: the last parameter is needed to filter in only those PCUs the current thread/thread-group is
-   responsible for processing.  
 */
+List<int> getActiveLpuIdsForSelectPivot(int k, int uDimension2Length, int blockSize);
+List<int> getActiveLpuIdsForUpdateLower(int k, int lDimension2Length, int blockSize);
 
-List<int> getActivePcuIdsForSelectPivot(int k, int uDimension2Length, int blockSize, int ppuGroupId);
-List<int> getActivePcuIdsForUpdateLower(int k, int lDimension2Length, int blockSize, int ppuGroupId);
+/* A structure is needed to group active LPUs of a dynamic space against corresponding PPUs. This is a 
+   generic structure that would be a part of the compiler data structures library.
+*/
+typedef struct {
+	int ppuGroupId;
+	int *lpuIds;
+} LPU_Group;
+
+/* Definition of the method that takes a list of LPU IDs for a dynamic space and returns a new list of 
+   LPU_Group. Alongside the LPU IDs it takes the name of the space as an input argument to be able to
+   refer to the appropriate partitioning functions for grouping purpose.
+   The grouping scheme is simple. The function refers to the partition function of the space for any
+   data structure to get the total number of LPUs. The number of PPUs for the underlying space is known
+   from the mapping configuration. Since each PPU handles a section of consecutive LPUs from the entire
+   range of LPUs, determining what belongs to whom is easy.    
+*/
+List<LPU_Group*> *groupLPUsUnderPPUs(char spaceId, List<int> *activeLPUList);
 
 /* A structure is needed to hold the PPU (parallel processing unit) Id of a thread for a space when it 
    is executing PCUs from that space. For higher level spaces a PPU group Id is also needed to determine 
@@ -344,7 +364,6 @@ List<int> getActivePcuIdsForUpdateLower(int k, int lDimension2Length, int blockS
    be -1 but ppuGroupId will be the Id of the PPU controlling the group. For PPUs of lower-most spaces in 
    the hierarchy both ids will be equal. This structure will be a part of the compiler library.   
 */
-
 typedef struct {
 	int ppuId;
 	int ppuGroupId;
@@ -354,7 +373,6 @@ typedef struct {
    adopt a thread-per-core execution methods, these Ids are fixed and can be generated in the main function
    before task execution begns.
 */
-
 typedef struct {
 	PPU_Ids spaceA_ids;
 	PPU_Ids spaceB_ids;
@@ -408,6 +426,37 @@ void updateUpper(SpaceB_PCU *pcu, LU_threadIds *threadIds,
 */
 void *getNextPCU(char spaceId, int groupId, int previousPCU_id);
 
+/* For each communication between a pair of spaces that do not have any order relationship between them,
+   we need to determine if a pair of LPUs taken from opposite spaces have overlapping data regions. The
+   compiler will spew one such checking method for each un-ordered space pair for each data exchange for
+   which there is a dependency arc in the intermediate code. These method have the common signature of
+   two LPU definitions from two spaces and the variable name as inputs and returning a boolean output
+   as the verdict on overlapping.
+
+   To generate these methods, the compiler checks the two partition configurations for the variable in 
+   two concerned spaces then call the intersect method (that are known for all pair of built-in partition 
+   functions) for each dimension of the variable. Then it ANDs the outcomes of those method.
+
+   For user defined partition functions, if intersect method is not provided, an interval matching will
+   be done for the index ranges of the LPUs. This would be a linear time operation on the number of 
+   intervals of the LPUs.
+
+   For LU factorization, only one such method is required to check transitions between Space C and B   	 	 	  	
+*/
+
+bool *doLPUsOverlap(SpaceB_LPU *lpu1, SpaceC_LPU *lpu2, char *variableName);
+
+/* Above methods are utilized to determine if two PPUs have overlapping in any pair of LPUs multiplexed
+   to them. So methods similar to the above should be generated for each PPU pair. These methods should 
+   invoke appropriate methods for LPUs intersection given above. If any space in the pair is dynamic then
+   we need the ID list of active LPUs for that space along with the ID of the PPU as an input argument.
+   
+   In case of LU factorization, Space C is dynamic. Therefore we have the following signature for the 
+   sole method that does intersection checking.      
+*/
+
+bool *doPPUsOverlap(int SpaceB_id, int SpaceC_id, List<int> *SpaceC_LPUs, char *variableName);
+
 /* Definition of the run method for a thread. It takes 1) the structure instace containing thread's PPU
    IDs for different spaces, 2) references of task global scalars, 3) references of its thread global 
    scalars, and 4) array metadata as input arguments. Array references will be safeguarded by library 
@@ -421,19 +470,21 @@ void run(LU_threadIds *threadIds,
 		LUTaskGlobalVars *taskGlobals, LUThreadGlobalVars *threadGlobals, 
 		LUArrayMetadata *arrayMetadata) {
 	
+	//************************************** Prepare *******************************************/
+
 	// check and execute the "Prepare" stage
 	if (threadIds->spaceB_ids.ppuId != INVALID_ID) {
-		SpaceB_PCU *spaceB_PCU = NULL;
-		int spaceB_pcuId = INVALID_ID;
+		SpaceB_LPU *spaceB_LPU = NULL;
+		int spaceB_lpuId = INVALID_ID;
 		// NOTE: because of the strided partitioning, this while loop should iterate only once 
-		while ((spaceB_PCU = getNextPCU('B', 
-				threadIds->spaceB_ids.groupId, spaceB_pcuId)) != NULL) {
-			prepare(spaceB_PCU, threadIds, taskGlobals, threadGlobals);
-			spaceB_pcuId = spaceB_PCU->pcuId;
+		while ((spaceB_LPU = getNextLPU('B', 
+				threadIds->spaceB_ids.groupId, spaceB_lpuId)) != NULL) {
+			prepare(spaceB_LPU, threadIds, taskGlobals, threadGlobals);
+			spaceB_lpuId = spaceB_LPU->lpuId;
 		} 
 	}
 
-	// TODO there should be a barrier or other from of wait here that we need to decide
+	//********************************* Repeat Cycle ********************************************/
 
 	// Space A is unpartitioned so there is no need for going through the library for next PCU in
         // this case: we know all threads should enter this repeat cycle.
@@ -441,49 +492,319 @@ void run(LU_threadIds *threadIds,
         // Translation of the repeat loop into a for loop can be done by checking the repeat condition.
 	// The in condition's range should be translated into the loop start and end points. If there
         // is a step expression that will act as the loop increment -- default loop increment is the
-        // constant 1. Any additional restriction, if exists, in the range will augment with the iteration 
-	// checking through an AND. 
+        // constant 1. Any additional restriction, if exists, in the range will augment with the 
+	// iteration checking through an AND. 
 	int loopStart = arrayMetadata->aDims[1].range.min;
 	int loopEnd = arrayMetadata->aDims[1].range.max;
  	for (threadGlobals->k = loopStart; threadGlobals->k <= loopEnd; threadGlobals->k += 1) {
 		
-		// the first stage in the loop 'Select Pivot' executes in a dynamic region of the space
-		// hierarchy. Therefore, first a call is needed to get the list of PCUs that will be 
-		// activated for the current thread.
-		List<int> pcuIds = getActivePcuIdsForSelectPivot(threadGlobals->k, 
-				arrayMetadata->uDims[2].length, 1, threadIds->spaceC_ids->groupId);
-		if (pcuIds->NumElements() != 0) {
-			if (threadIds->spaceC_ids.ppuId != INVALID_ID) {
-				
-				// TODO IMPLEMENTATION OF DATA LOADER SYNC HERE IS A HUGE CONCERN. HOW DO
-				// WE KNOW WHO IS(ARE) THE UPDATER(S) OF REGIONS IN OTHER SPACE THAT THIS
-				// THREAD NEEDS FOR ITS WORK? SO FAR THIS IS THE FIRST SOURCE OF UN-INTENDED 
-				// SYNCHRONIZATION. WHAT TO DO??? 
 
-				spaceC_InitializeDynamicReferences(threadIds->spaceC_ids.ppuId, 
-						1, environment, arrayMetaData, pcuIds);
-				// TODO signal to rest of its group that configuration update is done
-			} else {
-				// TODO threads within this NUMA node should wait for configuration update
-				// in the library	
-			}
-			// check and execute "Select Pivot" stage
-			// NOTE: this time we check if the groupId is invalid. This is because we know 
-			// from static analysis that there is a reduction in select pivot and all threads
-			// within a Space C group should participate in it.
-			if (threadIds->spaceC_ids.groupId != INVALID_ID) {
-				SpaceC_PCU *spaceC_PCU = NULL;
-				int spaceC_pcuId = INVALID_ID;
-				while ((spaceC_PCU = getNextPCU('C', 
-						threadIds->spaceC_ids.groupId, spaceC_pcuId)) != NULL) {
-					selectPivot(spaceC_PCU, threadIds, taskGlobals, threadGlobals);
+		//************************* Dynamic Computation Block ********************************/	
+
+		// The first stage in the loop is a conditional 'Dynamic Computation' block. Therefore,
+		// we need to execute the activation condition in each PPU to determine the list of LPUs
+		// that will be active for current iteration. Here all PPUs execute the same function
+		// for the same parameters.
+		List<int> lpuIds = getActiveLpuIdsForSelectPivot(threadGlobals->k, 
+				arrayMetadata->uDims[2].length, 1);
+		// The LPU Ids received in the previous step needs to be grouped under PPUs to decide 
+		// there respective roles regarding handling dynamic computation in current iteration.
+		List<LPU_Group*> lpuGroups = groupLPUsUnderPPUs('C', lpuIds);
+
+		// From LPU IDs vs PPU group Id map a thread will retrieve its own LPU list. 
+		List<int> myLpuIds = LPU_Groups->Nth(threadIds->spaceC_ids.groupId);
+		
+		// since this is a conditionally executed dynamic block, dynamic references need to 
+		// updated for all threads of the  NUMA node that has its myLpuIds list non-empty.
+		// NOTE: in general case this initialization should be done by only one thred, the
+		// first thread in the NUMA node, and every other thread in the node should wait on
+		// some barrier for the former to finish initialization.
+		// However, given that this dynamic block is executed only once in per iteration and
+		// there is no dynamic allocation, all threads of the NUMA node can do the same
+		// initialization separately that will only store the active LPU lists in the runtime
+		// library. Compiler can decide to do this optimization by traversing the computation 
+		// flow nested within the repeat loop. 
+		if (myLpuIds != NULL) {
+			spaceC_InitializeDynamicReferences(threadIds->SpaceC_ids.ppuId, 
+					1, environment, arrayMetaData, myLpuIds);		
+		}	
+
+		// The first stage within the dynamic computation block is 'Data Loader Sync.' It has
+		// a unordered space transition dependency (B -> C) on variable u from 'Prepare' or
+		// 'Update Upper' stage. So there is a need for detecting Space B to Space C 
+		// intersections among different PPUs. 
+
+		// each PPU will determine if it has intersection with other PPUs for u. If there is 
+		// any intersection with any other PPU, it will up a binary semaphore indicating that
+		// it has finished its previous step
+		bool intersactionFound = false;
+		for (int i = 0; i < lpuGroups->NumElements(); i++) {
+			LPU_Group *currentGroup = lpuGroups->Nth(i);
+			if (currentGroup->lpuIds == NULL) continue;
+			intersectionFound = doPPUsOverlap(threadIds->spaceB_ids.ppuId, 
+				currentGroup->ppuGroupId, currentGroup->lpuIds, "u");
+			if (intersectionFound) break;
+		}
+		if (intersactionFound) {
+			// TODO up a binary semaphore to indicate the waiting PPU can proceed 
+		}
+		
+		// A thread decides if it is a part of the Space C group that will execute the 'Data
+		// Loader Sync' and 'Select Pivot' stages for current iteration. 
+		if (myLpuIds != NULL) {
+			
+			//************************* Data Loader Sync *********************************/
+			
+			// Only the PPU with valid Space C PPU Id (the first thread in the active NUMA 
+			// node) should execute 'Data Loader Sync' stage. Therefore it should be the
+			// one that should wait for data synchronization
+			if (threadIds->spaceC_ids.ppuId != INVALID_ID) {
+				// find intersections with other PPUs.
+				List<int> *intersectingPPUs = new List<int>;
+				bool intersactionFound = false;
+				for (int i = 0; i < SPACE_B_THREADS_PER_SPACE_A; i++) {
+					intersectionFound = doPPUsOverlap(i, 
+							threadIds->spaceC_ids.ppuId, myLpuIds, "u");
+					if (intersectionFound) {
+						intersectingPPUs->Append(i);
+					}
 				}
+				// TODO implement a wait for semantics for the currently active thread
+			}	
+			
+			//*************************** Select Pivot ***********************************/	
+			
+			// there is a dependeny from 'Data Loader Sync' (executed by a single thread in 
+			// the NUMA node) to 'Select Pivot' (executed by all threads in the NUMA node).
+			// So there should be a barrier synchronization or counting semaphore based
+			// signaling should take place before actual method call.
+			
+			// TODO intra-NUMA node barrier synchronization
+			
+			// then invoke 'Select Pivot' function for active LPUs (there should be one per 
+			// iteration) 
+			SpaceC_LPU *spaceC_LPU = NULL;
+			while ((spaceC_LPU = getNextLPU('C', 
+					threadIds->SpaceC_ids.groupId, spaceC_lpuId)) != NULL) {
+				selectPivot(spaceC_LPU, threadIds, taskGlobals, threadGlobals);
 			}
-			// TODO The controller thread of the NUMA node should signal for "Data Restorer 
-			// Sync" stage that follows that pivot has been updated.
+
+			// There is an outgoing dependency from 'Select Pivot' to 'Data Restorer Sync'
+			// of Space A. So the controller thread of the NUMA node should signal on a 
+			// semaphore that pivot selection is done		
+			if (threadIds->SpaceC_ids.ppuId != INVALID_ID) {
+				// TODO  signal on a semaphore 		
+			}
 		}
 
-		// The next stage is a data restorer sync running in Space A. 
+		// The movement from 'Dynamic Computation' to 'Data Restorer Sync' indicates an exit
+		// from a dynamic space for all PPUs participating in the dynamic computation. So all
+		// threads should call a teardown reference method to get rid of any references and 
+		// free allocated memories (no allocation is done in this case).
+		teardownDynamicReferences(threadIds->SpaceC_ids.ppuId, 'C');
+		
+		//****************************** Data Restorer Sync **********************************/	
+		
+		if (threadIds->SpaceA_ids.ppuId != INVALID_ID) {
+			// TODO wait on the semaphore to be signaled by the thread selecting the pivot.
+			// QUESTION: how does this thread know that there is only one NUMA node that 
+			// updated the pivot. Or should we make both NUMA nodes to signal on a counting
+			// semaphore?	
+		}
+
+		//********************************* Store Pivot **************************************/
+	
+		// There is a dependency from 'Data Restorer Sync' to 'Store Pivot'. The compiler skips
+		// that because Space A is unpartitioned and the same thread will execute both stages.	 
+		if (threadIds->SpaceA_ids.ppuId != INVALID_ID) {
+			SpaceA_LPU *spaceA_LPU = getNextLPU('A', threadIds->SpaceA_Ids.groupId, NULL);
+			storePivot(spaceA_LPU, threadIds, taskGlobals, threadGlobals);
+		}
+
+		//******************************* Interchange Rows ***********************************/
+		
+		// There is a dependency from 'Data Restorer Sync' to 'Interchange Rows' on scaler pivot
+		// variable. Since all threads execute Space B code this can be implemented as a counting
+		// semaphore signalled by the sole Space A thread and everyone else waiting on it.
+
+		if (threadIds->SpaceA_ids.ppuId != INVALID_ID) {
+			// TODO set the counter of the semaphore to (total number of threads - 1)	
+		} else {
+			// TODO wait on the semaphore.
+		}
+
+		// check and execute the "Interchange Rows" stage
+		if (threadIds->spaceB_ids.ppuId != INVALID_ID) {
+			SpaceB_LPU *spaceB_LPU = NULL;
+			int spaceB_lpuId = INVALID_ID;
+			// NOTE: because of the strided partitioning, this while loop should iterate only 
+			// once 
+			while ((spaceB_LPU = getNextLPU('B', 
+					threadIds->spaceB_ids.groupId, spaceB_lpuId)) != NULL) {
+				interchangeRows(spaceB_LPU, threadIds, taskGlobals, threadGlobals);
+				spaceB_lpuId = spaceB_LPU->lpuId;
+			} 
+		}
+		
+		//************************* Dynamic Computation Block ********************************/	
+		
+		// Just like the 'Select Pivot' compute stage, 'Update Lower' is also nested inside a
+		// dynamic conditional compute block. So again we have to determine the LPU IDs that will
+		// active for current iteration (again there would be just one). Then group the LPUs 
+		// under PPUs.
+		lpuIds = getActiveLpuIdsForUpdateLower(threadGlobals->k, 
+				arrayMetadata->uDims[2].length, 1);
+		lpuGroups = groupLPUsUnderPPUs('C', lpuIds);
+		myLpuIds = LPU_Groups->Nth(threadIds->spaceC_ids.groupId);
+		if (myLpuIds != NULL) {
+			spaceC_InitializeDynamicReferences(threadIds->SpaceC_ids.ppuId, 
+					2, environment, arrayMetaData, myLpuIds);		
+		}
+
+		// Again, like in the 'Select Pivot' compute stage, the first stage in 'Update Lower' 
+		// is a loader sync that has input dependencies on both 'u' and 'l' (previous time there
+		// was just one dependency) to previous compute stage executed in Space B. So updaters
+		// of the portion of 'u' and 'l' that would be used next need to signal on semaphore 
+		// that they have finished their computation and activated LPUs for Space C (again there
+		// should be just one in this case) can proceed.
+		// For this to be done, similar code for intersection checking need to be put in place 	
+		intersactionFound = false;
+		for (int i = 0; i < lpuGroups->NumElements(); i++) {
+			LPU_Group *currentGroup = lpuGroups->Nth(i);
+			if (currentGroup->lpuIds == NULL) continue;
+			intersectionFound = doPPUsOverlap(threadIds->spaceB_ids.ppuId, 
+				currentGroup->ppuGroupId, currentGroup->lpuIds, "u");
+			if (intersectionFound) break;
+			intersectionFound = doPPUsOverlap(threadIds->spaceB_ids.ppuId, 
+				currentGroup->ppuGroupId, currentGroup->lpuIds, "l");
+			if (intersectionFound) break;
+		}
+		if (intersactionFound) {
+			// TODO up a binary semaphore to indicate the waiting PPU can proceed 
+		}
+		
+		// A thread decides if it is a part of the Space C group that will execute the 'Data
+		// Loader Sync' and 'Update Lower' stages for current iteration. 
+		if (myLpuIds != NULL) {
+			
+			//************************* Data Loader Sync *********************************/
+			
+			// Again, only the PPU with valid Space C PPU Id (the first thread in the active 
+			// NUMA node) should execute 'Data Loader Sync' stage. Therefore it should be 
+			// the one that should wait for data synchronization
+			if (threadIds->spaceC_ids.ppuId != INVALID_ID) {
+				// find intersections with other PPUs.
+				List<int> *intersectingPPUs = new List<int>;
+				bool intersactionFound = false;
+				for (int i = 0; i < SPACE_B_THREADS_PER_SPACE_A; i++) {
+					intersectionFound = doPPUsOverlap(i, 
+							threadIds->spaceC_ids.ppuId, myLpuIds, "u");
+					if (intersectionFound) {
+						intersectingPPUs->Append(i);
+					}
+				}
+				// TODO implement a wait for semantics for the currently active thread
+			}	
+			
+			//****************************** Update Lower *********************************/
+
+			// 'Update Lower' is a composite stage containing both Space C and D compute
+			// stages. Hence, all threads in the active NUMA group should enter this block
+			// and no additional condition checking is needed here.
+
+			//************************ Calculate Pivot Column *****************************/
+			
+			// 'Calculate Pivot Column' has input dependency from 'Data Loader Sync'. Since 
+			// all threads in the NUMA node participate in the former and only one in the 
+			// later, an intra NUMA node couting semaphore signaling should be enough.
+			
+			// TODO intra-NUMA node simaphore signaling or barrier synchronization
+
+			// check and execute the "Calculate Pivot Column" stage
+			if (threadIds->spaceD_ids.ppuId != INVALID_ID) {
+				SpaceD_LPU *spaceD_LPU = NULL;
+				int spaceD_lpuId = INVALID_ID;
+				while ((spaceD_LPU = getNextLPU('D', 
+					threadIds->spaceD_ids.ppuId, spaceD_lpuId)) != NULL) {
+				calculatePivotColumn(spaceD_LPU, threadIds, taskGlobals, threadGlobals);
+				spaceD_lpuId = spaceD_LPU->lpuId;
+			}
+
+			//************************** Data Restorer Sync ******************************/
+
+			// Only the controller thread of the NUMA node executes 'Data Restorer Sync' for
+			// the update dependency on 'l' produced by 'Calcuate Pivot Column' executed by
+			// every thread in the NUMA node. So a simple synchronization is to make the first
+			// thread wait on a counting semaphore that will be signalled everyone else.
+
+			if (threadIds->spaceC_ids.ppuId == INVALID_ID) {
+				// TODO signal the counting semaphore
+			} else {
+				// TODO wait on the counting semaphore
+			}	
+			
+			//************************ Update Shared Structure ****************************/
+
+			// There is a update dependency from 'Data Restorer Sync' to 'Update Shared Str-
+			// ucture' for 'l', but in the absense of replication transitions between stages
+			// of same LPS need no synchronization. Therefore, this synchronization is skipped.
+
+			if (threadIds->spaceC_ids.ppuId != INVALID_ID) {
+				// then invoke 'Select Pivot' function for active LPUs (there should be 
+				// one per iteration) 
+				SpaceC_LPU *spaceC_LPU = NULL;
+				while ((spaceC_LPU = getNextLPU('C', 
+						threadIds->SpaceC_ids.groupId, spaceC_lpuId)) != NULL) {
+					updateSharedStructure(spaceC_LPU, threadIds, 
+							taskGlobals, threadGlobals);
+				}
+				// There is an outgoing dependency from 'Update Shared Structure' to 'Data 
+				// Restorer Sync' of Space A. So the controller thread of the NUMA node 
+				// should signal on a semaphore that update is done
+
+				// TODO  signal on a semaphore 		
+			}
+		}
+
+		// The movement from 'Dynamic Computation' to 'Data Restorer Sync' indicates an exit
+		// from a dynamic space for all PPUs participating in the dynamic computation. So all
+		// threads should call a teardown reference method to get rid of any references and 
+		// free allocated memories (no allocation is done in this case).
+		teardownDynamicReferences(threadIds->SpaceC_ids.ppuId, 'C');
+		
+		//****************************** Data Restorer Sync **********************************/	
+		
+		if (threadIds->SpaceA_ids.ppuId != INVALID_ID) {
+			// TODO wait on the semaphore to be signaled by the thread updated the shared
+			// l_column data structure.
+		}
+		
+		//********************************* Update Upper *************************************/
+		
+		// There is a dependency from 'Data Restorer Sync' to 'Update Upper' on shared l_column
+		// variable. Since all threads execute Space B code this can be implemented as a counting
+		// semaphore signalled by the sole Space A thread and everyone else waiting on it.
+
+		if (threadIds->SpaceA_ids.ppuId != INVALID_ID) {
+			// TODO set the counter of the semaphore to (total number of threads - 1)	
+		} else {
+			// TODO wait on the semaphore.
+		}
+
+		// check and execute the "Update Upper" stage
+		if (threadIds->spaceB_ids.ppuId != INVALID_ID) {
+			SpaceB_LPU *spaceB_LPU = NULL;
+			int spaceB_lpuId = INVALID_ID;
+			// NOTE: because of the strided partitioning, this while loop should iterate only 
+			// once 
+			while ((spaceB_LPU = getNextLPU('B', 
+					threadIds->spaceB_ids.groupId, spaceB_lpuId)) != NULL) {
+				updateUpper(spaceB_LPU, threadIds, taskGlobals, threadGlobals);
+				spaceB_lpuId = spaceB_LPU->lpuId;
+			} 
+		}
+
+	//******************************* End of the Repeat Cycle *************************************/
 	}
 }
 
