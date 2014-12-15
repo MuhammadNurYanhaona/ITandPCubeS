@@ -1,0 +1,23 @@
+Task "Space Movement Test":
+	Define:
+	Environment:
+	Initialize:
+	Compute:
+		"Stage 1" (Space ) {}
+		"Stage 2" (Space ) {}
+		"Stage 3" (Space ) {}
+		Repeat: from "Stage 2" for 
+		"Stage 4" (Space ) {}
+		"Stage 5" (Space ) {
+			"Stage 6" (Space ) {}
+			"Stage 7" (Space ) {}
+			Repeat: from "Stage 7" for
+			"Stage 8" (Space ) {}
+		}
+		"Stage 9" (Space ) {}
+		Repeat: from "Stage 4" for
+		"Stage 10" (Space ) {
+			"Stage 11" (Space ) {}
+			"Stage 12" (Space ) {}
+		}  
+	Partition:

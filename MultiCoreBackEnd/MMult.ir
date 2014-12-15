@@ -1,0 +1,19 @@
+------------------------------------------------------------------
+Task: "Matrix Multiply"
+------------------------------------------------------------------
+Initialization Section:
+	a: metadata--R-
+	b: metadata--R-
+	c: metadata--W-
+Flow Stage: "Computation Flow Specification" (Space: rootSpace)
+	Flow Stage: "Repeat Cycle" (Space: A)
+		Flow Stage: "Data Loader Sync" (Space: A_subspace)
+			a: content--R--W- metadata--W-
+			b: content--R--W- metadata--W-
+			Data dependency arcs:
+				move a to "Block multiply matrices" comm-root A_subspace
+				move b to "Block multiply matrices" comm-root A_subspace
+		Flow Stage: "Block multiply matrices" (Space: B)
+			a: content--R- metadata--R-
+			b: content--R-
+			c: content--R--W- metadata--R-

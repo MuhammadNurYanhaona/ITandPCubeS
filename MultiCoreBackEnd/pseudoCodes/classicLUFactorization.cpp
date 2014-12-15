@@ -1,41 +1,3 @@
-/* A platform specific macro represents the number of threads (equivalent to the number of
-   cores) in each multicore platform.
-*/
-#define THREAD_COUNT 16
-
-/* Comparing mapping configuration file with the PCubeS description of the multicore CPU, we
-   should get a set of thread counts for different spaces. This is possible because the policy
-   is to have one thread per core regardless of the number LPUs in individual spaces.
-*/
-// assuming Space A is mapped to the CPU
-#define SPACE_A_THREADS 1
-// assuming Space B is mapped to individual cores 
-#define SPACE_B_THREADS_PER_SPACE_A 16
-// assuming Space C is mapped to a NUMA node
-#define SPACE_C_THREADS_PER_SPACE_A 2
-// assuming Space D is again mapped to individual cores
-#define SPACE_D_THREADS_PER_SPACE_C 8
-
-/* There should be some default data structures for holding properties of each array dimension,
-   epoch variables, etc.These should become parts of the compiler library in the future as we 
-   determine the set of all such data structures. 
-*/
-
-typedef struct {
-	int min;
-	int max;
-} Range;
-
-typedef struct {
-	int length;
-	Range range;
-} Dimension;
-
-typedef struct {
-	int beginAt;
-	int currentValue;
-} Epoch;
-
 /* We should have a data structure holding the metadata of all array variables. This is easy to 
    do as we have the dimension information of all arrays from the scope and type checking phase. 
    Generating this structure thus should be as simple as examining the define-scope of a task and 
@@ -94,18 +56,6 @@ typedef struct {
 	Epoch t;
 } LUThreadGlobalVars;
 
-/* A data structure is needed to demarcate the region of a dimension of an array that falls inside
-   a single LPU. The Dimension data structure created above is not adequate in this regard as 
-   sometimes we may have a single memory block allocated for a sequence of LPUs where each working 
-   on a different region of the allocated structure.
-   This data structure should be a part of the compiler data structures library too.  
-*/
-
-typedef struct {
-	Dimension storageDim;
-	Dimension partitionDim;
-} PartitionDimension;
-
 /* For each logical space specified in the task, we should have a data structure that holds 
    reference of all arrays that exist -- partitioned or unpartitioned -- in that space. These
    structures can be generated easily by examining the partition hierarchy that we got during
@@ -153,27 +103,6 @@ typedef struct {
 	PartitionDimension[1] lPartDims;
 } SpaceD_LPU;
 
-/* A set of inline index-transformation functions are needed for strided partitioning. These will
-   become part of the partition function definition in the library. In the future, if we allow 
-   programmer defined partition functions then similar transformation functions will be needed. 
-   Before we enable such a feature, we have to finalize the set of function headers that will suffice
-   accurate interpretation of indexes inside the compute block.
-   NOTE: all partition functions may not need to implement all transformation functions. For 
-   example, neither block_size nor block_count involves any transformation.      
-*/
-
-inline int stride_transformIndex(int originalIndex, int strideId) {
-	return originalIndex * strideId;
-}
-
-inline int stride_revertIndex(int stridedIndex, int strideId) {
-	return stridedIndex / strideId;
-}
-
-inline bool stride_isIndexIncluded(int originalIndex, int strideId) {
-	return (originalIndex % strideId == 0);
-}
-
 /* Definition for the function that loads all linked environment variables from external file. The
    main function should pass all command line arguments to this function at the very beginning.
    Each file should have dimentionality information for a specific array followed by the actual
@@ -208,8 +137,9 @@ void LU_initializeTask(LUEnvironmentLinks *links,
    the intermediate represention (this should not be difficult). Then we have to mark the entries
    in spaces in the partitition hierarchy that will need allocation. These markings will help to 
    determine data duplication needs during generating code for data communication. Furthermore,
-   whether or not a new space reallocates the same data or references to allocation done for another
-   space determines if index reordering is needed when translating codes for computation stages.	       
+   whether or not a new space reallocates the same data or references to allocation done for 
+   another space determines if index reordering is needed when translating codes for computation 
+   stages.	       
 */
 
 struct SpaceA_Content {
@@ -300,34 +230,6 @@ void spaceC_InitializeDynamicReferences(int ppuId,
 */
 void teardownDynamicReferences(int ppuId, char spaceId);
 
-/* One important efficiency concern is the identification of the dynamic LPUs that get activated in any
-   point of task execution. Without the aid of any helper function, this will boil down to checking 
-   activating condition against each possible LPU. In spaces with a large number of LPUs such as Space C 
-   in LU factorization this comparision may take considerable time to complete.
-   To expedite this computation, each partition function should provide its own implementation of three
-   index comparison tests of LPUs against any given index. All these comparison tests will return a LPU
-   range. The function for actual activation condition will be generated by joining the results of 
-   individual subconditions (here an OR will do a union of two ranges and an AND will do intersection).
-
-   In LU factorization, we need function definition of these tests for block_size function only and the
-   activation conditions in 'Select Pivot' and 'Update Lower' flow stages are direct application of one
-   of these tests.
-
-   NOTE: these function definitions and the LpuIDRange data structure will be part of compiler libraries.  
-*/
-typedef struct {
-	int startId;
-	int endId;
-} LpuIdRange;
-
-// For LPUs whose data ranges are above the compared index
-inline LpuIdRange *block_size_getUpperRange(int comparedIndex, int dimensionLength, int blockSize);
-// For LPUs whose data ranges are below the compared index 
-inline LpuIdRange *block_size_getLowerRange(int comparedIndex, int dimensionLength, int blockSize);
-// For LPUs whose data ranges include the given index (there should be at most one such LPU but we
-// maintain a function signature similarity with the others to make composition easier)
-inline LpuIdRange *block_size_getInclusiveRange(int comparedIndex, int dimensionLength, int blockSize);
-
 /* Definition of the activation control function for Space C entrance in LU decomposition. Internally
    this function should invoke block_size_getInclusiveRange with appropriate parameters and generate a
    list of LPU ids (there should be just one LPU in the list at a time).
@@ -338,14 +240,6 @@ inline LpuIdRange *block_size_getInclusiveRange(int comparedIndex, int dimension
 List<int> getActiveLpuIdsForSelectPivot(int k, int uDimension2Length, int blockSize);
 List<int> getActiveLpuIdsForUpdateLower(int k, int lDimension2Length, int blockSize);
 
-/* A structure is needed to group active LPUs of a dynamic space against corresponding PPUs. This is a 
-   generic structure that would be a part of the compiler data structures library.
-*/
-typedef struct {
-	int ppuGroupId;
-	int *lpuIds;
-} LPU_Group;
-
 /* Definition of the method that takes a list of LPU IDs for a dynamic space and returns a new list of 
    LPU_Group. Alongside the LPU IDs it takes the name of the space as an input argument to be able to
    refer to the appropriate partitioning functions for grouping purpose.
@@ -355,34 +249,6 @@ typedef struct {
    range of LPUs, determining what belongs to whom is easy.    
 */
 List<LPU_Group*> *groupLPUsUnderPPUs(char spaceId, List<int> *activeLPUList);
-
-/* A structure is needed to hold the PPU (parallel processing unit) Id of a thread for a space when it 
-   is executing LPUs from that space. For higher level spaces a PPU group Id is also needed to determine 
-   if the thread will enter any composite computation stage (such as "Update Lower" in LU factorization) 
-   or not.
-   NOTE: if a thread is a PPU for a space it should have nonnegative ppuId; otherwise, its ppuId will 
-   be -1 but ppuGroupId will be the Id of the PPU controlling the group. For PPUs of lower-most spaces in 
-   the hierarchy both ids will be equal. This structure will be a part of the compiler library.   
-*/
-typedef struct {
-	int ppuId;
-	int ppuGroupId;
-} PPU_Ids;
-
-/* A structure is needed to hold the ppu-ids of threads for all the spaces defined in the task. As we
-   adopt a thread-per-core execution methods, these Ids are fixed and can be generated in the main function
-   before task execution begns.
-*/
-typedef struct {
-	PPU_Ids spaceA_ids;
-	PPU_Ids spaceB_ids;
-	PPU_Ids spaceC_ids;
-	PPU_Ids spaceD_ids; 	
-} LU_threadIds;
-
-/* We define a constant for invalid ID
-*/
-#define INVALID_ID -1
 
 /* Function definitions of the computation stages of LU factorization. The name of the functions are 
    translated into camel-case notations from their original names. Each function should take 1) a 
@@ -423,7 +289,7 @@ void updateUpper(SpaceB_LPU *lpu, LU_threadIds *threadIds,
    concern, 2) PPU group Id of the invoking thread for current space, and 3) the id of the previous LPU
    the thread just executed in this space.  	
 */
-void *getNextLPUchar spaceId, int groupId, int previousLPU_id);
+void *getNextLPU(char spaceId, int groupId, int previousLPU_id);
 
 /* For each communication between a pair of spaces that do not have any order relationship between them,
    we need to determine if a pair of LPUs taken from opposite spaces have overlapping data regions. The
@@ -744,7 +610,7 @@ void run(LU_threadIds *threadIds,
 
 			// There is a update dependency from 'Data Restorer Sync' to 'Update Shared Str-
 			// ucture' for 'l', but in the absense of replication transitions between stages
-			// of same LPS need no synchronization. Therefore, this synchronization is skipped.
+			// of same LPS need no synchronization. Therefore, we skip this synchronization.
 
 			if (threadIds->spaceC_ids.ppuId != INVALID_ID) {
 				// then invoke 'Select Pivot' function for active LPUs (there should be 
@@ -755,7 +621,7 @@ void run(LU_threadIds *threadIds,
 					updateSharedStructure(spaceC_LPU, threadIds, 
 							taskGlobals, threadGlobals);
 				}
-				// There is an outgoing dependency from 'Update Shared Structure' to 'Data 
+				// There is an outgoing link from 'Update Shared Structure' to 'Data 
 				// Restorer Sync' of Space A. So the controller thread of the NUMA node 
 				// should signal on a semaphore that update is done
 

@@ -1,0 +1,48 @@
+Task "Prefix Sum":
+	Define:
+		a, c: 1D Array of Integer
+		t: Epoch
+	Environment:
+		a: link
+	Initialize:
+		c.dimension1.length = partition.p
+	Compute:
+		"Local Prefix Sum" (Space A) {
+			stride = 1
+			do { 
+				do { 
+					a[i] at (t) = (a[i] + a[i - stride1]) at (t - 1)
+				} for i in a and i > stride
+				stride = stride * 2
+			} while (2**stride < a.local.dimension1.length)
+		}
+		"Copy Final Local Sum" (Space A) {
+			do {
+				c[j] = a[a.local.dimension1.range.end]
+			} for j in c
+		}
+		"Prefix Sum Of Aggregates" (Space B) {
+			stride = 1
+			do {
+				do {
+					c[i] at (t) = (c[i] + c[i - stride]) at (t - 1)
+				} for i in c and i > stride
+				stride = stride * 2
+			} while (2**stride < c.dimension1.length)
+		}
+		"Right Shift Sums" (Space B) {
+			do {
+				c[i] at (t) = c[i - 1] at (t - 1)
+			} for i in c
+		}
+		"Adjust Local Sums" (Space A) {
+			do {
+				a[i] = a[i] + c[j]
+			} for i in a; j in c and j > 0
+		}
+	Partition(p):
+		Space B <un-partitioned> { a, c }
+		Space A <1D> divides Space B partitions {
+			a: block_count(p)
+			c: block_size(1)
+		}

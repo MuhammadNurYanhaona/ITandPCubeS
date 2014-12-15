@@ -1,0 +1,94 @@
+------------------------------------------------------------------
+Task: "LU Factorization"
+------------------------------------------------------------------
+Initialization Section:
+	a: metadata--R-
+	l: metadata--R--W-
+	l_column: metadata--W-
+	p: metadata--W-
+	u: metadata--W-
+Flow Stage: "Computation Flow Specification" (Space: rootSpace)
+	Flow Stage: "Prepare" (Space: B)
+		a: content--R- metadata--R-
+		l: content--W- metadata--R-
+		u: content--W-
+		Data dependency arcs:
+			move u to "Data Loader Sync" comm-root A
+			move l to "Interchange Rows" comm-root B
+	Flow Stage: "Repeat Cycle" (Space: A)
+		Flow Stage: "Dynamic Computation" (Space: C) Conditionally Executed
+			Flow Stage: "Data Loader Sync" (Space: C)
+				k: content--R-
+				u: content--R--W-
+				Data dependency arcs:
+					move u to "Select Pivot" comm-root C
+			Flow Stage: "Select Pivot" (Space: C)
+				k: content--R-
+				pivot: content--W-
+				u: content--A- metadata--R-
+				Data dependency arcs:
+					move pivot to "Data Restorer Sync" comm-root A sync-root rootSpace
+		Flow Stage: "Data Restorer Sync" (Space: A)
+			pivot: content--R--W-
+			Data dependency arcs:
+				move pivot to "Store Pivot" comm-root A
+				move pivot to "Interchange Rows" comm-root A
+		Flow Stage: "Store Pivot" (Space: A)
+			k: content--R-
+			p: content--W-
+			pivot: content--R-
+		Flow Stage: "Interchange Rows" (Space: B)
+			k: content--R-
+			l: content--R--W- metadata--R-
+			pivot: content--R-
+			t: content--R-
+			u: content--R--W- metadata--R-
+			Data dependency arcs:
+				move l to "Data Loader Sync" comm-root A
+				move u to "Data Loader Sync" comm-root A
+		Flow Stage: "Dynamic Computation" (Space: C) Conditionally Executed
+			Flow Stage: "Data Loader Sync" (Space: C)
+				k: content--R-
+				l: content--R--W-
+				u: content--R--W-
+				Data dependency arcs:
+					move u to "Calculate Pivot Column" comm-root C
+			Flow Stage: "Update Lower" (Space: C)
+				Flow Stage: "Calculate Pivot Column" (Space: D)
+					k: content--R-
+					l: content--W- metadata--R-
+					u: content--R-
+					Data dependency arcs:
+						move l to "Data Restorer Sync" comm-root C
+				Flow Stage: "Data Restorer Sync" (Space: C)
+					l: content--R--W-
+					Data dependency arcs:
+						move l to "Update Shared Structure" comm-root C
+						move l to "Data Restorer Sync" comm-root rootSpace
+				Flow Stage: "Update Shared Structure" (Space: C)
+					k: content--R-
+					l: content--R-
+					l_column: content--C-
+					Data dependency arcs:
+						move l_column to "Data Restorer Sync" comm-root rootSpace
+		Flow Stage: "Data Restorer Sync" (Space: rootSpace)
+			l: content--R--W-
+			l_column: content--R--W-
+			Data dependency arcs:
+				move l_column to "Update Upper" comm-root rootSpace
+				move l to "Interchange Rows" comm-root rootSpace
+		Flow Stage: "Update Upper" (Space: B)
+			k: content--R-
+			l_column: content--R-
+			u: content--R--W- metadata--R-
+			Data dependency arcs:
+				move u to "Data Loader Sync" comm-root A
+		Data dependency arcs:
+			move k to "Data Loader Sync" comm-root A sync-root rootSpace
+			move k to "Select Pivot" comm-root A sync-root rootSpace
+			move k to "Store Pivot" comm-root A sync-root rootSpace
+			move k to "Interchange Rows" comm-root A sync-root rootSpace
+			move k to "Data Loader Sync" comm-root A sync-root rootSpace
+			move k to "Calculate Pivot Column" comm-root A sync-root rootSpace
+			move k to "Update Shared Structure" comm-root A sync-root rootSpace
+			move k to "Update Upper" comm-root A sync-root rootSpace
