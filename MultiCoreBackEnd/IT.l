@@ -153,7 +153,7 @@ partitions		return Partitions;
 ascends			return Ascends;
 descends		return Descends;
 
-Space			return Space;
+Space			return T_Space;
 dim[0-9]+		{	
 				char *dimensionality = yytext + DIM_LENGTH;
 				yylval.intConstant = atoi(dimensionality);
@@ -164,8 +164,10 @@ TRUE			yylval.booleanConstant = true; return Boolean;
 FALSE			yylval.booleanConstant = false; return Boolean;
 \'.\'			yylval.characterConstant = yytext[1]; return Character;
 \".*\"			{	
-				yylval.stringConstant = (char *) malloc(strlen(yytext) + 1);
-                                strcpy(yylval.stringConstant, yytext);		
+				int actualLength = strlen(yytext) - 2;
+				yylval.stringConstant = (char *) malloc(actualLength + 1);
+                                strncpy(yylval.stringConstant, yytext + 1, actualLength);
+				yylval.stringConstant[actualLength] = '\0';		
 				return String;
 			} 
 [0-9]+\.[0-9]+  	{

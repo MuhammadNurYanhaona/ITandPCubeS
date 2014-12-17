@@ -2,8 +2,7 @@
 #define	_H_backend_space_mapping
 
 #include "list.h"
-
-class PartitionHierarchy;
+#include "task_space.h"
 
 /* structure definition to keep track of the configuration of a PCubeS space */
 typedef struct {
@@ -20,7 +19,7 @@ typedef struct {
 
 /* structure definition to identify an LPS-PPS mapping */
 typedef struct {
-	char LPS;
+	Space *LPS;
 	PPS_Definition *PPS;
 } MapEntry;
 
@@ -29,7 +28,6 @@ class MappingNode {
   public:
 	MappingNode *parent;
 	MapEntry *mappingConfig;
-	int index;
 	List<MappingNode*> *children;
 };
 
@@ -37,8 +35,10 @@ class MappingNode {
 List<PPS_Definition*> *parsePCubeSDescription(const char *filePath);
 
 /* function defintion to parse the mapping configuration file */
-MappingNode *parseMappingConfiguration(char *filePath, 
-		PartitionHierarchy *lpsHierarchy, List<PPS_Definition*> *pcubesConfig);
+MappingNode *parseMappingConfiguration(const char *taskName, 
+		const char *filePath, 
+		PartitionHierarchy *lpsHierarchy, 
+		List<PPS_Definition*> *pcubesConfig);
 
 /* function definition to generate macro definitions corresponds to LPSes */
 void generateLPSMacroDefinitions(char *outputFile, MappingNode *mappingRoot);

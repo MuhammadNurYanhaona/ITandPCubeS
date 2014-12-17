@@ -4,6 +4,7 @@
 #include "list.h"
 #include "string.h"
 #include "string_utils.h"
+#include "hashtable.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -76,4 +77,99 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		printf("Space %s-%d-%d\n", list->Nth(i)->name, list->Nth(i)->id, list->Nth(i)->units);
 	}
 	return list;
+}
+
+MappingNode *parseMappingConfiguration(const char *taskName,
+                const char *filePath,
+                PartitionHierarchy *lpsHierarchy,
+                List<PPS_Definition*> *pcubesConfig) {
+
+	std::string line;
+	std::ifstream mappingfile(filePath);
+	std::string commentsDelimiter = "//";
+	std::string newlineDelimiter = "\n";
+	std::string mappingDelimiter = ":";
+	List<std::string> *mappingList;
+	List<std::string> *tokenList;
+	std::string description;
+
+	// open the mapping configuration file and read mapping configurations in a string
+	if (mappingfile.is_open()) {
+		while (std::getline(mappingfile, line)) {
+			string_utils::trim(line);
+			if (line.length() == 0) continue;
+			if (string_utils::startsWith(line, commentsDelimiter)) continue;
+			mappingList = string_utils::tokenizeString(line, commentsDelimiter);
+			description.append(mappingList->Nth(0));
+			description.append("\n");
+		}
+	} else {
+		std::cout << "could not open the mapping file.\n";
+	}
+
+	// locate the mapping configuration of the mentioned task and extract it
+	int taskConfigBegin = description.find(taskName);
+	int mappingStart = description.find('{', taskConfigBegin);
+	int mappingEnd = description.find('}', taskConfigBegin);
+	std::string mapping = description.substr(mappingStart + 1, mappingEnd - mappingStart - 1);
+	string_utils::trim(mapping);
+
+	// create the root of the mapping hierarchy
+	MapEntry *rootEntry = new MapEntry();
+	Space *rootSpace = lpsHierarchy->getRootSpace();
+	rootEntry->LPS = rootSpace;
+	rootEntry->PPS = pcubesConfig->Nth(0);
+	MappingNode *rootNode = new MappingNode();
+	rootNode->parent = NULL;
+	rootNode->mappingConfig = rootEntry;
+	rootNode->children = new List<MappingNode*>;
+
+	// parse individual lines and construct the mapping hierarchy
+	mappingList = string_utils::tokenizeString(mapping, newlineDelimiter);
+	Hashtable<MappingNode*> *mappingTable = new Hashtable<MappingNode*>;
+	int i = 0;
+	int mappingCount = mappingList->NumElements();
+	int totalPPSes = pcubesConfig->NumElements();
+	while (i < mappingCount) {
+		// determine the LPS and PPS for the mapping
+		std::cout << mappingList->Nth(i) << std::endl;
+		std::string mapping = mappingList->Nth(i);
+		tokenList = string_utils::tokenizeString(mapping, mappingDelimiter);
+		std::string lpsStr = tokenList->Nth(0);
+		char lpsId = lpsStr.at(lpsStr.length() - 1);
+		Space *lps = lpsHierarchy->getSpace(lpsId);
+		int ppsId = atoi(tokenList->Nth(1).c_str());
+		PPS_Definition *pps = pcubesConfig->Nth(totalPPSes - ppsId);
+		
+		// create a mapping configuration object
+		MapEntry *entry = new MapEntry();
+		entry->LPS = lps;
+		entry->PPS = pps;
+		MappingNode *node = new MappingNode();
+		node->parent = NULL;
+		node->mappingConfig = entry;
+		node->children = new List<MappingNode*>;
+		mappingTable->Enter(lps->getName(), node, true);
+
+		std::cout << ppsId << "--" << lpsId;
+		std::cout << "-----------------\n";
+		i++;
+	}
+
+	// correct the mapping hierarchy by setting parent and children references correctly
+	MappingNode *currentNode = NULL;
+	Iterator<MappingNode*> iterator = mappingTable->GetIterator();
+	while ((currentNode = iterator.GetNextValue()) != NULL) {
+		Space *parentLps = currentNode->mappingConfig->LPS->getParent();
+		if (rootSpace == parentLps) {
+			currentNode->parent = rootNode;
+			rootNode->children->Append(currentNode);
+		} else {
+			MappingNode *parent = mappingTable->Lookup(parentLps->getName());
+			currentNode->parent = parent;
+			parent->children->Append(currentNode);
+		}
+	} 
+
+	return rootNode;
 }

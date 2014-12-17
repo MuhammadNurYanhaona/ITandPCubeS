@@ -57,6 +57,8 @@ void VariableDef::validateScope(Scope *parentScope) {
 
 //----------------------------------------- Program Definition ------------------------------------------/
 
+ProgramDef *ProgramDef::program = NULL;
+
 ProgramDef::ProgramDef(List<Node*> *c) : Definition() {
 	Assert(c != NULL);
 	components = c;
@@ -121,6 +123,16 @@ void ProgramDef::printTasks() {
                         taskDef->print();
                 }
         }
+}
+
+Node *ProgramDef::getTaskDefinition(const char *taskName) {
+	for (int i = 0; i < components->NumElements(); i++) {
+                Node *node = components->Nth(i);
+                TaskDef *taskDef = dynamic_cast<TaskDef*>(node);
+                if (taskDef == NULL) continue;
+		if (strcmp(taskName, taskDef->getName()) == 0) return taskDef;
+	}
+	return NULL;
 }
 
 //----------------------------------------- Tuple Definition ------------------------------------------/

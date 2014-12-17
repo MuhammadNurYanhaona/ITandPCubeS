@@ -353,13 +353,13 @@ Hashtable<VariableAccess*> *LogicalExpr::getAccessedGlobalVariables(TaskGlobalRe
 
 ReductionExpr::ReductionExpr(char *o, Expr *r, yyltype loc) : Expr(loc) {
 	Assert(r != NULL && o != NULL);
-	if (strcmp(o, "\"sum\"") == 0) op = SUM;
-	else if (strcmp(o, "\"product\"") == 0) op = PRODUCT;
-	else if (strcmp(o, "\"max\"") == 0) op = MAX;
-	else if (strcmp(o, "\"maxEntry\"") == 0) op = MAX_ENTRY;
-	else if (strcmp(o, "\"min\"") == 0) op = MIN;
-	else if (strcmp(o, "\"minEntry\"") == 0) op = MIN_ENTRY;
-	else if (strcmp(o, "\"avg\"") == 0) op = AVG;
+	if (strcmp(o, "sum") == 0) op = SUM;
+	else if (strcmp(o, "product") == 0) op = PRODUCT;
+	else if (strcmp(o, "max") == 0) op = MAX;
+	else if (strcmp(o, "maxEntry") == 0) op = MAX_ENTRY;
+	else if (strcmp(o, "min") == 0) op = MIN;
+	else if (strcmp(o, "minEntry") == 0) op = MIN_ENTRY;
+	else if (strcmp(o, "avg") == 0) op = AVG;
 	else {
 		// Forcefully through a fault for now. Later we will add user defined reduction function, God willing.
 		Assert(0 == 1);	

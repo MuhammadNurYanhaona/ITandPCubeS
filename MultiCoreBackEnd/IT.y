@@ -95,7 +95,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %token S_Define S_Environment S_Initialize S_Compute S_Partition S_Arguments S_Results
 %token T_Integer T_Character T_Real T_Boolean T_Epoch T_Index T_Range T_Array T_List
 %token Single Double Format
-%token Space
+%token T_Space
 %token Activate For If Repeat Else From In Step Foreach Range Local Index
 %token C_Sub_Partition While Do Sequence To Of
 %token Link Create Link_or_Create
@@ -190,8 +190,9 @@ program		: components					{@1; // this is needed to make bison set up
 								  	program->performStaticAnalysis();
 								  }
 								  if (ReportError::NumErrors() == 0) {
-								  	program->printTasks();
-								  }			
+								  //	program->printTasks();
+								  }
+								  ProgramDef::program = program;				
 								};
 components	: component					{ ($$ = new List<Node*>)->Append($1); }
 		| components component				{ ($$ = $1)->Append($2); };	
@@ -267,29 +268,29 @@ stage_sequence	: compute_stage					{ ($$ = new List<ComputeStage*>)->Append($1);
 		| stage_sequence compute_stage			{ ($$ = $1)->Append($2); };
 compute_stage	: stage_header '{' meta_stages '}'		{ $$ = new ComputeStage($1, $3); }
 		| stage_header '{' code '}'			{ $$ = new ComputeStage($1, $3); };
-stage_header	: String '(' Space Space_ID ')'
+stage_header	: String '(' T_Space Space_ID ')'
 		  activation_command				{ $$ = new StageHeader(new Identifier(@1, $1), $4, $6); };
 activation_command :						{ $$ = NULL; } 
 		| Activate If Variable_Name In expr		{ $$ = new RangeExpr(new Identifier(@3, $3), $5, NULL, false, @1); };	 
 repeat_control	: Repeat ':' From String repeat_loop 		{ $$ = new RepeatControl(new Identifier(@4, $4), $5, @1); };
 repeat_loop	: For Variable_Name In expr step_expr		{ $$ = new RangeExpr(new Identifier(@2, $2), $4, $5, true,  @1); }
 		| While expr					{ $$ = $2; }
-		| Foreach Space Space_ID C_Sub_Partition	{ $$ = new SubpartitionRangeExpr($3, @1); };
+		| Foreach T_Space Space_ID C_Sub_Partition	{ $$ = new SubpartitionRangeExpr($3, @1); };
 
 
 /* ---------------------------------------------- Partition Section ---------------------------------------------------------------- */
 partition	: S_Partition arguments	':' partition_specs	{ $$ = new PartitionSection($2, $4, @1); };
 partition_specs	: partition_spec 				{ ($$ = new List<PartitionSpec*>)->Append($1); }
 		| partition_specs partition_spec		{ ($$ = $1)->Append($2); };
-partition_spec  : Space Space_ID '<' Dimensionality '>'
+partition_spec  : T_Space Space_ID '<' Dimensionality '>'
 		  dynamic divides '{' main_dist sub_dist '}'	{ $$ = new PartitionSpec($2, $4, $9, $6, $7, $10, @1); }		
-		| Space Space_ID '<' Unpartitioned '>' 
+		| T_Space Space_ID '<' Unpartitioned '>' 
 		  '{' names '}'					{ $$ = new PartitionSpec($2, $7, @1); };
 dynamic		: 						{ $$ = false; }
 		| '<' Dynamic '>'				{ $$ = true; };
 divides		: 						{ $$ = NULL; }	
-		| Divides Space Space_ID Partitions		{ $$ = new SpaceLinkage(LinkTypePartition, $3, @1); }
-		| Divides Space Space_ID Sub_Partitions		{ $$ = new SpaceLinkage(LinkTypeSubpartition, $3, @1); };
+		| Divides T_Space Space_ID Partitions		{ $$ = new SpaceLinkage(LinkTypePartition, $3, @1); }
+		| Divides T_Space Space_ID Sub_Partitions		{ $$ = new SpaceLinkage(LinkTypeSubpartition, $3, @1); };
 main_dist	: data_spec					{ ($$ = new List<DataConfigurationSpec*>)->AppendAll($1); }
 		| main_dist data_spec				{ ($$ = $1)->AppendAll($2); };
 data_spec	: var_list ':' instr_list relativity		{ $$ = DataConfigurationSpec::decomposeDataConfig($1, $3, $4); };
@@ -312,7 +313,7 @@ partition_args	:						{ $$ = new List<PartitionArg*>; }
 partition_arg	: Variable_Name					{ $$ = new PartitionArg(new Identifier(@1, $1)); } 
 		| Integer					{ $$ = new PartitionArg(new IntConstant(@1, $1)); };	 	
 relativity	:						{ $$ = NULL; }
-		| ';' Relative_To Space Space_ID  		{ $$ = new SpaceLinkage(LinkTypeUndefined, $4, @2); };			
+		| ';' Relative_To T_Space Space_ID  		{ $$ = new SpaceLinkage(LinkTypeUndefined, $4, @2); };			
 sub_dist	:						{ $$ = NULL; }
 		| P_Sub_Partition '<' Dimensionality'>'
 		  '<' nature '>' '{' data_sub_dist '}'		{ $$ = new SubpartitionSpec($3, $6, $9, @1); };

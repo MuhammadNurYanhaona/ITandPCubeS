@@ -182,6 +182,10 @@ void TaskDef::print() {
 	compute->print();
 }
 
+PartitionHierarchy *TaskDef::getPartitionHierarchy() { 
+	return partition->getPartitionHierarchy(); 
+}
+
 //------------------------------------- Define Section ------------------------------------------/
 
 DefineSection::DefineSection(List<VariableDef*> *def, yyltype loc) : Node(loc) {

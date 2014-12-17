@@ -250,6 +250,10 @@ class TaskDef : public Definition {
 	// Static Analysis Routines
 	void analyseCode();
 	void print();
+
+	// helper functions for back-end compilers
+	const char *getName() { return id->getName(); }
+	PartitionHierarchy *getPartitionHierarchy();
 };
 
 #endif

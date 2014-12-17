@@ -42,6 +42,7 @@ class ProgramDef : public Definition {
   protected:
 	List<Node*> *components;
   public:
+	static ProgramDef *program;
 	ProgramDef(List<Node*> *components);
 	const char *GetPrintNameForNode() { return "Program"; } 
 	void PrintChildren(int indentLevel);	
@@ -49,6 +50,7 @@ class ProgramDef : public Definition {
 	void validateScope(Scope *parentScope);
 	void performStaticAnalysis();
 	void printTasks();
+	Node *getTaskDefinition(const char *taskName); 
 };
 
 class TupleDef : public Definition {
