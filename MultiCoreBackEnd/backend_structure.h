@@ -37,6 +37,7 @@ typedef struct {
         int id;
         int groupId; // used for higher space computations that each lower space PPU in the
 		     // hierarchy executes
+	int groupSize; // sometimes used for setting up synchronization parameters appropriately
 } PPU_Ids;
 
 /* a structure to hold PPU ids of a thread for different spaces */

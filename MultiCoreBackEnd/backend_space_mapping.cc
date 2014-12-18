@@ -11,6 +11,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <deque>
 
 List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 
@@ -169,7 +170,65 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 			currentNode->parent = parent;
 			parent->children->Append(currentNode);
 		}
+	}
+
+	// assign indexes to mapping nodes
+	std::deque<MappingNode*> nodeQueue;
+	nodeQueue.push_back(rootNode);
+	int index = 0;
+	while (!nodeQueue.empty()) {
+		MappingNode *node = nodeQueue.front();
+		node->index = index;
+		index++;
+		nodeQueue.pop_front();
+		for (int i = 0; i < node->children->NumElements(); i++) {
+			nodeQueue.push_back(node->children->Nth(i));
+		}
 	} 
 
 	return rootNode;
+}
+
+void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoot) {
+	std::ofstream programFile;
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+  	if (programFile.is_open()) {
+		programFile << "// macro definitions for LPSes\n";
+		std::deque<MappingNode*> nodeQueue;
+		nodeQueue.push_back(mappingRoot);
+		while (!nodeQueue.empty()) {
+			MappingNode *node = nodeQueue.front();
+			nodeQueue.pop_front();
+			for (int i = 0; i < node->children->NumElements(); i++) {
+				nodeQueue.push_back(node->children->Nth(i));
+			}
+			programFile << "#define Space_" << node->mappingConfig->LPS->getName();
+			programFile << " " << node->index << std::endl;	
+		}
+		programFile << std::endl; 
+    		programFile.close();
+  	}
+  	else std::cout << "Unable to open output program file";
+}
+
+void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcubesConfig) {
+	std::ofstream programFile;
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+  	if (programFile.is_open()) {
+		programFile << "// macro definitions for PPS counts\n";
+		PPS_Definition *pps = pcubesConfig->Nth(0);
+		int prevSpaceId = pps->id;
+		programFile << "#define Space_" << pps->id << "_PPUs";
+		programFile << " " << pps->units << std::endl;
+		for (int i = 1; i < pcubesConfig->NumElements(); i++) {
+			pps = pcubesConfig->Nth(i);
+			programFile << "#define Space_" << pps->id;
+			programFile << "_Par_" << prevSpaceId << "_PPUs";
+			programFile << " " << pps->units << std::endl;
+			prevSpaceId = pps->id;
+		}
+		programFile << std::endl; 
+    		programFile.close();
+  	}
+  	else std::cout << "Unable to open output program file";
 }

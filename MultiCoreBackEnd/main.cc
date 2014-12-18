@@ -35,5 +35,7 @@ int main(int argc, char *argv[]) {
 	PartitionHierarchy *lpsHierarchy = luTask->getPartitionHierarchy();
 	MappingNode *mappingConfig = parseMappingConfiguration("LU Factorization",
         		"/home/yan/opteron-solver-mapping.map", lpsHierarchy, pcubesConfig);
+	generateLPSMacroDefinitions("/home/yan/output.cpp", mappingConfig);
+	generatePPSCountMacros("/home/yan/output.cpp", pcubesConfig);
 }
 

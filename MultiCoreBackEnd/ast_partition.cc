@@ -119,6 +119,9 @@ void PartitionSpec::addSpaceConfiguration(TaskDef *taskDef, PartitionHierarchy *
 	if (currentHierarchy->addNewSpace(space) == false) {
 		ReportError::DuplicateSpaceDefinition(GetLocation(), spaceId);
 	}
+
+	// If there is a parent-child relationship between current and another space then the parent space must
+	// be specificied before this one to do proper validation of data structure partitions.
 	if (this->parentLink != NULL) {
 		Space *parentSpace = parentLink->getParentSpace(currentHierarchy);
 		if (parentSpace == NULL) {
@@ -132,6 +135,8 @@ void PartitionSpec::addSpaceConfiguration(TaskDef *taskDef, PartitionHierarchy *
 		space->setParent(currentHierarchy->getRootSpace());
 	}
 
+	// Unpartitioned spaces should only specify the list of variables they hold without any partition
+	// specification (which will contradict the nature of the space) for any data structure included within.
 	if (variableList != NULL) {
 		if (dimensionality > 0) {
 			ReportError::UnpartitionedDataInPartitionedSpace(GetLocation(), spaceId, dimensionality);
@@ -154,11 +159,14 @@ void PartitionSpec::addSpaceConfiguration(TaskDef *taskDef, PartitionHierarchy *
 			}
 		}
 		space->setStructureList(structureList);	
+	// For a partitioned space, on the other hand, detail validation is needed regarding the dimensionality
+	// matching of the space itself with the dimensionality of the data structure partitions. 
 	} else {
 		space->initEmptyStructureList();
 		TaskSymbol *taskSymbol = (TaskSymbol *) taskDef->getSymbol();
 		Scope *partitionScope = taskSymbol->getPartitionScope();
 		for (int i = 0; i < specList->NumElements(); i++) {
+			// each partition specification validates itself as it been added to the space
 			specList->Nth(i)->addPartitionConfiguration(space, partitionScope, currentHierarchy);	
 		}
 	}
@@ -191,6 +199,9 @@ void SubpartitionSpec::PrintChildren(int indentLevel) {
 	specList->PrintAll(indentLevel + 1);	
 }
 
+// The logic for subpartitioned space configuration validation is similar to a normal space validation. A further
+// restriction is that subpartitioned spaces will always have non-zero dimension. Therefore an extra validation for
+// possibly unpartitioned space configuration is skipped. 
 void SubpartitionSpec::addSpaceConfiguration(TaskDef *taskDef, PartitionHierarchy *currentHierarchy, Space *ownerSpace) {
 	
 	int suffixLength = strlen(Space::SubSpaceSuffix);
@@ -363,6 +374,7 @@ PartitionFunctionConfig *PartitionInstr::generateConfiguration(List<int> *dataDi
 			dimensionIds->Append(dataDimensions->Nth(index));
 		}	
 	}
+	// replace the default incremental dimension ID list that starts from 1 with the correct ID list 
 	config->setDimensionIds(dimensionIds);
 	config->setPartitionOrder(order);
 	return config;	
@@ -459,6 +471,10 @@ ArrayDataStructure* DataConfigurationSpec::addPartitionConfiguration(Space *spac
 		// and partitioned along them 
 		List<int> *sourceDimensions = arrayStruct->getRemainingDimensions();
 		List<int> *partitionDimensions = NULL;
+		// This indicates a possible reordering of dimensions for the sake of partitioning as dimension IDs are
+		// provided in the source code. There a validation is needed regarding feasibility of the partition along
+		// specified dimension. Furthermore, we need to associate appropriate dimensions with the partition
+		// functions in place of the default linearly increasing order based assignments. 	 	
 		if (dimensions != NULL && dimensions->NumElements() > 0) {
 			partitionDimensions = new List<int>;
 			for (int i = 0; i < dimensions->NumElements(); i++) {
@@ -476,6 +492,7 @@ ArrayDataStructure* DataConfigurationSpec::addPartitionConfiguration(Space *spac
 					partitionDimensions->Append(value);
 				}
 			}
+		// No reordering is done. So no extra validation or processing is required like in the previous case.
 		} else {
 			partitionDimensions = sourceDimensions;
 		}
@@ -500,6 +517,7 @@ ArrayDataStructure* DataConfigurationSpec::addPartitionConfiguration(Space *spac
 				space->storeToken(currentCoordinate, token);
 				currentCoordinate++;
 			} else {
+				// a partition function specification does its own validation
 				PartitionFunctionConfig *pFnConfig = instr->generateConfiguration(partitionDimensions, 
 							currentDataDimensionIndex, partitionScope);
 				List<int> *dimsFurtherPartitioned = pFnConfig->getPartitionedDimensions();
@@ -519,6 +537,9 @@ ArrayDataStructure* DataConfigurationSpec::addPartitionConfiguration(Space *spac
 		}
 
 		// set the before and after partition dimension information of the data structure
+		// note that both of these dimensions list are sorted and kept that way so that the validation logic
+		// of the above can be applied to each space on a hierarchy one-after-another without any additional
+		// reordering of these lists. 
 		newDef->setSourceDimensions(sourceDimensions);
 		List<int> *afterPartitionDimensions = new List<int>;
 		for (int i = 0; i < sourceDimensions->NumElements(); i++) {

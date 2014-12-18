@@ -12,6 +12,9 @@ void SingleArgumentPartitionFunction::processArguments(List<PartitionArg*> *divi
 	if (dividingArgs == NULL || dividingArgs->NumElements() == 0) {
 		ReportError::ArgumentMissingInPartitionFunction(location, functionName, argumentName);
 	} else {
+		// Note that it might seem confusing at first that a single argument partition function supporting
+		// multiple arguments. The answer is each argument here is used for a different dimension of the
+		// underlying data structure. Single argument here means one argument par partitionable dimension.
 		int dividingArgsCount = dividingArgs->NumElements();
 		if (paddingArgs == NULL || paddingArgs->NumElements() == 0) {
 			for (int i = 0; i < dividingArgsCount; i++) {
@@ -23,6 +26,8 @@ void SingleArgumentPartitionFunction::processArguments(List<PartitionArg*> *divi
 			if (dividingArgsCount == paddingArgsCount) {
 				for (int i = 0; i < dividingArgsCount; i++) {
 					Node *actualArg = dividingArgs->Nth(i)->getContent();
+					// the default dimension number assigned here gets updated with appropriate
+					// number during validation.
 					DataDimensionConfig *dataConfig = new DataDimensionConfig(i + 1, actualArg);
 					Node *actualPadding = paddingArgs->Nth(i)->getContent();
 					dataConfig->setPaddingArg(actualPadding);

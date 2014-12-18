@@ -9,7 +9,7 @@
 	a few partition functions are included. Our future plan is to include user defined partition
 	functions.
 	
-	Note that these classes only hold only configuration information regarding corresponding
+	Note that these classes hold only configuration information regarding corresponding
 	partition functions. Such information is used to validate the partition specification for a 
 	task where a partition function is been used. Actual implementation of a partition function 
 	should depend on the target hardware platform.

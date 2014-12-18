@@ -114,13 +114,17 @@ class DataStructure {
 
 class ArrayDataStructure : public DataStructure {
   protected:
-	List<int> *sourceDimensions;
+	List<int> *sourceDimensions; // indicates the dimensions of the data structure available for 
+				     // partitioning within the space under concern
 	List<PartitionFunctionConfig*> *partitionSpecs;
-	List<int> *afterPartitionDimensions;
+	List<int> *afterPartitionDimensions; // indicates the dimension remain available for partitioning
+					     // by subsequent spaces from each partition of the data structure
+					     // created by current space	
   public:
 	ArrayDataStructure(VariableDef *definition);
 	ArrayDataStructure(ArrayDataStructure *source);
 	bool isOrderDependent();
+	// note that dimension IDs start from 1 instead of from 0
 	void setSourceDimensions(List<int> *sourceDimensions) { this->sourceDimensions = sourceDimensions; }
 	void setAfterPartitionDimensions(List<int> *afterPartitionDimensions) {
 		this->afterPartitionDimensions = afterPartitionDimensions;
@@ -131,7 +135,7 @@ class ArrayDataStructure : public DataStructure {
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions
-	of data structures to the dimensions of corresponding spaces. Comparing toold Fortran-D terminology,
+	of data structures to the dimensions of corresponding spaces. Comparing to old Fortran-D terminology,
 	this is the mechanism of storing data structure alignment information in IT. We view individual 
 	spaces as a coordinate system of dimensionality as specified in the partition block. Then dimensions
 	of individual data structures within it somehow must be mapped to the coordinate dimensions. If some

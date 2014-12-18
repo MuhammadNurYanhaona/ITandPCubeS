@@ -28,6 +28,7 @@ class MappingNode {
   public:
 	MappingNode *parent;
 	MapEntry *mappingConfig;
+	int index;
 	List<MappingNode*> *children;
 };
 
@@ -41,13 +42,10 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		List<PPS_Definition*> *pcubesConfig);
 
 /* function definition to generate macro definitions corresponds to LPSes */
-void generateLPSMacroDefinitions(char *outputFile, MappingNode *mappingRoot);
+void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoot);
 
-/* function definition to generate the thread counts (the number of groups and group size) for 
-   all PPSes.
-*/
-void generatePPSCountMacros(char *outputFile, 
-		MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig); 
+/* function definition to generate the thread counts for all PPSes */
+void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcubesConfig); 
 
 /* function definition for generating the runtime library routine that will create ThreadIds */
 void generateFnForThreadIdsAllocation(char *outputFile, MappingNode *mappingRoot);

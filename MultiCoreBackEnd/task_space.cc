@@ -218,7 +218,7 @@ Coordinate *CoordinateSystem::getCoordinate(int dimensionNo) {
 
 //-------------------------------------------------- Space ------------------------------------------------------/
 
-const char *Space::RootSpaceName = "rootSpace";
+const char *Space::RootSpaceName = "Root";
 const char *Space::SubSpaceSuffix = "_subspace";
 
 Space::Space(const char *name, int dimensions, bool dynamic, bool subpartitionSpace) {
