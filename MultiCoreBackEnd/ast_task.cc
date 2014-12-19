@@ -186,6 +186,10 @@ PartitionHierarchy *TaskDef::getPartitionHierarchy() {
 	return partition->getPartitionHierarchy(); 
 }
 
+List<Identifier*> *TaskDef::getPartitionArguments() { 
+	return partition->getArguments(); 
+}
+
 //------------------------------------- Define Section ------------------------------------------/
 
 DefineSection::DefineSection(List<VariableDef*> *def, yyltype loc) : Node(loc) {

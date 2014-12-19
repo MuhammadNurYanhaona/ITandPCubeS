@@ -37,5 +37,6 @@ int main(int argc, char *argv[]) {
         		"/home/yan/opteron-solver-mapping.map", lpsHierarchy, pcubesConfig);
 	generateLPSMacroDefinitions("/home/yan/output.cpp", mappingConfig);
 	generatePPSCountMacros("/home/yan/output.cpp", pcubesConfig);
+	generateLPUCountFunctions("/home/yan/output.cpp", mappingConfig, luTask->getPartitionArguments());
 }
 

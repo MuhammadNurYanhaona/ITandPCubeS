@@ -5,6 +5,8 @@
 #include "string.h"
 #include "string_utils.h"
 #include "hashtable.h"
+#include "ast.h"
+#include "ast_expr.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -231,4 +233,129 @@ void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcube
     		programFile.close();
   	}
   	else std::cout << "Unable to open output program file";
+}
+
+List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &programFile,
+                Space *space, List<Identifier*> *partitionArgs) {
+
+
+	std::string defaultParameter = "ppuCount";
+	std::string parameterSeparator = ", ";
+	std::string statementSeparator = ";\n";
+	std::string statementIndent = "\t";
+
+	// This corresponds to the count functions definitions we have in backend_partition_mgmt file.
+	// We have to find a better mechanism to store constants like these in the future.	
+	std::string defaultPartitionFnSuffix = "_partitionCount(";
+
+	List<PartitionParameterConfig*> *paramConfigList = new List<PartitionParameterConfig*>;
+	CoordinateSystem *coordSys = space->getCoordinateSystem();
+	int dimensionality = space->getDimensionCount();
+	std::ostringstream functionHeader;
+	functionHeader << "int " << defaultParameter;
+	std::ostringstream functionBody;
+
+	// iterate over the dimension of the space and for each dimension pick an array partition to
+	// be used for partition-count calculation
+	for (int i = 1; i <= dimensionality; i++) {
+		Coordinate *coord = coordSys->getCoordinate(i);
+		List<Token*> *tokenList = coord->getTokenList();
+		for (int j = 0; j < tokenList->NumElements(); j++) {
+			Token *token = tokenList->Nth(j);
+			if (token->isWildcard()) continue;
+			ArrayDataStructure *array = (ArrayDataStructure*) token->getData();
+			int arrayDim = token->getDimensionId();
+			std::ostringstream dimensionParamName;
+			dimensionParamName << array->getName() << "Dim" << arrayDim;
+			
+			// add the dimension parameter in the function header
+			functionHeader << parameterSeparator << "Dimension " << dimensionParamName.str();
+			
+			PartitionFunctionConfig *partFn = array->getPartitionSpecForDimension(arrayDim);
+			std::ostringstream fnCall;
+			fnCall << partFn->getName() << defaultPartitionFnSuffix;
+			
+			// dimension and the ppu count are two default parameters in the cout routine
+			// of any partition function.	
+			fnCall << dimensionParamName.str() << parameterSeparator << defaultParameter;
+		
+			// Currently we only support one dividing argument par partition function. Later
+			// we may lift this restriction. Then the logic here will be different
+			Node *dividingArg = partFn->getArgsForDimension(arrayDim)->getDividingArg();
+			if (dividingArg != NULL) {
+				IntConstant *intConst = dynamic_cast<IntConstant*>(dividingArg);
+				// if the argument is a constant just apply it as an argument
+				if (intConst != NULL) {
+					fnCall << parameterSeparator << intConst->getValue();
+				// otherwise pass the argument and update the parameter config list 
+				} else {
+					const char *paramName = ((Identifier *) dividingArg)->getName();
+					fnCall << parameterSeparator << paramName;
+					functionHeader << parameterSeparator << "int " << paramName;	
+				}
+			}
+
+			fnCall << ")";
+			functionBody << statementIndent; 
+			functionBody << "count" << i << " = " << fnCall.str();
+			functionBody << statementSeparator;	
+			break;
+		}
+	}
+	if (dimensionality > 1) {
+		// if the space is multidimensional then partition counts along individual dimensions 
+		// are multiplied to generate the final count
+		functionBody << statementIndent << "count = count1";
+		for (int i = 2; i <= dimensionality; i++) {
+			functionBody << " * count" << i;
+		}
+		functionBody << statementSeparator;
+		functionBody << statementIndent << "return count" << statementSeparator;
+	} else {
+		functionBody << statementIndent << "return count1" << statementSeparator;
+	}
+
+	// write the function specification in the output file
+	programFile << "int getLPUsCountOfSpace" << space->getName();
+	programFile << "(" << functionHeader.str() << ") {\n"; 
+	programFile << functionBody.str() << "}" << std::endl;
+	
+	return paramConfigList;
+}
+
+Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const char *outputFile,
+                MappingNode *mappingRoot, List<Identifier*> *partitionArgs) {
+
+	// if the output file cannot be opened then return
+	std::ofstream programFile;
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+  	if (!programFile.is_open()) {
+		std::cout << "Unable to open output program file";
+		return NULL;
+	}
+
+	// add a common comments for all these functions
+	programFile << "//******************************** ";
+	programFile << "functions for retrieving partition counts in different LPSes" << std::endl;
+
+	Hashtable<List<PartitionParameterConfig*>*> *paramTable 
+			= new Hashtable<List<PartitionParameterConfig*>*>;		
+	std::deque<MappingNode*> nodeQueue;
+	nodeQueue.push_back(mappingRoot);
+	while (!nodeQueue.empty()) {
+		MappingNode *node = nodeQueue.front();
+		nodeQueue.pop_front();
+		for (int i = 0; i < node->children->NumElements(); i++) {
+			nodeQueue.push_back(node->children->Nth(i));
+		}
+		Space *lps = node->mappingConfig->LPS;
+		if (lps->getDimensionCount() == 0) continue;
+		List<PartitionParameterConfig*> *paramConfigList 
+			= generateLPUCountFunction(programFile, lps, partitionArgs);
+		paramTable->Enter(lps->getName(), paramConfigList, true);
+		programFile << std::endl;
+	}	
+	programFile.close(); 
+	
+	return paramTable;
 }

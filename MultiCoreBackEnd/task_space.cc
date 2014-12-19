@@ -91,6 +91,14 @@ bool PartitionFunctionConfig::hasOverlappingsAmongPartitions() {
 	return false;
 }
 
+DataDimensionConfig *PartitionFunctionConfig::getArgsForDimension(int dimensionNo) {
+	for (int i = 0; i < arguments->NumElements(); i++) {
+		DataDimensionConfig *argument = arguments->Nth(i);
+		if (argument->getDimensionNo() == dimensionNo) return argument;
+	}
+	return NULL;	
+}
+
 //------------------------------------------------- DataStructure ---------------------------------------------------/
 
 DataStructure::DataStructure(VariableDef *definition) {
@@ -171,6 +179,17 @@ bool ArrayDataStructure::hasOverlappingsAmongPartitions() {
 		if (config->hasOverlappingsAmongPartitions()) return true;
 	}
 	return false;
+}
+
+PartitionFunctionConfig *ArrayDataStructure::getPartitionSpecForDimension(int dimensionNo) {
+	for (int i = 0; i < partitionSpecs->NumElements(); i++) {
+		PartitionFunctionConfig *config = partitionSpecs->Nth(i);
+		List<int> *dataDimensions = config->getPartitionedDimensions();
+		for (int j = 0; j < dataDimensions->NumElements(); j++) {
+			if (dataDimensions->Nth(j) == dimensionNo) return config;
+		}
+	}
+	return NULL;
 }
 
 //----------------------------------------------------- Token ---------------------------------------------------/

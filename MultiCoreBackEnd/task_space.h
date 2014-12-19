@@ -83,6 +83,8 @@ class PartitionFunctionConfig {
 	void setPartitionOrder(PartitionOrder partitionOrder) { this->partitionOrder = partitionOrder; }
 	bool isOrdered() { return (partitionOrder == AscendingOrder || partitionOrder == DescendingOrder); }
 	bool hasOverlappingsAmongPartitions();
+	DataDimensionConfig *getArgsForDimension(int dimensionNo);
+	const char *getName() { return functionName; }
 };
 
 class DataStructure {
@@ -131,7 +133,8 @@ class ArrayDataStructure : public DataStructure {
 	}
 	List<int> *getRemainingDimensions() { return afterPartitionDimensions; }
 	void addPartitionSpec(PartitionFunctionConfig *partitionConfig);	
-	bool hasOverlappingsAmongPartitions();	
+	bool hasOverlappingsAmongPartitions();
+	PartitionFunctionConfig *getPartitionSpecForDimension(int dimensionNo);	
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions
@@ -157,6 +160,7 @@ class Token {
 	}
 	bool isWildcard() { return dimensionId == wildcardTokenId; }
 	DataStructure *getData() {return data; }
+	int getDimensionId() { return dimensionId; }
 };
 
 class Coordinate {
@@ -170,7 +174,8 @@ class Coordinate {
 	}
 	void storeToken(Token *token) { tokenList->Append(token); }
 	int getTokenCount() { return tokenList->NumElements(); }
-	Token *getTokenForDataStructure(const char *dataStructureName);	
+	Token *getTokenForDataStructure(const char *dataStructureName);
+	List<Token*> *getTokenList() { return tokenList; }	
 };
 
 class CoordinateSystem {
@@ -219,6 +224,7 @@ class Space {
 	static List<Space*> *getConnetingSpaceSequenceForSpacePair(Space *first, Space *last);
 	List<const char*> *getLocalDataStructuresWithOverlappedPartitions();
 	List<const char*> *getNonStorableDataStructures();
+	CoordinateSystem *getCoordinateSystem() { return coordSys; }
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy

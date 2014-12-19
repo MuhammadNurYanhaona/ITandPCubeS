@@ -254,6 +254,7 @@ class TaskDef : public Definition {
 	// helper functions for back-end compilers
 	const char *getName() { return id->getName(); }
 	PartitionHierarchy *getPartitionHierarchy();
+	List<Identifier*> *getPartitionArguments();
 };
 
 #endif
