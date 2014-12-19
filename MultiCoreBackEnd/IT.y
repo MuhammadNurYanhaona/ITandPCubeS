@@ -183,16 +183,16 @@ void yyerror(const char *msg); // standard error-handling routine
 program		: components					{@1; // this is needed to make bison set up
 							     	     // the location variable yylloc
 								  ProgramDef *program = new ProgramDef($1);
-								  //program->Print(0);
-								  program->attachScope(NULL);			
-								  program->validateScope(NULL);
-								  if (ReportError::NumErrors() == 0) {		
-								  	program->performStaticAnalysis();
-								  }
-								  if (ReportError::NumErrors() == 0) {
-								  //	program->printTasks();
-								  }
 								  ProgramDef::program = program;				
+								  //program->Print(0);
+								  //program->attachScope(NULL);			
+								  //program->validateScope(NULL);
+								  //if (ReportError::NumErrors() == 0) {		
+								  //	program->performStaticAnalysis();
+								  //}
+								  //if (ReportError::NumErrors() == 0) {
+								  //	program->printTasks();
+								  //}
 								};
 components	: component					{ ($$ = new List<Node*>)->Append($1); }
 		| components component				{ ($$ = $1)->Append($2); };	

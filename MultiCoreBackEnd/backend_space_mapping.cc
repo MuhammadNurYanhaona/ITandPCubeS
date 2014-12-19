@@ -238,7 +238,6 @@ void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcube
 List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &programFile,
                 Space *space, List<Identifier*> *partitionArgs) {
 
-
 	std::string defaultParameter = "ppuCount";
 	std::string parameterSeparator = ", ";
 	std::string statementSeparator = ";\n";
@@ -260,9 +259,14 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 	for (int i = 1; i <= dimensionality; i++) {
 		Coordinate *coord = coordSys->getCoordinate(i);
 		List<Token*> *tokenList = coord->getTokenList();
+
 		for (int j = 0; j < tokenList->NumElements(); j++) {
+			// if it is a replicated token then skip this data structure
 			Token *token = tokenList->Nth(j);
 			if (token->isWildcard()) continue;
+
+			// otherwise use the data structure partition information to determine LPU count along
+			// current dimension then break the loop
 			ArrayDataStructure *array = (ArrayDataStructure*) token->getData();
 			int arrayDim = token->getDimensionId();
 			std::ostringstream dimensionParamName;
@@ -270,6 +274,11 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 			
 			// add the dimension parameter in the function header
 			functionHeader << parameterSeparator << "Dimension " << dimensionParamName.str();
+			PartitionParameterConfig *paramConfig = new PartitionParameterConfig;
+			paramConfig->arrayName = array->getName();
+			paramConfig->dimensionNo = arrayDim;
+			paramConfig->partitionArgsIndexes = new List<int>;
+			paramConfigList->Append(paramConfig);
 			
 			PartitionFunctionConfig *partFn = array->getPartitionSpecForDimension(arrayDim);
 			std::ostringstream fnCall;
@@ -291,7 +300,22 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 				} else {
 					const char *paramName = ((Identifier *) dividingArg)->getName();
 					fnCall << parameterSeparator << paramName;
-					functionHeader << parameterSeparator << "int " << paramName;	
+					functionHeader << parameterSeparator << "int " << paramName;
+					// find the index of the parameter in partition section's argument
+					// list and store this information
+					bool paramFound = false;
+					for (int k = 0; k < partitionArgs->NumElements(); k++) {
+						const char *argName = partitionArgs->Nth(k)->getName();
+						if (strcmp(argName, paramName) == 0) {
+							paramConfig->partitionArgsIndexes->Append(k);
+							paramFound = true;
+							break;
+						}
+					} 
+					if (!paramFound) {
+						std::cout << "could not find matching argument in ";
+						std::cout << "partition section." << std::endl;
+					}	
 				}
 			}
 
