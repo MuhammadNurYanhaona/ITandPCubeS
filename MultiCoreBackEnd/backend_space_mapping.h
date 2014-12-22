@@ -63,7 +63,7 @@ void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoo
 /* function definition to generate the thread counts for all PPSes */
 void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcubesConfig); 
 
-/* function definition to generate get-partition-count() function for any given space */
+/* function definition to generate get-partition-count() routine for any given space */
 List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &programFile,
 		Space *space, List<Identifier*> *partitionArgs);
 
@@ -71,6 +71,16 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
    functions for all un-partitioned spaces.
 */
 Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const char *outputFile,
+		MappingNode *mappingRoot, List<Identifier*> *partitionArgs);
+
+/* function definition to generate routine for retrieving dimensions metadata for an array
+   in a given space given the id of the LPU for which the routine is invoked 
+*/
+List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *array, 
+		std::ofstream &programFile, List<Identifier*> *partitionArgs);
+
+/* function that calls the above function for all arrays partitioned in different spaces */
+Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile, 
 		MappingNode *mappingRoot, List<Identifier*> *partitionArgs);
 
 /* function definition for generating the runtime library routine that will create ThreadIds */

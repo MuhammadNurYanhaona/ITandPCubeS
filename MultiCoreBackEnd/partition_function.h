@@ -38,6 +38,7 @@ class BlockSize : public SingleArgumentPartitionFunction {
 	void processArguments(List<PartitionArg*> *dividingArgs, 
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	List<int> *getBlockedDimensions(Type *structureType);
+	bool doesSupportGhostRegion() { return true; }
 };
 
 class BlockCount : public SingleArgumentPartitionFunction {
@@ -47,6 +48,7 @@ class BlockCount : public SingleArgumentPartitionFunction {
 	void processArguments(List<PartitionArg*> *dividingArgs, 
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	List<int> *getBlockedDimensions(Type *structureType);
+	bool doesSupportGhostRegion() { return true; }
 };
 
 class StridedBlock : public SingleArgumentPartitionFunction {

@@ -22,22 +22,48 @@ int block_stride_partitionCount(Dimension d, int ppuCount, int size) {
 
 /*********************************** getRange functions *******************************************/
 
-Dimension *block_size_getRange(Dimension d, int lpuCount, int lpuId, int size) {
+Dimension *block_size_getRange(Dimension d, int lpuCount, int lpuId, int size, 
+		int frontPadding, int backPadding) {
         int begin = size * lpuId;
         Dimension *dimension = new Dimension();
         dimension->range.min = d.range.min + begin;
         dimension->range.max = d.range.min + begin + size - 1;
         if (lpuId == lpuCount - 1) dimension->range.max = d.range.max;
+	if (lpuId > 0 && frontPadding > 0) {
+		dimension->range.min = dimension->range.min - frontPadding;
+		if (dimension->range.min < d.range.min) {
+			dimension->range.min = d.range.min;
+		}
+	}
+	if (lpuId < lpuCount - 1 && backPadding > 0) {
+		dimension->range.max = dimension->range.max + backPadding;
+		if (dimension->range.max > d.range.max) {
+			dimension->range.max = d.range.max;
+		}
+	}
         return dimension;
 }
 
-Dimension *block_count_getRange(Dimension d, int lpuCount, int lpuId, int count) {
+Dimension *block_count_getRange(Dimension d, int lpuCount, int lpuId, int count, 
+		int frontPadding, int backPadding) {
 	int size = d.length / count;
         int begin = size * lpuId;
         Dimension *dimension = new Dimension();
         dimension->range.min = d.range.min + begin;
         dimension->range.max = d.range.min + begin + size - 1;
         if (lpuId == lpuCount - 1) dimension->range.max = d.range.max;
+	if (lpuId > 0 && frontPadding > 0) {
+		dimension->range.min = dimension->range.min - frontPadding;
+		if (dimension->range.min < d.range.min) {
+			dimension->range.min = d.range.min;
+		}
+	}
+	if (lpuId < lpuCount - 1 && backPadding > 0) {
+		dimension->range.max = dimension->range.max + backPadding;
+		if (dimension->range.max > d.range.max) {
+			dimension->range.max = d.range.max;
+		}
+	}
         return dimension;
 }
 

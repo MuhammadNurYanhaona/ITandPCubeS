@@ -192,6 +192,12 @@ PartitionFunctionConfig *ArrayDataStructure::getPartitionSpecForDimension(int di
 	return NULL;
 }
 
+int ArrayDataStructure::getDimensionality() {
+	if (source != NULL) {
+		return ((ArrayDataStructure*) source)->getDimensionality(); 
+	} else return sourceDimensions->NumElements();
+}
+
 //----------------------------------------------------- Token ---------------------------------------------------/
 
 int Token::wildcardTokenId = -1;

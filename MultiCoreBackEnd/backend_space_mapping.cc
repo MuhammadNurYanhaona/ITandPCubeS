@@ -195,7 +195,9 @@ void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoo
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (programFile.is_open()) {
-		programFile << "// macro definitions for LPSes\n";
+		programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+		programFile << "macro definitions for LPSes" << std::endl;
+		programFile << "------------------------------------------------------------------------------------*/" << std::endl;
 		std::deque<MappingNode*> nodeQueue;
 		nodeQueue.push_back(mappingRoot);
 		while (!nodeQueue.empty()) {
@@ -217,7 +219,9 @@ void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcube
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (programFile.is_open()) {
-		programFile << "// macro definitions for PPS counts\n";
+		programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+		programFile << "macro definitions for PPS counts" << std::endl;
+		programFile << "------------------------------------------------------------------------------------*/" << std::endl;
 		PPS_Definition *pps = pcubesConfig->Nth(0);
 		int prevSpaceId = pps->id;
 		programFile << "#define Space_" << pps->id << "_PPUs";
@@ -253,6 +257,9 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 	std::ostringstream functionHeader;
 	functionHeader << "int " << defaultParameter;
 	std::ostringstream functionBody;
+	functionBody << statementIndent; 
+	functionBody << "int *count = new int[" << dimensionality << "]";
+	functionBody << statementSeparator;
 
 	// iterate over the dimension of the space and for each dimension pick an array partition to
 	// be used for partition-count calculation
@@ -321,26 +328,15 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 
 			fnCall << ")";
 			functionBody << statementIndent; 
-			functionBody << "count" << i << " = " << fnCall.str();
+			functionBody << "count[" << i << "] = " << fnCall.str();
 			functionBody << statementSeparator;	
 			break;
 		}
 	}
-	if (dimensionality > 1) {
-		// if the space is multidimensional then partition counts along individual dimensions 
-		// are multiplied to generate the final count
-		functionBody << statementIndent << "count = count1";
-		for (int i = 2; i <= dimensionality; i++) {
-			functionBody << " * count" << i;
-		}
-		functionBody << statementSeparator;
-		functionBody << statementIndent << "return count" << statementSeparator;
-	} else {
-		functionBody << statementIndent << "return count1" << statementSeparator;
-	}
+	functionBody << statementIndent << "return count" << statementSeparator;
 
 	// write the function specification in the output file
-	programFile << "int getLPUsCountOfSpace" << space->getName();
+	programFile << "int *getLPUsCountOfSpace" << space->getName();
 	programFile << "(" << functionHeader.str() << ") {\n"; 
 	programFile << functionBody.str() << "}" << std::endl;
 	
@@ -359,8 +355,10 @@ Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const cha
 	}
 
 	// add a common comments for all these functions
-	programFile << "//******************************** ";
+	programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
 	programFile << "functions for retrieving partition counts in different LPSes" << std::endl;
+	programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	programFile << std::endl;
 
 	Hashtable<List<PartitionParameterConfig*>*> *paramTable 
 			= new Hashtable<List<PartitionParameterConfig*>*>;		
@@ -379,6 +377,214 @@ Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const cha
 		paramTable->Enter(lps->getName(), paramConfigList, true);
 		programFile << std::endl;
 	}	
+	programFile.close(); 
+	
+	return paramTable;
+}
+
+List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *array,
+        	std::ofstream &programFile, List<Identifier*> *partitionArgs) {
+	
+	std::string parameterSeparator = ", ";
+	std::string statementSeparator = ";\n";
+	std::string statementIndent = "\t";
+	
+	List<int> *argIndexList = new List<int>;
+	int dimensionCount = array->getDimensionality(); 
+	const char *arrayName = array->getName();
+	CoordinateSystem *coordSys = space->getCoordinateSystem();
+	int dimensionality = space->getDimensionCount();
+	List<const char*> *argNameList = new List<const char*>;
+	
+
+	// create two variables for parent LPU (i.e. the LPU of the parent space that will be passed as an 
+	// argument in the function call) and one for the current LPU under concern that will be generated
+	// and returned by the routine
+	std::ostringstream parentVarStr;
+	parentVarStr << arrayName << "ParentLpuDims";
+	std::string parentVar = parentVarStr.str();
+	std::ostringstream currentVarStr;
+	currentVarStr << arrayName << "LpuDims";
+	std::string currentVar = currentVarStr.str();
+	
+	// set the parameters default to all get-LPU routines	
+	std::ostringstream functionHeader;
+	functionHeader << "PartitionDimension **" << "get" << arrayName << "PartFor";
+	functionHeader << "Space" << space->getName() << "Lpu(";
+	functionHeader << "PartitionDimension **" << parentVar << parameterSeparator;
+	functionHeader << std::endl << statementIndent << statementIndent;
+	functionHeader << "int *lpuCount";
+	functionHeader << parameterSeparator << "int *lpuId";
+	std::ostringstream functionBody;
+	functionBody << " {\n" << statementIndent << "PartitionDimension **" << currentVar;
+	functionBody << " = new PartitionDimension[" << dimensionCount << "]" << statementSeparator;
+
+	for (int i = 0; i < dimensionCount; i++) {
+		PartitionFunctionConfig *partConfig = array->getPartitionSpecForDimension(i + 1);
+		// If the partition config along this dimension is null then this dimension is replicated
+		// from the parent. Therefore, we can just copy parent's dimension information in current 
+		// metadata object	
+		if (partConfig == NULL) {
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "] = " << parentVar << '[' << i << ']';
+			functionBody << statementSeparator;
+		// Otherwise, we need to allocate a new metadata variable for this dimension; invoke the
+		// mentioned partition function; and set up other references properly.
+		} else {
+			// allocate a new metadata variable	
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "] = new PartitionDimension"; 
+			functionBody << statementSeparator;
+
+			// copy parent's partition dimension into current LPU's storage dimension
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "]->storageDim = ";
+			functionBody << parentVar << '[' << i << "]->partitionDim";
+			functionBody << statementSeparator;
+
+			// assign the result of partition function invocation to current LPU's partition
+			// dimension and register any partition argument needs to be passed
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "]->partitionDim = ";
+			functionBody << partConfig->getName() << "_getRange(";
+			functionBody <<	parentVar << '[' << i << "]->partitionDim" << parameterSeparator;
+			functionBody << std::endl << statementIndent << statementIndent << statementIndent;
+		
+			// determine which LPU-Count and ID should be used by determining the aligment of
+			// concerned array's current dimension with the dimension of the space	
+			int lpuDimIndex = 0;
+			bool dimDidntMatch = true;
+			for (int j = 1; j <= dimensionality; j++) {
+				Coordinate *coord = coordSys->getCoordinate(j);
+				Token *token = coord->getTokenForDataStructure(arrayName);
+				if (token->getDimensionId() == i + 1) {
+					lpuDimIndex = j - 1;
+					dimDidntMatch = false;
+					break;
+				}
+			}
+			if (dimDidntMatch) std::cout << "problem generating LPUs in Space " 
+					<< space->getName() << " due to variable " << arrayName << std::endl;
+
+			// add two default parameters to the getRange function call
+			functionBody << "lpuCount" << '[' << lpuDimIndex << ']';
+			functionBody << parameterSeparator << "lpuId" << '[' << lpuDimIndex << ']';
+			// check for dividing and padding arguments and append more parameters to the function
+			// call accordingly
+			DataDimensionConfig *argConfig = partConfig->getArgsForDimension(i + 1);
+			Node *dividingArg = argConfig->getDividingArg();
+			if (dividingArg != NULL) {
+				IntConstant *intConst = dynamic_cast<IntConstant*>(dividingArg);
+				if (intConst != NULL) {
+					functionBody << parameterSeparator << intConst->getValue();
+				} else {
+					Identifier *arg = (Identifier*) dividingArg;
+					argNameList->Append(arg->getName());
+					functionBody << parameterSeparator << arg->getName();
+					functionHeader << parameterSeparator << "int " << arg->getName();
+				}
+				if (partConfig->doesSupportGhostRegion()) {
+					// process front padding arg
+					Node *paddingArg = argConfig->getFrontPaddingArg();
+					if (paddingArg == NULL) {
+						// if no padding is provided then a ZERO must be passed to the
+						// called function
+						functionBody << parameterSeparator << "0";
+					} else {
+						IntConstant *intConst = dynamic_cast<IntConstant*>(paddingArg);
+						if (intConst != NULL) {
+							functionBody << parameterSeparator << intConst->getValue();
+						} else {
+							Identifier *arg = (Identifier*) paddingArg;
+							argNameList->Append(arg->getName());
+							functionBody << parameterSeparator << arg->getName();
+							functionHeader << parameterSeparator << "int " << arg->getName();
+						}
+					}
+					// process back padding arg in exact same manner
+					paddingArg = argConfig->getBackPaddingArg();
+					if (paddingArg == NULL) {
+						functionBody << parameterSeparator << "0";
+					} else {
+						IntConstant *intConst = dynamic_cast<IntConstant*>(paddingArg);
+						if (intConst != NULL) {
+							functionBody << parameterSeparator << intConst->getValue();
+						} else {
+							Identifier *arg = (Identifier*) paddingArg;
+							argNameList->Append(arg->getName());
+							functionBody << parameterSeparator << arg->getName();
+							functionHeader << parameterSeparator << "int " << arg->getName();
+						}
+					}
+				}
+			}
+			functionBody << ")" << statementSeparator;
+		}
+	}
+	functionHeader << ")";
+	functionBody << statementIndent << "return " << arrayName << "LpuDims" << statementSeparator;
+	functionBody << "}\n";	
+	programFile << functionHeader.str() << functionBody.str();
+
+	// get the list of argument index from the used argument name list 
+	for (int i = 0; i < argNameList->NumElements(); i++) {
+		const char *argName = argNameList->Nth(i);
+		bool paramFound = false;
+		for (int k = 0; k < partitionArgs->NumElements(); k++) {
+			const char *paramName = partitionArgs->Nth(k)->getName();
+			if (strcmp(argName, paramName) == 0) {
+				argIndexList->Append(k);
+				paramFound = true;
+				break;
+			}
+		} 
+		if (!paramFound) std::cout << "some arguments in the getRange function is in error.";
+	}
+
+	return argIndexList;
+}
+
+Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile,
+                MappingNode *mappingRoot, List<Identifier*> *partitionArgs) {
+	
+	// if the output file cannot be opened then return
+	std::ofstream programFile;
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+  	if (!programFile.is_open()) {
+		std::cout << "Unable to open output program file";
+		return NULL;
+	}
+
+	// add a common comments for all these functions
+	programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+	programFile << "functions for getting data ranges along different dimensions of an LPU" << std::endl;
+	programFile << "-----------------------------------------------------------------------------------*/" << std::endl;
+	programFile << std::endl;
+
+	Hashtable<List<int>*> *paramTable = new Hashtable<List<int>*>;		
+	std::deque<MappingNode*> nodeQueue;
+	nodeQueue.push_back(mappingRoot);
+	while (!nodeQueue.empty()) {
+		MappingNode *node = nodeQueue.front();
+		nodeQueue.pop_front();
+		for (int i = 0; i < node->children->NumElements(); i++) {
+			nodeQueue.push_back(node->children->Nth(i));
+		}
+		Space *lps = node->mappingConfig->LPS;
+		if (lps->getDimensionCount() == 0) continue;
+		List<const char*> *arrayNameList = lps->getLocallyUsedArrayNames();
+		for (int i = 0; i < arrayNameList->NumElements(); i++) {
+			ArrayDataStructure *array = (ArrayDataStructure*) lps->getStructure(arrayNameList->Nth(i));
+			if (!array->isPartitioned()) continue;
+			List<int> *argList = generateGetArrayPartForLPURoutine(lps, array,
+        				programFile, partitionArgs);
+			std::ostringstream entryName;
+			entryName << lps->getName() << "_" << array->getName();
+			paramTable->Enter(entryName.str().c_str(), argList, true);
+			programFile << std::endl;
+		}	
+	}
+	programFile << std::endl;
 	programFile.close(); 
 	
 	return paramTable;

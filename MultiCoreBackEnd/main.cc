@@ -11,6 +11,7 @@
 #include "scanner.h"
 #include "backend_space_mapping.h"
 #include "list.h"
+#include "ast.h"
 #include "ast_def.h"
 #include "errors.h"
 
@@ -34,6 +35,7 @@ int main(int argc, char *argv[]) {
 	//**********************************************************************************
 
 
+
 	//**************************************************************** Back End Compiler
 	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription("/home/yan/pcubes.ml");
 	TaskDef *luTask = (TaskDef*) ProgramDef::program->getTaskDefinition("LU Factorization");
@@ -43,6 +45,8 @@ int main(int argc, char *argv[]) {
         		"/home/yan/opteron-solver-mapping.map", lpsHierarchy, pcubesConfig);
 	generateLPSMacroDefinitions("/home/yan/output.cpp", mappingConfig);
 	generatePPSCountMacros("/home/yan/output.cpp", pcubesConfig);
-	generateLPUCountFunctions("/home/yan/output.cpp", mappingConfig, luTask->getPartitionArguments());
+	List<Identifier*> *partitionArgs = luTask->getPartitionArguments();
+	generateLPUCountFunctions("/home/yan/output.cpp", mappingConfig, partitionArgs);
+	generateAllGetPartForLPURoutines("/home/yan/output.cpp", mappingConfig, partitionArgs);
 }
 

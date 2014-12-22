@@ -95,6 +95,9 @@ const char *StridedBlock::name = "strided_block";
 
 void StridedBlock::processArguments(List<PartitionArg*> *dividingArgs, 
 		List<PartitionArg*> *paddingArgs, const char *argumentName) {
+	if (paddingArgs != NULL && paddingArgs->NumElements() != 0) {
+		ReportError::PaddingArgumentsNotSupported(location, functionName);	
+	}
 	SingleArgumentPartitionFunction::processArguments(dividingArgs, paddingArgs, "block size");
 }
 

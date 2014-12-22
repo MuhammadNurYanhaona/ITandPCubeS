@@ -29,11 +29,17 @@ int block_stride_partitionCount(Dimension d, int ppuCount, int size);
 
    The signature for these functions are as follows
 
-   Dimension *$(FUNCTION)_getRange(Dimension d, int lpuCount, int lpuId, ...)		
+   Dimension *$(FUNCTION)_getRange(Dimension d, int lpuCount, int lpuId, ...)
+
+   Note that if a partition function supports overlapping boundary/ghost regions among
+   adjacent LPUs then two padding parameters (for front and back ends) should be
+   added in the range function to adjust the returned dimension range appropriately. 		
 */
 
-Dimension *block_size_getRange(Dimension d, int lpuCount, int lpuId, int size); 
-Dimension *block_count_getRange(Dimension d, int lpuCount, int lpuId, int count); 
+Dimension *block_size_getRange(Dimension d, int lpuCount, int lpuId, 
+		int size, int frontPadding, int backPadding); 
+Dimension *block_count_getRange(Dimension d, int lpuCount, int lpuId, int count, 
+		int frontPadding, int backPadding); 
 Dimension *stride_getRange(Dimension d, int lpuCount, int lpuId); 
 Dimension *block_stride_getRange(Dimension d, int lpuCount, int lpuId, int size); 
 

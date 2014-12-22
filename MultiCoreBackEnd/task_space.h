@@ -54,6 +54,8 @@ class DataDimensionConfig {
 	int getDimensionNo() { return dimensionNo; }
 	Node *getDividingArg() { return dividingArg; }
 	bool hasPadding() { return (frontPaddingArg != NULL || backPaddingArg != NULL); }		
+	Node *getFrontPaddingArg() { return frontPaddingArg; }
+	Node *getBackPaddingArg() { return backPaddingArg; }
 }; 
 
 /*	This class embodies the detail of application of a single partition functions on a data structure.
@@ -85,6 +87,7 @@ class PartitionFunctionConfig {
 	bool hasOverlappingsAmongPartitions();
 	DataDimensionConfig *getArgsForDimension(int dimensionNo);
 	const char *getName() { return functionName; }
+	virtual bool doesSupportGhostRegion() { return false; }
 };
 
 class DataStructure {
@@ -135,6 +138,8 @@ class ArrayDataStructure : public DataStructure {
 	void addPartitionSpec(PartitionFunctionConfig *partitionConfig);	
 	bool hasOverlappingsAmongPartitions();
 	PartitionFunctionConfig *getPartitionSpecForDimension(int dimensionNo);	
+	bool isPartitioned() { return partitionSpecs != NULL && partitionSpecs->NumElements() > 0; }
+	int getDimensionality();
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions
