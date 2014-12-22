@@ -9,17 +9,17 @@
 
 // here we need to include things needed for the yylval union
   
-#include "scanner.h"            // for MaxIdentLen
-#include "list.h"
-#include "ast.h"
-#include "ast_type.h"
-#include "ast_def.h"
-#include "ast_task.h"
-#include "ast_partition.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_library_fn.h"
-#include "task_space.h"		// for PartitionOrder
+#include "scanner.h"            		// for MaxIdentLen
+#include "utils/list.h"
+#include "syntax/ast.h"
+#include "syntax/ast_type.h"
+#include "syntax/ast_def.h"
+#include "syntax/ast_task.h"
+#include "syntax/ast_partition.h"
+#include "syntax/ast_stmt.h"
+#include "syntax/ast_expr.h"
+#include "syntax/ast_library_fn.h"
+#include "semantics/task_space.h"		// for PartitionOrder
  
 // Next, we want to get the exported defines for the token codes and
 // typedef for YYSTYPE and exported global variable yylval.  These

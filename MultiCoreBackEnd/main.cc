@@ -9,11 +9,11 @@
 
 #include "parser.h"
 #include "scanner.h"
-#include "backend_space_mapping.h"
-#include "list.h"
-#include "ast.h"
-#include "ast_def.h"
-#include "errors.h"
+#include "codegen/space_mapping.h"
+#include "utils/list.h"
+#include "syntax/ast.h"
+#include "syntax/ast_def.h"
+#include "syntax/errors.h"
 
 int main(int argc, char *argv[]) {
 	

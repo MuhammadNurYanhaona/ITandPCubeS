@@ -8,8 +8,8 @@
  */
 #include "scanner.h" // for yylex
 #include "parser.h"
-#include "utility.h"
-#include "errors.h"
+#include "utils/utility.h"
+#include "syntax/errors.h"
 
 void yyerror(const char *msg); // standard error-handling routine
 %}
