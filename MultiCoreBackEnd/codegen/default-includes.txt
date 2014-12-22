@@ -1,0 +1,16 @@
+// for error reporting and diagnostics
+#include <iostream>
+#include <string>
+#include <cstdlib>
+
+// for LPU and PPU management data structures
+#include "../structure.h"
+
+// for utility routines
+#include "../utils/list.h"
+#include "../utils/hashtable.h"
+#include "../utils/string_utils.h"
+
+// for routines related to partition functions
+#include "../partition-lib/index_xform.h"
+#include "../partition-lib/partition_mgmt.h"

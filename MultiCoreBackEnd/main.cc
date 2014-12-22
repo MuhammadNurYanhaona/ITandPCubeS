@@ -9,6 +9,7 @@
 
 #include "parser.h"
 #include "scanner.h"
+#include "codegen/code_generator.h"	
 #include "codegen/space_mapping.h"
 #include "utils/list.h"
 #include "syntax/ast.h"
@@ -37,16 +38,18 @@ int main(int argc, char *argv[]) {
 
 
 	//**************************************************************** Back End Compiler
+	const char *programFile = "/home/yan/output.cpp";
+	initializeOutputFile(programFile);
 	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription("/home/yan/pcubes.ml");
 	TaskDef *luTask = (TaskDef*) ProgramDef::program->getTaskDefinition("LU Factorization");
 	if (luTask == NULL) std::cout << "could not find LU factorization task\n";
 	PartitionHierarchy *lpsHierarchy = luTask->getPartitionHierarchy();
 	MappingNode *mappingConfig = parseMappingConfiguration("LU Factorization",
         		"/home/yan/opteron-solver-mapping.map", lpsHierarchy, pcubesConfig);
-	generateLPSMacroDefinitions("/home/yan/output.cpp", mappingConfig);
-	generatePPSCountMacros("/home/yan/output.cpp", pcubesConfig);
+	generateLPSMacroDefinitions(programFile, mappingConfig);
+	generatePPSCountMacros(programFile, pcubesConfig);
 	List<Identifier*> *partitionArgs = luTask->getPartitionArguments();
-	generateLPUCountFunctions("/home/yan/output.cpp", mappingConfig, partitionArgs);
-	generateAllGetPartForLPURoutines("/home/yan/output.cpp", mappingConfig, partitionArgs);
+	generateLPUCountFunctions(programFile, mappingConfig, partitionArgs);
+	generateAllGetPartForLPURoutines(programFile, mappingConfig, partitionArgs);
 }
 
