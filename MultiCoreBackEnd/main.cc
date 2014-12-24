@@ -46,10 +46,14 @@ int main(int argc, char *argv[]) {
 	PartitionHierarchy *lpsHierarchy = luTask->getPartitionHierarchy();
 	MappingNode *mappingConfig = parseMappingConfiguration("LU Factorization",
         		"/home/yan/opteron-solver-mapping.map", lpsHierarchy, pcubesConfig);
+	// generate macro definitions needed for various reasons
 	generateLPSMacroDefinitions(programFile, mappingConfig);
 	generatePPSCountMacros(programFile, pcubesConfig);
+	generateThreadCountMacros(programFile, mappingConfig, pcubesConfig);
+	// generate library routines for LPUs management	
 	List<Identifier*> *partitionArgs = luTask->getPartitionArguments();
 	generateLPUCountFunctions(programFile, mappingConfig, partitionArgs);
 	generateAllGetPartForLPURoutines(programFile, mappingConfig, partitionArgs);
+	generateFnForThreadIdsAllocation(programFile, mappingConfig, pcubesConfig);
 }
 

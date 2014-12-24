@@ -200,7 +200,9 @@ void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoo
 		programFile << "------------------------------------------------------------------------------------*/" << std::endl;
 		std::deque<MappingNode*> nodeQueue;
 		nodeQueue.push_back(mappingRoot);
+		int spaceCount = 0;
 		while (!nodeQueue.empty()) {
+			spaceCount++;	
 			MappingNode *node = nodeQueue.front();
 			nodeQueue.pop_front();
 			for (int i = 0; i < node->children->NumElements(); i++) {
@@ -209,6 +211,7 @@ void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoo
 			programFile << "#define Space_" << node->mappingConfig->LPS->getName();
 			programFile << " " << node->index << std::endl;	
 		}
+		programFile << "#define Space_Count " << spaceCount << std::endl;
 		programFile << std::endl; 
     		programFile.close();
   	}
@@ -328,7 +331,7 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 
 			fnCall << ")";
 			functionBody << statementIndent; 
-			functionBody << "count[" << i << "] = " << fnCall.str();
+			functionBody << "count[" << i - 1 << "] = " << fnCall.str();
 			functionBody << statementSeparator;	
 			break;
 		}
@@ -584,7 +587,6 @@ Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile,
 			programFile << std::endl;
 		}	
 	}
-	programFile << std::endl;
 	programFile.close(); 
 	
 	return paramTable;

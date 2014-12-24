@@ -5,8 +5,9 @@
 #include "../semantics/task_space.h"
 #include <iostream>
 
-/* structure definition to keep track of the configuration of a PCubeS space */
-typedef struct {
+/* object definition to keep track of the configuration of a PCubeS space */
+class PPS_Definition {
+  public:
 	int id;
 	const char *name;
 	int units;
@@ -16,7 +17,7 @@ typedef struct {
 	   marked as '*' besides its name.
 	*/
 	bool coreSpace;
-} PPS_Definition;
+};
 
 /* structure definition to identify an LPS-PPS mapping */
 typedef struct {
@@ -82,8 +83,5 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *a
 /* function that calls the above function for all arrays partitioned in different spaces */
 Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile, 
 		MappingNode *mappingRoot, List<Identifier*> *partitionArgs);
-
-/* function definition for generating the runtime library routine that will create ThreadIds */
-void generateFnForThreadIdsAllocation(char *outputFile, MappingNode *mappingRoot);
 
 #endif
