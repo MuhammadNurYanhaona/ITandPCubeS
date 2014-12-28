@@ -6,6 +6,15 @@
 
 /********************************************  LPU Counter  ***********************************************/
 
+LpuCounter::LpuCounter() {
+	lpsDimensions = 0;
+	lpuCounts = NULL;
+	lpusUnderDimensions = NULL;
+	currentLpuId = NULL;
+	currentRange = NULL;
+	currentLinearLpuId = INVALID_ID;
+}
+
 LpuCounter::LpuCounter(int lpsDimensions) {
 	
 	this->lpsDimensions = lpsDimensions;
@@ -31,22 +40,30 @@ void LpuCounter::setLpuCounts(int lpuCounts[]) {
 	} 
 }
 
-void LpuCounter::setCurrentRange(PPU_Ids ppuIds) {
-	
+void LpuCounter::setCurrentRange(PPU_Ids ppuIds) {	
 	int totalLpus = 1;
 	for (int i = 0; i < lpsDimensions; i++) {
 		totalLpus *= lpuCounts[i];
 	}
 
 	int ppuCount = ppuIds.ppuCount;
-	int lpusPerPpu = totalLpus / ppuCount;
-	int extraLpus = totalLpus % ppuCount;
 	int groupId = ppuIds.groupId;
-	
-	currentRange->startId = lpusPerPpu * groupId;
-	currentRange->endId = currentRange->startId + lpusPerPpu - 1;
-	if (groupId == ppuCount - 1) {
-		currentRange->endId = currentRange->endId + extraLpus; 
+	if (ppuCount > totalLpus) {
+		if (groupId < totalLpus) {
+			currentRange->startId = groupId;
+			currentRange->endId = groupId;
+		} else {
+			currentRange->startId = INVALID_ID;
+			currentRange->endId = INVALID_ID;
+		}
+	} else {
+		int lpusPerPpu = totalLpus / ppuCount;
+		int extraLpus = totalLpus % ppuCount;
+		currentRange->startId = lpusPerPpu * groupId;
+		currentRange->endId = currentRange->startId + lpusPerPpu - 1;
+		if (groupId == ppuCount - 1) {
+			currentRange->endId = currentRange->endId + extraLpus; 
+		}
 	}
 }
 
@@ -77,10 +94,31 @@ void LpuCounter::resetCounter() {
 	currentLinearLpuId = INVALID_ID;
 }
 
+/***************************************** Mock Lpu Counter  **********************************************/
+
+MockLpuCounter::MockLpuCounter(PPU_Ids ppuIds) : LpuCounter() {
+	active = (ppuIds.groupId == 0); 
+}
+
+int MockLpuCounter::getNextLpuId(int previousLpuId) {
+	if (!active) return INVALID_ID;
+	if (previousLpuId == INVALID_ID) return 0;
+	return INVALID_ID;
+}
+
+int *MockLpuCounter::setCurrentCompositeLpuId(int linearId) { 
+	currentLinearLpuId = linearId;
+	return &currentLinearLpuId; 
+}
+
 /*********************************************  LPS State  ************************************************/
 
-LpsState::LpsState(int lpsDimensions) {
-	counter = new LpuCounter(lpsDimensions);
+LpsState::LpsState(int lpsDimensions, PPU_Ids ppuIds) {
+	if (lpsDimensions == 0) {
+		counter = new MockLpuCounter(ppuIds);
+	} else {
+		counter = new LpuCounter(lpsDimensions);
+	}
 	checkpointed = false;
 	currentLpu = NULL;
 }
@@ -91,7 +129,7 @@ ThreadState::ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, T
 	this->lpsCount = lpsCount;
 	lpsStates = new LpsState*[lpsCount];
 	for (int i = 0; i < lpsCount; i++) {
-		lpsStates[i] = new LpsState(lpsDimensions[i]);
+		lpsStates[i] = new LpsState(lpsDimensions[i], threadIds->ppuIds[i]);
 	}
 	lpsParentIndexMap = NULL;
 	this->partitionArgs = partitionArgs;

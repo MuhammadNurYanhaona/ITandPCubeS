@@ -18,12 +18,12 @@
  * creates lots of copies.
  */
 
-Type *Type::intType    		= new Type("Integer");
-Type *Type::floatType  		= new Type("Real single-precison");
-Type *Type::doubleType 		= new Type("Real double-precision");
-Type *Type::charType   		= new Type("Character");
-Type *Type::boolType   		= new Type("Boolean");
-Type *Type::stringType 		= new Type("String");
+Type *Type::intType    		= new Type("int");
+Type *Type::floatType  		= new Type("float");
+Type *Type::doubleType 		= new Type("double");
+Type *Type::charType   		= new Type("char");
+Type *Type::boolType   		= new Type("bool");
+Type *Type::stringType 		= new Type("std::string");
 Type *Type::epochType   	= new Type("Epoch");
 Type *Type::dimensionType  	= new Type("Dimension");
 Type *Type::rangeType   	= new Type("Range");

@@ -38,26 +38,38 @@ class LpuCounter {
 	int *currentLpuId;
 	// linear equivalent of the multidimensional id
 	int currentLinearLpuId;
+	// a constructor to be utilized by subclasses
+	LpuCounter();
   public:
 	LpuCounter(int lpsDimensions);
-	void setLpuCounts(int *lpuCounts);
-	int *getLpuCounts() { return lpuCounts; }
-	void setCurrentRange(PPU_Ids ppuIds);
-	int *getCompositeLpuId() { return currentLpuId; }
-	int *setCurrentCompositeLpuId(int linearId);
+	virtual void setLpuCounts(int *lpuCounts);
+	virtual int *getLpuCounts() { return lpuCounts; }
+	virtual void setCurrentRange(PPU_Ids ppuIds);
+	virtual int *getCompositeLpuId() { return currentLpuId; }
+	virtual int *setCurrentCompositeLpuId(int linearId);
 	int getCurrentLpuId() { return currentLinearLpuId; }
+	virtual int getNextLpuId(int previousLpuId);
+	virtual void resetCounter();
+};
+
+class MockLpuCounter : public LpuCounter {
+  protected:
+	bool active;
+  public:
+	MockLpuCounter(PPU_Ids ppuIds);
+	void setLpuCounts(int *lpuCounts) {}
+	int *getLpuCounts() { return NULL; }
+	void setCurrentRange(PPU_Ids ppuIds) {}
+	int *getCompositeLpuId() { return &currentLinearLpuId; }
+	int *setCurrentCompositeLpuId(int linearId);
 	int getNextLpuId(int previousLpuId);
-	void resetCounter();
+	void resetCounter() { currentLinearLpuId = INVALID_ID; }
 };
 
 /* base class for LPUs of all LPSes; task specific subclasses will add other necessary fields  */
 class LPU {
-  protected: 
+  public: 
 	int id;
-  public:
-	LPU(int id) { this->id = id; }
-	int getId();
-	virtual ~LPU() {} 	
 };
 
 /* class for holding all necessary state information for an LPS of a thread */
@@ -71,7 +83,7 @@ class LpsState {
 	// a current LPU reference to aid in calculating LPUs for descendent LPSes
 	LPU *currentLpu;
   public:
-	LpsState(int lpsDimensions);
+	LpsState(int lpsDimensions, PPU_Ids ppuIds);
 	void checkpointState() { checkpointed = true; }
 	bool isCheckpointed() { return checkpointed; }
 	void removeCheckpoint() { checkpointed = false; }

@@ -91,7 +91,7 @@ List<int> *BlockCount::getBlockedDimensions(Type *structureType) {
 
 //--------------------------------------------------- Strided Block ----------------------------------------------/
 
-const char *StridedBlock::name = "strided_block";
+const char *StridedBlock::name = "block_stride";
 
 void StridedBlock::processArguments(List<PartitionArg*> *dividingArgs, 
 		List<PartitionArg*> *paddingArgs, const char *argumentName) {
@@ -103,7 +103,7 @@ void StridedBlock::processArguments(List<PartitionArg*> *dividingArgs,
 
 //----------------------------------------------------- Strided --------------------------------------------------/
 
-const char *Strided::name = "strided";
+const char *Strided::name = "stride";
 
 void Strided::processArguments(List<PartitionArg*> *dividingArgs, List<PartitionArg*> *paddingArgs) {
 	

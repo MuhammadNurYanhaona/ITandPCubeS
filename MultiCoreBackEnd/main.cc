@@ -15,6 +15,7 @@
 #include "syntax/ast.h"
 #include "syntax/ast_def.h"
 #include "syntax/errors.h"
+#include "syntax/ast_task.h"
 
 int main(int argc, char *argv[]) {
 	
@@ -38,7 +39,7 @@ int main(int argc, char *argv[]) {
 
 
 	//**************************************************************** Back End Compiler
-	const char *programFile = "/home/yan/output.cpp";
+	const char *programFile = "build/output.cc";
 	initializeOutputFile(programFile);
 	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription("/home/yan/pcubes.ml");
 	TaskDef *luTask = (TaskDef*) ProgramDef::program->getTaskDefinition("LU Factorization");
@@ -55,5 +56,8 @@ int main(int argc, char *argv[]) {
 	generateLPUCountFunctions(programFile, mappingConfig, partitionArgs);
 	generateAllGetPartForLPURoutines(programFile, mappingConfig, partitionArgs);
 	generateFnForThreadIdsAllocation(programFile, mappingConfig, pcubesConfig);
+	generateLpuDataStructures(programFile, mappingConfig);
+	generateArrayMetadataAndEnvLinks(programFile, mappingConfig, 
+			luTask->getEnvironmentLinks());
 }
 

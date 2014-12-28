@@ -72,7 +72,7 @@ Task "LU Factorization":
 	Partition(s):
 		Space A <un-partitioned> { p }
 		Space B <1D> divides Space A partitions {
-			a<dim2>, u<dim2>, l<dim2>: strided ()
+			a<dim2>, u<dim2>, l<dim2>: stride ()
 			l_column: replicated
 		} 
 		Space C <1D> <dynamic> divides Space A partitions { 

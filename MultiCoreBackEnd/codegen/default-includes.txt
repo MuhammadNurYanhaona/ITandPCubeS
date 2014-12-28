@@ -4,7 +4,8 @@
 #include <cstdlib>
 
 // for LPU and PPU management data structures
-#include "../structure.h"
+#include "../codegen/structure.h"
+#include "../codegen/lpu_management.h"
 
 // for utility routines
 #include "../utils/list.h"

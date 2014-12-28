@@ -21,8 +21,8 @@ typedef struct {
 /* structure to demarcate the region of a dimension of an array that falls inside a single LPU */
 
 typedef struct {
-        Dimension storageDim;
-        Dimension partitionDim;
+        Dimension *storageDim;
+        Dimension *partitionDim;
 } PartitionDimension;
 
 /* structure for holding a sequence of LPU ids */
@@ -44,7 +44,7 @@ typedef struct {
 
 /* a structure to hold PPU ids of a thread for different spaces */
 typedef struct {
-	PPU_Ids ppuIds[];
+	PPU_Ids *ppuIds;
 } ThreadIds;
 
 /* a structure to group active LPUs of a dynamic space against corresponding PPUs */

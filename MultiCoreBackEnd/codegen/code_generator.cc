@@ -1,5 +1,8 @@
 #include "code_generator.h"
 #include "space_mapping.h"
+#include "../semantics/task_space.h"
+#include "../utils/list.h"
+#include "../syntax/ast_task.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -116,7 +119,7 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 	functionBody << "ThreadIds *threadIds = new ThreadIds";
 	functionBody << statementSeparator;
 	// allocate a new array to hold the PPU Ids of the thread
-	functionBody << statementIndent<< "threadIds->ppuIds = new PPU_ids[Space_Count]" << statementSeparator;
+	functionBody << statementIndent<< "threadIds->ppuIds = new PPU_Ids[Space_Count]" << statementSeparator;
 	// declare a local array to hold the index of the thread in different PPS group for ID assignment
 	// to be done accurately 
 	functionBody << statementIndent << "int idsArray[Space_Count]" << statementSeparator;
@@ -130,7 +133,7 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 	// declare some local variables needed for thread Id calculation
 	functionBody << std::endl;
 	functionBody << statementIndent << "int threadCount" << statementSeparator;
-	functionBody << statementIndent << "int groupSize" << statementSeparator;
+	functionBody << statementIndent << "int ppuCount" << statementSeparator;
 	functionBody << statementIndent << "int groupThreadId" << statementSeparator;
 	functionBody << std::endl;
 
@@ -161,11 +164,7 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 		std::string varName = varNameStr.str();
 		std::ostringstream groupThreadIdStr; 
 		
-		// allocate a variable for PPU-Ids for current PPS
 		functionBody << statementIndent << "// for Space " << lps->getName() << statementSeparator;
-		functionBody << statementIndent; 
-		functionBody << varName << " = new PPU_Ids" << statementSeparator;
-
 		// determine the total number of threads contributing in the parent PPS and current thread's 
 		// index in that PPS 
 		if (parent == mappingRoot) {
@@ -174,7 +173,7 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 			groupThreadIdStr << "idsArray[Space_Root]";
 		} else {
 			functionBody << statementIndent;
-			functionBody << "threadCount = " << namePrefix << parentLps->getName() << "]->groupSize";
+			functionBody << "threadCount = " << namePrefix << parentLps->getName() << "].ppuCount";
 			functionBody << statementSeparator;
 			groupThreadIdStr << "idsArray[Space_" << parentLps->getName() << "]";
 		}
@@ -182,31 +181,31 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 		// determine the number of threads per group in the current PPS
 		functionBody << statementIndent;
 		if (lps->getDimensionCount() > 0) {
-			functionBody << "groupSize = threadCount" << " / " << partitionCount;
-		} else 	functionBody << "groupSize = threadCount";
+			functionBody << "ppuCount = threadCount" << " / " << partitionCount;
+		} else 	functionBody << "ppuCount = threadCount";
 		functionBody << statementSeparator;
 
 		// determine the id of the thread in the group it belongs to	
 		functionBody << statementIndent;
-		functionBody << "groupThreadId = " << groupThreadIdStr.str() << " \% groupSize";
+		functionBody << "groupThreadId = " << groupThreadIdStr.str() << " \% ppuCount";
 		functionBody << statementSeparator;
 
 		// assign proper group Id and group size in the PPU-Ids variable created before 
 		functionBody << statementIndent;
-		functionBody  << varName << "->groupId = " << groupThreadIdStr.str() << " / groupSize";
+		functionBody  << varName << ".groupId = " << groupThreadIdStr.str() << " / ppuCount";
 		functionBody << statementSeparator;	
 		functionBody << statementIndent;
-		functionBody  << varName << "->groupSize = groupSize";
+		functionBody  << varName << ".ppuCount = ppuCount";
 		functionBody << statementSeparator;
 
 		// assign PPU Id to the thread depending on its groupThreadId
 		functionBody << statementIndent;
-		functionBody << "if (groupThreadId == 0) " << varName << "->id = \n"; 
+		functionBody << "if (groupThreadId == 0) " << varName << ".id\n"; 
 		functionBody << statementIndent << statementIndent << statementIndent;
-		functionBody << varName << "->groupId";
+		functionBody <<  "= " << varName << ".groupId";
 		functionBody << statementSeparator;	
 		functionBody << statementIndent;
-		functionBody << "else " << varName << "->id = INVALID_ID";
+		functionBody << "else " << varName << ".id = INVALID_ID";
 		functionBody << statementSeparator;	
 		
 		// store the index of the thread in the group for subsequent references	
@@ -221,4 +220,109 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 	programFile << std::endl << functionHeader.str() << " " << functionBody.str();
 	programFile << std::endl;
 	programFile.close();
+}
+
+void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot) {
+        
+	std::string statementSeparator = ";\n";
+        std::string statementIndent = "\t";
+	std::ofstream programFile;
+        
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+        if (programFile.is_open()) {
+                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+                programFile << "Data structures representing LPS and LPU contents " << std::endl;
+                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	}
+	else std::cout << "Unable to open output program file";
+
+	std::deque<MappingNode*> nodeQueue;
+        nodeQueue.push_back(mappingRoot);
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		Space *lps = node->mappingConfig->LPS;
+		List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
+
+		// create the object for containing references to data structures of the LPS
+		programFile << "\nclass Space" << lps->getName() << "_Content {\n";
+		programFile << "  public:\n";
+		for (int i = 0; i < localArrays->NumElements(); i++) {
+			ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(localArrays->Nth(i));
+			ArrayType *arrayType = (ArrayType*) array->getType();
+			const char *elemType = arrayType->getTerminalElementType()->getName();
+			programFile << statementIndent << elemType << " *" << array->getName();
+			programFile << statementSeparator;	
+		}
+		programFile << "};\n\n";
+
+		// create the object for representing an LPU of the LPS
+		programFile << "class Space" << lps->getName() << "_LPU : public LPU {\n";
+		programFile << "  public:\n";
+		for (int i = 0; i < localArrays->NumElements(); i++) {
+			ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(localArrays->Nth(i));
+			ArrayType *arrayType = (ArrayType*) array->getType();
+			const char *elemType = arrayType->getTerminalElementType()->getName();
+			programFile << statementIndent << elemType << " *" << array->getName();
+			programFile << statementSeparator;
+			int dimensions = array->getDimensionality();
+			programFile << statementIndent << "PartitionDimension **";
+			programFile << array->getName() << "PartDims";
+			programFile << statementSeparator;	
+		}
+		programFile << "};\n";
+	}
+	
+	programFile << std::endl;
+	programFile.close();
+}
+
+void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappingRoot,
+                List<EnvironmentLink*> *envLinks) {
+	
+	std::string statementSeparator = ";\n";
+        std::string statementIndent = "\t";
+	std::ofstream programFile;
+        
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+        if (programFile.is_open()) {
+                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+                programFile << "Data structures for Array-Metadata and Environment-Links " << std::endl;
+                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	}
+	else std::cout << "Unable to open output program file";
+	
+	Space *rootLps = mappingRoot->mappingConfig->LPS;
+	programFile << "\nclass ArrayMetadata {\n";
+	programFile << "  public:\n";
+	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
+	for (int i = 0; i < localArrays->NumElements(); i++) {
+		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(localArrays->Nth(i));
+		int dimensions = array->getDimensionality();
+		programFile << statementIndent;
+		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
+		programFile << statementSeparator;
+	}
+	programFile << "};\n";
+	
+	programFile << "\nclass EnvironmentLinks {\n";
+	programFile << "  public:\n";
+	for (int i = 0; i < envLinks->NumElements(); i++) {
+		EnvironmentLink *link = envLinks->Nth(i);
+		if (!link->isExternal()) continue;
+		const char *linkName = link->getVariable()->getName();
+		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(localArrays->Nth(i));
+		ArrayType *arrayType = (ArrayType*) array->getType();
+		const char *elemType = arrayType->getTerminalElementType()->getName();
+		programFile << statementIndent << elemType << " *" << array->getName();
+		programFile << statementSeparator;
+		int dimensions = array->getDimensionality();
+		programFile << statementIndent;
+		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
+		programFile << statementSeparator;	
+	}	
+	programFile << "};\n";
 }

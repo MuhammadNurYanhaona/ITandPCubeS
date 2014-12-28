@@ -420,7 +420,7 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *a
 	functionHeader << parameterSeparator << "int *lpuId";
 	std::ostringstream functionBody;
 	functionBody << " {\n" << statementIndent << "PartitionDimension **" << currentVar;
-	functionBody << " = new PartitionDimension[" << dimensionCount << "]" << statementSeparator;
+	functionBody << " = new PartitionDimension*[" << dimensionCount << "]" << statementSeparator;
 
 	for (int i = 0; i < dimensionCount; i++) {
 		PartitionFunctionConfig *partConfig = array->getPartitionSpecForDimension(i + 1);
@@ -449,7 +449,7 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *a
 			// dimension and register any partition argument needs to be passed
 			functionBody << statementIndent;
 			functionBody << currentVar << '[' << i << "]->partitionDim = ";
-			functionBody << partConfig->getName() << "_getRange(";
+			functionBody << partConfig->getName() << "_getRange(*";
 			functionBody <<	parentVar << '[' << i << "]->partitionDim" << parameterSeparator;
 			functionBody << std::endl << statementIndent << statementIndent << statementIndent;
 		

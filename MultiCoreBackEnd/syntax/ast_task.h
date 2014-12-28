@@ -62,6 +62,9 @@ class EnvironmentLink : public Node {
         const char *GetPrintNameForNode();
         void PrintChildren(int indentLevel);
 	Identifier *getVariable() { return var; }
+
+	// Helper routines for back-end compiler
+	bool isExternal() { return (mode == TypeLink || mode == TypeCreateIfNotLinked); }
 };
 
 class EnvironmentConfig : public Node {
@@ -255,6 +258,7 @@ class TaskDef : public Definition {
 	const char *getName() { return id->getName(); }
 	PartitionHierarchy *getPartitionHierarchy();
 	List<Identifier*> *getPartitionArguments();
+	List<EnvironmentLink*> *getEnvironmentLinks() { return environment->getLinks(); }
 };
 
 #endif
