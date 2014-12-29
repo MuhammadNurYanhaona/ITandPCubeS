@@ -323,11 +323,21 @@ Thread-State implementation class for the task
 
 class ThreadStateImpl : public ThreadState {
   public:
-	virtual void setLpsParentIndexMap() = 0;
+	void setLpsParentIndexMap();
         virtual void setRootLpu() = 0;
         int *computeLpuCounts(int lpsId);
         virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;
 };
+
+// Constraction of task specific LPS hierarchy index map
+void ThreadStateImpl::setLpsParentIndexMap() {
+	lpsParentIndexMap = new int[Space_Count];
+	lpsParentIndexMap[Space_Root] = INVALID_ID;
+	lpsParentIndexMap[Space_A] = Space_Root;
+	lpsParentIndexMap[Space_B] = Space_A;
+	lpsParentIndexMap[Space_C] = Space_A;
+	lpsParentIndexMap[Space_D] = Space_C;
+}
 
 // Implementation of task specific compute-LPU-Count function 
 int *ThreadStateImpl::computeLpuCounts(int lpsId) {

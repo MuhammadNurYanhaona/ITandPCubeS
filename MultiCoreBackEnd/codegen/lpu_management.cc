@@ -120,7 +120,7 @@ LpsState::LpsState(int lpsDimensions, PPU_Ids ppuIds) {
 		counter = new LpuCounter(lpsDimensions);
 	}
 	checkpointed = false;
-	currentLpu = NULL;
+	lpu = NULL;
 }
 
 /*******************************************  Thread State  ***********************************************/

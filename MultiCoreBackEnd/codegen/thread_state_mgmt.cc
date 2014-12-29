@@ -10,6 +10,43 @@
 #include <sstream>
 #include <string>
 
+void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
+	
+        programFile << "// Construction of task specific LPS hierarchy index map\n";
+	
+	std::string statementSeparator = ";\n";
+        std::string singleIndent = "\t";
+	std::ostringstream allocateStmt;
+	std::ostringstream initializeStmts;
+
+	allocateStmt << singleIndent << "lpsParentIndexMap = new int";
+	allocateStmt << "[Space_Count]" << statementSeparator;
+	initializeStmts << singleIndent << "lpsParentIndexMap[Space_";
+	initializeStmts << mappingRoot->mappingConfig->LPS->getName();
+	initializeStmts << "] = INVALID_ID" << statementSeparator;
+
+	std::deque<MappingNode*> nodeQueue;
+        for (int i = 0; i < mappingRoot->children->NumElements(); i++) {
+        	nodeQueue.push_back(mappingRoot->children->Nth(i));
+        }
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		Space *lps = node->mappingConfig->LPS;
+		initializeStmts << singleIndent;
+		initializeStmts << "lpsParentIndexMap[Space_" << lps->getName() << "] = ";
+		initializeStmts << "Space_" << lps->getParent()->getName();
+		initializeStmts << statementSeparator;
+	}
+
+	programFile << "void ThreadStateImpl::setLpsParentIndexMap() {\n";
+	programFile << allocateStmt.str() << initializeStmts.str();
+	programFile << "}\n\n";
+}
+
 void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *mappingRoot, 
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig) {
 
@@ -130,6 +167,8 @@ void generateThreadStateImpl(const char *outputFile, MappingNode *mappingRoot,
 	}
 	else std::cout << "Unable to open common include file";
 
+	// construct the index array that encode the LPS hierarchy for this task
+	generateParentIndexMapRoutine(programFile, mappingRoot);
 	// then call the get-LPU-Count function generator method for class specific implementation
 	generateComputeLpuCountRoutine(programFile, mappingRoot, countFunctionsArgsConfig);
  
