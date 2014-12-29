@@ -80,15 +80,16 @@ class LpsState {
 	// any descendent LPS will not progress further up from this point. By default the root LPS
 	// will remain checkpointed at the beginning.
 	bool checkpointed;
-	// a current LPU reference to aid in calculating LPUs for descendent LPSes
-	LPU *currentLpu;
   public:
+	// a current LPU reference to aid in calculating LPUs for descendent LPSes
+	LPU *lpu;
+
 	LpsState(int lpsDimensions, PPU_Ids ppuIds);
 	void checkpointState() { checkpointed = true; }
 	bool isCheckpointed() { return checkpointed; }
 	void removeCheckpoint() { checkpointed = false; }
-	void setCurrentLpu(LPU *currentLpu) { this->currentLpu = currentLpu; }
-	LPU *getCurrentLpu() { return currentLpu; }
+	void setCurrentLpu(LPU *currentLpu) { lpu = currentLpu; }
+	LPU *getCurrentLpu() { return lpu; }
 	LpuCounter *getCounter() { return counter; }
 };
 
@@ -115,7 +116,7 @@ class ThreadState {
 	virtual void setLpsParentIndexMap() = 0;
 	virtual void setRootLpu() = 0;
 	virtual int *computeLpuCounts(int lpsId) = 0;
-	virtual LPU *computeNextLpu(int lpsId, int lpuCounts[], int nextLpuId[]) = 0;
+	virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;
 
 	LPU *getNextLpu(int lpsId, int containerLpsId, int currentLpuId);
 	void removeCheckpoint(int lpsId);

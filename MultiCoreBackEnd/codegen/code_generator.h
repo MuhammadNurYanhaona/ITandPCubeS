@@ -23,6 +23,6 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
 		List<EnvironmentLink*> *envLinks);
 
 /* function definition to generate data structures representing LPUs of different LPSes */
-void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot); 
+void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot);
 
 #endif

@@ -324,5 +324,5 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
 		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
 		programFile << statementSeparator;	
 	}	
-	programFile << "};\n";
+	programFile << "};\n\n";
 }

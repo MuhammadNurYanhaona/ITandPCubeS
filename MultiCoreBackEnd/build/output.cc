@@ -148,68 +148,6 @@ PartitionDimension **getuPartForSpaceDLpu(PartitionDimension **uParentLpuDims,
 }
 
 /*-----------------------------------------------------------------------------------
-function to generate PPU IDs and PPU group IDs for a thread
-------------------------------------------------------------------------------------*/
-
-ThreadIds *getPpuIdsForThread(int threadNo)  {
-
-	ThreadIds *threadIds = new ThreadIds;
-	threadIds->ppuIds = new PPU_Ids[Space_Count];
-	int idsArray[Space_Count];
-	idsArray[Space_Root] = threadNo;
-
-	int threadCount;
-	int ppuCount;
-	int groupThreadId;
-
-	// for Space A;
-	threadCount = Total_Threads;
-	ppuCount = threadCount;
-	groupThreadId = idsArray[Space_Root] % ppuCount;
-	threadIds->ppuIds[Space_A].groupId = idsArray[Space_Root] / ppuCount;
-	threadIds->ppuIds[Space_A].ppuCount = ppuCount;
-	if (groupThreadId == 0) threadIds->ppuIds[Space_A].id
-			= threadIds->ppuIds[Space_A].groupId;
-	else threadIds->ppuIds[Space_A].id = INVALID_ID;
-	idsArray[Space_A] = groupThreadId;
-
-	// for Space B;
-	threadCount = threadIds->ppuIds[Space_A].ppuCount;
-	ppuCount = threadCount / 32;
-	groupThreadId = idsArray[Space_A] % ppuCount;
-	threadIds->ppuIds[Space_B].groupId = idsArray[Space_A] / ppuCount;
-	threadIds->ppuIds[Space_B].ppuCount = ppuCount;
-	if (groupThreadId == 0) threadIds->ppuIds[Space_B].id
-			= threadIds->ppuIds[Space_B].groupId;
-	else threadIds->ppuIds[Space_B].id = INVALID_ID;
-	idsArray[Space_B] = groupThreadId;
-
-	// for Space C;
-	threadCount = threadIds->ppuIds[Space_A].ppuCount;
-	ppuCount = threadCount / 4;
-	groupThreadId = idsArray[Space_A] % ppuCount;
-	threadIds->ppuIds[Space_C].groupId = idsArray[Space_A] / ppuCount;
-	threadIds->ppuIds[Space_C].ppuCount = ppuCount;
-	if (groupThreadId == 0) threadIds->ppuIds[Space_C].id
-			= threadIds->ppuIds[Space_C].groupId;
-	else threadIds->ppuIds[Space_C].id = INVALID_ID;
-	idsArray[Space_C] = groupThreadId;
-
-	// for Space D;
-	threadCount = threadIds->ppuIds[Space_C].ppuCount;
-	ppuCount = threadCount / 8;
-	groupThreadId = idsArray[Space_C] % ppuCount;
-	threadIds->ppuIds[Space_D].groupId = idsArray[Space_C] / ppuCount;
-	threadIds->ppuIds[Space_D].ppuCount = ppuCount;
-	if (groupThreadId == 0) threadIds->ppuIds[Space_D].id
-			= threadIds->ppuIds[Space_D].groupId;
-	else threadIds->ppuIds[Space_D].id = INVALID_ID;
-	idsArray[Space_D] = groupThreadId;
-
-	return threadIds;
-}
-
-/*-----------------------------------------------------------------------------------
 Data structures representing LPS and LPU contents 
 ------------------------------------------------------------------------------------*/
 
@@ -316,3 +254,111 @@ class EnvironmentLinks {
 	float *a;
 	Dimension aDims[2];
 };
+
+/*-----------------------------------------------------------------------------------
+function to generate PPU IDs and PPU group IDs for a thread
+------------------------------------------------------------------------------------*/
+
+ThreadIds *getPpuIdsForThread(int threadNo)  {
+
+	ThreadIds *threadIds = new ThreadIds;
+	threadIds->ppuIds = new PPU_Ids[Space_Count];
+	int idsArray[Space_Count];
+	idsArray[Space_Root] = threadNo;
+
+	int threadCount;
+	int ppuCount;
+	int groupThreadId;
+
+	// for Space A;
+	threadCount = Total_Threads;
+	ppuCount = threadCount;
+	groupThreadId = idsArray[Space_Root] % ppuCount;
+	threadIds->ppuIds[Space_A].groupId = idsArray[Space_Root] / ppuCount;
+	threadIds->ppuIds[Space_A].ppuCount = ppuCount;
+	if (groupThreadId == 0) threadIds->ppuIds[Space_A].id
+			= threadIds->ppuIds[Space_A].groupId;
+	else threadIds->ppuIds[Space_A].id = INVALID_ID;
+	idsArray[Space_A] = groupThreadId;
+
+	// for Space B;
+	threadCount = threadIds->ppuIds[Space_A].ppuCount;
+	ppuCount = threadCount / 32;
+	groupThreadId = idsArray[Space_A] % ppuCount;
+	threadIds->ppuIds[Space_B].groupId = idsArray[Space_A] / ppuCount;
+	threadIds->ppuIds[Space_B].ppuCount = ppuCount;
+	if (groupThreadId == 0) threadIds->ppuIds[Space_B].id
+			= threadIds->ppuIds[Space_B].groupId;
+	else threadIds->ppuIds[Space_B].id = INVALID_ID;
+	idsArray[Space_B] = groupThreadId;
+
+	// for Space C;
+	threadCount = threadIds->ppuIds[Space_A].ppuCount;
+	ppuCount = threadCount / 4;
+	groupThreadId = idsArray[Space_A] % ppuCount;
+	threadIds->ppuIds[Space_C].groupId = idsArray[Space_A] / ppuCount;
+	threadIds->ppuIds[Space_C].ppuCount = ppuCount;
+	if (groupThreadId == 0) threadIds->ppuIds[Space_C].id
+			= threadIds->ppuIds[Space_C].groupId;
+	else threadIds->ppuIds[Space_C].id = INVALID_ID;
+	idsArray[Space_C] = groupThreadId;
+
+	// for Space D;
+	threadCount = threadIds->ppuIds[Space_C].ppuCount;
+	ppuCount = threadCount / 8;
+	groupThreadId = idsArray[Space_C] % ppuCount;
+	threadIds->ppuIds[Space_D].groupId = idsArray[Space_C] / ppuCount;
+	threadIds->ppuIds[Space_D].ppuCount = ppuCount;
+	if (groupThreadId == 0) threadIds->ppuIds[Space_D].id
+			= threadIds->ppuIds[Space_D].groupId;
+	else threadIds->ppuIds[Space_D].id = INVALID_ID;
+	idsArray[Space_D] = groupThreadId;
+
+	return threadIds;
+}
+
+/*-----------------------------------------------------------------------------------
+Thread-State implementation class for the task
+------------------------------------------------------------------------------------*/
+
+class ThreadStateImpl : public ThreadState {
+  public:
+	virtual void setLpsParentIndexMap() = 0;
+        virtual void setRootLpu() = 0;
+        int *computeLpuCounts(int lpsId);
+        virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;
+};
+
+// Implementation of task specific compute-LPU-Count function 
+int *ThreadStateImpl::computeLpuCounts(int lpsId) {
+	if (lpsId == Space_Root) {
+		return NULL;
+	}
+	if (lpsId == Space_A) {
+		return NULL;
+	}
+	if (lpsId == Space_B) {
+		int ppuCount = threadIds->ppuIds[Space_B].ppuCount;
+		SpaceRoot_LPU *spaceRootLpu = (SpaceRoot_LPU*) 
+				lpsStates[Space_Root]->lpu;
+		return getLPUsCountOfSpaceB(ppuCount, 
+				*spaceRootLpu->aPartDims[1]->partitionDim);
+	}
+	if (lpsId == Space_C) {
+		int ppuCount = threadIds->ppuIds[Space_C].ppuCount;
+		SpaceRoot_LPU *spaceRootLpu = (SpaceRoot_LPU*) 
+				lpsStates[Space_Root]->lpu;
+		return getLPUsCountOfSpaceC(ppuCount, 
+				*spaceRootLpu->uPartDims[1]->partitionDim);
+	}
+	if (lpsId == Space_D) {
+		int ppuCount = threadIds->ppuIds[Space_D].ppuCount;
+		SpaceC_LPU *spaceCLpu = (SpaceC_LPU*) 
+				lpsStates[Space_C]->lpu;
+		return getLPUsCountOfSpaceD(ppuCount, 
+				*spaceCLpu->uPartDims[0]->partitionDim, 
+				partitionArgs[0]);
+	}
+	return NULL;
+}
+

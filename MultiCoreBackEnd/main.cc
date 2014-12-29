@@ -10,6 +10,7 @@
 #include "parser.h"
 #include "scanner.h"
 #include "codegen/code_generator.h"	
+#include "codegen/thread_state_mgmt.h"	
 #include "codegen/space_mapping.h"
 #include "utils/list.h"
 #include "syntax/ast.h"
@@ -53,11 +54,17 @@ int main(int argc, char *argv[]) {
 	generateThreadCountMacros(programFile, mappingConfig, pcubesConfig);
 	// generate library routines for LPUs management	
 	List<Identifier*> *partitionArgs = luTask->getPartitionArguments();
-	generateLPUCountFunctions(programFile, mappingConfig, partitionArgs);
-	generateAllGetPartForLPURoutines(programFile, mappingConfig, partitionArgs);
-	generateFnForThreadIdsAllocation(programFile, mappingConfig, pcubesConfig);
+	Hashtable<List<PartitionParameterConfig*>*> *partitionFnParamConfigs 
+			= generateLPUCountFunctions(programFile, mappingConfig, partitionArgs);
+	Hashtable<List<int>*> *lpuPartFnParamsConfigs 
+			= generateAllGetPartForLPURoutines(programFile, mappingConfig, partitionArgs);
+	// generate task specific data structures 
 	generateLpuDataStructures(programFile, mappingConfig);
 	generateArrayMetadataAndEnvLinks(programFile, mappingConfig, 
 			luTask->getEnvironmentLinks());
+	// generate thread management functions and classes
+	generateFnForThreadIdsAllocation(programFile, mappingConfig, pcubesConfig);
+	generateThreadStateImpl(programFile, mappingConfig, 
+			partitionFnParamConfigs, lpuPartFnParamsConfigs);
 }
 
