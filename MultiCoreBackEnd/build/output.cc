@@ -326,10 +326,10 @@ class ThreadStateImpl : public ThreadState {
 	void setLpsParentIndexMap();
         virtual void setRootLpu() = 0;
         int *computeLpuCounts(int lpsId);
-        virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;
+        LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
 };
 
-// Constraction of task specific LPS hierarchy index map
+// Construction of task specific LPS hierarchy index map
 void ThreadStateImpl::setLpsParentIndexMap() {
 	lpsParentIndexMap = new int[Space_Count];
 	lpsParentIndexMap[Space_Root] = INVALID_ID;
@@ -368,6 +368,64 @@ int *ThreadStateImpl::computeLpuCounts(int lpsId) {
 		return getLPUsCountOfSpaceD(ppuCount, 
 				*spaceCLpu->uPartDims[0]->partitionDim, 
 				partitionArgs[0]);
+	}
+	return NULL;
+}
+
+// Implementation of task specific compute-Next-LPU function 
+LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) {
+	if (lpsId == Space_A) {
+		SpaceRoot_LPU *spaceRootLpu = (SpaceRoot_LPU*) 
+				lpsStates[Space_Root]->lpu;
+		SpaceA_LPU *currentLpu = new SpaceA_LPU;
+		currentLpu->p = NULL;
+		currentLpu->pPartDims = spaceRootLpu->pPartDims;
+		return currentLpu;
+	}
+	if (lpsId == Space_B) {
+		SpaceRoot_LPU *spaceRootLpu = (SpaceRoot_LPU*) 
+				lpsStates[Space_Root]->lpu;
+		SpaceB_LPU *currentLpu = new SpaceB_LPU;
+		currentLpu->a = NULL;
+		currentLpu->aPartDims = getaPartForSpaceBLpu(
+				spaceRootLpu->aPartDims, lpuCounts, nextLpuId);
+		currentLpu->l = NULL;
+		currentLpu->lPartDims = getlPartForSpaceBLpu(
+				spaceRootLpu->lPartDims, lpuCounts, nextLpuId);
+		currentLpu->l_column = NULL;
+		currentLpu->l_columnPartDims = spaceRootLpu->l_columnPartDims;
+		currentLpu->u = NULL;
+		currentLpu->uPartDims = getuPartForSpaceBLpu(
+				spaceRootLpu->uPartDims, lpuCounts, nextLpuId);
+		return currentLpu;
+	}
+	if (lpsId == Space_C) {
+		SpaceRoot_LPU *spaceRootLpu = (SpaceRoot_LPU*) 
+				lpsStates[Space_Root]->lpu;
+		SpaceC_LPU *currentLpu = new SpaceC_LPU;
+		currentLpu->l = NULL;
+		currentLpu->lPartDims = getlPartForSpaceCLpu(
+				spaceRootLpu->lPartDims, lpuCounts, nextLpuId);
+		currentLpu->l_column = NULL;
+		currentLpu->l_columnPartDims = spaceRootLpu->l_columnPartDims;
+		currentLpu->u = NULL;
+		currentLpu->uPartDims = getuPartForSpaceCLpu(
+				spaceRootLpu->uPartDims, lpuCounts, nextLpuId);
+		return currentLpu;
+	}
+	if (lpsId == Space_D) {
+		SpaceC_LPU *spaceCLpu = (SpaceC_LPU*) 
+				lpsStates[Space_C]->lpu;
+		SpaceD_LPU *currentLpu = new SpaceD_LPU;
+		currentLpu->l = NULL;
+		currentLpu->lPartDims = getlPartForSpaceDLpu(
+				spaceCLpu->lPartDims, lpuCounts, nextLpuId, 
+				partitionArgs[0]);
+		currentLpu->u = NULL;
+		currentLpu->uPartDims = getuPartForSpaceDLpu(
+				spaceCLpu->uPartDims, lpuCounts, nextLpuId, 
+				partitionArgs[0]);
+		return currentLpu;
 	}
 	return NULL;
 }
