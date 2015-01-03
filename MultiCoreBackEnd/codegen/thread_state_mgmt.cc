@@ -10,6 +10,63 @@
 #include <sstream>
 #include <string>
 
+// This function is simple. It just copy the dimension information from the global array metadata object to the 
+// partition dimensions of individual arrays. Memory for these arrays are not allocated as it is not done for 
+// any LPU in any LPS. For memory allocation further analysis of the compute block is needed and the whole allocation 
+// logic will be handled in a separate module.
+void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
+	
+	std::cout << "Generating routine for root LPU calculation" << std::endl;
+        programFile << "// Construction of task specific root LPU\n";
+
+	std::string statementSeparator = ";\n";
+        std::string singleIndent = "\t";
+	
+	// specify the signature of the compute-Next-Lpu function matching the virtual function in Thread-State class
+	std::ostringstream functionHeader;
+        functionHeader << "void ThreadStateImpl::setRootLpu()";
+        std::ostringstream functionBody;
+	functionBody << "{\n";
+
+	// allocate an LPU for the root
+	Space *rootLps = mappingRoot->mappingConfig->LPS;
+	functionBody << singleIndent;
+	functionBody << "Space" << rootLps->getName() << "_LPU *lpu = new Space";
+	functionBody  << rootLps->getName() << "_LPU";
+	functionBody << statementSeparator;
+
+	// initialize each array in the root LPU
+	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
+	for (int i = 0; i < localArrays->NumElements(); i++) {
+		if (i > 0) functionBody << std::endl;
+		const char* arrayName = localArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
+		int dimensionCount = array->getDimensionality();
+		functionBody << singleIndent << "lpu->" << arrayName << " = NULL" << statementSeparator;
+		std::ostringstream varName;
+		varName << "lpu->" << arrayName << "PartDims";
+		functionBody << singleIndent << varName.str() << " = new PartitionDimension*[";
+		functionBody << dimensionCount << "]" << statementSeparator;
+		for (int j = 0; j < dimensionCount; j++) {
+			functionBody << singleIndent << varName.str() << "[" << j << "] = ";
+			functionBody << "new PartitionDimension" << statementSeparator;
+			functionBody << singleIndent << varName.str() << "[" << j << "]->storageDim = ";
+			functionBody << varName.str() << "[" << j << "]->partitionDim" << std::endl;
+			functionBody << singleIndent << singleIndent << singleIndent;
+			functionBody << "= &arrayMetadata." << arrayName << "Dims[" << j << "]";
+			functionBody << statementSeparator;			
+		}	
+	}
+	
+	// store the LPU in the proper LPS state
+	functionBody << std::endl;	
+	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
+	functionBody << statementSeparator << "}\n";
+	
+	programFile << functionHeader.str() << " " << functionBody.str();
+	programFile << std::endl;
+}
+
 void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
 	
 	std::cout << "Generating parent pointer index map" << std::endl;
@@ -312,6 +369,8 @@ void generateThreadStateImpl(const char *outputFile, MappingNode *mappingRoot,
 
 	// construct the index array that encode the LPS hierarchy for this task
 	generateParentIndexMapRoutine(programFile, mappingRoot);
+	// generate the function for creating the root LPU from array metadata information
+	generateRootLpuComputeRoutine(programFile, mappingRoot);
 	// then call the compute-LPU-Count function generator method for class specific implementation
 	generateComputeLpuCountRoutine(programFile, mappingRoot, countFunctionsArgsConfig);
 	// then call the compute-Next-LPU function generator method for class specific implementation

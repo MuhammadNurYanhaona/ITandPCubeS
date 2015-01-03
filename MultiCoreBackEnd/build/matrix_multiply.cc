@@ -186,6 +186,7 @@ class ArrayMetadata {
 	Dimension bDims[2];
 	Dimension cDims[2];
 };
+ArrayMetadata arrayMetadata;
 
 class EnvironmentLinks {
   public:
@@ -194,6 +195,7 @@ class EnvironmentLinks {
 	float *b;
 	Dimension bDims[2];
 };
+EnvironmentLinks environmentLinks;
 
 /*-----------------------------------------------------------------------------------
 function to generate PPU IDs and PPU group IDs for a thread
@@ -239,7 +241,7 @@ Thread-State implementation class for the task
 class ThreadStateImpl : public ThreadState {
   public:
 	void setLpsParentIndexMap();
-        virtual void setRootLpu() = 0;
+        void setRootLpu();
         int *computeLpuCounts(int lpsId);
         LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
 };
@@ -250,6 +252,39 @@ void ThreadStateImpl::setLpsParentIndexMap() {
 	lpsParentIndexMap[Space_Root] = INVALID_ID;
 	lpsParentIndexMap[Space_A] = Space_Root;
 	lpsParentIndexMap[Space_A_Sub] = Space_A;
+}
+
+// Construction of task specific root LPU
+void ThreadStateImpl::setRootLpu() {
+	SpaceRoot_LPU *lpu = new SpaceRoot_LPU;
+	lpu->a = NULL;
+	lpu->aPartDims = new PartitionDimension*[2];
+	lpu->aPartDims[0] = new PartitionDimension;
+	lpu->aPartDims[0]->storageDim = lpu->aPartDims[0]->partitionDim
+			= &arrayMetadata.aDims[0];
+	lpu->aPartDims[1] = new PartitionDimension;
+	lpu->aPartDims[1]->storageDim = lpu->aPartDims[1]->partitionDim
+			= &arrayMetadata.aDims[1];
+
+	lpu->b = NULL;
+	lpu->bPartDims = new PartitionDimension*[2];
+	lpu->bPartDims[0] = new PartitionDimension;
+	lpu->bPartDims[0]->storageDim = lpu->bPartDims[0]->partitionDim
+			= &arrayMetadata.bDims[0];
+	lpu->bPartDims[1] = new PartitionDimension;
+	lpu->bPartDims[1]->storageDim = lpu->bPartDims[1]->partitionDim
+			= &arrayMetadata.bDims[1];
+
+	lpu->c = NULL;
+	lpu->cPartDims = new PartitionDimension*[2];
+	lpu->cPartDims[0] = new PartitionDimension;
+	lpu->cPartDims[0]->storageDim = lpu->cPartDims[0]->partitionDim
+			= &arrayMetadata.cDims[0];
+	lpu->cPartDims[1] = new PartitionDimension;
+	lpu->cPartDims[1]->storageDim = lpu->cPartDims[1]->partitionDim
+			= &arrayMetadata.cDims[1];
+
+	lpsStates[Space_Root]->lpu = lpu;
 }
 
 // Implementation of task specific compute-LPU-Count function 

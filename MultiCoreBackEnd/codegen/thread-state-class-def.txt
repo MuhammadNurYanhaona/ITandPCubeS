@@ -1,7 +1,7 @@
 class ThreadStateImpl : public ThreadState {
   public:
 	void setLpsParentIndexMap();
-        virtual void setRootLpu() = 0;
+        void setRootLpu();
         int *computeLpuCounts(int lpsId);
         LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
 };

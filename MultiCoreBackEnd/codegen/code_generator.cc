@@ -343,6 +343,7 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
 		programFile << statementSeparator;
 	}
 	programFile << "};\n";
+	programFile << "ArrayMetadata arrayMetadata" << statementSeparator;
 	
 	programFile << "\nclass EnvironmentLinks {\n";
 	programFile << "  public:\n";
@@ -360,5 +361,6 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
 		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
 		programFile << statementSeparator;	
 	}	
-	programFile << "};\n\n";
+	programFile << "};\n";
+	programFile << "EnvironmentLinks environmentLinks" << statementSeparator << std::endl;
 }

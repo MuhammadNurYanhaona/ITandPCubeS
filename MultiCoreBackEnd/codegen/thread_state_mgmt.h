@@ -22,6 +22,9 @@ class PartitionParameterConfig;
 */
 void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
 
+/* function definition for genering the routine for constructing the root LPU */
+void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
+
 /* function definition to generate task specific implementation of compute-LPU-Count routine that 
    is part of the Thread-State object.
 */
