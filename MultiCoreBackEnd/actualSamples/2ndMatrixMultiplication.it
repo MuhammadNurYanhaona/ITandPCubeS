@@ -1,4 +1,4 @@
-// A dual space matrix multiplication code that computes c as the result of multiplying
+// A single space matrix multiplication code that computes c as the result of multiplying
 // a and b in a block-by-block fasion.
 Task "Matrix Multiply":
 	Define:
@@ -12,14 +12,12 @@ Task "Matrix Multiply":
 	Compute:
 		// The underlying computation for block matrix multiplication is the same
 		// of that of simple matrix multiplication algorithm	
-		"Block multiply matrices" (Space B) { 
+		"Block multiply matrices" (Space A) { 
 			do { c[i][j] = c[i][j] + a[i][k] * b[k][j]
 			} for i, j in c; k in a
 		}
 		Repeat: from "Block multiply matrices" foreach Space A sub-partition
-	Partition (k, l, q, m, n):
-		// Higher level space, Space A, defines what portion of c should be computed
-		// within a single PCU (parallel computation unit) 
+	Partition (k, l, q):
 		Space A <2D> {
 			c: block_size(k, l)
 			a: block_size(k), replicated
@@ -29,11 +27,4 @@ Task "Matrix Multiply":
 			Sub-partition <1D> <unordered> {
 				a<dim2>, b<dim1>: block_size(q)
 			}
-		}
-		// partition specification for the lower space PCUs where actual computation
-		// takes place
-		Space B <2D> divides Space A sub-partitions {
-			c: block_size(m, n)	
-			a: block_size(m), replicated 
-			b: replicated, block_size(n)
 		}

@@ -210,6 +210,7 @@ void SubpartitionSpec::addSpaceConfiguration(TaskDef *taskDef, PartitionHierarch
 	strcat(spaceName, Space::SubSpaceSuffix);
 	Space *space = new Space(spaceName, dimensionality, false, true);
 	space->setParent(ownerSpace);
+	ownerSpace->setSubpartition(space);
 	
 	TaskSymbol *taskSymbol = (TaskSymbol *) taskDef->getSymbol();
 	Scope *partitionScope = taskSymbol->getPartitionScope();

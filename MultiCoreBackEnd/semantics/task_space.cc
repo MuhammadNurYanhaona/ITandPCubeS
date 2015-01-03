@@ -244,7 +244,7 @@ Coordinate *CoordinateSystem::getCoordinate(int dimensionNo) {
 //-------------------------------------------------- Space ------------------------------------------------------/
 
 const char *Space::RootSpaceName = "Root";
-const char *Space::SubSpaceSuffix = "_subspace";
+const char *Space::SubSpaceSuffix = "_Sub";
 
 Space::Space(const char *name, int dimensions, bool dynamic, bool subpartitionSpace) {
 	this->id = name;
@@ -258,6 +258,7 @@ Space::Space(const char *name, int dimensions, bool dynamic, bool subpartitionSp
 	}
 	this->parent = NULL;
 	this->dataStructureList = new Hashtable<DataStructure*>;
+	this->subpartition = NULL;
 }
 
 void Space::setStructureList(Hashtable<DataStructure*> *dataStructureList) {
@@ -318,6 +319,20 @@ List<const char*> *Space::getLocallyUsedArrayNames() {
 	while ((structure = iterator.GetNextValue()) != NULL) {
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		if (array != NULL) localArrays->Append(array->getName());
+	}
+	if (subpartitionSpace) {
+		List<const char*> *parentArrays = parent->getLocallyUsedArrayNames();
+		for (int i = 0; i < parentArrays->NumElements(); i++) {
+			const char *parentArray = parentArrays->Nth(i);
+			bool existsInCurrent = false;
+			for (int j = 0; j < localArrays->NumElements(); j++) {
+				if (strcmp(parentArray, localArrays->Nth(j)) == 0) {
+					existsInCurrent = true;
+					break;
+				}
+			}
+			if (!existsInCurrent) localArrays->Append(parentArray);
+		}
 	}
 	return localArrays;
 }

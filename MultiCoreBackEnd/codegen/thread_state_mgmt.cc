@@ -12,6 +12,7 @@
 
 void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
 	
+	std::cout << "Generating parent pointer index map" << std::endl;
         programFile << "// Construction of task specific LPS hierarchy index map\n";
 	
 	std::string statementSeparator = ";\n";
@@ -50,6 +51,7 @@ void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mapp
 void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *mappingRoot, 
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig) {
 
+	std::cout << "Generating compute LPU count function" << std::endl;
         programFile << "// Implementation of task specific compute-LPU-Count function ";
 	
 	std::string statementSeparator = ";\n";
@@ -148,7 +150,8 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 
 void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot, 
                 Hashtable<List<int>*> *lpuPartFunctionsArgsConfig) {
-        
+       
+	std::cout << "Generating compute next LPU function" << std::endl; 
 	programFile << "// Implementation of task specific compute-Next-LPU function ";
 	
 	std::string statementSeparator = ";\n";
@@ -185,7 +188,12 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 		List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
 		for (int i = 0; i < localArrays->NumElements(); i++) {
 			const char *arrayName = localArrays->Nth(i);
-			Space *parentLps = lps->getLocalStructure(arrayName)->getSource()->getSpace();
+			DataStructure *structure = lps->getLocalStructure(arrayName);
+			Space *parentLps = structure->getSource()->getSpace();
+			// if the array is inherited from parent LPS by a subpartitioned LPS then correct parent reference
+			if (structure->getSpace() != lps) {
+				parentLps = structure->getSpace();
+			}
 			if (parentLpus->Lookup(parentLps->getName()) == NULL) {
 				std::ostringstream parentLpuStr;
 				functionBody << doubleIndent;
@@ -230,7 +238,8 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 				functionBody << doubleIndent << "currentLpu->" << arrayName << "PartDims = ";
 				
 				// if the structure is replicated then just copy its information from the parent
-				if (!array->isPartitioned()) {
+				// NOTE the second condition is for arrays inherited by a subpartitioned LPS
+				if (!(array->isPartitioned() && array->getSpace() == lps)) {
 					const char *parentLpu = arrayToParentLpus->Lookup(arrayName);
 					functionBody << parentLpu << "->" << arrayName << "PartDims";
 				// otherwise get the array part for current LPU by calling appropriate function
@@ -277,7 +286,8 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 void generateThreadStateImpl(const char *outputFile, MappingNode *mappingRoot, 
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig,
                 Hashtable<List<int>*> *lpuPartFunctionsArgsConfig) {
-	
+
+	std::cout << "Generating task spacific Thread State implementation task.............." << std::endl;	
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
         if (programFile.is_open()) {

@@ -6,9 +6,12 @@
 #include <iostream>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "parser.h"
 #include "scanner.h"
+#include "codegen/task_generator.h"	
 #include "codegen/code_generator.h"	
 #include "codegen/thread_state_mgmt.h"	
 #include "codegen/space_mapping.h"
@@ -18,7 +21,38 @@
 #include "syntax/errors.h"
 #include "syntax/ast_task.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, const char *argv[]) {
+
+	//**************************************************** Command Line Arguments Reader
+	// read the input arguments and keep track of the appropriate files
+	const char *sourceFile, *pcubesFile, *mappingFile;
+	if (argc < 4) {
+		std::cout << "You need to pass three files as input arguments" << std::endl;
+		std::cout << "\t" << "1. The input IT program file" << std::endl;
+		std::cout << "\t" << "2. The PCubeS model of the machine" << std::endl;
+		std::cout << "\t" << "3. The mapping configuration file" << std::endl;
+		return -1;
+	} else {
+		sourceFile = argv[1];
+		std::cout << "Source program: " << sourceFile << std::endl;
+		pcubesFile = argv[2];
+		std::cout << "PCubeS model: " << pcubesFile << std::endl;
+		mappingFile = argv[3];
+		std::cout << "Mapping Configuration: " << mappingFile << std::endl;	
+	}
+	// redirect standard input to the source file for the front end compiler to work
+	int fileDescriptor = open(sourceFile, O_RDONLY);
+	if (fileDescriptor < 0) {
+		std::cout << "Could not open the source program file" << std::endl;
+		return -1;
+	}
+	dup2(fileDescriptor, STDIN_FILENO);
+	close(fileDescriptor);
+	// set the default output directory parameter
+	const char *outputDir = "build/";
+	//**********************************************************************************
+
+
 	
 	//*************************************************************** Front End Compiler
  	/* Entry point to the entire program. InitScanner() is used to set up the scanner.
@@ -40,14 +74,23 @@ int main(int argc, char *argv[]) {
 
 
 	//**************************************************************** Back End Compiler
-	const char *programFile = "build/output.cc";
+	// parse PCubeS description of the multicore hardware
+	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription(pcubesFile);
+	// iterate over list of tasks and generate code for each of them in separate files
+	List<TaskDef*> *taskList = ProgramDef::program->getTasks();
+	for (int i = 0; i < taskList->NumElements(); i++) {
+		TaskDef *taskDef = taskList->Nth(i);
+		TaskGenerator *generator = new TaskGenerator(taskDef, outputDir, mappingFile);
+		generator->generate(pcubesConfig);
+	}
+
+	/*
 	initializeOutputFile(programFile);
-	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription("/home/yan/pcubes.ml");
 	TaskDef *luTask = (TaskDef*) ProgramDef::program->getTaskDefinition("LU Factorization");
 	if (luTask == NULL) std::cout << "could not find LU factorization task\n";
 	PartitionHierarchy *lpsHierarchy = luTask->getPartitionHierarchy();
 	MappingNode *mappingConfig = parseMappingConfiguration("LU Factorization",
-        		"/home/yan/opteron-solver-mapping.map", lpsHierarchy, pcubesConfig);
+        		mappingFile, lpsHierarchy, pcubesConfig);
 	// generate macro definitions needed for various reasons
 	generateLPSMacroDefinitions(programFile, mappingConfig);
 	generatePPSCountMacros(programFile, pcubesConfig);
@@ -66,5 +109,6 @@ int main(int argc, char *argv[]) {
 	generateFnForThreadIdsAllocation(programFile, mappingConfig, pcubesConfig);
 	generateThreadStateImpl(programFile, mappingConfig, 
 			partitionFnParamConfigs, lpuPartFnParamsConfigs);
+	*/
 }
 

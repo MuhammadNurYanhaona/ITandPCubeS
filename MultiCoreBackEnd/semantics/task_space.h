@@ -201,6 +201,7 @@ class Space {
 	bool subpartitionSpace;
 	CoordinateSystem *coordSys;
 	Space *parent;
+	Space *subpartition;
 	Hashtable<DataStructure*> *dataStructureList;
   public:
 	static const char *RootSpaceName;
@@ -230,6 +231,8 @@ class Space {
 	List<const char*> *getLocalDataStructuresWithOverlappedPartitions();
 	List<const char*> *getNonStorableDataStructures();
 	CoordinateSystem *getCoordinateSystem() { return coordSys; }
+	void setSubpartition(Space *subpartition) { this->subpartition = subpartition; }
+	Space *getSubpartition() { return subpartition; }
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy

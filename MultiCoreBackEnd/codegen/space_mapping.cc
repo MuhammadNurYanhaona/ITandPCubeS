@@ -25,7 +25,11 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 	std::string separator3 = "(";
 	List<std::string> *tokenList;
 
-	if (!pcubesfile.is_open()) std::cout << "could not open PCubeS specification file" << std::endl;
+	if (!pcubesfile.is_open()) {
+		std::cout << "could not open PCubeS specification file" << std::endl;
+		std::exit(EXIT_FAILURE);
+	}
+	std::cout << "Parsing the PCubeS description........................................" << std::endl;
 
 	while (std::getline(pcubesfile, line)) {
 		// trim line and escape it if it is a comment	
@@ -108,7 +112,9 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		}
 	} else {
 		std::cout << "could not open the mapping file.\n";
+		std::exit(EXIT_FAILURE);
 	}
+	std::cout << "Parsing the mapping configuration....................................." << std::endl;
 
 	// locate the mapping configuration of the mentioned task and extract it
 	int taskConfigBegin = description.find(taskName);
@@ -135,12 +141,15 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	int totalPPSes = pcubesConfig->NumElements();
 	while (i < mappingCount) {
 		// determine the LPS and PPS for the mapping
-		std::cout << mappingList->Nth(i) << std::endl;
 		std::string mapping = mappingList->Nth(i);
 		tokenList = string_utils::tokenizeString(mapping, mappingDelimiter);
 		std::string lpsStr = tokenList->Nth(0);
 		char lpsId = lpsStr.at(lpsStr.length() - 1);
 		Space *lps = lpsHierarchy->getSpace(lpsId);
+		if (lps == NULL) {
+			std::cout << "Logical space is not found in the code" << std::endl;
+			std::exit(EXIT_FAILURE);
+		}
 		int ppsId = atoi(tokenList->Nth(1).c_str());
 		PPS_Definition *pps = pcubesConfig->Nth(totalPPSes - ppsId);
 		
@@ -154,9 +163,21 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		node->children = new List<MappingNode*>;
 		mappingTable->Enter(lps->getName(), node, true);
 
-		std::cout << ppsId << "--" << lpsId;
-		std::cout << "-----------------\n";
+		std::cout << ppsId << "--" << lpsId << std::endl;
 		i++;
+	
+		// if the LPS is subpartitioned than map the subpartition into the same PPS
+		if (lps->getSubpartition() != NULL) {
+			MapEntry *subEntry = new MapEntry();
+			subEntry->LPS = lps->getSubpartition();
+			subEntry->PPS = pps;
+			MappingNode *subNode = new MappingNode();
+			subNode->parent = node;
+			subNode->mappingConfig = subEntry;
+			subNode->children = new List<MappingNode*>;
+			mappingTable->Enter(subEntry->LPS->getName(), subNode, true);
+			std::cout << ppsId << "--" << subEntry->LPS->getName() << std::endl;
+		}
 	}
 
 	// correct the mapping hierarchy by setting parent and children references correctly
@@ -214,8 +235,10 @@ void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoo
 		programFile << "#define Space_Count " << spaceCount << std::endl;
 		programFile << std::endl; 
     		programFile.close();
-  	}
-  	else std::cout << "Unable to open output program file";
+  	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
+	}
 }
 
 void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcubesConfig) {
@@ -238,8 +261,10 @@ void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcube
 		}
 		programFile << std::endl; 
     		programFile.close();
-  	}
-  	else std::cout << "Unable to open output program file";
+  	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
+	}
 }
 
 List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &programFile,
@@ -349,12 +374,14 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const char *outputFile,
                 MappingNode *mappingRoot, List<Identifier*> *partitionArgs) {
 
+	std::cout << "Generating LPU count founctions" << std::endl;
+
 	// if the output file cannot be opened then return
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (!programFile.is_open()) {
 		std::cout << "Unable to open output program file";
-		return NULL;
+		std::exit(EXIT_FAILURE);
 	}
 
 	// add a common comments for all these functions
@@ -550,12 +577,14 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *a
 Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile,
                 MappingNode *mappingRoot, List<Identifier*> *partitionArgs) {
 	
+	std::cout << "Generating founctions for determining array parts" << std::endl;
+
 	// if the output file cannot be opened then return
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (!programFile.is_open()) {
 		std::cout << "Unable to open output program file";
-		return NULL;
+		std::exit(EXIT_FAILURE);
 	}
 
 	// add a common comments for all these functions
@@ -578,7 +607,8 @@ Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile,
 		List<const char*> *arrayNameList = lps->getLocallyUsedArrayNames();
 		for (int i = 0; i < arrayNameList->NumElements(); i++) {
 			ArrayDataStructure *array = (ArrayDataStructure*) lps->getStructure(arrayNameList->Nth(i));
-			if (!array->isPartitioned()) continue;
+			// note that the second condition is for arrays inherited by a subpartitioned LPS
+			if (!(array->isPartitioned() && array->getSpace() == lps)) continue;
 			List<int> *argList = generateGetArrayPartForLPURoutine(lps, array,
         				programFile, partitionArgs);
 			std::ostringstream entryName;

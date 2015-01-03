@@ -19,16 +19,20 @@ void initializeOutputFile(const char *filePath) {
                 programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
                 programFile << "header files included for different purposes" << std::endl;
                 programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open output program file";
 
 	if (commIncludeFile.is_open()) {
                 while (std::getline(commIncludeFile, line)) {
 			programFile << line << std::endl;
 		}
 		programFile << std::endl;
+	} else {
+		std::cout << "Unable to open common include file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open common include file";
 	commIncludeFile.close();
 	programFile.close();
 }
@@ -42,15 +46,18 @@ void generateThreadCountMacros(const char *outputFile,
                 programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
                 programFile << "macro definitions for total and par core thread counts" << std::endl;
                 programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open output program file";
 	
-	// find lowest PPS to which any LPS has been mapped and highest PPS that has a partitioned LPS mapped
-	// to it 
+	// find lowest PPS to which any LPS has been mapped and highest PPS that has an un-partitioned LPS 
+	// mapped to it 
 	std::deque<MappingNode*> nodeQueue;
         nodeQueue.push_back(mappingRoot);
-	int highestPartitionedPpsId = 1;
 	int lowestPpsId = pcubesConfig->Nth(0)->id;
+	int highestPartitionedPpsId = 1;
+	int highestUnpartitionedPpsId = lowestPpsId; // the top-most PPS handling the root LPS
         while (!nodeQueue.empty()) {
                 MappingNode *node = nodeQueue.front();
                 nodeQueue.pop_front();
@@ -62,6 +69,10 @@ void generateThreadCountMacros(const char *outputFile,
 		Space *lps = node->mappingConfig->LPS;
 		if (lps->getDimensionCount() > 0 && pps->id > highestPartitionedPpsId) {
 			highestPartitionedPpsId = pps->id;
+		} else if (lps->getDimensionCount() == 0) {
+			if (pps->id > highestPartitionedPpsId && pps->id < highestUnpartitionedPpsId) {
+				highestUnpartitionedPpsId = pps->id;
+			}
 		}
 	}
 	
@@ -69,7 +80,7 @@ void generateThreadCountMacros(const char *outputFile,
 	int totalThreads = 1;
 	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
 		PPS_Definition *pps = pcubesConfig->Nth(i);
-		if (pps->id > highestPartitionedPpsId) continue;
+		if (pps->id >= highestUnpartitionedPpsId) continue;
 		totalThreads *= pps->units;
 		if (pps->id == lowestPpsId) break;
 	}
@@ -107,8 +118,10 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
                 programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
                 programFile << "function to generate PPU IDs and PPU group IDs for a thread" << std::endl;
                 programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open output program file";
 
 	std::ostringstream functionHeader;
         functionHeader << "ThreadIds *" << "getPpuIdsForThread";
@@ -133,7 +146,7 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 	// declare some local variables needed for thread Id calculation
 	functionBody << std::endl;
 	functionBody << statementIndent << "int threadCount" << statementSeparator;
-	functionBody << statementIndent << "int ppuCount" << statementSeparator;
+	functionBody << statementIndent << "int groupSize" << statementSeparator;
 	functionBody << statementIndent << "int groupThreadId" << statementSeparator;
 	functionBody << std::endl;
 
@@ -163,8 +176,24 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 		varNameStr << namePrefix << lps->getName() << "]";
 		std::string varName = varNameStr.str();
 		std::ostringstream groupThreadIdStr; 
-		
+	
 		functionBody << statementIndent << "// for Space " << lps->getName() << statementSeparator;
+		// if the current LPS is a subpartition then most of the fields of a thread Id can be 
+		// copied from its parent LPU configuration
+		if (lps->isSubpartitionSpace()) {
+			functionBody << statementIndent << varName << ".groupId = 0" << statementSeparator;	
+			functionBody << statementIndent << varName << ".ppuCount = 1" << statementSeparator;
+			functionBody << statementIndent;
+			functionBody  << varName << ".groupSize = ";
+			functionBody << namePrefix << parentLps->getName() << "].groupSize";
+			functionBody << statementSeparator;
+			functionBody << statementIndent << varName << ".id = 0" << statementSeparator;
+			functionBody << statementIndent;
+			functionBody << "idsArray[Space_" << lps->getName() << "] = idsArray[Space_";
+			functionBody << parentLps->getName() << "]" << statementSeparator << std::endl;
+			continue;
+		}
+
 		// determine the total number of threads contributing in the parent PPS and current thread's 
 		// index in that PPS 
 		if (parent == mappingRoot) {
@@ -173,7 +202,7 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 			groupThreadIdStr << "idsArray[Space_Root]";
 		} else {
 			functionBody << statementIndent;
-			functionBody << "threadCount = " << namePrefix << parentLps->getName() << "].ppuCount";
+			functionBody << "threadCount = " << namePrefix << parentLps->getName() << "].groupSize";
 			functionBody << statementSeparator;
 			groupThreadIdStr << "idsArray[Space_" << parentLps->getName() << "]";
 		}
@@ -181,21 +210,24 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 		// determine the number of threads per group in the current PPS
 		functionBody << statementIndent;
 		if (lps->getDimensionCount() > 0) {
-			functionBody << "ppuCount = threadCount" << " / " << partitionCount;
-		} else 	functionBody << "ppuCount = threadCount";
+			functionBody << "groupSize = threadCount" << " / " << partitionCount;
+		} else 	functionBody << "groupSize = threadCount";
 		functionBody << statementSeparator;
 
 		// determine the id of the thread in the group it belongs to	
 		functionBody << statementIndent;
-		functionBody << "groupThreadId = " << groupThreadIdStr.str() << " \% ppuCount";
+		functionBody << "groupThreadId = " << groupThreadIdStr.str() << " \% groupSize";
 		functionBody << statementSeparator;
 
-		// assign proper group Id and group size in the PPU-Ids variable created before 
+		// assign proper group Id, PPU count, and group size in the PPU-Ids variable created before 
 		functionBody << statementIndent;
-		functionBody  << varName << ".groupId = " << groupThreadIdStr.str() << " / ppuCount";
+		functionBody  << varName << ".groupId = " << groupThreadIdStr.str() << " / groupSize";
 		functionBody << statementSeparator;	
 		functionBody << statementIndent;
-		functionBody  << varName << ".ppuCount = ppuCount";
+		functionBody  << varName << ".ppuCount = " << partitionCount;
+		functionBody << statementSeparator;
+		functionBody << statementIndent;
+		functionBody  << varName << ".groupSize = groupSize";
 		functionBody << statementSeparator;
 
 		// assign PPU Id to the thread depending on its groupThreadId
@@ -233,8 +265,10 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
                 programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
                 programFile << "Data structures representing LPS and LPU contents " << std::endl;
                 programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open output program file";
 
 	std::deque<MappingNode*> nodeQueue;
         nodeQueue.push_back(mappingRoot);
@@ -292,8 +326,10 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
                 programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
                 programFile << "Data structures for Array-Metadata and Environment-Links " << std::endl;
                 programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open output program file";
 	
 	Space *rootLps = mappingRoot->mappingConfig->LPS;
 	programFile << "\nclass ArrayMetadata {\n";

@@ -39,7 +39,10 @@ typedef struct {
 		      // hierarchy executes; this is set to the PPU ID of the group to which
 		      // current resource belongs to (for resources of the lowest PPS these 
 		      // two ids are always equal)	
-	int ppuCount; // sometimes used for setting up synchronization parameters appropriately
+	int ppuCount; 
+	int groupSize;// sometimes used for setting up synchronization parameters appropriately
+		      // this represents the total number of leaf level PPUs under the hierarchy
+		      // rooted in PPU of this PPS		
 } PPU_Ids;
 
 /* a structure to hold PPU ids of a thread for different spaces */

@@ -26,6 +26,15 @@ namespace string_utils {
 	// tokenize a string, this implementation trim and remove extra 
 	// whitespaces within the tokens.	
 	List<std::string> *tokenizeString(std::string &str, std::string &delims);
+
+	// replace all occurances of a character with another character
+	const char *replaceChar(const char *origString, char ch1, char ch2);
+
+	// convert a character string to lower case and return a new string
+	const char *toLower(const char *origString);
+
+	// get the capitalized characters of string as its initials
+	const char *getInitials(const char *str);
 }
 
 #endif

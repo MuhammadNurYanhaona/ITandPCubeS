@@ -135,6 +135,17 @@ Node *ProgramDef::getTaskDefinition(const char *taskName) {
 	return NULL;
 }
 
+List<TaskDef*> *ProgramDef::getTasks() {
+	List<TaskDef*> *taskList = new List<TaskDef*>;
+	for (int i = 0; i < components->NumElements(); i++) {
+                Node *node = components->Nth(i);
+                TaskDef *taskDef = dynamic_cast<TaskDef*>(node);
+                if (taskDef == NULL) continue;
+		taskList->Append(taskDef);
+	}
+	return taskList;
+}
+
 //----------------------------------------- Tuple Definition ------------------------------------------/
 
 TupleDef::TupleDef(Identifier *i, List<VariableDef*> *c) : Definition(*i->GetLocation()) {

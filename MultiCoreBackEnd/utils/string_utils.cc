@@ -5,6 +5,7 @@
 #include <string>
 #include <cstdlib>
 #include <cctype>
+#include <string.h>
 
 void string_utils::trim(std::string &str) {
 
@@ -75,4 +76,35 @@ List<std::string> *string_utils::tokenizeString(std::string &str, std::string &d
 	trim(strCp);
 	if (strCp.length() > 0) tokenList->Append(strCp);
 	return tokenList;
+}
+
+const char *string_utils::replaceChar(const char *origString, char ch1, char ch2) {
+	std::string str(origString);
+	for (int i = 0; i < str.length(); i++) {
+		if (str[i] != ch1) continue;
+		str[i] = ch2;
+	}
+	return strdup(str.c_str());
+}
+
+const char *string_utils::toLower(const char *origString) {
+	std::string str(origString);
+	for (int i = 0; i < str.length(); i++) {
+		char ch = str[i];
+		char lowerCh = tolower(ch);
+		str[i] = lowerCh;	
+	}
+	return strdup(str.c_str());
+}
+
+const char *string_utils::getInitials(const char *str) {
+	std::ostringstream initials;
+	int length = strlen(str);
+	for (int i = 0; i < length; i++) {
+		char ch = str[i];
+		if (ch >= 'A' && ch <= 'Z') {
+			initials << ch;
+		}
+	}
+	return strdup(initials.str().c_str());
 }
