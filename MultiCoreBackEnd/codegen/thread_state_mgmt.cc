@@ -340,33 +340,43 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 	programFile << std::endl;
 }
 
-void generateThreadStateImpl(const char *outputFile, MappingNode *mappingRoot, 
+void generateThreadStateImpl(const char *headerFileName, const char *programFileName, 
+		MappingNode *mappingRoot, 
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig,
                 Hashtable<List<int>*> *lpuPartFunctionsArgsConfig) {
 
 	std::cout << "Generating task spacific Thread State implementation task.............." << std::endl;	
-	std::ofstream programFile;
-	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
-        if (programFile.is_open()) {
-                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "Thread-State implementation class for the task" << std::endl;
-                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	std::ofstream programFile, headerFile;
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open program or header file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open output program file";
-	
-	// write the common class definition from the sample file in the output program
-	programFile << std::endl;
+                
+	// write the common class definition from the sample file in the header file
+	headerFile << "/*-----------------------------------------------------------------------------------\n";
+        headerFile << "Thread-State implementation class for the task" << std::endl;
+        headerFile << "------------------------------------------------------------------------------------*/\n\n";
 	std::string line;
         std::ifstream classDefinitionFile("codegen/thread-state-class-def.txt");
 	if (classDefinitionFile.is_open()) {
                 while (std::getline(classDefinitionFile, line)) {
-			programFile << line << std::endl;
+			headerFile << line << std::endl;
 		}
-		programFile << std::endl;
+		headerFile << std::endl;
 		classDefinitionFile.close();
+	} else {
+		std::cout << "Unable to open common include file";
+		std::exit(EXIT_FAILURE);
 	}
-	else std::cout << "Unable to open common include file";
+	headerFile.close();
 
+	// write the implementions of virtual functions in the program file
+	programFile << "/*-----------------------------------------------------------------------------------\n";
+        programFile << "Thread-State implementation class for the task" << std::endl;
+        programFile << "------------------------------------------------------------------------------------*/\n\n";
+	
 	// construct the index array that encode the LPS hierarchy for this task
 	generateParentIndexMapRoutine(programFile, mappingRoot);
 	// generate the function for creating the root LPU from array metadata information

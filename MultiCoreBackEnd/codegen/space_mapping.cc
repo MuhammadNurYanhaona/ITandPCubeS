@@ -212,12 +212,12 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	return rootNode;
 }
 
-void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoot) {
+void generateLPSConstants(const char *outputFile, MappingNode *mappingRoot) {
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (programFile.is_open()) {
 		programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-		programFile << "macro definitions for LPSes" << std::endl;
+		programFile << "constants for LPSes" << std::endl;
 		programFile << "------------------------------------------------------------------------------------*/" << std::endl;
 		std::deque<MappingNode*> nodeQueue;
 		nodeQueue.push_back(mappingRoot);
@@ -229,10 +229,10 @@ void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoo
 			for (int i = 0; i < node->children->NumElements(); i++) {
 				nodeQueue.push_back(node->children->Nth(i));
 			}
-			programFile << "#define Space_" << node->mappingConfig->LPS->getName();
-			programFile << " " << node->index << std::endl;	
+			programFile << "const int Space_" << node->mappingConfig->LPS->getName();
+			programFile << " = " << node->index << ';' << std::endl;	
 		}
-		programFile << "#define Space_Count " << spaceCount << std::endl;
+		programFile << "const int Space_Count = " << spaceCount << ';' << std::endl;
 		programFile << std::endl; 
     		programFile.close();
   	} else {
@@ -241,22 +241,22 @@ void generateLPSMacroDefinitions(const char *outputFile, MappingNode *mappingRoo
 	}
 }
 
-void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcubesConfig) {
+void generatePPSCountConstants(const char *outputFile, List<PPS_Definition*> *pcubesConfig) {
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (programFile.is_open()) {
 		programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-		programFile << "macro definitions for PPS counts" << std::endl;
+		programFile << "constants for PPS counts" << std::endl;
 		programFile << "------------------------------------------------------------------------------------*/" << std::endl;
 		PPS_Definition *pps = pcubesConfig->Nth(0);
 		int prevSpaceId = pps->id;
-		programFile << "#define Space_" << pps->id << "_PPUs";
-		programFile << " " << pps->units << std::endl;
+		programFile << "const int Space_" << pps->id << "_PPUs";
+		programFile << " = " << pps->units << ';' << std::endl;
 		for (int i = 1; i < pcubesConfig->NumElements(); i++) {
 			pps = pcubesConfig->Nth(i);
-			programFile << "#define Space_" << pps->id;
+			programFile << "const int Space_" << pps->id;
 			programFile << "_Par_" << prevSpaceId << "_PPUs";
-			programFile << " " << pps->units << std::endl;
+			programFile << " = " << pps->units << ';' << std::endl;
 			prevSpaceId = pps->id;
 		}
 		programFile << std::endl; 
@@ -267,8 +267,11 @@ void generatePPSCountMacros(const char *outputFile, List<PPS_Definition*> *pcube
 	}
 }
 
-List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &programFile,
-                Space *space, List<Identifier*> *partitionArgs) {
+List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerFile, 
+                std::ofstream &programFile, 
+                const char *initials,
+                Space *space, 
+                List<Identifier*> *partitionArgs) {
 
 	std::string defaultParameter = "ppuCount";
 	std::string parameterSeparator = ", ";
@@ -363,33 +366,44 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &program
 	}
 	functionBody << statementIndent << "return count" << statementSeparator;
 
-	// write the function specification in the output file
-	programFile << "int *getLPUsCountOfSpace" << space->getName();
+	// write the function signature in the header file
+	headerFile << "int *getLPUsCountOfSpace" << space->getName();
+	headerFile << "(" << functionHeader.str() << ");\n"; 
+
+	// write the function specification in the program file
+	programFile << "int *" << initials << "::getLPUsCountOfSpace" << space->getName();
 	programFile << "(" << functionHeader.str() << ") {\n"; 
 	programFile << functionBody.str() << "}" << std::endl;
 	
 	return paramConfigList;
 }
 
-Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const char *outputFile,
-                MappingNode *mappingRoot, List<Identifier*> *partitionArgs) {
+Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const char *headerFileName,
+                const char *programFileName, 
+                const char *initials,
+                MappingNode *mappingRoot, 
+                List<Identifier*> *partitionArgs) {
 
 	std::cout << "Generating LPU count founctions" << std::endl;
 
-	// if the output file cannot be opened then return
-	std::ofstream programFile;
-	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
-  	if (!programFile.is_open()) {
-		std::cout << "Unable to open output program file";
+	// if the output files cannot be opened then return
+	std::ofstream programFile, headerFile;
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+  	if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open output header/program file";
 		std::exit(EXIT_FAILURE);
 	}
 
 	// add a common comments for all these functions
-	programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-	programFile << "functions for retrieving partition counts in different LPSes" << std::endl;
-	programFile << "------------------------------------------------------------------------------------*/" << std::endl;
-	programFile << std::endl;
+	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
+	headerFile << "functions for retrieving partition counts in different LPSes\n";
+	headerFile << "------------------------------------------------------------------------------------*/\n";
+	programFile << "/*-----------------------------------------------------------------------------------\n";
+	programFile << "functions for retrieving partition counts in different LPSes\n";
+	programFile << "------------------------------------------------------------------------------------*/\n\n";
 
+	// iterate over all LPSes and generate a function for each partitioned LPS
 	Hashtable<List<PartitionParameterConfig*>*> *paramTable 
 			= new Hashtable<List<PartitionParameterConfig*>*>;		
 	std::deque<MappingNode*> nodeQueue;
@@ -403,17 +417,23 @@ Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const cha
 		Space *lps = node->mappingConfig->LPS;
 		if (lps->getDimensionCount() == 0) continue;
 		List<PartitionParameterConfig*> *paramConfigList 
-			= generateLPUCountFunction(programFile, lps, partitionArgs);
+			= generateLPUCountFunction(headerFile, 
+					programFile, initials, lps, partitionArgs);
 		paramTable->Enter(lps->getName(), paramConfigList, true);
 		programFile << std::endl;
-	}	
-	programFile.close(); 
+	}
 	
+	headerFile.close();
+	programFile.close(); 
 	return paramTable;
 }
 
-List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *array,
-        	std::ofstream &programFile, List<Identifier*> *partitionArgs) {
+List<int> *generateGetArrayPartForLPURoutine(Space *space, 
+                ArrayDataStructure *array,
+                std::ostream &headerFile,  
+                std::ofstream &programFile, 
+                const char *initials,
+                List<Identifier*> *partitionArgs) {
 	
 	std::string parameterSeparator = ", ";
 	std::string statementSeparator = ";\n";
@@ -439,8 +459,7 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *a
 	
 	// set the parameters default to all get-LPU routines	
 	std::ostringstream functionHeader;
-	functionHeader << "PartitionDimension **" << "get" << arrayName << "PartFor";
-	functionHeader << "Space" << space->getName() << "Lpu(";
+	functionHeader << "get" << arrayName << "PartForSpace" << space->getName() << "Lpu(";
 	functionHeader << "PartitionDimension **" << parentVar << parameterSeparator;
 	functionHeader << std::endl << statementIndent << statementIndent;
 	functionHeader << "int *lpuCount";
@@ -553,8 +572,11 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *a
 	}
 	functionHeader << ")";
 	functionBody << statementIndent << "return " << arrayName << "LpuDims" << statementSeparator;
-	functionBody << "}\n";	
-	programFile << functionHeader.str() << functionBody.str();
+	functionBody << "}\n";
+	
+	// write function signature in the header file and the specification in the program file
+	headerFile << "PartitionDimension **" << functionHeader.str() << statementSeparator;
+	programFile << "PartitionDimension **" << initials << "::" << functionHeader.str() << functionBody.str();
 
 	// get the list of argument index from the used argument name list 
 	for (int i = 0; i < argNameList->NumElements(); i++) {
@@ -574,24 +596,30 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space, ArrayDataStructure *a
 	return argIndexList;
 }
 
-Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile,
-                MappingNode *mappingRoot, List<Identifier*> *partitionArgs) {
+Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *headerFileName,
+                const char *programFileName,
+                const char *initials,
+                MappingNode *mappingRoot,
+                List<Identifier*> *partitionArgs) {
 	
 	std::cout << "Generating founctions for determining array parts" << std::endl;
 
-	// if the output file cannot be opened then return
-	std::ofstream programFile;
-	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
-  	if (!programFile.is_open()) {
-		std::cout << "Unable to open output program file";
+	// if the output files cannot be opened then return
+	std::ofstream programFile, headerFile;
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+  	if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open output header/program file";
 		std::exit(EXIT_FAILURE);
 	}
 
 	// add a common comments for all these functions
-	programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-	programFile << "functions for getting data ranges along different dimensions of an LPU" << std::endl;
-	programFile << "-----------------------------------------------------------------------------------*/" << std::endl;
-	programFile << std::endl;
+	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
+	headerFile << "functions for getting data ranges along different dimensions of an LPU\n";
+	headerFile << "-----------------------------------------------------------------------------------*/\n";
+	programFile << "/*-----------------------------------------------------------------------------------\n";
+	programFile << "functions for getting data ranges along different dimensions of an LPU\n";
+	programFile << "-----------------------------------------------------------------------------------*/\n\n";
 
 	Hashtable<List<int>*> *paramTable = new Hashtable<List<int>*>;		
 	std::deque<MappingNode*> nodeQueue;
@@ -609,14 +637,17 @@ Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *outputFile,
 			ArrayDataStructure *array = (ArrayDataStructure*) lps->getStructure(arrayNameList->Nth(i));
 			// note that the second condition is for arrays inherited by a subpartitioned LPS
 			if (!(array->isPartitioned() && array->getSpace() == lps)) continue;
-			List<int> *argList = generateGetArrayPartForLPURoutine(lps, array,
-        				programFile, partitionArgs);
+			List<int> *argList = generateGetArrayPartForLPURoutine(lps, 
+					array, headerFile, programFile, initials, partitionArgs);
 			std::ostringstream entryName;
 			entryName << lps->getName() << "_" << array->getName();
 			paramTable->Enter(entryName.str().c_str(), argList, true);
 			programFile << std::endl;
 		}	
 	}
+
+	headerFile << std::endl;
+	headerFile.close();
 	programFile.close(); 
 	
 	return paramTable;

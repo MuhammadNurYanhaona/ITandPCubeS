@@ -36,7 +36,8 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 		Hashtable<List<int>*> *lpuPartFunctionsArgsConfig);
 
 /* function definition for generating the task specific implementation of Thread-State class */
-void generateThreadStateImpl(const char *outputFile, MappingNode *mappingRoot,
+void generateThreadStateImpl(const char *headerFileName, const char *programFileName, 
+		MappingNode *mappingRoot,
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig,
                 Hashtable<List<int>*> *lpuPartFunctionsArgsConfig);
 

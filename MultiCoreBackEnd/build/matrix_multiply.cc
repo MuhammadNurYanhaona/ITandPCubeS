@@ -1,4 +1,9 @@
 /*-----------------------------------------------------------------------------------
+header file for the task
+------------------------------------------------------------------------------------*/
+#include "matrix_multiply.h"
+
+/*-----------------------------------------------------------------------------------
 header files included for different purposes
 ------------------------------------------------------------------------------------*/
 // for error reporting and diagnostics
@@ -19,41 +24,20 @@ header files included for different purposes
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-/*-----------------------------------------------------------------------------------
-macro definitions for LPSes
-------------------------------------------------------------------------------------*/
-#define Space_Root 0
-#define Space_A 1
-#define Space_A_Sub 2
-#define Space_Count 3
-
-/*-----------------------------------------------------------------------------------
-macro definitions for PPS counts
-------------------------------------------------------------------------------------*/
-#define Space_5_PPUs 1
-#define Space_4_Par_5_PPUs 2
-#define Space_3_Par_4_PPUs 4
-#define Space_2_Par_3_PPUs 2
-#define Space_1_Par_2_PPUs 4
-
-/*-----------------------------------------------------------------------------------
-macro definitions for total and par core thread counts
-------------------------------------------------------------------------------------*/
-#define Total_Threads 16
-#define Threads_Par_Core 1
+using namespace mm;
 
 /*-----------------------------------------------------------------------------------
 functions for retrieving partition counts in different LPSes
 ------------------------------------------------------------------------------------*/
 
-int *getLPUsCountOfSpaceA(int ppuCount, Dimension cDim1, int k, Dimension cDim2, int l) {
+int *mm::getLPUsCountOfSpaceA(int ppuCount, Dimension cDim1, int k, Dimension cDim2, int l) {
 	int *count = new int[2];
 	count[0] = block_size_partitionCount(cDim1, ppuCount, k);
 	count[1] = block_size_partitionCount(cDim2, ppuCount, l);
 	return count;
 }
 
-int *getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q) {
+int *mm::getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q) {
 	int *count = new int[1];
 	count[0] = block_size_partitionCount(aDim2, ppuCount, q);
 	return count;
@@ -63,7 +47,7 @@ int *getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q) {
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
 
-PartitionDimension **getaPartForSpaceALpu(PartitionDimension **aParentLpuDims, 
+PartitionDimension **mm::getaPartForSpaceALpu(PartitionDimension **aParentLpuDims, 
 		int *lpuCount, int *lpuId, int k) {
 	PartitionDimension **aLpuDims = new PartitionDimension*[2];
 	aLpuDims[0] = new PartitionDimension;
@@ -74,7 +58,7 @@ PartitionDimension **getaPartForSpaceALpu(PartitionDimension **aParentLpuDims,
 	return aLpuDims;
 }
 
-PartitionDimension **getbPartForSpaceALpu(PartitionDimension **bParentLpuDims, 
+PartitionDimension **mm::getbPartForSpaceALpu(PartitionDimension **bParentLpuDims, 
 		int *lpuCount, int *lpuId, int l) {
 	PartitionDimension **bLpuDims = new PartitionDimension*[2];
 	bLpuDims[0] = new PartitionDimension;
@@ -85,7 +69,7 @@ PartitionDimension **getbPartForSpaceALpu(PartitionDimension **bParentLpuDims,
 	return bLpuDims;
 }
 
-PartitionDimension **getcPartForSpaceALpu(PartitionDimension **cParentLpuDims, 
+PartitionDimension **mm::getcPartForSpaceALpu(PartitionDimension **cParentLpuDims, 
 		int *lpuCount, int *lpuId, int k, int l) {
 	PartitionDimension **cLpuDims = new PartitionDimension*[2];
 	cLpuDims[0] = new PartitionDimension;
@@ -99,7 +83,7 @@ PartitionDimension **getcPartForSpaceALpu(PartitionDimension **cParentLpuDims,
 	return cLpuDims;
 }
 
-PartitionDimension **getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDims, 
+PartitionDimension **mm::getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDims, 
 		int *lpuCount, int *lpuId, int q) {
 	PartitionDimension **aLpuDims = new PartitionDimension*[2];
 	aLpuDims[0] = aParentLpuDims[0];
@@ -110,7 +94,7 @@ PartitionDimension **getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDim
 	return aLpuDims;
 }
 
-PartitionDimension **getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDims, 
+PartitionDimension **mm::getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDims, 
 		int *lpuCount, int *lpuId, int q) {
 	PartitionDimension **bLpuDims = new PartitionDimension*[2];
 	bLpuDims[0] = new PartitionDimension;
@@ -122,86 +106,10 @@ PartitionDimension **getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDim
 }
 
 /*-----------------------------------------------------------------------------------
-Data structures representing LPS and LPU contents 
-------------------------------------------------------------------------------------*/
-
-class SpaceRoot_Content {
-  public:
-	float *a;
-	float *b;
-	float *c;
-};
-
-class SpaceRoot_LPU : public LPU {
-  public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *b;
-	PartitionDimension **bPartDims;
-	float *c;
-	PartitionDimension **cPartDims;
-};
-
-class SpaceA_Content {
-  public:
-	float *a;
-	float *b;
-	float *c;
-};
-
-class SpaceA_LPU : public LPU {
-  public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *b;
-	PartitionDimension **bPartDims;
-	float *c;
-	PartitionDimension **cPartDims;
-};
-
-class SpaceA_Sub_Content {
-  public:
-	float *a;
-	float *b;
-	float *c;
-};
-
-class SpaceA_Sub_LPU : public LPU {
-  public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *b;
-	PartitionDimension **bPartDims;
-	float *c;
-	PartitionDimension **cPartDims;
-};
-
-/*-----------------------------------------------------------------------------------
-Data structures for Array-Metadata and Environment-Links 
-------------------------------------------------------------------------------------*/
-
-class ArrayMetadata {
-  public:
-	Dimension aDims[2];
-	Dimension bDims[2];
-	Dimension cDims[2];
-};
-ArrayMetadata arrayMetadata;
-
-class EnvironmentLinks {
-  public:
-	float *a;
-	Dimension aDims[2];
-	float *b;
-	Dimension bDims[2];
-};
-EnvironmentLinks environmentLinks;
-
-/*-----------------------------------------------------------------------------------
 function to generate PPU IDs and PPU group IDs for a thread
 ------------------------------------------------------------------------------------*/
 
-ThreadIds *getPpuIdsForThread(int threadNo)  {
+ThreadIds *mm::getPpuIdsForThread(int threadNo)  {
 
 	ThreadIds *threadIds = new ThreadIds;
 	threadIds->ppuIds = new PPU_Ids[Space_Count];
@@ -237,14 +145,6 @@ ThreadIds *getPpuIdsForThread(int threadNo)  {
 /*-----------------------------------------------------------------------------------
 Thread-State implementation class for the task
 ------------------------------------------------------------------------------------*/
-
-class ThreadStateImpl : public ThreadState {
-  public:
-	void setLpsParentIndexMap();
-        void setRootLpu();
-        int *computeLpuCounts(int lpsId);
-        LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
-};
 
 // Construction of task specific LPS hierarchy index map
 void ThreadStateImpl::setLpsParentIndexMap() {

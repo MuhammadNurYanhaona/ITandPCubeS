@@ -2,6 +2,7 @@
 #include "space_mapping.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
+#include "../utils/string_utils.h"
 #include "../syntax/ast_task.h"
 
 #include <cstdlib>
@@ -9,42 +10,69 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <string.h>
+#include <stdio.h>
 
-void initializeOutputFile(const char *filePath) {
+void initializeOutputFiles(const char *headerFileName, 
+		const char *programFileName, const char *initials) {
+
 	std::string line;
         std::ifstream commIncludeFile("codegen/default-includes.txt");
-	std::ofstream programFile;
-        programFile.open (filePath, std::ofstream::out);
-        if (programFile.is_open()) {
-                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "header files included for different purposes" << std::endl;
-                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
-	} else {
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out);
+        programFile.open (programFileName, std::ofstream::out);
+        if (!programFile.is_open()) {
 		std::cout << "Unable to open output program file";
 		std::exit(EXIT_FAILURE);
 	}
+	if (!headerFile.is_open()) {
+		std::cout << "Unable to open output header file";
+		std::exit(EXIT_FAILURE);
+	}
+	
+	headerFile << "#ifndef _H_" << initials << std::endl;
+	headerFile << "#define _H_" << initials << std::endl << std::endl;
 
+	int taskNameIndex = string_utils::getLastIndexOf(headerFileName, '/') + 1;
+	char *taskName = string_utils::substr(headerFileName, taskNameIndex, strlen(headerFileName));
+	
+	programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+        programFile << "header file for the task" << std::endl;
+        programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	programFile << "#include \"" << taskName  << '"' << std::endl << std::endl;
+                
+	programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+        programFile << "header files included for different purposes" << std::endl;
+        programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	
 	if (commIncludeFile.is_open()) {
                 while (std::getline(commIncludeFile, line)) {
+			headerFile << line << std::endl;
 			programFile << line << std::endl;
 		}
+		headerFile << std::endl;
 		programFile << std::endl;
 	} else {
 		std::cout << "Unable to open common include file";
 		std::exit(EXIT_FAILURE);
 	}
+
+	headerFile << "namespace " << string_utils::toLower(initials) << " {\n\n";
+	programFile << "using namespace " << string_utils::toLower(initials) << ";\n\n";
+
 	commIncludeFile.close();
 	programFile.close();
+	headerFile.close();
 }
 
-void generateThreadCountMacros(const char *outputFile,       
+void generateThreadCountConstants(const char *outputFile,       
                 MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig) {
 	
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
         if (programFile.is_open()) {
                 programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "macro definitions for total and par core thread counts" << std::endl;
+                programFile << "constants for total and par core thread counts" << std::endl;
                 programFile << "------------------------------------------------------------------------------------*/" << std::endl;
 	} else {
 		std::cout << "Unable to open output program file";
@@ -84,7 +112,7 @@ void generateThreadCountMacros(const char *outputFile,
 		totalThreads *= pps->units;
 		if (pps->id == lowestPpsId) break;
 	}
-	programFile << "#define Total_Threads " << totalThreads << std::endl;
+	programFile << "const int Total_Threads = " << totalThreads << ';' << std::endl;
 	
 	// determine the number of threads attached par core to understand how to do thread affinity management
 	int coreSpaceId = pcubesConfig->Nth(0)->id;
@@ -101,31 +129,36 @@ void generateThreadCountMacros(const char *outputFile,
 		PPS_Definition *pps = pcubesConfig->Nth(ppsCount - i);
 		threadsParCore *= pps->units;
 	}	
-	programFile << "#define Threads_Par_Core " << threadsParCore << std::endl;
-	programFile << std::endl;
+	programFile << "const int Threads_Par_Core = " << threadsParCore << ';' << std::endl;
 	programFile.close();
 }
 
-void generateFnForThreadIdsAllocation(const char *outputFile, 
-		MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig) {
+void generateFnForThreadIdsAllocation(const char *headerFileName, 
+                const char *programFileName, 
+                const char *initials,
+                MappingNode *mappingRoot, 
+                List<PPS_Definition*> *pcubesConfig) {
 
         std::string statementSeparator = ";\n";
         std::string statementIndent = "\t";
-	std::ofstream programFile;
+	std::ofstream programFile, headerFile;
         
-	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
-        if (programFile.is_open()) {
-                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "function to generate PPU IDs and PPU group IDs for a thread" << std::endl;
-                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
-	} else {
-		std::cout << "Unable to open output program file";
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open header/program file";
 		std::exit(EXIT_FAILURE);
 	}
+                
+	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
+        headerFile << "function to generate PPU IDs and PPU group IDs for a thread\n";
+        headerFile << "------------------------------------------------------------------------------------*/\n";
+	programFile << "/*-----------------------------------------------------------------------------------\n";
+        programFile << "function to generate PPU IDs and PPU group IDs for a thread\n";
+        programFile << "------------------------------------------------------------------------------------*/\n";
 
 	std::ostringstream functionHeader;
-        functionHeader << "ThreadIds *" << "getPpuIdsForThread";
-        functionHeader << "(int threadNo)";
+        functionHeader << "getPpuIdsForThread(int threadNo)";
         std::ostringstream functionBody;
         
 	functionBody << " {\n\n" << statementIndent;
@@ -248,9 +281,13 @@ void generateFnForThreadIdsAllocation(const char *outputFile,
 	}
 	functionBody << statementIndent << "return threadIds" << statementSeparator;
 	functionBody << "}\n";
-	
-	programFile << std::endl << functionHeader.str() << " " << functionBody.str();
+
+	headerFile << "ThreadIds *" << functionHeader.str() << ";\n\n";	
+	programFile << std::endl << "ThreadIds *" << initials << "::"; 
+	programFile <<functionHeader.str() << " " << functionBody.str();
 	programFile << std::endl;
+
+	headerFile.close();
 	programFile.close();
 }
 
@@ -363,4 +400,18 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
 	}	
 	programFile << "};\n";
 	programFile << "EnvironmentLinks environmentLinks" << statementSeparator << std::endl;
+	programFile.close();
+}
+
+void closeNameSpace(const char *headerFile) {
+	std::ofstream programFile;
+	programFile.open (headerFile, std::ofstream::app);
+	if (programFile.is_open()) {
+		programFile << std::endl << '}' << std::endl;
+		programFile << "#endif" << std::endl;
+		programFile.close();
+	} else {
+		std::cout << "Could not open header file" << std::endl;
+		std::exit(EXIT_FAILURE);
+	}
 }

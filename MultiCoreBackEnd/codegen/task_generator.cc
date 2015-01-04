@@ -38,39 +38,43 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 	programFile = strdup(programFileStr.str().c_str());
 
 	initials = string_utils::getInitials(taskDef->getName());
+	initials = string_utils::toLower(initials);
 }
 
 void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
-	initializeOutputFile(programFile);
+	initializeOutputFiles(headerFile, programFile, initials);
 
         PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
         MappingNode *mappingConfig = parseMappingConfiguration(taskDef->getName(),
                         mappingFile, lpsHierarchy, pcubesConfig);
         
-	// generate macro definitions needed for various reasons
-        generateLPSMacroDefinitions(programFile, mappingConfig);
-        generatePPSCountMacros(programFile, pcubesConfig);
-        generateThreadCountMacros(programFile, mappingConfig, pcubesConfig);
+	// generate constansts needed for various reasons
+        generateLPSConstants(headerFile, mappingConfig);
+        generatePPSCountConstants(headerFile, pcubesConfig);
+        generateThreadCountConstants(headerFile, mappingConfig, pcubesConfig);
         
 	// generate library routines for LPUs management        
         List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
         Hashtable<List<PartitionParameterConfig*>*> *partitionFnParamConfigs
-                        = generateLPUCountFunctions(programFile, mappingConfig, partitionArgs);
+                        = generateLPUCountFunctions(headerFile, 
+					programFile, initials, mappingConfig, partitionArgs);
         Hashtable<List<int>*> *lpuPartFnParamsConfigs
-                        = generateAllGetPartForLPURoutines(programFile, 
-					mappingConfig, partitionArgs);
+                        = generateAllGetPartForLPURoutines(headerFile, programFile, 
+					initials, mappingConfig, partitionArgs);
         
 	// generate task specific data structures 
-        generateLpuDataStructures(programFile, mappingConfig);
-        generateArrayMetadataAndEnvLinks(programFile, 
+        generateLpuDataStructures(headerFile, mappingConfig);
+        generateArrayMetadataAndEnvLinks(headerFile, 
 			mappingConfig, taskDef->getEnvironmentLinks());
         
 	// generate thread management functions and classes
-        generateFnForThreadIdsAllocation(programFile, mappingConfig, pcubesConfig);
-        generateThreadStateImpl(programFile, mappingConfig,
+        generateFnForThreadIdsAllocation(headerFile, 
+			programFile, initials, mappingConfig, pcubesConfig);
+        generateThreadStateImpl(headerFile, programFile, mappingConfig,
                         partitionFnParamConfigs, lpuPartFnParamsConfigs);
 
+	closeNameSpace(headerFile);
 }
 
 

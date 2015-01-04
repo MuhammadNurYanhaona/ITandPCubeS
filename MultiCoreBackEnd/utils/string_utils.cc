@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cctype>
 #include <string.h>
+#include <stdio.h>
 
 void string_utils::trim(std::string &str) {
 
@@ -107,4 +108,21 @@ const char *string_utils::getInitials(const char *str) {
 		}
 	}
 	return strdup(initials.str().c_str());
+}
+
+int string_utils::getLastIndexOf(const char *str, char ch) {
+	int length = strlen(str);
+	int lastIndex = -1;
+	for (int i = 0; i < length; i++) {
+		if (str[i] == ch) lastIndex = i;
+	}
+	return lastIndex;
+}
+
+char *string_utils::substr(const char *str, int begin, int end) {
+	int length = end - begin + 1;
+	char *buffer = new char[length + 1];
+	const char *source = str + begin;
+	strncpy(buffer, source, length);
+	return buffer;
 }

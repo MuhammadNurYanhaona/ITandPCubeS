@@ -35,6 +35,11 @@ namespace string_utils {
 
 	// get the capitalized characters of string as its initials
 	const char *getInitials(const char *str);
+
+	int getLastIndexOf(const char *str, char ch);
+
+	// get the substring from begin to end with both indexes included
+	char *substr(const char *str, int begin, int end);
 }
 
 #endif
