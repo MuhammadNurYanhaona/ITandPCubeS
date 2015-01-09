@@ -48,6 +48,9 @@ class InitializeInstr : public Node {
 	// Static Analysis Routines
 	void performVariableAccessAnalysis(Scope *taskGlobalScope);
 	void printUsageStatistics();
+
+	// Helper routines for back-end compiler
+	List<const char*> *getArguments();
 };
 
 class EnvironmentLink : public Node {
@@ -134,7 +137,11 @@ class ComputeStage : public DataFlowStage {
 	int assignFlowStageAndNestingIndexes(int currentNestingIndex, 
 			int currentStageIndex, List<DataFlowStage*> *currentStageList);
 	Hashtable<VariableAccess*> *getAccessMap();
-	void constructComputationFlow(List<FlowStage*> *inProgressStageList, CompositeStage *currentContainerStage);
+	void constructComputationFlow(List<FlowStage*> *inProgressStageList, 
+			CompositeStage *currentContainerStage);
+	
+	// Helper routines for back-end compiler
+	void populateRepeatIndexes(List <const char*> *currentList);
 };
 
 class RepeatControl : public DataFlowStage {
@@ -163,6 +170,9 @@ class RepeatControl : public DataFlowStage {
 	bool iterateSubpartitions() { return subpartitionIteration; }
 	void changeBeginning(Identifier *newBeginning) { begin = newBeginning; }
 	Expr *getCondition() { return rangeExpr; }
+	
+	// Helper routines for back-end compiler
+	void populateRepeatIndexes(List <const char*> *currentList);
 };
 
 class MetaComputeStage : public Node {
@@ -187,7 +197,11 @@ class MetaComputeStage : public Node {
 	int assignFlowStageAndNestingIndexes(int currentNestingIndex, 
 			int currentStageIndex, List<DataFlowStage*> *currentStageList);
 	Hashtable<VariableAccess*> *getAggregateAccessMapOfNestedStages();
-	void constructComputationFlow(List<FlowStage*> *inProgressStageList, CompositeStage *currentContainerStage);
+	void constructComputationFlow(List<FlowStage*> *inProgressStageList, 
+			CompositeStage *currentContainerStage);
+
+	// Helper routines for back-end compiler
+	void populateRepeatIndexes(List <const char*> *currentList);
 };
 
 class ComputeSection : public Node {
@@ -219,6 +233,9 @@ class ComputeSection : public Node {
 		computation->performDependencyAnalysis(hierarchy); 
 	}
 	void print() { computation->print(0); }
+
+	// Helper functions for backend compiler
+	List<const char*> *getRepeatIndexes();
 };
 
 class TaskDef : public Definition {
@@ -243,6 +260,7 @@ class TaskDef : public Definition {
 	void attachScope(Scope *parentScope);
 	void validateScope(Scope *parentScope);
 	TupleDef *getEnvTuple() { return envTuple; }
+	TupleDef *getPartitionTuple() { return partitionTuple; }
 	List<Type*> *getInitArgTypes();
 	int getPartitionArgsCount();
 	DefineSection *getDefineSection() { return define; }	
@@ -259,6 +277,8 @@ class TaskDef : public Definition {
 	PartitionHierarchy *getPartitionHierarchy();
 	List<Identifier*> *getPartitionArguments();
 	List<EnvironmentLink*> *getEnvironmentLinks() { return environment->getLinks(); }
+	List<const char*> *getRepeatIndexes() { return compute->getRepeatIndexes(); }
+	InitializeInstr *getInitSection() { return initialize; }
 };
 
 #endif

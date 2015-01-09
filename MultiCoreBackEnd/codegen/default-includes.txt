@@ -3,6 +3,10 @@
 #include <string>
 #include <cstdlib>
 
+// for tuple definitions found in the source code
+#include "tuple.h"
+#include <vector>
+
 // for LPU and PPU management data structures
 #include "../codegen/structure.h"
 #include "../codegen/lpu_management.h"

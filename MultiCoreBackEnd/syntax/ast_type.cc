@@ -123,6 +123,12 @@ bool Type::isAssignableFrom(Type *other) {
 				|| other == Type::doubleType);
 	} else { return this == other; }
 }
+
+const char *Type::getCppDeclaration(const char *varName) {
+	std::ostringstream decl;
+	decl << typeName << " " << varName;
+	return strdup(decl.str().c_str());
+}
 	
 //---------------------------------------------- Tuple Type ----------------------------------------------/
 
@@ -139,6 +145,12 @@ bool NamedType::isEqual(Type *other) {
 	NamedType *otherType = dynamic_cast<NamedType*>(other);
 	if (otherType == NULL) return false;
 	return strcmp(this->getName(), otherType->getName()) == 0;
+}
+
+const char *NamedType::getCppDeclaration(const char *varName) {
+	std::ostringstream decl;
+	decl << id->getName() << " " << varName;
+	return strdup(decl.str().c_str());
 }
 
 //---------------------------------------------- Array Type ----------------------------------------------/
@@ -191,6 +203,18 @@ const char *ArrayType::getName() {
 	return (const char*) arrayName;  
 }
 
+const char *ArrayType::getCType() {
+	std::ostringstream cName;
+	cName << elemType->getCType() << "*";
+	return strdup(cName.str().c_str());
+}
+
+const char *ArrayType::getCppDeclaration(const char *varName) {
+	std::ostringstream decl;
+	decl << this->getCType() << " " << varName;
+	return strdup(decl.str().c_str());
+}
+
 void StaticArrayType::setLengths(List<int> *dimLengths) {
 	dimensionLengths = dimLengths;
 }
@@ -212,6 +236,15 @@ Type *StaticArrayType::reduceADimension() {
 	}
 	arrayType->setLengths(dims);
 	return arrayType; 
+}
+
+const char *StaticArrayType::getCppDeclaration(const char *varName) {
+	std::ostringstream decl;
+	decl << elemType->getCType() << " " << varName;
+	for (int i = 0; i < dimensionLengths->NumElements(); i++) {
+		decl << '[' << dimensionLengths->Nth(i) << ']';
+	}
+	return strdup(decl.str().c_str());	
 }
 
 //---------------------------------------------- List Type ----------------------------------------------/
@@ -247,6 +280,18 @@ const char *ListType::getName() {
 	strcpy(listName, "List of ");
 	strcat(listName, elementTypeName);
 	return (const char*) listName;  
+}
+
+const char *ListType::getCType() {
+	std::ostringstream cType;
+	cType << "std::vector<" << elemType->getCType() << ">";
+	return strdup(cType.str().c_str());
+}
+
+const char *ListType::getCppDeclaration(const char *varName) {
+	std::ostringstream decl;
+	decl << this->getCType() << " " << varName;
+	return strdup(decl.str().c_str());
 }
 
 //---------------------------------------------- Map Type -----------------------------------------------/

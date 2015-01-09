@@ -146,6 +146,24 @@ List<TaskDef*> *ProgramDef::getTasks() {
 	return taskList;
 }
 
+List<TupleDef*> *ProgramDef::getTuples() {
+	List<TupleDef*> *tupleList = new List<TupleDef*>;
+	for (int i = 0; i < components->NumElements(); i++) {
+                Node *node = components->Nth(i);
+                TaskDef *taskDef = dynamic_cast<TaskDef*>(node);
+                if (taskDef != NULL) {
+			tupleList->Append(taskDef->getEnvTuple());
+			tupleList->Append(taskDef->getPartitionTuple());	
+			continue;	
+		}
+		TupleDef *tupleDef = dynamic_cast<TupleDef*>(node);
+		if (tupleDef != NULL) {
+			tupleList->Append(tupleDef);
+		}
+	}
+	return tupleList;	
+}
+
 //----------------------------------------- Tuple Definition ------------------------------------------/
 
 TupleDef::TupleDef(Identifier *i, List<VariableDef*> *c) : Definition(*i->GetLocation()) {

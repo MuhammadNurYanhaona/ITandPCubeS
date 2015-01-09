@@ -122,6 +122,7 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	int mappingEnd = description.find('}', taskConfigBegin);
 	std::string mapping = description.substr(mappingStart + 1, mappingEnd - mappingStart - 1);
 	string_utils::trim(mapping);
+	mappingfile.close();
 
 	// create the root of the mapping hierarchy
 	MapEntry *rootEntry = new MapEntry();

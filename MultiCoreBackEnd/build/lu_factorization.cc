@@ -11,6 +11,10 @@ header files included for different purposes
 #include <string>
 #include <cstdlib>
 
+// for tuple definitions found in the source code
+#include "tuple.h"
+#include <vector>
+
 // for LPU and PPU management data structures
 #include "../codegen/structure.h"
 #include "../codegen/lpu_management.h"
@@ -149,7 +153,7 @@ ThreadIds *luf::getPpuIdsForThread(int threadNo)  {
 	groupSize = threadCount;
 	groupThreadId = idsArray[Space_Root] % groupSize;
 	threadIds->ppuIds[Space_A].groupId = idsArray[Space_Root] / groupSize;
-	threadIds->ppuIds[Space_A].ppuCount = 2;
+	threadIds->ppuIds[Space_A].ppuCount = 1;
 	threadIds->ppuIds[Space_A].groupSize = groupSize;
 	if (groupThreadId == 0) threadIds->ppuIds[Space_A].id
 			= threadIds->ppuIds[Space_A].groupId;
@@ -158,10 +162,10 @@ ThreadIds *luf::getPpuIdsForThread(int threadNo)  {
 
 	// for Space B;
 	threadCount = threadIds->ppuIds[Space_A].groupSize;
-	groupSize = threadCount / 32;
+	groupSize = threadCount / 16;
 	groupThreadId = idsArray[Space_A] % groupSize;
 	threadIds->ppuIds[Space_B].groupId = idsArray[Space_A] / groupSize;
-	threadIds->ppuIds[Space_B].ppuCount = 32;
+	threadIds->ppuIds[Space_B].ppuCount = 16;
 	threadIds->ppuIds[Space_B].groupSize = groupSize;
 	if (groupThreadId == 0) threadIds->ppuIds[Space_B].id
 			= threadIds->ppuIds[Space_B].groupId;
@@ -170,10 +174,10 @@ ThreadIds *luf::getPpuIdsForThread(int threadNo)  {
 
 	// for Space C;
 	threadCount = threadIds->ppuIds[Space_A].groupSize;
-	groupSize = threadCount / 4;
+	groupSize = threadCount / 2;
 	groupThreadId = idsArray[Space_A] % groupSize;
 	threadIds->ppuIds[Space_C].groupId = idsArray[Space_A] / groupSize;
-	threadIds->ppuIds[Space_C].ppuCount = 4;
+	threadIds->ppuIds[Space_C].ppuCount = 2;
 	threadIds->ppuIds[Space_C].groupSize = groupSize;
 	if (groupThreadId == 0) threadIds->ppuIds[Space_C].id
 			= threadIds->ppuIds[Space_C].groupId;
@@ -343,5 +347,14 @@ LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) 
 		return currentLpu;
 	}
 	return NULL;
+}
+
+/*-----------------------------------------------------------------------------------
+function for the initialize block
+------------------------------------------------------------------------------------*/
+
+void luf::initializeTask(TaskGlobals taskGlobals, ThreadLocals threadLocals) {
+	arrayMetadata.aDims[0] = environmentLinks.aDims[0];
+	arrayMetadata.aDims[1] = environmentLinks.aDims[1];
 }
 

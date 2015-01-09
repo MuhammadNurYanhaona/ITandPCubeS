@@ -7,6 +7,7 @@
 
 #include "errors.h"
 #include "../utils/list.h"
+#include "../utils/string_utils.h"
 #include "../semantics/symbol.h"
 #include "../semantics/scope.h"
 #include "../semantics/task_space.h"
@@ -72,9 +73,13 @@ void TaskDef::attachScope(Scope *parentScope) {
 			envElementTypes->Append(varSym->getType());	
 		}
 	}
-	char *envTupleName = (char *) malloc(strlen(id->getName()) + 13);
-	strcpy(envTupleName, id->getName());
-	strcat(envTupleName, " Environment");
+
+	const char *initials = string_utils::getInitials(id->getName());
+	char *envTupleName = (char *) malloc(strlen(initials) + 12);
+	strcpy(envTupleName, initials);
+	strcat(envTupleName, "Environment");
+	
+	
 	Identifier *envId = new Identifier(*GetLocation(), envTupleName);
 	envTuple = new TupleDef(envId, envDef);
 	envTuple->setSymbol(new TupleSymbol(envId, envTuple, envElementTypes));
@@ -85,9 +90,9 @@ void TaskDef::attachScope(Scope *parentScope) {
 	List<Identifier*> *partitionArgs = partition->getArguments();
 	List<VariableDef*> *partitionDef = new List<VariableDef*>;
 	List<Type*> *partElementTypes = new List<Type*>;	
-	char *partTupleName = (char *) malloc(strlen(id->getName()) + 11);
-	strcpy(partTupleName, id->getName());
-	strcat(partTupleName, " Partition");
+	char *partTupleName = (char *) malloc(strlen(initials) + 10);
+	strcpy(partTupleName, initials);
+	strcat(partTupleName, "Partition");
 	Identifier *partitionId = new Identifier(*GetLocation(), partTupleName);
 	Scope *partScope = new Scope(TaskPartitionScope);
 	for (int i = 0; i < partitionArgs->NumElements(); i++) {
@@ -320,6 +325,15 @@ void InitializeInstr::printUsageStatistics() {
 	while ((accessLog = iter.GetNextValue()) != NULL) {
 		accessLog->printAccessDetail(1);
 	}	
+}
+
+List<const char*> *InitializeInstr::getArguments() {
+	List<const char*> *argNameList = new List<const char*>;
+	for (int i = 0; i < arguments->NumElements(); i++) {
+		Identifier *id = arguments->Nth(i);
+		argNameList->Append(id->getName());
+	}
+	return argNameList;
 }
 
 //------------------------------------- Environment Section ----------------------------------------/
@@ -616,6 +630,15 @@ Hashtable<VariableAccess*> *ComputeStage::getAccessMap() {
         return aggregateMap;
 }
 
+void ComputeStage::populateRepeatIndexes(List <const char*> *currentList) {
+	if (metaStage) {
+        	for (int i = 0; i < nestedSequence->NumElements(); i++) {
+                	MetaComputeStage *nestedMetaStage = nestedSequence->Nth(i);
+			nestedMetaStage->populateRepeatIndexes(currentList);
+		}
+	}
+}
+
 //-------------------------------------------------------------------------- Repeat Control
 RepeatControl::RepeatControl(Identifier *b, Expr *r, yyltype loc) : DataFlowStage(loc) {
 	Assert(b != NULL && r != NULL);
@@ -718,6 +741,15 @@ void RepeatControl::checkVariableAccess(Scope *taskGlobalScope) {
 	}
 }
 
+void RepeatControl::populateRepeatIndexes(List <const char*> *currentList) {
+	if (!subpartitionIteration) {
+		RangeExpr *expr = dynamic_cast<RangeExpr*>(rangeExpr);
+		if (expr != NULL) {
+			currentList->Append(expr->getIndexName());
+		}
+	}
+}
+
 //-------------------------------------------------------------------------- Stage Sequence
 MetaComputeStage::MetaComputeStage(List<ComputeStage*> *s, RepeatControl *r) : Node() {
 	Assert(s != NULL);
@@ -797,33 +829,6 @@ void MetaComputeStage::checkVariableAccess(Scope *taskGlobalScope) {
 	}
 }
 
-/*
-void MetaComputeStage::performDependencyAnalysis(List<DataFlowStage*> *stageList) {
-	// first, go over the stages to establish forward direction depenendy arcs
-	for (int i = 0; i < stageSequence->NumElements(); i++) {
-		ComputeStage *stage = stageSequence->Nth(i);
-		stage->performDependencyAnalysis(stageList);	
-	}
-	if (repeatInstr != NULL) {
-		// if there is a repeat loop, establish dependency arcs for it 
-		const char *repeatRoot = repeatInstr->performDependencyAnalysis(stageList);
-		if (repeatRoot == NULL) return;
-		// repeat loop should cause the dependency analysis takes place again in the
-		// repeated stages to establish backward direction dependency arcs
-		int i = 0;
-		// skip non-repeated stages
-		for (;i < stageSequence->NumElements(); i++) {
-			ComputeStage *stage = stageSequence->Nth(i);
-			if (strcmp(stage->getName(), repeatRoot) == 0) break;
-		}
-		// perform dependency checking again for repeated stages
-		for (;i < stageSequence->NumElements(); i++) {
-			ComputeStage *stage = stageSequence->Nth(i);
-			stage->performDependencyAnalysis(stageList);	
-		}
-	}	
-}
-*/
 int MetaComputeStage::assignFlowStageAndNestingIndexes(int currentNestingIndex, 
 			int currentStageIndex, List<DataFlowStage*> *currentStageList) {
 	if (repeatInstr == NULL) {
@@ -911,6 +916,16 @@ void MetaComputeStage::constructComputationFlow(List<FlowStage*> *inProgressStag
 	}
 }
 
+void MetaComputeStage::populateRepeatIndexes(List <const char*> *currentList) {
+	for (int i = 0; i < stageSequence->NumElements(); i++) {
+		ComputeStage *stage = stageSequence->Nth(i);
+		stage->populateRepeatIndexes(currentList);
+	}
+	if (repeatInstr != NULL) {
+		repeatInstr->populateRepeatIndexes(currentList);
+	}
+}
+
 //------------------------------------------------------------------------- Compute Section
 ComputeSection::ComputeSection(List<MetaComputeStage*> *s, yyltype loc) : Node(loc) {
 	Assert(s != NULL);
@@ -963,4 +978,25 @@ void ComputeSection::constructComputationFlow(Space *rootSpace) {
 	computation = containerStage;
 	computation->setName("\"Computation Flow Specification\"");
 	computation->reorganizeDynamicStages();
+}
+
+List<const char*> *ComputeSection::getRepeatIndexes() {
+	List<const char*> *repeatIndexes = new List<const char*>;
+	for (int i = 0; i < stageSeqList->NumElements(); i++) {
+		MetaComputeStage *metaStage = stageSeqList->Nth(i);
+		metaStage->populateRepeatIndexes(repeatIndexes);
+	}
+	List<const char*> *filteredList = new List<const char*>;
+	for (int i = 0; i < repeatIndexes->NumElements(); i++) {
+		const char* indexName = repeatIndexes->Nth(i);
+		bool indexFound = false;
+		for (int j = 0; j < filteredList->NumElements(); j++) {
+			if (strcmp(filteredList->Nth(j), indexName) == 0) {
+				indexFound = true;
+				break;
+			}
+		}
+		if (!indexFound) filteredList->Append(indexName);
+	}	
+	return filteredList;
 }

@@ -8,6 +8,7 @@
 #include "../semantics/scope.h"
 
 class TaskDef;
+class TupleDef;
 
 class Definition : public Node {	
   public:
@@ -53,7 +54,8 @@ class ProgramDef : public Definition {
 	void performStaticAnalysis();
 	void printTasks();
 	Node *getTaskDefinition(const char *taskName); 
-	List<TaskDef*> *getTasks(); 
+	List<TaskDef*> *getTasks();
+	List<TupleDef*> *getTuples(); 
 };
 
 class TupleDef : public Definition {

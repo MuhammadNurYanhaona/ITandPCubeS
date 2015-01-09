@@ -544,6 +544,8 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
 	}
 	field = f;
 	field->SetParent(this);
+	metadata = false;
+	local = false;
 }
 
 void FieldAccess::PrintChildren(int indentLevel) {
@@ -702,13 +704,25 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
 			Type *globalType = global->getType();
 			const char *globalName = global->getName();
 			if ((dynamic_cast<ArrayType*>(globalType)) != NULL) {
-				table->Lookup(globalName)->markMetadataAccess();
+				table->Lookup(globalName)->markMetadataAccess(); 
+				// set some flags in the base expression that will help during code generation
+				baseField->setMetadata(true);
+				if (this->isLocalTerminalField()) {
+					baseField->markLocal();
+				}
 			} else {
 				table->Lookup(globalName)->markContentAccess();
 			}	
 		}
 		return table;
 	}
+}
+
+bool FieldAccess::isLocalTerminalField() {
+	if (base == NULL) return false;
+	FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+	if (baseField == NULL) return false;
+	return (baseField->isTerminalField() && strcmp(field->getName(), Identifier::LocalId) == 0);
 }
 
 //------------------------------------------------ Range Expressions --------------------------------------------------/

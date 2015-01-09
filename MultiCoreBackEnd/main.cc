@@ -48,8 +48,9 @@ int main(int argc, const char *argv[]) {
 	}
 	dup2(fileDescriptor, STDIN_FILENO);
 	close(fileDescriptor);
-	// set the default output directory parameter
+	// set the default output directory and common header file parameters
 	const char *outputDir = "build/";
+	const char *tupleHeader = "build/tuple.h";
 	//**********************************************************************************
 
 
@@ -83,32 +84,7 @@ int main(int argc, const char *argv[]) {
 		TaskGenerator *generator = new TaskGenerator(taskDef, outputDir, mappingFile);
 		generator->generate(pcubesConfig);
 	}
-
-	/*
-	initializeOutputFile(programFile);
-	TaskDef *luTask = (TaskDef*) ProgramDef::program->getTaskDefinition("LU Factorization");
-	if (luTask == NULL) std::cout << "could not find LU factorization task\n";
-	PartitionHierarchy *lpsHierarchy = luTask->getPartitionHierarchy();
-	MappingNode *mappingConfig = parseMappingConfiguration("LU Factorization",
-        		mappingFile, lpsHierarchy, pcubesConfig);
-	// generate macro definitions needed for various reasons
-	generateLPSMacroDefinitions(programFile, mappingConfig);
-	generatePPSCountMacros(programFile, pcubesConfig);
-	generateThreadCountMacros(programFile, mappingConfig, pcubesConfig);
-	// generate library routines for LPUs management	
-	List<Identifier*> *partitionArgs = luTask->getPartitionArguments();
-	Hashtable<List<PartitionParameterConfig*>*> *partitionFnParamConfigs 
-			= generateLPUCountFunctions(programFile, mappingConfig, partitionArgs);
-	Hashtable<List<int>*> *lpuPartFnParamsConfigs 
-			= generateAllGetPartForLPURoutines(programFile, mappingConfig, partitionArgs);
-	// generate task specific data structures 
-	generateLpuDataStructures(programFile, mappingConfig);
-	generateArrayMetadataAndEnvLinks(programFile, mappingConfig, 
-			luTask->getEnvironmentLinks());
-	// generate thread management functions and classes
-	generateFnForThreadIdsAllocation(programFile, mappingConfig, pcubesConfig);
-	generateThreadStateImpl(programFile, mappingConfig, 
-			partitionFnParamConfigs, lpuPartFnParamsConfigs);
-	*/
+	// generate classes for the list of tuples present in the source in a header file
+	generateClassesForTuples(tupleHeader, ProgramDef::program->getTuples());
 }
 

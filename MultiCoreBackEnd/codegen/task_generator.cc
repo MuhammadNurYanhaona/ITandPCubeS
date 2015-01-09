@@ -10,6 +10,7 @@
 #include "code_generator.h"
 #include "thread_state_mgmt.h"
 #include "space_mapping.h"
+#include "name_transformer.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
@@ -17,6 +18,7 @@
 #include "../syntax/ast_def.h"
 #include "../syntax/errors.h"
 #include "../syntax/ast_task.h"
+#include "../static-analysis/task_global.h"
 
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
                 const char *outputDirectory,
@@ -43,6 +45,10 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 
 void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
+	std::cout << "\n-----------------------------------------------------------------\n";
+	std::cout << "Translating task: " << taskDef->getName();
+	std::cout << "\n-----------------------------------------------------------------\n";
+
 	initializeOutputFiles(headerFile, programFile, initials);
 
         PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
@@ -65,14 +71,25 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         
 	// generate task specific data structures 
         generateLpuDataStructures(headerFile, mappingConfig);
-        generateArrayMetadataAndEnvLinks(headerFile, 
+        List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
 			mappingConfig, taskDef->getEnvironmentLinks());
+	List<TaskGlobalScalar*> *globalScalars 
+		= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
+	generateClassesForGlobalScalars(headerFile, globalScalars);
         
 	// generate thread management functions and classes
         generateFnForThreadIdsAllocation(headerFile, 
 			programFile, initials, mappingConfig, pcubesConfig);
         generateThreadStateImpl(headerFile, programFile, mappingConfig,
                         partitionFnParamConfigs, lpuPartFnParamsConfigs);
+
+	// initialize the variable transformation map that would be used to translate
+	// the code inside initialize and compute blocks
+	ntransform::NameTransformer::setTransformer(taskDef);	
+
+	// translate the initialize block of the task into a function
+	generateInitializeFunction(headerFile, programFile, initials, 
+        		envLinkList, taskDef, mappingConfig->mappingConfig->LPS);
 
 	closeNameSpace(headerFile);
 }

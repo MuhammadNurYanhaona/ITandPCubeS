@@ -1,9 +1,13 @@
 #include "code_generator.h"
 #include "space_mapping.h"
+#include "name_transformer.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 #include "../utils/string_utils.h"
+#include "../syntax/ast_def.h"
 #include "../syntax/ast_task.h"
+#include "../syntax/ast_type.h"
+#include "../static-analysis/task_global.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -292,7 +296,9 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 }
 
 void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot) {
-        
+       
+	std::cout << "Generating data structures for LPUs\n";
+ 
 	std::string statementSeparator = ";\n";
         std::string statementIndent = "\t";
 	std::ofstream programFile;
@@ -351,8 +357,10 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 	programFile.close();
 }
 
-void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappingRoot,
+List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappingRoot,
                 List<EnvironmentLink*> *envLinks) {
+
+	std::cout << "Generating array metadata and environment links\n";
 	
 	std::string statementSeparator = ";\n";
         std::string statementIndent = "\t";
@@ -368,6 +376,7 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
 		std::exit(EXIT_FAILURE);
 	}
 	
+	// construct an array metadata object by listing all arrays present in the root LPS
 	Space *rootLps = mappingRoot->mappingConfig->LPS;
 	programFile << "\nclass ArrayMetadata {\n";
 	programFile << "  public:\n";
@@ -382,25 +391,36 @@ void generateArrayMetadataAndEnvLinks(const char *outputFile, MappingNode *mappi
 	programFile << "};\n";
 	programFile << "ArrayMetadata arrayMetadata" << statementSeparator;
 	
+	// create a class for environment links; also generate a list of the name of such links to be returned
+	List<const char*> *linkList = new List<const char*>;
 	programFile << "\nclass EnvironmentLinks {\n";
 	programFile << "  public:\n";
 	for (int i = 0; i < envLinks->NumElements(); i++) {
 		EnvironmentLink *link = envLinks->Nth(i);
 		if (!link->isExternal()) continue;
 		const char *linkName = link->getVariable()->getName();
-		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(localArrays->Nth(i));
-		ArrayType *arrayType = (ArrayType*) array->getType();
-		const char *elemType = arrayType->getTerminalElementType()->getName();
-		programFile << statementIndent << elemType << " *" << array->getName();
-		programFile << statementSeparator;
-		int dimensions = array->getDimensionality();
-		programFile << statementIndent;
-		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
-		programFile << statementSeparator;	
+		DataStructure *structure = rootLps->getLocalStructure(linkName);
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array != NULL) {
+               		ArrayType *arrayType = (ArrayType*) array->getType();
+               		const char *elemType = arrayType->getTerminalElementType()->getName();
+               		programFile << statementIndent << elemType << " *" << array->getName();
+               		programFile << statementSeparator;
+               		int dimensions = array->getDimensionality();
+               		programFile << statementIndent;
+               		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
+               		programFile << statementSeparator;
+		} else {
+			Type *type = structure->getType();
+			const char *declaration = type->getCppDeclaration(structure->getName());
+			programFile << statementIndent << declaration << statementSeparator;
+		}
+		linkList->Append(linkName);
 	}	
 	programFile << "};\n";
 	programFile << "EnvironmentLinks environmentLinks" << statementSeparator << std::endl;
 	programFile.close();
+	return linkList;
 }
 
 void closeNameSpace(const char *headerFile) {
@@ -414,4 +434,190 @@ void closeNameSpace(const char *headerFile) {
 		std::cout << "Could not open header file" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
+	programFile.close();
+}
+
+void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefList) {
+	std::ofstream headerFile;
+	headerFile.open(filePath, std::ofstream::out);
+	if (!headerFile.is_open()) {
+		std::cout << "Unable to open header file for tuple definitions\n";
+		std::exit(EXIT_FAILURE);
+	}
+	headerFile << "#ifndef _H_tuple\n";
+	headerFile << "#define _H_tuple\n\n";
+
+	// by default include header file for standard vector for any list variable that may present
+	// in any tuple definition
+	headerFile << "#include <iostream>\n";	
+	headerFile << "#include <vector>\n\n";	
+
+	// first have a list of forward declarations for all tuples to avoid having errors during 
+	// compilation of individual classes
+	for (int i = 0; i < tupleDefList->NumElements(); i++) {
+		TupleDef *tupleDef = tupleDefList->Nth(i);
+		headerFile << "class " << tupleDef->getId()->getName() << ";\n";
+	}
+	headerFile << "\n";
+
+	// then generate a class for each tuple in the list
+	for (int i = 0; i < tupleDefList->NumElements(); i++) {
+		// if the tuple definition has no element inside then ignore it and proceed to the next
+		TupleDef *tupleDef = tupleDefList->Nth(i);
+		List<VariableDef*> *variables = tupleDef->getComponents();
+		if (variables->NumElements() == 0) continue;
+		// otherwise, generate a new class and add the elements as public components
+		headerFile << "class " << tupleDef->getId()->getName() << " {\n";
+		headerFile << "  public:\n";
+		for (int j = 0; j < variables->NumElements(); j++) {
+			headerFile << "\t";
+			VariableDef *variable = variables->Nth(j);
+			Type *type = variable->getType();
+			const char *varName = variable->getId()->getName();
+			headerFile << type->getCppDeclaration(varName);
+			headerFile << ";\n";
+		}
+		headerFile << "};\n\n";
+	}
+
+	headerFile << "#endif\n";
+	headerFile.close();
+}
+
+void generateClassesForGlobalScalars(const char *filePath, List<TaskGlobalScalar*> *globalList) {
+	
+	std::cout << "Generating structures holding task global and thread local scalar\n";
+
+	std::ofstream headerFile;
+	headerFile.open (filePath, std::ofstream::out | std::ofstream::app);
+	if (!headerFile.is_open()) {
+		std::cout << "Unable to open output header file for task\n";
+		std::exit(EXIT_FAILURE);
+	}
+                
+	headerFile << "/*-----------------------------------------------------------------------------------\n";
+        headerFile << "Data structures for Task-Global and Thread-Local scalar variables\n";
+        headerFile << "------------------------------------------------------------------------------------*/\n\n";
+	
+	std::ostringstream taskGlobals, threadLocals;
+	taskGlobals << "class TaskGlobals {\n";
+	taskGlobals << "  public:\n";
+	threadLocals << "class ThreadLocals {\n";
+	threadLocals << "  public:\n";
+
+	for (int i = 0; i < globalList->NumElements(); i++) {
+		TaskGlobalScalar *scalar = globalList->Nth(i);
+		// determine to which class the global should go into
+		std::ostringstream *stream = &taskGlobals;
+		if (scalar->isLocallyManageable()) {
+			stream = &threadLocals;
+		}
+		// then write the variable declaration within the stream
+		Type *type = scalar->getType();
+		*stream << "\t";
+		*stream << type->getCppDeclaration(scalar->getName());
+		*stream << ";\n";		
+	}
+	
+	taskGlobals << "};\n\n";
+	threadLocals << "};\n";
+
+	headerFile << taskGlobals.str() << threadLocals.str();
+	headerFile.close();
+}
+
+void generateInitializeFunction(const char *headerFileName, const char *programFileName, const char *initials,
+                List<const char*> *envLinkList, TaskDef *taskDef, Space *rootLps) {
+        
+	std::cout << "Generating function for the initialize block\n";
+
+	std::string statementSeparator = ";\n";
+        std::string statementIndent = "\t";
+	std::string parameterSeparator = ", ";
+	std::ofstream programFile, headerFile;
+        
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open header/program file for initialize block generation";
+		std::exit(EXIT_FAILURE);
+	}
+                
+	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
+        headerFile << "function for the initialize block\n";
+        headerFile << "------------------------------------------------------------------------------------*/\n";
+	programFile << "/*-----------------------------------------------------------------------------------\n";
+        programFile << "function for the initialize block\n";
+        programFile << "------------------------------------------------------------------------------------*/\n";
+
+	std::ostringstream functionHeader;
+        functionHeader << "initializeTask(TaskGlobals taskGlobals";
+	functionHeader << parameterSeparator << "ThreadLocals threadLocals";
+
+
+        std::ostringstream functionBody;
+	functionBody << "{\n";
+
+	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+	for (int i = 0; i < envLinkList->NumElements(); i++) {
+		const char *envLink = envLinkList->Nth(i);
+		// if the variable is an array then its dimension information needs to be copied from the
+		// environment link object to array metadata object of all subsequent references
+		if (transformer->isGlobalArray(envLink)) {
+			const char *varName = transformer->getTransformedName(envLink, true, false);
+			ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(envLink);
+			int dimensionCount = array->getDimensionality();
+			for (int j = 0; j < dimensionCount; j++) {
+				functionBody << statementIndent;
+				functionBody << varName << "[" << j << "]";
+				functionBody << " = " << "environmentLinks.";
+				functionBody << envLink;
+				functionBody << "Dims[" << j << "]";
+				functionBody << statementSeparator;
+			}
+		// otherwise the value of the scalar variable should be copied back to task global or thread
+		// local variable depending on what is the right destination
+		} else {
+			functionBody << statementIndent;
+			functionBody << transformer->getTransformedName(envLink, true, false);
+			functionBody << " = " << "environmentLinks.";
+			functionBody << envLink;
+			functionBody << statementSeparator;
+		}
+	}
+
+	InitializeInstr *initSection = taskDef->getInitSection();
+	if (initSection != NULL) {
+		
+		// iterate over all initialization parameters and add them as function arguments
+		List<const char*> *argNames = initSection->getArguments();
+		List<Type*> *argTypes = initSection->getArgumentTypes();
+		for (int i = 0; i < argNames->NumElements(); i++) {
+			const char *arg = argNames->Nth(i);
+			Type *type = argTypes->Nth(i);
+			functionHeader << parameterSeparator;
+			functionHeader << "\n" << statementIndent << statementIndent;
+			functionHeader << type->getCppDeclaration(arg);
+			// if any argument matches a global variable in the task then copy it to the appropriate
+			// data structure
+			if (transformer->isThreadLocal(arg) || transformer->isTaskGlobal(arg)) {
+				functionBody << statementIndent;
+				functionBody << transformer->getTransformedName(arg, true, false);
+				functionBody << " = " << arg;
+				functionBody << statementSeparator;
+			}
+		}
+	}
+
+	functionHeader << ")";
+	functionBody << "}\n";
+
+	headerFile << "void " << functionHeader.str() << ";\n\n";	
+	programFile << std::endl << "void " << initials << "::"; 
+	programFile <<functionHeader.str() << " " << functionBody.str();
+	programFile << std::endl;
+
+	headerFile.close();
+	programFile.close();
+	std::cout << "Done processing the initialize block";
 }

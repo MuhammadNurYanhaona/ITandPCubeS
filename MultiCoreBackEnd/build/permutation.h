@@ -1,10 +1,14 @@
-#ifndef _H_mm
-#define _H_mm
+#ifndef _H_p
+#define _H_p
 
 // for error reporting and diagnostics
 #include <iostream>
 #include <string>
 #include <cstdlib>
+
+// for tuple definitions found in the source code
+#include "tuple.h"
+#include <vector>
 
 // for LPU and PPU management data structures
 #include "../codegen/structure.h"
@@ -19,15 +23,14 @@
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-namespace mm {
+namespace p {
 
 /*-----------------------------------------------------------------------------------
 constants for LPSes
 ------------------------------------------------------------------------------------*/
 const int Space_Root = 0;
 const int Space_A = 1;
-const int Space_A_Sub = 2;
-const int Space_Count = 3;
+const int Space_Count = 2;
 
 /*-----------------------------------------------------------------------------------
 constants for PPS counts
@@ -41,82 +44,60 @@ const int Space_1_Par_2_PPUs = 4;
 /*-----------------------------------------------------------------------------------
 constants for total and par core thread counts
 ------------------------------------------------------------------------------------*/
-const int Total_Threads = 16;
+const int Total_Threads = 64;
 const int Threads_Par_Core = 1;
-
 
 /*-----------------------------------------------------------------------------------
 functions for retrieving partition counts in different LPSes
 ------------------------------------------------------------------------------------*/
-int *getLPUsCountOfSpaceA(int ppuCount, Dimension cDim1, int k, Dimension cDim2, int l);
-int *getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q);
+int *getLPUsCountOfSpaceA(int ppuCount, Dimension pDim1, int n);
 
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
-PartitionDimension **getaPartForSpaceALpu(PartitionDimension **aParentLpuDims, 
-		int *lpuCount, int *lpuId, int k);
-PartitionDimension **getbPartForSpaceALpu(PartitionDimension **bParentLpuDims, 
-		int *lpuCount, int *lpuId, int l);
-PartitionDimension **getcPartForSpaceALpu(PartitionDimension **cParentLpuDims, 
-		int *lpuCount, int *lpuId, int k, int l);
-PartitionDimension **getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDims, 
-		int *lpuCount, int *lpuId, int q);
-PartitionDimension **getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDims, 
-		int *lpuCount, int *lpuId, int q);
+PartitionDimension **getpPartForSpaceALpu(PartitionDimension **pParentLpuDims, 
+		int *lpuCount, int *lpuId, int n);
+PartitionDimension **getuPartForSpaceALpu(PartitionDimension **uParentLpuDims, 
+		int *lpuCount, int *lpuId, int n);
+PartitionDimension **getvPartForSpaceALpu(PartitionDimension **vParentLpuDims, 
+		int *lpuCount, int *lpuId, int n);
+
 /*-----------------------------------------------------------------------------------
 Data structures representing LPS and LPU contents 
 ------------------------------------------------------------------------------------*/
 
 class SpaceRoot_Content {
   public:
-	float *a;
-	float *b;
-	float *c;
+	int *p;
+	float *u;
+	float *v;
 };
 
 class SpaceRoot_LPU : public LPU {
   public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *b;
-	PartitionDimension **bPartDims;
-	float *c;
-	PartitionDimension **cPartDims;
+	int *p;
+	PartitionDimension **pPartDims;
+	float *u;
+	PartitionDimension **uPartDims;
+	float *v;
+	PartitionDimension **vPartDims;
 };
 
 class SpaceA_Content {
   public:
-	float *a;
-	float *b;
-	float *c;
+	int *p;
+	float *u;
+	float *v;
 };
 
 class SpaceA_LPU : public LPU {
   public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *b;
-	PartitionDimension **bPartDims;
-	float *c;
-	PartitionDimension **cPartDims;
-};
-
-class SpaceA_Sub_Content {
-  public:
-	float *a;
-	float *b;
-	float *c;
-};
-
-class SpaceA_Sub_LPU : public LPU {
-  public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *b;
-	PartitionDimension **bPartDims;
-	float *c;
-	PartitionDimension **cPartDims;
+	int *p;
+	PartitionDimension **pPartDims;
+	float *u;
+	PartitionDimension **uPartDims;
+	float *v;
+	PartitionDimension **vPartDims;
 };
 
 /*-----------------------------------------------------------------------------------
@@ -125,26 +106,38 @@ Data structures for Array-Metadata and Environment-Links
 
 class ArrayMetadata {
   public:
-	Dimension aDims[2];
-	Dimension bDims[2];
-	Dimension cDims[2];
+	Dimension pDims[1];
+	Dimension uDims[1];
+	Dimension vDims[1];
 };
 ArrayMetadata arrayMetadata;
 
 class EnvironmentLinks {
   public:
-	float *a;
-	Dimension aDims[2];
-	float *b;
-	Dimension bDims[2];
+	int *p;
+	Dimension pDims[1];
+	float *u;
+	Dimension uDims[1];
 };
 EnvironmentLinks environmentLinks;
 
+/*-----------------------------------------------------------------------------------
+Data structures for Task-Global and Thread-Local scalar variables
+------------------------------------------------------------------------------------*/
+
+class TaskGlobals {
+  public:
+};
+
+class ThreadLocals {
+  public:
+};
 
 /*-----------------------------------------------------------------------------------
 function to generate PPU IDs and PPU group IDs for a thread
 ------------------------------------------------------------------------------------*/
 ThreadIds *getPpuIdsForThread(int threadNo);
+
 /*-----------------------------------------------------------------------------------
 Thread-State implementation class for the task
 ------------------------------------------------------------------------------------*/
@@ -156,6 +149,12 @@ class ThreadStateImpl : public ThreadState {
         int *computeLpuCounts(int lpsId);
         LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
 };
+
+
+/*-----------------------------------------------------------------------------------
+function for the initialize block
+------------------------------------------------------------------------------------*/
+void initializeTask(TaskGlobals taskGlobals, ThreadLocals threadLocals);
 
 
 }

@@ -190,6 +190,14 @@ class FieldAccess : public Expr {
   protected:
 	Expr *base;
 	Identifier *field;
+	// Two boolean variables are retained to determine if the field access is corresponding to an
+	// array then whether its data or content is been accessed by the expression which this access
+	// is a part of. When the access is indeed correspond to an array, we in addition need to know 
+	// if local or global version (differ in how indexes are accessed) of the array been used.
+	// These facts are important for the backend compiler to locate appropriate data structure for
+	// the access as metadata and data for an array are kept separate. 
+	bool metadata;
+	bool local;
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "FieldAccess"; }
@@ -198,7 +206,15 @@ class FieldAccess : public Expr {
 	void inferType(Scope *scope, Type *rootType);   
 	const char *getBaseVarName();
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	// an additional helper function for static analysis
 	bool isTerminalField() { return base == NULL; }
+	// helper functions for back end compiler
+	bool isLocalTerminalField();
+	void markLocal() { local = true; }
+	void setMetadata(bool metadata) { this->metadata = metadata; }
+	bool isLocal() { return local; }
+	bool isMetadata() { return metadata; }
+	
 };
 
 class RangeExpr : public Expr {
@@ -213,6 +229,7 @@ class RangeExpr : public Expr {
     	void PrintChildren(int indentLevel);	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	const char *getIndexName() { return index->getName(); }
 };
 
 class SubpartitionRangeExpr : public Expr {
