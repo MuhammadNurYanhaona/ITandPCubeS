@@ -4,42 +4,28 @@
 #include <iostream>
 #include <vector>
 
-class PEnvironment;
-class PPartition;
-class SEnvironment;
-class SPartition;
-class LUFEnvironment;
-class LUFPartition;
+class ValueCoordinatePair;
+class COOMVMEnvironment;
+class COOMVMPartition;
 
-class PEnvironment {
+class ValueCoordinatePair {
   public:
-	int* p;
-	float* u;
+	float value;
+	int row;
+	int column;
+};
+
+class COOMVMEnvironment {
+  public:
+	ValueCoordinatePair* m;
 	float* v;
+	float* w;
 };
 
-class PPartition {
+class COOMVMPartition {
   public:
-	int n;
-};
-
-class SEnvironment {
-  public:
-	float* m;
-	float* v;
-};
-
-class LUFEnvironment {
-  public:
-	float* a;
-	float* u;
-	float* l;
-	int* p;
-};
-
-class LUFPartition {
-  public:
-	int s;
+	int p;
+	int r;
 };
 
 #endif

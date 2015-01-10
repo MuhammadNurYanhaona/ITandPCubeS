@@ -33,7 +33,8 @@ Task "Monte Carlo Area Estimation":
 		subarea_estimate.dimension = grid.dimension
 		point_placements.dimension1 = grid.dimension1
 		point_placements.dimension2 = grid.dimension2
-		point_placements.dimension3.length = partition.p	
+		point_placements.dimension3.range.min = 0	
+		point_placements.dimension3.range.max = partition.p - 1	
 	Compute:
 		"Calculate Point Position" (Space A) {
 			do { 

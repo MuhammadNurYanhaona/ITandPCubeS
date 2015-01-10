@@ -8,6 +8,9 @@
 #include "errors.h"
 #include "../static-analysis/loop_index.h"
 
+#include <iostream>
+#include <sstream>
+
 //--------------------------------------------- Statement -------------------------------------------/
 
 void Stmt::mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
@@ -59,6 +62,13 @@ Hashtable<VariableAccess*> *StmtBlock::getAccessedGlobalVariables(TaskGlobalRefe
 	}
 	return table;
 }
+
+void StmtBlock::generateCode(std::ostringstream &stream, int indentLevel) {
+	for (int i = 0; i < stmts->NumElements(); i++) {
+		Stmt *stmt = stmts->Nth(i);
+		stmt->generateCode(stream, indentLevel);
+	}	
+}
 	
 //-------------------------------------- Conditional Statement ---------------------------------------/
 
@@ -96,6 +106,33 @@ Hashtable<VariableAccess*> *ConditionalStmt::getAccessedGlobalVariables(TaskGlob
 	return table;
 }
 
+void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, bool first) {
+	if (first) {
+		for (int i = 0; i < indentLevel; i++) stream << '\t';	
+		stream << "if (";
+		if (condition != NULL) {
+			condition->translate(stream, indentLevel, 0);
+		} else {
+			stream << "true";
+		}
+		stream << ") {\n";
+		stmt->generateCode(stream, indentLevel + 1);	
+		for (int i = 0; i < indentLevel; i++) stream << '\t';	
+		stream << "}";
+	} else {
+		if (condition != NULL) {
+			stream << " else if (";
+			condition->translate(stream, indentLevel, 0);
+			stream << ") {\n";
+		} else {
+			stream << " else {\n";
+		}
+		stmt->generateCode(stream, indentLevel + 1);	
+		for (int i = 0; i < indentLevel; i++) stream << '\t';	
+		stream << "}";
+	}
+}
+
 IfStmt::IfStmt(List<ConditionalStmt*> *ib, yyltype loc) : Stmt(loc) {
 	Assert(ib != NULL);
 	ifBlocks = ib;
@@ -129,6 +166,14 @@ Hashtable<VariableAccess*> *IfStmt::getAccessedGlobalVariables(TaskGlobalReferen
 		mergeAccessedVariables(table, stmt->getAccessedGlobalVariables(globalReferences));
 	}
 	return table;
+}
+
+void IfStmt::generateCode(std::ostringstream &stream, int indentLevel) {
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+		ConditionalStmt *stmt = ifBlocks->Nth(i);
+		stmt->generateCode(stream, indentLevel, i == 0);
+	}
+	stream << '\n';
 }
 	
 //----------------------------------------- Parallel Loop -------------------------------------------/
@@ -399,8 +444,23 @@ void WhileStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 	body->checkSemantics(executionScope, ignoreTypeFailures);
 }
 
-Hashtable<VariableAccess*> *WhileStmt::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+Hashtable<VariableAccess*> *WhileStmt::getAccessedGlobalVariables(
+		TaskGlobalReferences *globalReferences) {
 	Hashtable<VariableAccess*> *table = condition->getAccessedGlobalVariables(globalReferences);
 	mergeAccessedVariables(table, body->getAccessedGlobalVariables(globalReferences));
 	return table;
+}
+
+void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel) {
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "while (";
+	if (condition != NULL) {
+		condition->translate(stream, indentLevel, 0);
+	} else {
+		stream << "true";
+	}
+	stream << ") {\n";
+	body->generateCode(stream, indentLevel + 1);
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "}\n";
 }

@@ -13,6 +13,8 @@
 #include "../semantics/task_space.h"
 #include "../static-analysis/data_flow.h"
 
+#include <sstream>
+
 //------------------------------------------- Task ----------------------------------------------/
 
 TaskDef::TaskDef(Identifier *i, DefineSection *d, EnvironmentConfig *e, 
@@ -336,6 +338,26 @@ List<const char*> *InitializeInstr::getArguments() {
 	return argNameList;
 }
 
+void InitializeInstr::generateCode(std::ostringstream &stream) {
+
+	// declare all local variables found in the scope
+	Iterator<Symbol*> iterator = scope->get_local_symbols();
+	Symbol *symbol;
+	while ((symbol = iterator.GetNextValue()) != NULL) {
+		VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
+		if (variable == NULL) continue;
+		Type *type = variable->getType();
+		const char *name = variable->getName();
+		stream << "\t" << type->getCppDeclaration(name) << ";\n";
+	}
+
+	// translate statements into C++ code
+	for (int i = 0; i < code->NumElements(); i++) {
+		Stmt *stmt = code->Nth(i);
+		stmt->generateCode(stream, 1);
+	}		
+}
+
 //------------------------------------- Environment Section ----------------------------------------/
 
 //-------------------------------------------------------------------------Environment Link
@@ -503,7 +525,7 @@ void ComputeStage::validateScope(Scope *rootScope, PartitionHierarchy *partition
 		}
 	} else {
 		// create and attach a scope to the compute stage 
-		scope = new Scope(ComputationStageScope);
+		this->scope = new Scope(ComputationStageScope);
 		rootScope->enter_scope(scope);
 			
 		// do semantic analysis of the stage body
@@ -601,6 +623,7 @@ void ComputeStage::constructComputationFlow(List<FlowStage*> *inProgressStageLis
 		ExecutionStage *stage = new ExecutionStage(index, space, executeCond);
 		inProgressStageList->Append(stage);
 		stage->setCode(code);
+		stage->setScope(scope);
 		flowStage = stage;		
         	currentContainerStage->addSyncStagesBeforeExecution(flowStage, inProgressStageList);
 	} else {

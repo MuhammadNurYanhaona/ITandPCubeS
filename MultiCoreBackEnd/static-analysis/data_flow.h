@@ -6,6 +6,7 @@
 #include "../syntax/ast_stmt.h"
 #include "../syntax/ast_task.h"
 #include "../semantics/task_space.h"
+#include "../semantics/scope.h"
 #include "../utils/hashtable.h"
 
 class VariableAccess;
@@ -127,9 +128,12 @@ class SyncStage : public FlowStage {
 class ExecutionStage : public FlowStage {
   protected:
 	Stmt *code;
+	Scope *scope;
   public:
 	ExecutionStage(int index, Space *space, Expr *executeCond);
 	void setCode(List<Stmt*> *stmtList);
+	void setScope(Scope *scope) { this->scope = scope; }
+	Scope *getScope() { return scope; }
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 

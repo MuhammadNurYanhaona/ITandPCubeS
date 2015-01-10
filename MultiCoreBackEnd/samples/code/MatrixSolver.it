@@ -49,10 +49,10 @@ Task "Substitution":
 		m, v: link
 	Initialize (lower_triangular_system):
 		if (lower_triangular_system) {
-			index_range = v.dimension.range
+			index_range = v.dimension1.range
 		} else {
-			index_range.start = v.dimension.range.end
-			index_range.end = 0
+			index_range.min = v.dimension1.range.max
+			index_range.max = 0
 		}
 	Compute:
 		"Calculate Next Element" (Space A) 
@@ -61,7 +61,7 @@ Task "Substitution":
 			v[k] = v_element
 		}
 		"Column Sweep" (Space A) {
-			if (index_range.start < index_range.end) { 
+			if (index_range.min < index_range.max) { 
 				do {
 					result = reduce ("sum", m[i][k] * v_element)
 					v[k] = v[k] - result

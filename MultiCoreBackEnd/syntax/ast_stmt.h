@@ -15,6 +15,8 @@
 #include "../static-analysis/data_access.h"
 #include "../utils/hashtable.h"
 
+#include <sstream>
+
 class Expr;
 
 class Stmt : public Node {
@@ -47,6 +49,10 @@ class Stmt : public Node {
 	}
 	static void mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
 				Hashtable<VariableAccess*> *second);
+
+	// back end code generation routine; subclasses should provide appropriate 
+	// implementations
+	virtual void generateCode(std::ostringstream &stream, int indentLevel) {};
 };
 
 class StmtBlock : public Stmt {
@@ -66,6 +72,9 @@ class StmtBlock : public Stmt {
     
 	// Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel);
 };
 
 class ConditionalStmt: public Stmt {
@@ -85,6 +94,9 @@ class ConditionalStmt: public Stmt {
     
 	// Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel, bool first);
 };
 
 class IfStmt: public Stmt {
@@ -103,6 +115,9 @@ class IfStmt: public Stmt {
     
 	// Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel);
 };
 
 class IndexRangeCondition: public Node {
@@ -157,6 +172,9 @@ class PLoopStmt: public LoopStmt {
     
 	// Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel) {}
 };
 
 class SLoopStmt: public LoopStmt {
@@ -178,6 +196,9 @@ class SLoopStmt: public LoopStmt {
     
 	// Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel) {}
 };
 
 class WhileStmt: public Stmt {
@@ -197,6 +218,9 @@ class WhileStmt: public Stmt {
     
 	// Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel);
 };
 
 #endif

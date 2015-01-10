@@ -67,10 +67,10 @@ void Type::storeBuiltInTypesInScope(Scope *scope) {
 	
 	List<VariableDef*> *rangeElements = new List<VariableDef*>;
 	rangeElements->Append(new VariableDef(
-			new Identifier(dummyLocation, (const char*) "start"), 
+			new Identifier(dummyLocation, (const char*) "min"), 
 			intType));
 	rangeElements->Append(new VariableDef(
-			new Identifier(dummyLocation, (const char*) "end"), 
+			new Identifier(dummyLocation, (const char*) "max"), 
 			intType));
 	TupleDef *rangeTuple = new TupleDef(
 			new Identifier(dummyLocation, rangeType->getName()),

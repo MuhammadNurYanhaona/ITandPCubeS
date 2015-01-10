@@ -12,7 +12,8 @@ Task "COO Matrix Vector Multiplication":
 		w: create
 	Initialize:
 		w.dimension = m.dimension1
-		w_local.dimension1.length = partition.p
+		w_local.dimension1.range.min = 0
+		w_local.dimension1.range.max = partition.p - 1
 		w_local.dimension2 = w.dimension
 	Compute:
 		"Local Multiplications" (Space A) {

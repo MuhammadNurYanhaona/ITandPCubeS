@@ -1,10 +1,13 @@
-#ifndef _H_p
-#define _H_p
+#ifndef _H_coomvm
+#define _H_coomvm
 
 // for error reporting and diagnostics
 #include <iostream>
 #include <string>
 #include <cstdlib>
+
+// for math functions
+#include <math.h>
 
 // for tuple definitions found in the source code
 #include "tuple.h"
@@ -23,14 +26,15 @@
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-namespace p {
+namespace coomvm {
 
 /*-----------------------------------------------------------------------------------
 constants for LPSes
 ------------------------------------------------------------------------------------*/
 const int Space_Root = 0;
 const int Space_A = 1;
-const int Space_Count = 2;
+const int Space_B = 2;
+const int Space_Count = 3;
 
 /*-----------------------------------------------------------------------------------
 constants for PPS counts
@@ -44,23 +48,26 @@ const int Space_1_Par_2_PPUs = 4;
 /*-----------------------------------------------------------------------------------
 constants for total and par core thread counts
 ------------------------------------------------------------------------------------*/
-const int Total_Threads = 64;
+const int Total_Threads = 16;
 const int Threads_Par_Core = 1;
 
 /*-----------------------------------------------------------------------------------
 functions for retrieving partition counts in different LPSes
 ------------------------------------------------------------------------------------*/
-int *getLPUsCountOfSpaceA(int ppuCount, Dimension pDim1, int n);
+int *getLPUsCountOfSpaceA(int ppuCount, Dimension w_localDim1);
+int *getLPUsCountOfSpaceB(int ppuCount, Dimension wDim1, int r);
 
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
-PartitionDimension **getpPartForSpaceALpu(PartitionDimension **pParentLpuDims, 
-		int *lpuCount, int *lpuId, int n);
-PartitionDimension **getuPartForSpaceALpu(PartitionDimension **uParentLpuDims, 
-		int *lpuCount, int *lpuId, int n);
-PartitionDimension **getvPartForSpaceALpu(PartitionDimension **vParentLpuDims, 
-		int *lpuCount, int *lpuId, int n);
+PartitionDimension **getmPartForSpaceALpu(PartitionDimension **mParentLpuDims, 
+		int *lpuCount, int *lpuId, int p);
+PartitionDimension **getw_localPartForSpaceALpu(PartitionDimension **w_localParentLpuDims, 
+		int *lpuCount, int *lpuId);
+PartitionDimension **getwPartForSpaceBLpu(PartitionDimension **wParentLpuDims, 
+		int *lpuCount, int *lpuId, int r);
+PartitionDimension **getw_localPartForSpaceBLpu(PartitionDimension **w_localParentLpuDims, 
+		int *lpuCount, int *lpuId, int r);
 
 /*-----------------------------------------------------------------------------------
 Data structures representing LPS and LPU contents 
@@ -68,36 +75,53 @@ Data structures representing LPS and LPU contents
 
 class SpaceRoot_Content {
   public:
-	int *p;
-	float *u;
+	ValueCoordinatePair *m;
 	float *v;
+	float *w;
+	float *w_local;
 };
 
 class SpaceRoot_LPU : public LPU {
   public:
-	int *p;
-	PartitionDimension **pPartDims;
-	float *u;
-	PartitionDimension **uPartDims;
+	ValueCoordinatePair *m;
+	PartitionDimension **mPartDims;
 	float *v;
 	PartitionDimension **vPartDims;
+	float *w;
+	PartitionDimension **wPartDims;
+	float *w_local;
+	PartitionDimension **w_localPartDims;
 };
 
 class SpaceA_Content {
   public:
-	int *p;
-	float *u;
+	ValueCoordinatePair *m;
 	float *v;
+	float *w_local;
 };
 
 class SpaceA_LPU : public LPU {
   public:
-	int *p;
-	PartitionDimension **pPartDims;
-	float *u;
-	PartitionDimension **uPartDims;
+	ValueCoordinatePair *m;
+	PartitionDimension **mPartDims;
 	float *v;
 	PartitionDimension **vPartDims;
+	float *w_local;
+	PartitionDimension **w_localPartDims;
+};
+
+class SpaceB_Content {
+  public:
+	float *w;
+	float *w_local;
+};
+
+class SpaceB_LPU : public LPU {
+  public:
+	float *w;
+	PartitionDimension **wPartDims;
+	float *w_local;
+	PartitionDimension **w_localPartDims;
 };
 
 /*-----------------------------------------------------------------------------------
@@ -106,18 +130,19 @@ Data structures for Array-Metadata and Environment-Links
 
 class ArrayMetadata {
   public:
-	Dimension pDims[1];
-	Dimension uDims[1];
+	Dimension mDims[1];
 	Dimension vDims[1];
+	Dimension wDims[1];
+	Dimension w_localDims[2];
 };
 ArrayMetadata arrayMetadata;
 
 class EnvironmentLinks {
   public:
-	int *p;
-	Dimension pDims[1];
-	float *u;
-	Dimension uDims[1];
+	ValueCoordinatePair *m;
+	Dimension mDims[1];
+	float *v;
+	Dimension vDims[1];
 };
 EnvironmentLinks environmentLinks;
 
@@ -154,7 +179,9 @@ class ThreadStateImpl : public ThreadState {
 /*-----------------------------------------------------------------------------------
 function for the initialize block
 ------------------------------------------------------------------------------------*/
-void initializeTask(TaskGlobals taskGlobals, ThreadLocals threadLocals);
+void initializeTask(TaskGlobals taskGlobals, 
+		ThreadLocals threadLocals, 
+		COOMVMPartition partition);
 
 
 }

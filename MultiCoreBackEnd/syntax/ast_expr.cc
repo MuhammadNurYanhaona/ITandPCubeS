@@ -11,6 +11,11 @@
 #include "../utils/hashtable.h"
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/loop_index.h"
+#include "../codegen/name_transformer.h"
+
+#include <iostream>
+#include <sstream>
+#include <cstdlib>
 
 //----------------------------------------------------- Expression ----------------------------------------------------/
 
@@ -19,6 +24,17 @@ void Expr::performTypeInference(Scope *executionScope) {
 		resolveType(executionScope, true);
 	}
 	inferType(executionScope, this->type);	
+}
+
+void Expr::generateCode(std::ostringstream &stream, int indentLevel) {
+        for (int i = 0; i < indentLevel; i++) stream << '\t';
+        translate(stream, indentLevel, 0);
+        stream << ";\n";
+}
+
+void Expr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+	std::cout << "A sub-class of expression didn't implement the code generation method\n";
+	std::exit(EXIT_FAILURE);
 }
 
 //----------------------------------------------- Constant Expression -------------------------------------------------/
@@ -218,6 +234,28 @@ Hashtable<VariableAccess*> *ArithmaticExpr::getAccessedGlobalVariables(TaskGloba
 	return table;
 }
 
+void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+	if (op != POWER) {
+		left->translate(stream, indentLevel, currentLineLength);
+		switch (op) {
+			case ADD: stream << " + "; break;
+			case SUBTRACT: stream << " - "; break;
+			case MULTIPLY: stream << " * "; break;
+			case DIVIDE: stream << " / "; break;
+			case MODULUS: stream << ' ' << '%' << ' '; break;
+			case LEFT_SHIFT: stream <<" << "; break;
+			case RIGHT_SHIFT: stream << " >> "; break;
+			default: break;
+		}
+		right->translate(stream, indentLevel, currentLineLength);
+	} else {
+		stream << "pow(";
+		left->translate(stream, indentLevel, currentLineLength);
+		stream << ", ";
+		right->translate(stream, indentLevel, currentLineLength);
+	}
+}
+
 //------------------------------------------------ Logical Expression -------------------------------------------------/
 
 LogicalExpr::LogicalExpr(Expr *l, LogicalOperator o, Expr *r, yyltype loc) : Expr(loc) {
@@ -347,6 +385,24 @@ Hashtable<VariableAccess*> *LogicalExpr::getAccessedGlobalVariables(TaskGlobalRe
 			accessLog->getMetadataAccessFlags()->flagAsRead();
 	}
 	return table;
+}
+
+void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+	if (left != NULL) {
+		left->translate(stream, indentLevel, currentLineLength);
+	}
+	switch (op) {
+		case AND: stream << " && "; break;
+		case OR: stream << " || "; break;
+		case NOT: stream << "!"; break;
+		case EQ: stream << " == "; break;
+		case NE: stream << "!="; break;
+		case GT: stream << " > "; break;
+		case LT: stream << " < "; break;
+		case GTE: stream << " >= "; break;
+		case LTE: stream << " <= "; break;
+	}
+	right->translate(stream, indentLevel, currentLineLength);
 }
 
 //----------------------------------------------- Reduction Expression ------------------------------------------------/
@@ -725,6 +781,37 @@ bool FieldAccess::isLocalTerminalField() {
 	return (baseField->isTerminalField() && strcmp(field->getName(), Identifier::LocalId) == 0);
 }
 
+void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+	if (base != NULL) {
+		// call the translate function recursively on base if it is not null
+		base->translate(stream, indentLevel, currentLineLength);
+		
+		// skip the field if it is a local flag for an array dimension
+		// if it is an array dimension then access the appropriate index corresponding to that dimension
+		ArrayType *arrayType = dynamic_cast<ArrayType*>(base->getType());
+		if (arrayType != NULL && !strcmp(field->getName(), Identifier::LocalId) == 0) {
+			DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(field);
+			int fieldDimension = dimension->getDimensionNo();
+			// If Dimension No is 0 then this is handled in assignment statement translation when there is
+			// a possibility of multiple dimensions been copied from an array to another
+			if (fieldDimension > 0) {
+				// One is subtracted as dimension no started from 1 in the source code
+				stream << '[' << fieldDimension - 1 << ']';
+			} else if (arrayType->getDimensions() == 1) {
+				stream << "[0]";
+			}
+		// otherwise just write the field directly
+		} else {
+			stream << "." << field->getName();
+		}
+	// if this is a terminal field then there may be a need for name transformation; so we consult the transformer
+	} else {
+		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+		const char *fieldName = field->getName();
+		stream << transformer->getTransformedName(fieldName, metadata, local);
+	}
+}
+
 //------------------------------------------------ Range Expressions --------------------------------------------------/
 
 RangeExpr::RangeExpr(Identifier *i, Expr *r, Expr *s, bool l, yyltype loc) : Expr(loc) {
@@ -956,6 +1043,61 @@ Hashtable<VariableAccess*> *AssignmentExpr::getAccessedGlobalVariables(TaskGloba
 		}
 	}
 	return table;
+}
+
+void AssignmentExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+	left->translate(stream, indentLevel, currentLineLength);
+	stream << " = ";
+	right->translate(stream, indentLevel, currentLineLength);
+}
+
+void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel) {
+
+	// If the right is also an assignment expression then this is a compound statement. Break it up into
+	// several simple statements.
+	AssignmentExpr *rightExpr = dynamic_cast<AssignmentExpr*>(right);
+	Expr *rightPart = right;
+	if (rightExpr != NULL) {
+		rightPart = rightExpr->left;
+		rightExpr->generateCode(stream, indentLevel);	
+	}
+
+	// If this is a dimension assignment statement with multiple dimensions of an array assigned once to
+	// another one then we need to handle it separately.
+	Type *leftType = left->getType();
+	FieldAccess *fieldAccess = dynamic_cast<FieldAccess*>(left);
+	if (leftType == Type::dimensionType 
+			&& fieldAccess != NULL 
+			&& fieldAccess->getBase() != NULL) {
+		
+		ArrayType *array = dynamic_cast<ArrayType*>(fieldAccess->getBase()->getType());
+		DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(fieldAccess->getField());
+		if (array != NULL && dimension != NULL 
+				&& dimension->getDimensionNo() == 0
+				&& array->getDimensions() > 1) {
+			int dimensionCount = array->getDimensions();
+			for (int i = 0; i < dimensionCount; i++) {
+				for (int j = 0; j < indentLevel; j++) stream << '\t';
+				left->translate(stream, indentLevel, 0);
+				stream << '[' << i << "] = ";
+				rightPart->translate(stream, indentLevel, 0);
+				stream << '[' << i << "];\n";
+			}
+		// If the array is unidimensional then it follows the normal assignment procedure
+		} else {
+			for (int i = 0; i < indentLevel; i++) stream << '\t';
+			left->translate(stream, indentLevel, 0);
+			stream << " = ";
+			rightPart->translate(stream, indentLevel, 0);
+			stream << ";\n";
+		}
+	} else {
+		for (int i = 0; i < indentLevel; i++) stream << '\t';
+		left->translate(stream, indentLevel, 0);
+		stream << " = ";
+		rightPart->translate(stream, indentLevel, 0);
+		stream << ";\n";
+	}
 }
 
 //--------------------------------------------------- Array Access ----------------------------------------------------/

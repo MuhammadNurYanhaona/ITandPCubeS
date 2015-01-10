@@ -3,6 +3,9 @@
 #include <string>
 #include <cstdlib>
 
+// for math functions
+#include <math.h>
+
 // for tuple definitions found in the source code
 #include "tuple.h"
 #include <vector>

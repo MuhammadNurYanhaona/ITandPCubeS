@@ -12,6 +12,8 @@
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/data_flow.h"
 
+#include <sstream>
+
 class PartitionSection;
 class MetaComputeStage;
 
@@ -51,6 +53,7 @@ class InitializeInstr : public Node {
 
 	// Helper routines for back-end compiler
 	List<const char*> *getArguments();
+	void generateCode(std::ostringstream &stream);
 };
 
 class EnvironmentLink : public Node {

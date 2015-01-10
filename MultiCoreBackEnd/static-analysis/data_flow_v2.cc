@@ -7,6 +7,7 @@
 #include "../utils/hashtable.h"
 #include "data_flow.h"
 #include "../semantics/task_space.h"
+#include "../semantics/scope.h"
 
 //-------------------------------------------------- Flow Stage ----------------------------------------------------------/
 
@@ -150,7 +151,10 @@ int SyncStage::populateAccessMap(List<VariableAccess*> *accessLogs,
 //------------------------------------------------ Execution Stage -------------------------------------------------------/
 
 ExecutionStage::ExecutionStage(int index, Space *space, Expr *executeCond) 
-		: FlowStage(index, space, executeCond) {}
+		: FlowStage(index, space, executeCond) {
+	this->code = NULL;
+	this->scope = NULL;
+}
 
 void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 	this->code = new StmtBlock(stmtList);

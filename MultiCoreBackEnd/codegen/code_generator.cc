@@ -465,7 +465,6 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 		// if the tuple definition has no element inside then ignore it and proceed to the next
 		TupleDef *tupleDef = tupleDefList->Nth(i);
 		List<VariableDef*> *variables = tupleDef->getComponents();
-		if (variables->NumElements() == 0) continue;
 		// otherwise, generate a new class and add the elements as public components
 		headerFile << "class " << tupleDef->getId()->getName() << " {\n";
 		headerFile << "  public:\n";
@@ -550,13 +549,17 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
         programFile << "function for the initialize block\n";
         programFile << "------------------------------------------------------------------------------------*/\n";
 
+	// put three default parameters for task-globals, thread-locals, and partition configuration
 	std::ostringstream functionHeader;
         functionHeader << "initializeTask(TaskGlobals taskGlobals";
-	functionHeader << parameterSeparator << "ThreadLocals threadLocals";
-
+	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent; 
+	functionHeader << "ThreadLocals threadLocals";
+	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent;
+	functionHeader << string_utils::getInitials(taskDef->getName());
+	functionHeader << "Partition partition";
 
         std::ostringstream functionBody;
-	functionBody << "{\n";
+	functionBody << "{\n\n";
 
 	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
 	for (int i = 0; i < envLinkList->NumElements(); i++) {
@@ -607,6 +610,8 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
 				functionBody << statementSeparator;
 			}
 		}
+		// then translate the user code in the init section into a c++ instruction stream
+		initSection->generateCode(functionBody);
 	}
 
 	functionHeader << ")";
@@ -619,5 +624,4 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
 
 	headerFile.close();
 	programFile.close();
-	std::cout << "Done processing the initialize block";
 }

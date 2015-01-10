@@ -20,6 +20,8 @@
 #include "../semantics/scope.h"
 #include "../static-analysis/data_access.h"
 
+#include <sstream>
+
 enum ArithmaticOperator { ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS, LEFT_SHIFT, RIGHT_SHIFT, POWER };
 enum LogicalOperator { AND, OR, NOT, EQ, NE, GT, LT, GTE, LTE };
 enum ReductionOperator { SUM, PRODUCT, MAX, MIN, AVG, MAX_ENTRY, MIN_ENTRY };
@@ -44,10 +46,16 @@ class Expr : public Stmt {
 	Type *getType() { return type; }
 	
 	// Helper functions for static analysis
-	virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+	virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(
+			TaskGlobalReferences *globalReferences) {
 		return new Hashtable<VariableAccess*>;
 	}
 	virtual const char *getBaseVarName() { return NULL; }
+	
+	// Helper functions for code generation
+	virtual void generateCode(std::ostringstream &stream, int indentLevel);
+	virtual void translate(std::ostringstream &stream, 
+			int indentLevel, int currentLineLength);
 };
 
 class IntConstant : public Expr {
@@ -60,6 +68,7 @@ class IntConstant : public Expr {
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::intType; }
 	void inferType(Scope *scope, Type *rootType);
 	int getValue() { return value; }  
+	void translate(std::ostringstream &s, int i, int c) { s << value; }
 };
 
 class FloatConstant : public Expr {
@@ -71,6 +80,7 @@ class FloatConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::floatType; }
 	void inferType(Scope *scope, Type *rootType);   
+	void translate(std::ostringstream &s, int i, int c) { s << value; }
 };
 
 class DoubleConstant : public Expr {
@@ -82,6 +92,7 @@ class DoubleConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::doubleType; }
 	void inferType(Scope *scope, Type *rootType);   
+	void translate(std::ostringstream &s, int i, int c) { s << value; }
 };
 
 class BoolConstant : public Expr {
@@ -93,6 +104,7 @@ class BoolConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::boolType; }
 	void inferType(Scope *scope, Type *rootType);   
+	void translate(std::ostringstream &s, int i, int c) { s << value; }
 };
 
 class StringConstant : public Expr {
@@ -105,6 +117,7 @@ class StringConstant : public Expr {
 	const char *getValue() { return value; }
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::stringType; }
 	void inferType(Scope *scope, Type *rootType);   
+	void translate(std::ostringstream &s, int i, int c) { s << value; }
 };
 
 class CharacterConstant : public Expr {
@@ -116,6 +129,7 @@ class CharacterConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::charType; }
 	void inferType(Scope *scope, Type *rootType);   
+	void translate(std::ostringstream &s, int i, int c) { s << value; }
 };
 
 class ArithmaticExpr : public Expr {
@@ -130,6 +144,7 @@ class ArithmaticExpr : public Expr {
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
 };
 
 class LogicalExpr : public Expr {
@@ -144,6 +159,7 @@ class LogicalExpr : public Expr {
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
 };
 
 class ReductionExpr : public Expr {
@@ -206,15 +222,19 @@ class FieldAccess : public Expr {
 	void inferType(Scope *scope, Type *rootType);   
 	const char *getBaseVarName();
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
 	// an additional helper function for static analysis
 	bool isTerminalField() { return base == NULL; }
+	
 	// helper functions for back end compiler
 	bool isLocalTerminalField();
 	void markLocal() { local = true; }
 	void setMetadata(bool metadata) { this->metadata = metadata; }
 	bool isLocal() { return local; }
 	bool isMetadata() { return metadata; }
-	
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	Expr *getBase() { return base; }
+	Identifier *getField() { return field; }
 };
 
 class RangeExpr : public Expr {
@@ -255,6 +275,14 @@ class AssignmentExpr : public Expr {
 	void inferType(Scope *scope, Type *rootType);   
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	const char *getBaseVarName() { return left->getBaseVarName(); }
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+
+	// Assignment expression overrides generate-code function along with common translate function
+	// to break compound assignment statements to multiple simple ones. Also we currently support
+	// direct assignment of multiple dimensions from one array to another. That need to be tackled
+	// by overriding generate-code. TODO later we have to find out a better way of doing this or 
+	// rethink that array assignment feature all together.
+	void generateCode(std::ostringstream &stream, int indentLevel);
 };
 
 class SubRangeExpr : public Expr {

@@ -114,7 +114,7 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		std::cout << "could not open the mapping file.\n";
 		std::exit(EXIT_FAILURE);
 	}
-	std::cout << "Parsing the mapping configuration....................................." << std::endl;
+	std::cout << "Parsing the mapping configuration\n";
 
 	// locate the mapping configuration of the mentioned task and extract it
 	int taskConfigBegin = description.find(taskName);
@@ -163,8 +163,6 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		node->mappingConfig = entry;
 		node->children = new List<MappingNode*>;
 		mappingTable->Enter(lps->getName(), node, true);
-
-		std::cout << ppsId << "--" << lpsId << std::endl;
 		i++;
 	
 		// if the LPS is subpartitioned than map the subpartition into the same PPS
@@ -177,7 +175,6 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 			subNode->mappingConfig = subEntry;
 			subNode->children = new List<MappingNode*>;
 			mappingTable->Enter(subEntry->LPS->getName(), subNode, true);
-			std::cout << ppsId << "--" << subEntry->LPS->getName() << std::endl;
 		}
 	}
 
