@@ -16,6 +16,9 @@
 
 class PartitionSection;
 class MetaComputeStage;
+class FlowStage;
+class CompositeStage;
+class VariableAccess;
 
 enum LinkageType { TypeCreate, TypeLink, TypeCreateIfNotLinked };
 
@@ -87,6 +90,33 @@ class EnvironmentConfig : public Node {
 	// Semantic Analysis Routines
 	void attachScope();
 };
+
+//-----------------------------------------------------------------------------------------------
+/* This version of Data Flow Stage is no longer in use. We keep it around for now as it has some 
+   utility routines that are used for creating the flow stages mentioned in data_flow.h header file.
+   TODO we should get rid of this class after moving the remaining one or two useful functions in
+   other places.	
+*/
+class DataFlowStage : public Node {
+  public:
+        int nestingIndex;
+        int computeIndex;
+        Space *executionSpace;
+        Hashtable<VariableAccess*> *accessMap;
+        DataDependencies *dataDependencies;
+        DataFlowStage *nestingController;
+        DataFlowStage(yyltype loc);
+        void setNestingIndex(int nestingIndex);
+        void setNestingController(DataFlowStage *controller);
+        int getNestingIndex();
+        void setComputeIndex(int computeIndex);
+        int getComputeIndex();
+        DataDependencies *getDataDependencies();
+        virtual Hashtable<VariableAccess*> *getAccessMap();
+        Space *getSpace();
+        const char *performDependencyAnalysis(List<DataFlowStage*> *stageList);
+};
+//------------------------------------------------------------------------------------------------
 
 class StageHeader : public Node {
   protected:
@@ -232,13 +262,12 @@ class ComputeSection : public Node {
 	// meta-compute and compute stages.
 	void constructComputationFlow(Space *rootSpace);
 	// This is again a recursive process of determining the dependency arcs among flow stages
-	void performDependencyAnalysis(PartitionHierarchy *hierarchy) { 
-		computation->performDependencyAnalysis(hierarchy); 
-	}
-	void print() { computation->print(0); }
+	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	void print();
 
 	// Helper functions for backend compiler
 	List<const char*> *getRepeatIndexes();
+	CompositeStage *getComputation();
 };
 
 class TaskDef : public Definition {
@@ -282,6 +311,7 @@ class TaskDef : public Definition {
 	List<EnvironmentLink*> *getEnvironmentLinks() { return environment->getLinks(); }
 	List<const char*> *getRepeatIndexes() { return compute->getRepeatIndexes(); }
 	InitializeInstr *getInitSection() { return initialize; }
+	CompositeStage *getComputation();
 };
 
 #endif

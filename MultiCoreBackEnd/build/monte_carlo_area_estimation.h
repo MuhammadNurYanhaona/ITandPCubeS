@@ -1,5 +1,5 @@
-#ifndef _H_coomvm
-#define _H_coomvm
+#ifndef _H_mcae
+#define _H_mcae
 
 // for error reporting and diagnostics
 #include <iostream>
@@ -26,15 +26,16 @@
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-namespace coomvm {
+namespace mcae {
 
 /*-----------------------------------------------------------------------------------
 constants for LPSes
 ------------------------------------------------------------------------------------*/
 const int Space_Root = 0;
-const int Space_A = 1;
+const int Space_C = 1;
 const int Space_B = 2;
-const int Space_Count = 3;
+const int Space_A = 3;
+const int Space_Count = 4;
 
 /*-----------------------------------------------------------------------------------
 constants for PPS counts
@@ -48,26 +49,26 @@ const int Space_1_Par_2_PPUs = 4;
 /*-----------------------------------------------------------------------------------
 constants for total and par core thread counts
 ------------------------------------------------------------------------------------*/
-const int Total_Threads = 16;
-const int Threads_Par_Core = 1;
+const int Total_Threads = 64;
+const int Threads_Par_Core = 4;
 
 /*-----------------------------------------------------------------------------------
 functions for retrieving partition counts in different LPSes
 ------------------------------------------------------------------------------------*/
-int *getLPUsCountOfSpaceA(int ppuCount, Dimension w_localDim1);
-int *getLPUsCountOfSpaceB(int ppuCount, Dimension wDim1, int r);
+int *getLPUsCountOfSpaceB(int ppuCount, Dimension point_placementsDim1, Dimension point_placementsDim2);
+int *getLPUsCountOfSpaceA(int ppuCount, Dimension point_placementsDim3, int p);
 
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
-PartitionDimension **getmPartForSpaceALpu(PartitionDimension **mParentLpuDims, 
-		int *lpuCount, int *lpuId, int p);
-PartitionDimension **getw_localPartForSpaceALpu(PartitionDimension **w_localParentLpuDims, 
+PartitionDimension **getgridPartForSpaceBLpu(PartitionDimension **gridParentLpuDims, 
 		int *lpuCount, int *lpuId);
-PartitionDimension **getwPartForSpaceBLpu(PartitionDimension **wParentLpuDims, 
-		int *lpuCount, int *lpuId, int r);
-PartitionDimension **getw_localPartForSpaceBLpu(PartitionDimension **w_localParentLpuDims, 
-		int *lpuCount, int *lpuId, int r);
+PartitionDimension **getpoint_placementsPartForSpaceBLpu(PartitionDimension **point_placementsParentLpuDims, 
+		int *lpuCount, int *lpuId);
+PartitionDimension **getsubarea_estimatePartForSpaceBLpu(PartitionDimension **subarea_estimateParentLpuDims, 
+		int *lpuCount, int *lpuId);
+PartitionDimension **getpoint_placementsPartForSpaceALpu(PartitionDimension **point_placementsParentLpuDims, 
+		int *lpuCount, int *lpuId, int p);
 
 /*-----------------------------------------------------------------------------------
 Data structures representing LPS and LPU contents 
@@ -75,53 +76,61 @@ Data structures representing LPS and LPU contents
 
 class SpaceRoot_Content {
   public:
-	ValueCoordinatePair *m;
-	float *v;
-	float *w;
-	float *w_local;
+	Rectangle *grid;
+	int *point_placements;
+	float *subarea_estimate;
 };
 
 class SpaceRoot_LPU : public LPU {
   public:
-	ValueCoordinatePair *m;
-	PartitionDimension **mPartDims;
-	float *v;
-	PartitionDimension **vPartDims;
-	float *w;
-	PartitionDimension **wPartDims;
-	float *w_local;
-	PartitionDimension **w_localPartDims;
+	Rectangle *grid;
+	PartitionDimension **gridPartDims;
+	int *point_placements;
+	PartitionDimension **point_placementsPartDims;
+	float *subarea_estimate;
+	PartitionDimension **subarea_estimatePartDims;
 };
 
-class SpaceA_Content {
+class SpaceC_Content {
   public:
-	ValueCoordinatePair *m;
-	float *v;
-	float *w_local;
+	float *subarea_estimate;
 };
 
-class SpaceA_LPU : public LPU {
+class SpaceC_LPU : public LPU {
   public:
-	ValueCoordinatePair *m;
-	PartitionDimension **mPartDims;
-	float *v;
-	PartitionDimension **vPartDims;
-	float *w_local;
-	PartitionDimension **w_localPartDims;
+	float *subarea_estimate;
+	PartitionDimension **subarea_estimatePartDims;
 };
 
 class SpaceB_Content {
   public:
-	float *w;
-	float *w_local;
+	Rectangle *grid;
+	int *point_placements;
+	float *subarea_estimate;
 };
 
 class SpaceB_LPU : public LPU {
   public:
-	float *w;
-	PartitionDimension **wPartDims;
-	float *w_local;
-	PartitionDimension **w_localPartDims;
+	Rectangle *grid;
+	PartitionDimension **gridPartDims;
+	int *point_placements;
+	PartitionDimension **point_placementsPartDims;
+	float *subarea_estimate;
+	PartitionDimension **subarea_estimatePartDims;
+};
+
+class SpaceA_Content {
+  public:
+	Rectangle *grid;
+	int *point_placements;
+};
+
+class SpaceA_LPU : public LPU {
+  public:
+	Rectangle *grid;
+	PartitionDimension **gridPartDims;
+	int *point_placements;
+	PartitionDimension **point_placementsPartDims;
 };
 
 /*-----------------------------------------------------------------------------------
@@ -130,19 +139,17 @@ Data structures for Array-Metadata and Environment-Links
 
 class ArrayMetadata {
   public:
-	Dimension mDims[1];
-	Dimension vDims[1];
-	Dimension wDims[1];
-	Dimension w_localDims[2];
+	Dimension gridDims[2];
+	Dimension point_placementsDims[3];
+	Dimension subarea_estimateDims[2];
 };
 ArrayMetadata arrayMetadata;
 
 class EnvironmentLinks {
   public:
-	ValueCoordinatePair *m;
-	Dimension mDims[1];
-	float *v;
-	Dimension vDims[1];
+	Rectangle *grid;
+	Dimension gridDims[2];
+	std::vector<Coefficients> shape;
 };
 EnvironmentLinks environmentLinks;
 
@@ -152,10 +159,16 @@ Data structures for Task-Global and Thread-Local scalar variables
 
 class TaskGlobals {
   public:
+	float area;
+	float cell_size;
+	float precision;
+	float precision_local;
+	std::vector<Coefficients> shape;
 };
 
 class ThreadLocals {
   public:
+	Epoch t;
 };
 
 /*-----------------------------------------------------------------------------------
@@ -181,7 +194,28 @@ function for the initialize block
 ------------------------------------------------------------------------------------*/
 void initializeTask(TaskGlobals taskGlobals, 
 		ThreadLocals threadLocals, 
-		COOMVMPartition partition);
+		MCAEPartition partition, 
+		float precision, 
+		float cell_size);
+
+/*-----------------------------------------------------------------------------------
+functions for compute stages 
+------------------------------------------------------------------------------------*/
+
+void Calculate_Point_Position(SpaceA_LPU lpu, 
+		ArrayMetadata arrayMetadata, 
+		TaskGlobals taskGlobals, 
+		ThreadLocals threadLocals, MCAEPartition partition);
+
+void Refine_Subarea_Estimate(SpaceB_LPU lpu, 
+		ArrayMetadata arrayMetadata, 
+		TaskGlobals taskGlobals, 
+		ThreadLocals threadLocals, MCAEPartition partition);
+
+void Estimate_Total_Area(SpaceC_LPU lpu, 
+		ArrayMetadata arrayMetadata, 
+		TaskGlobals taskGlobals, 
+		ThreadLocals threadLocals, MCAEPartition partition);
 
 
 }

@@ -4,28 +4,42 @@
 #include <iostream>
 #include <vector>
 
-class ValueCoordinatePair;
-class COOMVMEnvironment;
-class COOMVMPartition;
+class Point;
+class Rectangle;
+class Coefficients;
+class MCAEEnvironment;
+class MCAEPartition;
 
-class ValueCoordinatePair {
+class Point {
   public:
-	float value;
-	int row;
-	int column;
+	float x;
+	float y;
 };
 
-class COOMVMEnvironment {
+class Rectangle {
   public:
-	ValueCoordinatePair* m;
-	float* v;
-	float* w;
+	int top;
+	int right;
+	int bottom;
+	int left;
 };
 
-class COOMVMPartition {
+class Coefficients {
+  public:
+	int order;
+	float values[2];
+};
+
+class MCAEEnvironment {
+  public:
+	Rectangle* grid;
+	std::vector<Coefficients> shape;
+	float area;
+};
+
+class MCAEPartition {
   public:
 	int p;
-	int r;
 };
 
 #endif

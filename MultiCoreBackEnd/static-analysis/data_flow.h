@@ -9,33 +9,11 @@
 #include "../semantics/scope.h"
 #include "../utils/hashtable.h"
 
+#include <iostream>
+#include <fstream>
+
 class VariableAccess;
 class DataDependencies;
-
-/*	This version of Data Flow Stage is no longer in use. We keep it around for now as it has some utility routines
-	that are used for creating the flow stages listed below.
-*/
-class DataFlowStage : public Node {
-  public:
-        int nestingIndex;
-        int computeIndex;
-	Space *executionSpace;
-	Hashtable<VariableAccess*> *accessMap;
-        DataDependencies *dataDependencies;
-	DataFlowStage *nestingController;
-
-        DataFlowStage(yyltype loc);
-
-        void setNestingIndex(int nestingIndex) { this->nestingIndex = nestingIndex; }
-	void setNestingController(DataFlowStage *controller) { this->nestingController = controller; }
-	int getNestingIndex() { return nestingIndex; }
-        void setComputeIndex(int computeIndex) { this->computeIndex = computeIndex; }
-	int getComputeIndex() { return computeIndex; }
-	DataDependencies *getDataDependencies();
-        virtual Hashtable<VariableAccess*> *getAccessMap() { return accessMap; }
-        Space *getSpace() { return executionSpace; }
-	const char *performDependencyAnalysis(List<DataFlowStage*> *stageList);
-};
 
 /* 	Task global variables may be synchronized/retrieved in several cases. The cases are
 	Entrance: moving from a higher to a lower space
@@ -134,6 +112,9 @@ class ExecutionStage : public FlowStage {
 	void setCode(List<Stmt*> *stmtList);
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
+
+	// helper method for generating back-end code
+	void translateCode(std::ofstream &stream);
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 

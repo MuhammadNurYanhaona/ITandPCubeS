@@ -11,6 +11,8 @@
 #include "thread_state_mgmt.h"
 #include "space_mapping.h"
 #include "name_transformer.h"
+#include "compute_translator.h"
+
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
@@ -90,6 +92,9 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// translate the initialize block of the task into a function
 	generateInitializeFunction(headerFile, programFile, initials, 
         		envLinkList, taskDef, mappingConfig->mappingConfig->LPS);
+
+	// generate functions for all compute stages in the source code
+	generateFnsForComputation(taskDef, headerFile, programFile, initials);
 
 	closeNameSpace(headerFile);
 }

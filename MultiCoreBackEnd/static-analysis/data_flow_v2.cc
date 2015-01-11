@@ -3,11 +3,16 @@
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
 #include "../syntax/ast_task.h"
+#include "../syntax/ast_type.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "data_flow.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
+#include "../semantics/symbol.h"
+
+#include <iostream>
+#include <fstream>
 
 //-------------------------------------------------- Flow Stage ----------------------------------------------------------/
 
@@ -98,7 +103,7 @@ bool FlowStage::isDataModifierRelevant(FlowStage *modifier) {
 	return (this->space == syncStage->space || this->space->isParentSpace(syncStage->space));
 }
 
-//------------------------------------------------ Execution Stage -------------------------------------------------------/
+//-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(0, space, NULL) {
 	
@@ -158,6 +163,27 @@ ExecutionStage::ExecutionStage(int index, Space *space, Expr *executeCond)
 
 void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 	this->code = new StmtBlock(stmtList);
+}
+
+void ExecutionStage::translateCode(std::ofstream &stream) {
+
+	// declare all local variables found in the scope
+        Iterator<Symbol*> iterator = scope->get_local_symbols();
+        Symbol *symbol;
+	bool first = true;
+        while ((symbol = iterator.GetNextValue()) != NULL) {
+		if (first) {
+			stream << "\n\t//declare the local variables of this compute stage\n"; 
+			first = false;
+		}
+                VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
+                if (variable == NULL) continue;
+                Type *type = variable->getType();
+                const char *name = variable->getName();
+                stream << "\t" << type->getCppDeclaration(name) << ";\n";
+        }
+
+        // TODO translate statements into C++ code
 }
 
 //------------------------------------------------ Composite Stage -------------------------------------------------------/

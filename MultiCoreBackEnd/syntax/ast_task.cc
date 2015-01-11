@@ -7,11 +7,13 @@
 
 #include "errors.h"
 #include "../utils/list.h"
+#include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../semantics/symbol.h"
 #include "../semantics/scope.h"
 #include "../semantics/task_space.h"
 #include "../static-analysis/data_flow.h"
+#include "../static-analysis/data_access.h"
 
 #include <sstream>
 
@@ -196,6 +198,8 @@ PartitionHierarchy *TaskDef::getPartitionHierarchy() {
 List<Identifier*> *TaskDef::getPartitionArguments() { 
 	return partition->getArguments(); 
 }
+
+CompositeStage *TaskDef::getComputation() { return compute->getComputation(); }
 
 //------------------------------------- Define Section ------------------------------------------/
 
@@ -398,7 +402,18 @@ void EnvironmentConfig::PrintChildren(int indentLevel) {
         links->PrintAll(indentLevel + 1);
 }
 
+
+
 //------------------------------------- Compute Section ------------------------------------------/
+
+//--------------------------------------------------------------- Deprecated Data Flow Stage
+void DataFlowStage::setNestingIndex(int nestingIndex) { this->nestingIndex = nestingIndex; }
+void DataFlowStage::setNestingController(DataFlowStage *con) { nestingController = con; }
+int DataFlowStage::getNestingIndex() { return nestingIndex; }
+void DataFlowStage::setComputeIndex(int computeIndex) { this->computeIndex = computeIndex; }
+int DataFlowStage::getComputeIndex() { return computeIndex; }
+Hashtable<VariableAccess*> *DataFlowStage::getAccessMap() { return accessMap; }
+Space *DataFlowStage::getSpace() { return executionSpace; }
 
 //------------------------------------------------------------------------------Stage Header
 StageHeader::StageHeader(Identifier *s, char si, Expr *a) : Node(*s->GetLocation()) {
@@ -1023,3 +1038,11 @@ List<const char*> *ComputeSection::getRepeatIndexes() {
 	}	
 	return filteredList;
 }
+
+void ComputeSection::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
+                computation->performDependencyAnalysis(hierarchy);
+}
+        
+void ComputeSection::print() { computation->print(0); }
+
+CompositeStage *ComputeSection::getComputation() { return computation; }
