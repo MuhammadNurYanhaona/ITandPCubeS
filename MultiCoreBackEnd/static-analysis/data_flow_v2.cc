@@ -13,6 +13,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 //-------------------------------------------------- Flow Stage ----------------------------------------------------------/
 
@@ -153,6 +154,12 @@ int SyncStage::populateAccessMap(List<VariableAccess*> *accessLogs,
 	return count;
 }
 
+void SyncStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
+	// TODO need to provide an accurate implementation. Now we are just printing a comment
+	for (int i = 0; i < indentation; i++) stream << "\t";
+	stream << "//this is a comment correspond to a sync stage\n";	
+}
+
 //------------------------------------------------ Execution Stage -------------------------------------------------------/
 
 ExecutionStage::ExecutionStage(int index, Space *space, Expr *executeCond) 
@@ -184,6 +191,20 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
         }
 
         // TODO translate statements into C++ code
+}
+
+void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
+	// write the indent
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+	stream << indent.str();
+	// invoke the related method with current LPU parameter
+	stream << name << "(*space" << space->getName() << "Lpu, ";
+	// along with other default arguments
+	indent << "\t\t";
+	stream << '\n' << indent.str() << "arrayMetadata,";
+	stream << '\n' << indent.str() << "taskGlobals,";
+	stream << '\n' << indent.str() << "threadLocals, partition);\n";
 }
 
 //------------------------------------------------ Composite Stage -------------------------------------------------------/
@@ -430,6 +451,85 @@ void CompositeStage::reorganizeDynamicStages() {
 	}
 }
 
+List<List<FlowStage*>*> *CompositeStage::getConsecutiveNonLPSCrossingStages() {
+	
+	List<List<FlowStage*>*> *stageGroups = new List<List<FlowStage*>*>;
+	Space *currentSpace = stageList->Nth(0)->getSpace();
+	List<FlowStage*> *currentGroup = new List<FlowStage*>;
+	currentGroup->Append(stageList->Nth(0));
+
+	for (int i = 1; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		// if the stage is executing in a different LPS then create a new group
+		if (stage->getSpace() != currentSpace) {
+			currentSpace = stage->getSpace();
+			stageGroups->Append(currentGroup);
+			currentGroup = new List<FlowStage*>;
+			currentGroup->Append(stage);
+		// otherwise add the stage in the current group
+		} else {
+			currentGroup->Append(stage);
+		}
+	}
+	stageGroups->Append(currentGroup);
+	return stageGroups;
+}
+
+void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
+	
+	std::string stmtSeparator = ";\n";
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+	int nextIndentation = indentation;
+	std::ostringstream nextIndent;
+	nextIndent << indent.str();
+
+	// if their is an LPS transition due to entering this stage then create a while loop traversing LPUs
+	// of newly entered LPS
+	if (this->space != containerSpace) {
+		nextIndentation++;
+		nextIndent << '\t';
+		stream << indent.str() << "while(true) {\n";		
+	}
+	
+	// Iterate over groups of flow stages where each group executes within a single LPS. This scheme has the
+	// consequence of generating LPU only one time for all stages of a group then execute all of them before
+	// proceed to the next LPU 
+	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
+	
+	for (int i = 0; i < stageGroups->NumElements(); i++) {
+		List<FlowStage*> *currentGroup = stageGroups->Nth(i);
+		Space *groupSpace = currentGroup->Nth(0)->getSpace();
+		// if the LPS of the group is not the same of this one then we need to consider LPS entry, i.e.,
+		// include a while loop for the group to traverse over the LPUs
+		if (groupSpace != space) {
+			stream << nextIndent.str() << "while(true) {\n";
+			for (int j = 0; j < currentGroup->NumElements(); j++) {
+				FlowStage *stage = currentGroup->Nth(j);
+				stage->generateInvocationCode(stream, nextIndentation + 1, groupSpace);
+			}
+			stream << nextIndent.str() << "}\n";
+		// otherwise the current LPU of this composite stage will suffice and we execute all the nested
+		// stages one after one.	 
+		} else {
+			for (int j = 0; j < currentGroup->NumElements(); j++) {
+				FlowStage *stage = currentGroup->Nth(j);
+				stage->generateInvocationCode(stream, nextIndentation, space);
+			}
+		}
+	}
+
+	// close the while loop if applicable
+	if (space != containerSpace) {
+		stream << indent.str() << "}\n";
+		// at the end remove checkpoint if the container LPS is not the root LPS
+		if (!containerSpace->isRoot()) {
+			stream << indent.str() << "threadStage.removeIterationBound(Space_";
+			stream << space->getName() << stmtSeparator;
+		}
+	}	
+}
+
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/
 
 RepeatCycle::RepeatCycle(int index, Space *space, RepeatCycleType type, Expr *executeCond) 
@@ -456,3 +556,9 @@ void RepeatCycle::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 	FlowStage::performDependencyAnalysis(repeatConditionAccessMap, hierarchy);
 	CompositeStage::performDependencyAnalysis(hierarchy);	
 }
+
+void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
+	//TODO need to implement repeat loop condition checking
+	CompositeStage::generateInvocationCode(stream, indentation, containerSpace);
+}
+

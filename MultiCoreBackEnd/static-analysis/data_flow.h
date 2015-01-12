@@ -85,6 +85,11 @@ class FlowStage {
 	virtual void reorganizeDynamicStages() {}
 	void setExecuteCondition(Expr *condition) { executeCond = condition; }
 	Expr *getExecuteCondition() { return executeCond; }
+
+	// This virtual method is used to recursively generate the run method for the task for the multi-core back
+	// end compiler.
+	virtual void generateInvocationCode(std::ofstream &stream, 
+			int indentation, Space *containerSpace) {}
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -99,6 +104,7 @@ class SyncStage : public FlowStage {
 	int populateAccessMap(List<VariableAccess*> *accessLogs, 
 		bool filterOutNonReads, bool filterOutNonWritten);
 	bool isLoaderSync() { return (mode == Load || mode == Load_And_Configure); }
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	This class is equivalent to a ComputeStage with executable code from abstract syntax tree
@@ -115,6 +121,7 @@ class ExecutionStage : public FlowStage {
 
 	// helper method for generating back-end code
 	void translateCode(std::ofstream &stream);
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 
@@ -141,6 +148,11 @@ class CompositeStage : public FlowStage {
 	virtual void print(int indent);
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void reorganizeDynamicStages();
+
+	// helper functions for code generation
+	List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();
+	virtual void generateInvocationCode(std::ofstream &stream, 
+			int indentation, Space *containerSpace);
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.
@@ -155,6 +167,7 @@ class RepeatCycle : public CompositeStage {
 	void addSyncStagesOnReturn(List<FlowStage*> *stageList);
 	void setRepeatConditionAccessMap(Hashtable<VariableAccess*> *map) { repeatConditionAccessMap = map; }
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	This is a utility class to keep track of the last point of entry to a space as flow of control move from

@@ -8,6 +8,7 @@
 
 #include <iostream>
 #include <fstream>
+#include "space_mapping.h"
 
 class TaskDef;
 class FlowStage;
@@ -21,7 +22,9 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 void generateFnsForComputation(TaskDef *taskDef, const char *headerFile, 
 		const char *programFile, const char *initials);
 
+/* function definition for generating the thread::run function */
 void generateThreadRunFunction(TaskDef *taskDef, const char *headerFile,
-		const char *programFile, const char *initials);	
+		const char *programFile, const char *initials,
+		MappingNode *mappingRoot);	
 
 #endif

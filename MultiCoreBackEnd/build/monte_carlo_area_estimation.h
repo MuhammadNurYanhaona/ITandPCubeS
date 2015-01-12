@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
+#include <stdio.h>
 
 // for math functions
 #include <math.h>
@@ -216,6 +217,16 @@ void Estimate_Total_Area(SpaceC_LPU lpu,
 		ArrayMetadata arrayMetadata, 
 		TaskGlobals taskGlobals, 
 		ThreadLocals threadLocals, MCAEPartition partition);
+
+
+/*-----------------------------------------------------------------------------------
+The run method for thread simulating the task flow 
+------------------------------------------------------------------------------------*/
+
+void run(ArrayMetadata arrayMetadata, 
+		TaskGlobals taskGlobals, 
+		ThreadLocals threadLocals, 
+		MCAEPartition partition, ThreadStateImpl threadState);
 
 
 }

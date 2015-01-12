@@ -96,6 +96,10 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// generate functions for all compute stages in the source code
 	generateFnsForComputation(taskDef, headerFile, programFile, initials);
 
+	// generate run function for threads
+	generateThreadRunFunction(taskDef, headerFile, 
+			programFile, initials, mappingConfig);
+
 	closeNameSpace(headerFile);
 }
 

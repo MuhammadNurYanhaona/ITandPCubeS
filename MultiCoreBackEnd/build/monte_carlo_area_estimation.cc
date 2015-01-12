@@ -10,6 +10,7 @@ header files included for different purposes
 #include <iostream>
 #include <string>
 #include <cstdlib>
+#include <stdio.h>
 
 // for math functions
 #include <math.h>
@@ -361,5 +362,41 @@ void mcae::Estimate_Total_Area(SpaceC_LPU lpu,
 	Dimension subarea_estimatePartDims[2];
 	subarea_estimatePartDims[0] = *lpu.subarea_estimatePartDims[0]->storageDim;
 	subarea_estimatePartDims[1] = *lpu.subarea_estimatePartDims[1]->storageDim;
+}
+
+/*-----------------------------------------------------------------------------------
+The run method for thread simulating the task flow 
+------------------------------------------------------------------------------------*/
+
+void mcae::run(ArrayMetadata arrayMetadata, 
+		TaskGlobals taskGlobals, 
+		ThreadLocals threadLocals, 
+		MCAEPartition partition, ThreadStateImpl threadState) {
+
+	threadState.setRootLpu();
+
+	SpaceRoot_LPU *spaceRootLpu = NULL;
+	SpaceC_LPU *spaceCLpu = NULL;
+	SpaceB_LPU *spaceBLpu = NULL;
+	SpaceA_LPU *spaceALpu = NULL;
+
+	while(true) {
+		while(true) {
+			Calculate_Point_Position(*spaceALpu, 
+					arrayMetadata,
+					taskGlobals,
+					threadLocals, partition);
+		}
+		Refine_Subarea_Estimate(*spaceBLpu, 
+				arrayMetadata,
+				taskGlobals,
+				threadLocals, partition);
+	}
+	while(true) {
+		Estimate_Total_Area(*spaceCLpu, 
+				arrayMetadata,
+				taskGlobals,
+				threadLocals, partition);
+	}
 }
 

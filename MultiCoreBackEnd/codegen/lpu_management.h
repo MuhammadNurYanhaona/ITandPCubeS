@@ -76,18 +76,18 @@ class LPU {
 class LpsState {
   protected:
 	LpuCounter *counter;
-	// if an LPS is checkpointed then the recursive routine for get next LPU invoked for
-	// any descendent LPS will not progress further up from this point. By default the root LPS
-	// will remain checkpointed at the beginning.
-	bool checkpointed;
+	// if an LPS is marked as an iteration bound then the recursive routine for get next LPU invoked 
+	// for any descendent LPS will not progress further up from this point. By default the root LPS
+	// will remain marked as the iteration bound at the beginning.
+	bool iterationBound;
   public:
 	// a current LPU reference to aid in calculating LPUs for descendent LPSes
 	LPU *lpu;
 
 	LpsState(int lpsDimensions, PPU_Ids ppuIds);
-	void checkpointState() { checkpointed = true; }
-	bool isCheckpointed() { return checkpointed; }
-	void removeCheckpoint() { checkpointed = false; }
+	void markAsIterationBound() { iterationBound = true; }
+	bool isIterationBound() { return iterationBound; }
+	void removeIterationBound() { iterationBound = false; }
 	void setCurrentLpu(LPU *currentLpu) { lpu = currentLpu; }
 	LPU *getCurrentLpu() { return lpu; }
 	LpuCounter *getCounter() { return counter; }
@@ -119,7 +119,7 @@ class ThreadState {
 	virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;
 
 	LPU *getNextLpu(int lpsId, int containerLpsId, int currentLpuId);
-	void removeCheckpoint(int lpsId);
+	void removeIterationBound(int lpsId);
 	virtual ~ThreadState() {}
 };
 

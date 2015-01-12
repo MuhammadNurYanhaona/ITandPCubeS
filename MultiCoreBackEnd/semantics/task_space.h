@@ -233,6 +233,7 @@ class Space {
 	CoordinateSystem *getCoordinateSystem() { return coordSys; }
 	void setSubpartition(Space *subpartition) { this->subpartition = subpartition; }
 	Space *getSubpartition() { return subpartition; }
+	bool isRoot() { return parent == NULL; }
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy

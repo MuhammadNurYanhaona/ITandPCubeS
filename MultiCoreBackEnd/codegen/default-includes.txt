@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
+#include <stdio.h>
 
 // for math functions
 #include <math.h>

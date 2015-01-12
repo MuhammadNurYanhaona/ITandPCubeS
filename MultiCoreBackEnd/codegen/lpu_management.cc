@@ -119,7 +119,7 @@ LpsState::LpsState(int lpsDimensions, PPU_Ids ppuIds) {
 	} else {
 		counter = new LpuCounter(lpsDimensions);
 	}
-	checkpointed = false;
+	iterationBound = false;
 	lpu = NULL;
 }
 
@@ -162,7 +162,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 			// declare that no new LPUs to be executed
 			int parentLpsId = lpsParentIndexMap[lpsId];
 			LpsState *parentState = lpsStates[parentLpsId];
-			if (parentState->isCheckpointed()) {
+			if (parentState->isIterationBound()) {
 				return NULL;
 			// otherwise check if parent LPS'es LPU can be updated
 			} else {			
@@ -197,7 +197,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	// this is the first call to the routine if current ID is invalid  
 	LpsState *containerState = lpsStates[containerLpsId];
 	// checkpoint the container state to limit the span of recursive get-Next-LPU call below that LPS
-	containerState->checkpointState();
+	containerState->markAsIterationBound();
 	
 	// check if parent LPS is the same as the container LPS	
 	int parentLpsId = lpsParentIndexMap[lpsId];
@@ -223,7 +223,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	return lpu;	
 }
 
-void ThreadState::removeCheckpoint(int lpsId) {
+void ThreadState::removeIterationBound(int lpsId) {
 	LpsState *state = lpsStates[lpsId];
-	state->removeCheckpoint();
+	state->removeIterationBound();
 }
