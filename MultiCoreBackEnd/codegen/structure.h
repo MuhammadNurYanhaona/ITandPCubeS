@@ -14,8 +14,8 @@ typedef struct {
 } Dimension;
 
 typedef struct {
-	int beginAt;
-	int currentValue;
+	int begin;
+	int current;
 } Epoch;
 
 /* structure to demarcate the region of a dimension of an array that falls inside a single LPU */
