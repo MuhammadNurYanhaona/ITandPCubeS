@@ -120,6 +120,8 @@ class ThreadState {
 
 	LPU *getNextLpu(int lpsId, int containerLpsId, int currentLpuId);
 	void removeIterationBound(int lpsId);
+	ThreadIds *getThreadIds() { return threadIds; }
+	bool isValidPpu(int lpsId); 
 	virtual ~ThreadState() {}
 };
 

@@ -194,17 +194,46 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 }
 
 void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
+	
 	// write the indent
 	std::ostringstream indent;
 	for (int i = 0; i < indentation; i++) indent << '\t';
-	stream << indent.str();
+	std::ostringstream nextIndent;
+	nextIndent << indent.str();
+
+	// if this is not a group entry execution stage then add a condition ensure that a PPU with only
+	// valid ID corresponding to this stage's LPS should go on executing the code
+	if (!isGroupEntry()) {
+		nextIndent << '\t';
+		stream << indent.str() << "if (threadState.isValidPpu(Space_" << space->getName();
+		stream << ")) {\n";
+	}
 	// invoke the related method with current LPU parameter
+	stream << nextIndent.str() << "// invoking user computation\n";
+	stream << nextIndent.str();
 	stream << name << "(*space" << space->getName() << "Lpu, ";
 	// along with other default arguments
-	indent << "\t\t";
-	stream << '\n' << indent.str() << "arrayMetadata,";
-	stream << '\n' << indent.str() << "taskGlobals,";
-	stream << '\n' << indent.str() << "threadLocals, partition);\n";
+	nextIndent << "\t\t";
+	stream << '\n' << nextIndent.str() << "arrayMetadata,";
+	stream << '\n' << nextIndent.str() << "taskGlobals,";
+	stream << '\n' << nextIndent.str() << "threadLocals, partition);\n";
+
+	// close the if condition if applicable
+	if (!isGroupEntry()) {
+		stream << indent.str() << "}\n";
+	}
+}
+
+// An execution stage is a group entry if it contain any reduction operation
+bool ExecutionStage::isGroupEntry() {
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+	VariableAccess *access;
+	while ((access = iterator.GetNextValue()) != NULL) {
+		if (access->isContentAccessed() && access->getContentAccessFlags()->isReduced()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 //------------------------------------------------ Composite Stage -------------------------------------------------------/
@@ -478,6 +507,7 @@ List<List<FlowStage*>*> *CompositeStage::getConsecutiveNonLPSCrossingStages() {
 void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
 	
 	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
 	std::ostringstream indent;
 	for (int i = 0; i < indentation; i++) indent << '\t';
 	int nextIndentation = indentation;
@@ -487,9 +517,27 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 	// if their is an LPS transition due to entering this stage then create a while loop traversing LPUs
 	// of newly entered LPS
 	if (this->space != containerSpace) {
+		const char *spaceName = space->getName();
 		nextIndentation++;
 		nextIndent << '\t';
-		stream << indent.str() << "while(true) {\n";		
+		// create a new local scope for traversing LPUs of this new scope
+		stream << indent.str() << "{ // scope entrance for iterating LPUs of Space ";
+		stream << spaceName << "\n";
+		// declare a new variable for tracking the last LPU id
+		stream << indent.str() << "int space" << spaceName << "LpuId = INVALID_ID" << stmtSeparator;
+		// declare another variable to track the iteration number of the while loop
+		stream << indent.str() << "int space" << spaceName << "Iteration = 0" << stmtSeparator;
+		// declare a new variable to hold on to current LPU of this LPS
+		stream << indent.str() << "Space" << spaceName << "_LPU *space" << spaceName << "Lpu = NULL";
+		stream << stmtSeparator;
+		// declare another variable to assign the value of get-Next-LPU call
+		stream << indent.str() << "LPU *lpu = NULL" << stmtSeparator;
+		stream << indent.str() << "while((lpu = threadState.getNextLpu(";
+		stream << "Space_" << spaceName << paramSeparator << "Space_" << containerSpace->getName();
+		stream << paramSeparator << "space" << spaceName << "LpuId)) != NULL) {\n";
+		// cast the common LPU variable to LPS specific LPU		
+		stream << nextIndent.str() << "space" << spaceName << "Lpu = (Space" << spaceName;
+		stream  << "_LPU*) lpu" << stmtSeparator;
 	}
 	
 	// Iterate over groups of flow stages where each group executes within a single LPS. This scheme has the
@@ -503,12 +551,11 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// if the LPS of the group is not the same of this one then we need to consider LPS entry, i.e.,
 		// include a while loop for the group to traverse over the LPUs
 		if (groupSpace != space) {
-			stream << nextIndent.str() << "while(true) {\n";
-			for (int j = 0; j < currentGroup->NumElements(); j++) {
-				FlowStage *stage = currentGroup->Nth(j);
-				stage->generateInvocationCode(stream, nextIndentation + 1, groupSpace);
-			}
-			stream << nextIndent.str() << "}\n";
+			// create a local composite flow stage to apply the logic of this function recursively
+			CompositeStage *tempStage = new CompositeStage(0, groupSpace, NULL);
+			tempStage->setStageList(currentGroup);
+			tempStage->generateInvocationCode(stream, nextIndentation, space);
+			delete tempStage;
 		// otherwise the current LPU of this composite stage will suffice and we execute all the nested
 		// stages one after one.	 
 		} else {
@@ -521,13 +568,32 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 
 	// close the while loop if applicable
 	if (space != containerSpace) {
+		const char *spaceName = space->getName();
+		// update the iteration number and next LPU id
+		stream << nextIndent.str() << "space" << spaceName << "LpuId = space" << spaceName;
+		stream << "Lpu->id" << stmtSeparator;	
+		stream << nextIndent.str() << "space" << spaceName << "Iteration++" << stmtSeparator;
 		stream << indent.str() << "}\n";
 		// at the end remove checkpoint if the container LPS is not the root LPS
 		if (!containerSpace->isRoot()) {
-			stream << indent.str() << "threadStage.removeIterationBound(Space_";
-			stream << space->getName() << stmtSeparator;
+			stream << indent.str() << "threadState.removeIterationBound(Space_";
+			stream << containerSpace->getName() << ')' << stmtSeparator;
 		}
+		// exit from the scope
+		stream << indent.str() << "} // scope exit for iterating LPUs of Space ";
+		stream << space->getName() << "\n";
 	}	
+}
+
+// A composite stage is a group entry if it has flow stages of multiple LPSes inside or any stage inside it
+// is a group entry.
+bool CompositeStage::isGroupEntry() {
+	for (int i = 1; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		if (stage->isGroupEntry()) return true;
+	}
+	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
+	return (stageGroups->NumElements() > 1 || space != stageGroups->Nth(0)->Nth(0)->getSpace());
 }
 
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/
@@ -558,7 +624,59 @@ void RepeatCycle::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 }
 
 void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
-	//TODO need to implement repeat loop condition checking
-	CompositeStage::generateInvocationCode(stream, indentation, containerSpace);
+	
+	std::string stmtSeparator = ";\n";
+	
+	// if it is not a sub-partition repeat block then we have to add a while or for loopd depending on the
+	// condition
+	if (type == Conditional_Repeat) {
+		
+		// translate the repeat condition
+		std::ostringstream indent;
+		for (int i = 0; i < indentation; i++) indent << '\t';
+		
+		// if the repeat condition is a logical expression then it is a while loop in the source code
+		if (dynamic_cast<LogicalExpr*>(repeatCond) != NULL) {
+			std::ostringstream condition;
+			repeatCond->translate(condition, indentation, 0);
+			stream << indent.str() << "while (" << condition.str() << ") {\n";
+			CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
+			stream << indent.str() << "}\n";
+		// otherwise it is a for loop based on a range condition that we need to translate
+		} else {
+			RangeExpr *rangeExpr = dynamic_cast<RangeExpr*>(repeatCond);
+			const char *indexVar = rangeExpr->getIndexExpr();
+			const char *rangeCond = rangeExpr->getRangeExpr();
+			const char *stepCond = rangeExpr->getStepExpr();
+			
+			// create a scope for repeat loop
+			stream << indent.str() << "{ // scope entrance for repeat loop\n";
+			// create two new variables for setting appropriate loop  condition checking and index 
+			// increment, and one variable to multiply index properly during looping
+			stream << indent.str() << "int iterationBound = " << rangeCond << ".max";
+			stream << stmtSeparator;
+			stream << indent.str() << "int indexIncrement = " << stepCond << stmtSeparator;
+			stream << indent.str() << "int indexMultiplier = 1" << stmtSeparator;
+			stream << indent.str() << "if (" << rangeCond << ".min > " << rangeCond << ".max) {\n";
+			stream << indent.str() << "\titerationBound *= -1" << stmtSeparator;
+			stream << indent.str() << "\tindexIncrement *= -1" << stmtSeparator;
+			stream << indent.str() << "\tindexMultiplier = -1" << stmtSeparator;
+			stream << indent.str() << "}\n";
+			// write the for loop corresponding to the repeat instruction
+			stream << indent.str() << "for (" << indexVar << " = " << rangeCond << ".min; \n";
+			stream << indent.str() << "\t\tindexMultiplier * " << indexVar << " <= iterationBound; \n";
+			stream << indent.str() << "\t\t" << indexVar << " += indexIncrement) {\n";
+			CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
+			stream << indent.str() << "}\n";
+			// exit the scope created for the repeat loop 
+			stream << indent.str() << "} // scope exit for repeat loop\n";
+
+			delete indexVar;
+			delete rangeCond;
+			delete stepCond;
+		}
+	} else {
+		CompositeStage::generateInvocationCode(stream, indentation, containerSpace);
+	}
 }
 

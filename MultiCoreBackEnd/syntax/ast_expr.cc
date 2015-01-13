@@ -908,6 +908,49 @@ Hashtable<VariableAccess*> *RangeExpr::getAccessedGlobalVariables(TaskGlobalRefe
 	return table;
 }
 
+void RangeExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+
+	// get the appropriate back-end name for the index variable
+	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+        const char *indexVar = transformer->getTransformedName(index->getName(), false, false);
+	// translate the range condition
+	std::ostringstream rangeStr;
+	range->translate(rangeStr, indentLevel, 0);
+	std::string rangeCond = rangeStr.str();
+
+	// by default a range expression is translated as a boolean condition
+	
+	// check if the index variable is larger than or equal to the min value of range
+	stream << indexVar << " >= " << rangeCond << ".min &&";
+	// and less than or equal to the max value of range
+	stream << indexVar << " <= "<< rangeCond << ".max && ";
+	// and range mean is less than range max
+	stream  << rangeCond << ".min <" << rangeCond << ".max";
+	// otherwise, do the exact inverse calculation
+	stream << " || ";	
+	stream << indexVar << " <= " << rangeCond << ".min &&";
+	stream << indexVar << " >= " << rangeCond << ".max";
+}
+
+const char *RangeExpr::getIndexExpr() {
+	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+        return transformer->getTransformedName(index->getName(), false, false);
+}
+
+const char *RangeExpr::getRangeExpr() {
+	std::ostringstream rangeStr;
+	range->translate(rangeStr, 0, 0);
+	return strdup(rangeStr.str().c_str());
+}
+
+const char *RangeExpr::getStepExpr() {
+	std::ostringstream stepStr;
+	if (step == NULL) stepStr << "1";
+	else step->translate(stepStr, 0, 0);
+	std::string stepCond = stepStr.str();
+	return strdup(stepCond.c_str());
+}
+
 SubpartitionRangeExpr::SubpartitionRangeExpr(char s, yyltype loc) : Expr(loc) {
 	spaceId = s;
 }

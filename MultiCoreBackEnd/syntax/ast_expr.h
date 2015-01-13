@@ -250,6 +250,15 @@ class RangeExpr : public Expr {
 	void resolveType(Scope *scope, bool ignoreFailure);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	const char *getIndexName() { return index->getName(); }
+	
+	// helper functions for backend compiler
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	// As a range expression can be used as the condition for a repeat loop that needs to be
+	// translated a for loop with other content inside, it provides following functions so that
+	// the caller can get string equivalent of its parts and generate the loop
+	const char *getIndexExpr();
+	const char *getRangeExpr();
+	const char *getStepExpr();
 };
 
 class SubpartitionRangeExpr : public Expr {

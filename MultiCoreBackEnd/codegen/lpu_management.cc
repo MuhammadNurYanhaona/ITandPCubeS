@@ -227,3 +227,8 @@ void ThreadState::removeIterationBound(int lpsId) {
 	LpsState *state = lpsStates[lpsId];
 	state->removeIterationBound();
 }
+
+bool ThreadState::isValidPpu(int lpsId) {
+	PPU_Ids ppu = threadIds->ppuIds[lpsId];
+	return ppu.id != INVALID_ID;
+}

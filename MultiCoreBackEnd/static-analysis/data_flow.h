@@ -90,6 +90,15 @@ class FlowStage {
 	// end compiler.
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace) {}
+
+	// For code generation for the back-end multi-core compiler we need to know if a flow stage should be enter-
+	// ed by multiple PPUs that are under a single higher level PPU but not necessarily responsible for
+	// executing any code of current LPS under concern; or only the PPU with valid PPU ID for the LPS should
+	// enter the code. To make it clear with an example, if an execution stage has a reduction instruction then
+	// all PPUs within a group should participate in that reduction. If it is a stage devoid of instructions 
+	// needing such collective support, then only a single PPU should enter and execute it. The method below 
+	// need to be overridden by subclasses to reflect intended behavior. 
+	virtual bool isGroupEntry() { return false; }
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -122,6 +131,7 @@ class ExecutionStage : public FlowStage {
 	// helper method for generating back-end code
 	void translateCode(std::ofstream &stream);
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
+	bool isGroupEntry();
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 
@@ -153,6 +163,7 @@ class CompositeStage : public FlowStage {
 	List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace);
+	bool isGroupEntry();
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.
