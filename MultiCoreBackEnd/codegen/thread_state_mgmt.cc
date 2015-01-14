@@ -271,7 +271,16 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 		// create a variable for current LPU
 		functionBody << doubleIndent;
 		functionBody << "Space" << lps->getName() << "_LPU *currentLpu = new Space" << lps->getName() << "_LPU";
-		functionBody << statementSeparator;	
+		functionBody << statementSeparator;
+
+		// if the LPS is partitioned then copy queried LPU id to the lpuId static array of the created LPU
+		if (lps->getDimensionCount() > 0) {
+			for (int i = 0; i < lps->getDimensionCount(); i++) {
+				functionBody << doubleIndent;
+				functionBody << "currentLpu->lpuId[" << i << "] = nextLpuId[" << i << "]"; 
+				functionBody << statementSeparator;
+			}
+		}	
 
 		// if the LPS is unpartitioned then we need to create the new LPU by extracting elements from
 		// LPUs of ancestor LPSes for common data structures.

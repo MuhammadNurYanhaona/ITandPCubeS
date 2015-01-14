@@ -34,10 +34,14 @@ Task "Monte Carlo Area Estimation":
 		local_pre: 2D Array of Real single-precision
 		// some global variables useful for the compution (area holds the final result)
 		area, cell_size, precision: Real single-precision
+		// two temporary variables to terminate iterations for now as we are still not
+		// translating array access
+		t: Epoch
+		maxIterations : Integer
 	Environment:
 		grid, shape: link
 		area: create
-	Initialize (precision, cell_size):
+	Initialize (precision, cell_size, maxIterations):
 		sub_estimates.dimension = stats.dimension = local_pre.dimension  = grid.dimension
 		point_placements.dimension1 = grid.dimension1
 		point_placements.dimension2 = grid.dimension2
@@ -62,10 +66,10 @@ Task "Monte Carlo Area Estimation":
 				total_points = stats[i][j].pointsInside + stats[i][j].pointsOutside
 				oldEstimate = sub_estimates[i][j]
 				sub_estimates[i][j] = cell_size * stats[i][j].pointsInside / total_points
-				local_pre[i][j] = sub_estimates[i][j] - oldEstimate
+				local_pre[i][j] at (t) = sub_estimates[i][j] - oldEstimate
 			} for i, j in sub_estimates
 		}
-		Repeat: from "Calculate Point Position" while local_pre[lpuId[0]][lpuId[1]] > precision
+		Repeat: from "Calculate Point Position" while t.current < maxIterations
 		"Estimate Total Area" (Space C) {
 			do {
 				area = reduce ("sum", sub_estimates[i][j])

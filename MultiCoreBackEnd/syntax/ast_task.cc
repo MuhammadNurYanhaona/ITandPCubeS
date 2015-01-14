@@ -542,6 +542,12 @@ void ComputeStage::validateScope(Scope *rootScope, PartitionHierarchy *partition
 		// create and attach a scope to the compute stage 
 		this->scope = new Scope(ComputationStageScope);
 		rootScope->enter_scope(scope);
+
+		// enter a lpuId variable in the scope if the execution space is partitioned
+		Symbol *symbol = executionSpace->getLpuIdSymbol();
+		if (symbol != NULL) {
+			scope->insert_symbol(symbol);
+		}
 			
 		// do semantic analysis of the stage body
         	for (int j = 0; j < code->NumElements(); j++) {
@@ -562,6 +568,12 @@ void ComputeStage::validateScope(Scope *rootScope, PartitionHierarchy *partition
                 	Stmt *stmt = code->Nth(j);
                 	stmt->checkSemantics(scope, false);
         	}
+
+		// remove the lpuId variable if exists
+		if (symbol != NULL) {
+			scope->remove_symbol(symbol->getName());
+		}
+	
 		scope->exit_scope();
 	}
 }
@@ -699,7 +711,17 @@ void RepeatControl::PrintChildren(int indentLevel) {
 }
 
 void RepeatControl::validateScopes(Scope *rootScope, PartitionHierarchy *partitionHierarchy) {
+	// enter a lpuId variable in the scope if the execution space is partitioned
+	Symbol *symbol = NULL;
+	if (executionSpace != NULL) symbol = executionSpace->getLpuIdSymbol();
+	if (symbol != NULL) {
+		rootScope->insert_symbol(symbol);
+	}
 	rangeExpr->resolveType(rootScope, false);
+	// remove the lpuId variable if exists
+	if (symbol != NULL) {
+		rootScope->remove_symbol(symbol->getName());
+	}
 }
 
 Space *RepeatControl::getExecutionSpace(PartitionHierarchy *partitionHierarchy) {
@@ -834,6 +856,7 @@ void MetaComputeStage::validateScopes(Scope *rootScope, PartitionHierarchy *part
 							stage->getExecutionSpace(partitionHierarchy));
 			}
 			repeatInstr->setExecutionSpace(topSpaceInSeq, partitionHierarchy);
+			repeatInstr->validateScopes(rootScope, partitionHierarchy);
 			Space *repeatSpace = repeatInstr->getExecutionSpace(partitionHierarchy);
 			for (int i = startStageIndex; i < stageSequence->NumElements(); i++) {
 				stageSequence->Nth(i)->setRepeatLoopSpace(repeatSpace);

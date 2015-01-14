@@ -35,6 +35,7 @@ class Scope {
 
         Scope* enter_scope(Scope *newScope);
         void insert_symbol(Symbol *symbol);
+	void remove_symbol(const char *key);
         Symbol* lookup(const char *key);
         Symbol* local_lookup(const char *key);
         Scope* exit_scope();

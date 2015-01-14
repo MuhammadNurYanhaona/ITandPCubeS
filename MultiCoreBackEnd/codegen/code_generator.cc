@@ -350,6 +350,12 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 			programFile << array->getName() << "PartDims";
 			programFile << statementSeparator;	
 		}
+		// add a specific lpu_id static array with dimensionality equals to the dimensions of the LPS
+		if (lps->getDimensionCount() > 0) {
+			programFile << statementIndent << "int lpuId[";
+			programFile << lps->getDimensionCount() << "]";
+			programFile << statementSeparator;
+		}	
 		programFile << "};\n";
 	}
 	

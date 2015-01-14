@@ -6,6 +6,7 @@
 #include "../syntax/location.h"
 #include "../partition-lib/partition_function.h"
 #include "../syntax/errors.h"
+#include "symbol.h"
 
 //------------------------------------------------- DataDimensionConfig -----------------------------------------------/
 
@@ -424,6 +425,16 @@ List<const char*> *Space::getNonStorableDataStructures() {
 		}	
 	}
 	return nonStorableStructureList; 
+}
+
+Symbol *Space::getLpuIdSymbol() {
+	if (dimensions == 0) return NULL;
+	StaticArrayType *type = new StaticArrayType(yylloc, Type::intType, 1);
+	List<int> *dimLengths = new List<int>;
+	dimLengths->Append(dimensions);
+	type->setLengths(dimLengths);
+	VariableSymbol *symbol = new VariableSymbol("lpuId", type);
+	return symbol;	
 }
 
 //-------------------------------------------- Partition Hierarchy -------------------------------------------------/

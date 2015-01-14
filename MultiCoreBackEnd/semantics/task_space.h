@@ -28,6 +28,7 @@ enum PartitionLinkType { LinkTypePartition, LinkTypeSubpartition, LinkTypeUndefi
 
 class PartitionArg;
 class Space;
+class Symbol;
 
 /*	This class stores partition funcion arguments regarding a single dimension of a task global array 
 	within a single space configuration. 
@@ -234,6 +235,7 @@ class Space {
 	void setSubpartition(Space *subpartition) { this->subpartition = subpartition; }
 	Space *getSubpartition() { return subpartition; }
 	bool isRoot() { return parent == NULL; }
+	Symbol *getLpuIdSymbol();
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy

@@ -34,6 +34,13 @@ void Scope::insert_symbol(Symbol *symbol) {
         symbol->setScopeType(this->type);
 }
 
+void Scope::remove_symbol(const char *key) {
+	Symbol *symbol = local_lookup(key);
+	if (symbol != NULL) {
+		this->symbolTable->Remove(key, symbol);
+	}
+}
+
 void Scope::copy_symbol(Symbol *symbol) {
         this->symbolTable->Enter(symbol->getName(), symbol, false);
 }
