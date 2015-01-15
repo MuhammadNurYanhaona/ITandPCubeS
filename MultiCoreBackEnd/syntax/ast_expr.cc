@@ -6,6 +6,7 @@
 #include "../utils/list.h"
 #include "string.h"
 #include "../semantics/symbol.h"
+#include "../semantics/task_space.h"
 #include "errors.h"
 
 #include "../utils/hashtable.h"
@@ -35,6 +36,24 @@ void Expr::generateCode(std::ostringstream &stream, int indentLevel) {
 void Expr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
 	std::cout << "A sub-class of expression didn't implement the code generation method\n";
 	std::exit(EXIT_FAILURE);
+}
+
+List<FieldAccess*> *Expr::getTerminalFieldAccesses() {
+	return new List<FieldAccess*>;
+}
+
+void Expr::copyNewFields(List<FieldAccess*> *destination, List<FieldAccess*> *source) {
+	for (int i = 0; i < source->NumElements(); i++) {
+		FieldAccess *field = source->Nth(i);
+		bool match = false;
+		for (int j = 0; j < destination->NumElements(); j++) {
+			if (destination->Nth(j)->isEqual(field)) {
+				match = true;
+				break;
+			}
+		}
+		if (!match) destination->Append(field);
+	}
 }
 
 //----------------------------------------------- Constant Expression -------------------------------------------------/
@@ -256,6 +275,12 @@ void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int 
 	}
 }
 
+List<FieldAccess*> *ArithmaticExpr::getTerminalFieldAccesses() {
+	List<FieldAccess*> *leftList = left->getTerminalFieldAccesses();
+	Expr::copyNewFields(leftList, right->getTerminalFieldAccesses());
+	return leftList;
+}
+
 //------------------------------------------------ Logical Expression -------------------------------------------------/
 
 LogicalExpr::LogicalExpr(Expr *l, LogicalOperator o, Expr *r, yyltype loc) : Expr(loc) {
@@ -405,6 +430,34 @@ void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int cur
 	right->translate(stream, indentLevel, currentLineLength);
 }
 
+List<FieldAccess*> *LogicalExpr::getTerminalFieldAccesses() {
+	if (left == NULL) return right->getTerminalFieldAccesses();
+	List<FieldAccess*> *leftList = left->getTerminalFieldAccesses();
+	Expr::copyNewFields(leftList, right->getTerminalFieldAccesses());
+	return leftList;
+}
+
+// TODO: note that this is a simple implementation that does not appy any transformation to the logical expression
+// that may allow it to express as a collective of AND operations. More elaborate implementation that does that may
+// be attempted later if seems worthwhile.
+List<LogicalExpr*> *LogicalExpr::getANDBreakDown() {
+	List<LogicalExpr*> *breakDownList = new List<LogicalExpr*>;
+	// it is a unary NOT statement and there is nothing to do here
+	if (left == NULL) {
+		breakDownList->Append(this); 
+		return NULL;
+	// if it is not an AND operation then we cannot break it down either
+	} else if (op != AND) {
+		breakDownList->Append(this);
+	} else {
+		LogicalExpr *leftLogic = dynamic_cast<LogicalExpr*>(left);
+		breakDownList->AppendAll(leftLogic->getANDBreakDown());
+		LogicalExpr *rightLogic = dynamic_cast<LogicalExpr*>(right);
+		breakDownList->AppendAll(rightLogic->getANDBreakDown());
+	}
+	return breakDownList;
+}
+
 //----------------------------------------------- Reduction Expression ------------------------------------------------/
 
 ReductionExpr::ReductionExpr(char *o, Expr *r, yyltype loc) : Expr(loc) {
@@ -507,6 +560,8 @@ Hashtable<VariableAccess*> *ReductionExpr::getAccessedGlobalVariables(TaskGlobal
 	return table;
 }
 
+List<FieldAccess*> *ReductionExpr::getTerminalFieldAccesses() { return right->getTerminalFieldAccesses(); }
+
 //------------------------------------------------- Epoch Expression --------------------------------------------------/
 
 EpochValue::EpochValue(Identifier *e, int l) : Expr(*e->GetLocation()) {
@@ -589,6 +644,8 @@ Hashtable<VariableAccess*> *EpochExpr::getAccessedGlobalVariables(TaskGlobalRefe
 	}
 	return table;
 }
+
+List<FieldAccess*> *EpochExpr::getTerminalFieldAccesses() { return root->getTerminalFieldAccesses(); }
 
 //-------------------------------------------------- Field Access -----------------------------------------------------/
 
@@ -812,6 +869,28 @@ void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int cur
 	}
 }
 
+bool FieldAccess::isEqual(FieldAccess *other) {
+	if (strcmp(this->field->getName(), other->field->getName()) != 0) return false;
+	if (this->base == NULL && other->base == NULL) return true;
+	if (this->base == NULL && other->base != NULL) return false;
+	if (this->base != NULL && other->base == NULL) return false;
+	FieldAccess *baseField1 = dynamic_cast<FieldAccess*>(this->base);
+	FieldAccess *baseField2 = dynamic_cast<FieldAccess*>(other->base);
+	if (baseField1 != NULL && baseField2 != NULL) {
+		return baseField1->isEqual(baseField2);
+	}
+	return false;
+}
+
+List<FieldAccess*> *FieldAccess::getTerminalFieldAccesses() { 
+	if (base == NULL) {
+		List<FieldAccess*> *list = new List<FieldAccess*>;
+		list->Append(this);
+		return list;
+	}
+	return base->getTerminalFieldAccesses();
+}
+
 //------------------------------------------------ Range Expressions --------------------------------------------------/
 
 RangeExpr::RangeExpr(Identifier *i, Expr *r, Expr *s, bool l, yyltype loc) : Expr(loc) {
@@ -949,6 +1028,39 @@ const char *RangeExpr::getStepExpr() {
 	else step->translate(stepStr, 0, 0);
 	std::string stepCond = stepStr.str();
 	return strdup(stepCond.c_str());
+}
+
+List<FieldAccess*> *RangeExpr::getTerminalFieldAccesses() {
+	if (indexField == NULL) {
+		indexField = new FieldAccess(NULL, index, *index->GetLocation());
+	}
+	List<FieldAccess*> *list = new List<FieldAccess*>;
+	list->Append(indexField);
+	Expr::copyNewFields(list, range->getTerminalFieldAccesses());
+	if (step != NULL) Expr::copyNewFields(list, step->getTerminalFieldAccesses());
+	return list;
+}
+
+const char *RangeExpr::getBaseArrayForRange(Space *executionSpace) {
+	FieldAccess *rangeField = dynamic_cast<FieldAccess*>(range);
+	if (rangeField == NULL) return NULL;
+	if (rangeField->isTerminalField()) return NULL;
+	const char *baseVar = getBaseVarName();
+	DataStructure *structure = executionSpace->getLocalStructure(baseVar);
+	if (structure == NULL) return NULL;
+	ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+	if (array == NULL) return NULL;
+	return baseVar;
+}
+
+// This implementation assumes that we know the range is related to some dimension of an array
+int RangeExpr::getDimensionForRange(Space *executionSpace) {
+	FieldAccess *rangeField = dynamic_cast<FieldAccess*>(range);
+	Expr *base = rangeField->getBase();
+	FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+	Identifier *field = baseField->getField();
+	DimensionIdentifier *dimensionId = dynamic_cast<DimensionIdentifier*>(field);
+	return dimensionId->getDimensionNo();	
 }
 
 SubpartitionRangeExpr::SubpartitionRangeExpr(char s, yyltype loc) : Expr(loc) {
@@ -1143,6 +1255,12 @@ void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel) {
 	}
 }
 
+List<FieldAccess*> *AssignmentExpr::getTerminalFieldAccesses() {
+	List<FieldAccess*> *leftList = left->getTerminalFieldAccesses();
+	Expr::copyNewFields(leftList, right->getTerminalFieldAccesses());
+	return leftList;
+}
+
 //--------------------------------------------------- Array Access ----------------------------------------------------/
 
 SubRangeExpr::SubRangeExpr(Expr *b, Expr *e, yyltype loc) : Expr(loc) {
@@ -1185,6 +1303,13 @@ Hashtable<VariableAccess*> *SubRangeExpr::getAccessedGlobalVariables(TaskGlobalR
 		}
 	}
 	return table;
+}
+
+List<FieldAccess*> *SubRangeExpr::getTerminalFieldAccesses() {
+	List<FieldAccess*> *list = Expr::getTerminalFieldAccesses();
+	if (begin != NULL) Expr::copyNewFields(list, begin->getTerminalFieldAccesses());
+	if (end != NULL) Expr::copyNewFields(list, end->getTerminalFieldAccesses());
+	return list;
 }
 
 ArrayAccess::ArrayAccess(Expr *b, Expr *i, yyltype loc) : Expr(loc) {
@@ -1275,6 +1400,12 @@ int ArrayAccess::getIndexPosition() {
 	return 0;
 }
 
+List<FieldAccess*> *ArrayAccess::getTerminalFieldAccesses() {
+	List<FieldAccess*> *list = base->getTerminalFieldAccesses();
+	Expr::copyNewFields(list, index->getTerminalFieldAccesses());
+	return list;
+}
+
 //-------------------------------------------------- Function Call ----------------------------------------------------/
 
 FunctionCall::FunctionCall(Identifier *b, List<Expr*> *a, yyltype loc) : Expr(loc) {
@@ -1352,6 +1483,15 @@ Hashtable<VariableAccess*> *FunctionCall::getAccessedGlobalVariables(TaskGlobalR
 		}
 	}
 	return table;	
+}
+
+List<FieldAccess*> *FunctionCall::getTerminalFieldAccesses() {
+	List<FieldAccess*> *list = Expr::getTerminalFieldAccesses();
+	for (int i = 0; i < arguments->NumElements(); i++) {
+		Expr *expr = arguments->Nth(i);
+		Expr::copyNewFields(list, expr->getTerminalFieldAccesses());
+	}
+	return list;
 }
 
 //------------------------------------------------- Task Invocation ---------------------------------------------------/

@@ -199,6 +199,25 @@ int ArrayDataStructure::getDimensionality() {
 	} else return sourceDimensions->NumElements();
 }
 
+bool ArrayDataStructure::isDimensionReordered(int dimensionNo, Space *comparisonBound) {
+	if (isDimensionLocallyReordered(dimensionNo)) return true;
+	if (this->space == comparisonBound) return false;
+	if (source == NULL) return false;
+	ArrayDataStructure *sourceArray = (ArrayDataStructure*) source;
+	if (source->getSpace() == comparisonBound) {
+		return sourceArray->isDimensionLocallyReordered(dimensionNo);
+	}
+	else if (source->getSpace()->isParentSpace(comparisonBound)) {
+		return sourceArray->isDimensionReordered(dimensionNo, comparisonBound);		
+	} else return false;
+}
+
+bool ArrayDataStructure::isDimensionLocallyReordered(int dimensionNo) {
+	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+	if (partConfig == NULL) return false;
+	return partConfig->doesReorderStoredData();
+}
+
 //----------------------------------------------------- Token ---------------------------------------------------/
 
 int Token::wildcardTokenId = -1;

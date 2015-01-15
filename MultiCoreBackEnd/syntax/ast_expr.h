@@ -27,6 +27,8 @@ enum LogicalOperator { AND, OR, NOT, EQ, NE, GT, LT, GTE, LTE };
 enum ReductionOperator { SUM, PRODUCT, MAX, MIN, AVG, MAX_ENTRY, MIN_ENTRY };
 
 class TaskDef;
+class FieldAccess;
+class Space;
 
 class Expr : public Stmt {
   protected:
@@ -56,6 +58,8 @@ class Expr : public Stmt {
 	virtual void generateCode(std::ostringstream &stream, int indentLevel);
 	virtual void translate(std::ostringstream &stream, 
 			int indentLevel, int currentLineLength);
+	virtual List<FieldAccess*> *getTerminalFieldAccesses();
+	static void copyNewFields(List<FieldAccess*> *destination, List<FieldAccess*> *source);
 };
 
 class IntConstant : public Expr {
@@ -140,11 +144,18 @@ class ArithmaticExpr : public Expr {
   public:
 	ArithmaticExpr(Expr *left, ArithmaticOperator op, Expr *right, yyltype loc);
 	const char *GetPrintNameForNode() { return "ArithmaticExpr"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+
+	// for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
+	
+	// for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+
+	// for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
 class LogicalExpr : public Expr {
@@ -156,10 +167,25 @@ class LogicalExpr : public Expr {
 	LogicalExpr(Expr *left, LogicalOperator op, Expr *right, yyltype loc);
 	const char *GetPrintNameForNode() { return "LogicalExpr"; }
     	void PrintChildren(int indentLevel);	    	
+	
+	// for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
+
+	// for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	List<FieldAccess*> *getTerminalFieldAccesses();
+	// Local expressions sometimes are added to indexed based parallel loop statement blocks to further
+	// restrict the range of indexes been traversed by the for loop. Given that there might be multiple
+	// nested for loops in the target code correspond to a single loop in IT source, we need to know
+	// what loop is the best place for a restricting logical expression to put into and then do that.
+	// For this to be done efficiently we may need to break restricting conditions connected by AND op-
+	// erators and put different parts in different location. So the following method has been added to
+	// break a collective of AND statements into a list of such statements
+	List<LogicalExpr*> *getANDBreakDown(); 
 };
 
 class ReductionExpr : public Expr {
@@ -169,10 +195,17 @@ class ReductionExpr : public Expr {
   public:
 	ReductionExpr(char *opName, Expr *right, yyltype loc);
 	const char *GetPrintNameForNode() { return "ReductionExpr"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+
+	// for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
+
+	// for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+
+	// for code generation
+	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
 class EpochValue : public Expr {
@@ -194,12 +227,17 @@ class EpochExpr : public Expr {
   public:
 	EpochExpr(Expr *root, EpochValue *epoch);
 	const char *GetPrintNameForNode() { return "EpochExpr"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+
+	// for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 	Expr *getRootExpr() { return root; }
+
+	// for code generation
 	const char *getBaseVarName() { return root->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
 class FieldAccess : public Expr {
@@ -235,6 +273,8 @@ class FieldAccess : public Expr {
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
 	Expr *getBase() { return base; }
 	Identifier *getField() { return field; }
+	bool isEqual(FieldAccess *other);
+	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
 class RangeExpr : public Expr {
@@ -242,7 +282,10 @@ class RangeExpr : public Expr {
 	Identifier *index;
 	Expr *range;
 	Expr *step;
-	bool loopingRange; 
+	bool loopingRange;
+	// a variable corresponding to index to work as a holder of index transformation information
+	// during range checking, if need, during code generation 
+	FieldAccess *indexField;
   public:
 	RangeExpr(Identifier *index, Expr *range, Expr *step, bool loopingRange, yyltype loc);		
 	const char *GetPrintNameForNode() { return "RangeExpr"; }
@@ -259,6 +302,20 @@ class RangeExpr : public Expr {
 	const char *getIndexExpr();
 	const char *getRangeExpr();
 	const char *getStepExpr();
+	List<FieldAccess*> *getTerminalFieldAccesses();
+	// As the range within a range expression may be the dimension of some array, there might be a
+	// need for index transformation depending on whether or not that dimension is been reordered 
+	// by the partition function. Therefore, the following two methods are provided to identify the
+	// array and dimension no correspond to the range expression, if applicable. At code generation
+	// this information will be used to determine if any adjustment is needed in the index before
+	// it can be used for anything else. TODO note that a normal field access within any other expr
+	// may involve accessing the dimension range of some array. Nonetheless, we do not provide methods
+	// similar to this in the field-access and other classes as it does not make sense accessing the
+	// min and max of an array dimension in a computation if the underlying partition function for
+	// the LPS can reorder data. If, however, in the future such accesses seem to be normal then we
+	// need to elaborate on this logic. 
+	const char *getBaseArrayForRange(Space *executionSpace);
+	int getDimensionForRange(Space *executionSpace);
 };
 
 class SubpartitionRangeExpr : public Expr {
@@ -279,13 +336,19 @@ class AssignmentExpr : public Expr {
   public:
 	AssignmentExpr(Expr *left, Expr *right, yyltype loc);	
 	const char *GetPrintNameForNode() { return "AssignmentExpr"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+
+	// for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
-	void inferType(Scope *scope, Type *rootType);   
+	void inferType(Scope *scope, Type *rootType);
+
+	// for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	const char *getBaseVarName() { return left->getBaseVarName(); }
+	
+	// for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
-
+	List<FieldAccess*> *getTerminalFieldAccesses();
 	// Assignment expression overrides generate-code function along with common translate function
 	// to break compound assignment statements to multiple simple ones. Also we currently support
 	// direct assignment of multiple dimensions from one array to another. That need to be tackled
@@ -305,6 +368,7 @@ class SubRangeExpr : public Expr {
     	void PrintChildren(int indentLevel);	    	
 	void inferType(Scope *scope, Type *rootType); 
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
 class ArrayAccess : public Expr {
@@ -314,11 +378,18 @@ class ArrayAccess : public Expr {
   public:
 	ArrayAccess(Expr *base, Expr *index, yyltype loc);		
 	const char *GetPrintNameForNode() { return "ArrayAccess"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+
+	// for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
+
+	// for static analysis
 	const char *getBaseVarName() { return base->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	int getIndexPosition();
+	
+	// for code generation
+	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
 class FunctionCall : public Expr {
@@ -331,6 +402,7 @@ class FunctionCall : public Expr {
     	void PrintChildren(int indentLevel);	    	
 	void resolveType(Scope *scope, bool ignoreType);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
 class OptionalInvocationParams : public Node {

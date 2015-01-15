@@ -89,6 +89,7 @@ class PartitionFunctionConfig {
 	DataDimensionConfig *getArgsForDimension(int dimensionNo);
 	const char *getName() { return functionName; }
 	virtual bool doesSupportGhostRegion() { return false; }
+	virtual bool doesReorderStoredData() { return false; }
 };
 
 class DataStructure {
@@ -141,6 +142,15 @@ class ArrayDataStructure : public DataStructure {
 	PartitionFunctionConfig *getPartitionSpecForDimension(int dimensionNo);	
 	bool isPartitioned() { return partitionSpecs != NULL && partitionSpecs->NumElements() > 0; }
 	int getDimensionality();
+
+	// Since some partition functions results in reordering array dimensions if data is been copied down
+	// to ensure that each partition work over a sequential block of memory, during code generation we
+	// need to know if any indexing on an array needs to be transformed from original to reordered index
+	// and vice versa. Therefore this two methods have been provided to aid such decision making. The
+	// former check for potential reordering starting from current LPS to any upper LPS up to the bound
+	// specified. The latter check for only local reordering.
+	bool isDimensionReordered(int dimensionNo, Space *comparisonBound);
+	bool isDimensionLocallyReordered(int dimensionNo);
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions

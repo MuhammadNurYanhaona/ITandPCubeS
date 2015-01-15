@@ -57,6 +57,7 @@ class StridedBlock : public SingleArgumentPartitionFunction {
 	StridedBlock(yyltype *location) : SingleArgumentPartitionFunction(location, name) {}
 	void processArguments(List<PartitionArg*> *dividingArgs, 
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
+	bool doesReorderStoredData() { return true; }
 };
 
 class Strided : public PartitionFunctionConfig {
@@ -64,6 +65,7 @@ class Strided : public PartitionFunctionConfig {
 	static const char *name;
 	Strided(yyltype *location) : PartitionFunctionConfig(location, name) {}
 	void processArguments(List<PartitionArg*> *dividingArgs, List<PartitionArg*> *paddingArgs);
+	bool doesReorderStoredData() { return true; }
 };
 
 #endif
