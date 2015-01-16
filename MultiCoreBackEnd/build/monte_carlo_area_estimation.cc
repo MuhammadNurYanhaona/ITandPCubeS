@@ -386,6 +386,54 @@ void mcae::Calculate_Point_Position(SpaceA_LPU lpu,
 
 	//declare the local variables of this compute stage
 	Point point;
+
+	{// scope entrance for parallel loop on index i
+	int i;
+	int iterationBound = point_placementsPartDims[0].range.max;
+	int indexIncrement = 1;
+	int indexMultiplier = 1;
+	if (point_placementsPartDims[0].range.min > point_placementsPartDims[0].range.max) {
+		iterationBound *= -1;
+		indexIncrement *= -1;
+		indexMultiplier = -1;
+	}
+	for (i = point_placementsPartDims[0].range.min; 
+			indexMultiplier * i <= iterationBound; 
+			i += indexIncrement) {
+
+		{// scope entrance for parallel loop on index j
+		int j;
+		int iterationBound = point_placementsPartDims[1].range.max;
+		int indexIncrement = 1;
+		int indexMultiplier = 1;
+		if (point_placementsPartDims[1].range.min > point_placementsPartDims[1].range.max) {
+			iterationBound *= -1;
+			indexIncrement *= -1;
+			indexMultiplier = -1;
+		}
+		for (j = point_placementsPartDims[1].range.min; 
+				indexMultiplier * j <= iterationBound; 
+				j += indexIncrement) {
+
+			{// scope entrance for parallel loop on index k
+			int k;
+			int iterationBound = point_placementsPartDims[2].range.max;
+			int indexIncrement = 1;
+			int indexMultiplier = 1;
+			if (point_placementsPartDims[2].range.min > point_placementsPartDims[2].range.max) {
+				iterationBound *= -1;
+				indexIncrement *= -1;
+				indexMultiplier = -1;
+			}
+			for (k = point_placementsPartDims[2].range.min; 
+					indexMultiplier * k <= iterationBound; 
+					k += indexIncrement) {
+			}
+			}// scope exit for parallel loop on index k
+		}
+		}// scope exit for parallel loop on index j
+	}
+	}// scope exit for parallel loop on index i
 }
 
 void mcae::Refine_Subarea_Estimate(SpaceB_LPU lpu, 
@@ -417,6 +465,39 @@ void mcae::Refine_Subarea_Estimate(SpaceB_LPU lpu,
 	int local_points;
 	float oldEstimate;
 	float total_points;
+	local_points = arrayMetadata.point_placementsDims[2].length;
+
+	{// scope entrance for parallel loop on index i
+	int i;
+	int iterationBound = sub_estimatesPartDims[0].range.max;
+	int indexIncrement = 1;
+	int indexMultiplier = 1;
+	if (sub_estimatesPartDims[0].range.min > sub_estimatesPartDims[0].range.max) {
+		iterationBound *= -1;
+		indexIncrement *= -1;
+		indexMultiplier = -1;
+	}
+	for (i = sub_estimatesPartDims[0].range.min; 
+			indexMultiplier * i <= iterationBound; 
+			i += indexIncrement) {
+
+		{// scope entrance for parallel loop on index j
+		int j;
+		int iterationBound = sub_estimatesPartDims[1].range.max;
+		int indexIncrement = 1;
+		int indexMultiplier = 1;
+		if (sub_estimatesPartDims[1].range.min > sub_estimatesPartDims[1].range.max) {
+			iterationBound *= -1;
+			indexIncrement *= -1;
+			indexMultiplier = -1;
+		}
+		for (j = sub_estimatesPartDims[1].range.min; 
+				indexMultiplier * j <= iterationBound; 
+				j += indexIncrement) {
+		}
+		}// scope exit for parallel loop on index j
+	}
+	}// scope exit for parallel loop on index i
 }
 
 void mcae::Estimate_Total_Area(SpaceC_LPU lpu, 
@@ -428,6 +509,38 @@ void mcae::Estimate_Total_Area(SpaceC_LPU lpu,
 	Dimension sub_estimatesPartDims[2];
 	sub_estimatesPartDims[0] = *lpu.sub_estimatesPartDims[0]->storageDim;
 	sub_estimatesPartDims[1] = *lpu.sub_estimatesPartDims[1]->storageDim;
+
+	{// scope entrance for parallel loop on index i
+	int i;
+	int iterationBound = sub_estimatesPartDims[0].range.max;
+	int indexIncrement = 1;
+	int indexMultiplier = 1;
+	if (sub_estimatesPartDims[0].range.min > sub_estimatesPartDims[0].range.max) {
+		iterationBound *= -1;
+		indexIncrement *= -1;
+		indexMultiplier = -1;
+	}
+	for (i = sub_estimatesPartDims[0].range.min; 
+			indexMultiplier * i <= iterationBound; 
+			i += indexIncrement) {
+
+		{// scope entrance for parallel loop on index j
+		int j;
+		int iterationBound = sub_estimatesPartDims[1].range.max;
+		int indexIncrement = 1;
+		int indexMultiplier = 1;
+		if (sub_estimatesPartDims[1].range.min > sub_estimatesPartDims[1].range.max) {
+			iterationBound *= -1;
+			indexIncrement *= -1;
+			indexMultiplier = -1;
+		}
+		for (j = sub_estimatesPartDims[1].range.min; 
+				indexMultiplier * j <= iterationBound; 
+				j += indexIncrement) {
+		}
+		}// scope exit for parallel loop on index j
+	}
+	}// scope exit for parallel loop on index i
 }
 
 /*-----------------------------------------------------------------------------------

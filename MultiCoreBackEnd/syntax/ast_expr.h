@@ -60,6 +60,7 @@ class Expr : public Stmt {
 			int indentLevel, int currentLineLength);
 	virtual List<FieldAccess*> *getTerminalFieldAccesses();
 	static void copyNewFields(List<FieldAccess*> *destination, List<FieldAccess*> *source);
+	void setType(Type *type) { this->type = type; }
 };
 
 class IntConstant : public Expr {

@@ -190,7 +190,10 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
                 stream << "\t" << type->getCppDeclaration(name) << ";\n";
         }
 
-        // TODO translate statements into C++ code
+        // translate statements into C++ code
+	std::ostringstream codeStream;
+	code->generateCode(codeStream, 1, space);
+	stream << codeStream.str();
 }
 
 void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {

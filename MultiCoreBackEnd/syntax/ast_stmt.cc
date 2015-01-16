@@ -194,10 +194,17 @@ void IfStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *sp
 	}
 	stream << '\n';
 }
-	
+
+//----------------------------------------- Loop Generic _-------------------------------------------/
+
+void LoopStmt::setIndexScope(IndexScope *indexScope) { this->indexScope = indexScope; }
+
+IndexScope *LoopStmt::getIndexScope() { return indexScope; }
+
 //----------------------------------------- Parallel Loop -------------------------------------------/
 
-IndexRangeCondition::IndexRangeCondition(List<Identifier*> *i, Identifier *c, Expr *rs, yyltype loc) : Node(loc) {
+IndexRangeCondition::IndexRangeCondition(List<Identifier*> *i, Identifier *c, 
+		int dim, Expr *rs, yyltype loc) : Node(loc) {
 	Assert(i != NULL && c != NULL);
 	indexes = i;
 	for (int j = 0; j < indexes->NumElements(); j++) {
@@ -209,6 +216,7 @@ IndexRangeCondition::IndexRangeCondition(List<Identifier*> *i, Identifier *c, Ex
 	if (restrictions != NULL) {
 		restrictions->SetParent(this);
 	}
+	this->dimensionNo = dim;
 }
 
 void IndexRangeCondition::PrintChildren(int indentLevel) {
@@ -279,9 +287,17 @@ Hashtable<VariableAccess*> *IndexRangeCondition::getAccessedGlobalVariables(
 }
 
 void IndexRangeCondition::putIndexesInIndexScope() {
+	IndexScope *indexScope = IndexScope::currentScope;
 	for (int i = 0; i < indexes->NumElements(); i++) {
 		Identifier *index = indexes->Nth(i);
-		IndexScope::currentScope->initiateAssociationList(index->getName());
+		const char *indexName = index->getName();
+		const char *arrayName = collection->getName();
+		indexScope->initiateAssociationList(indexName);
+		indexScope->setPreferredArrayForIndex(indexName, arrayName);
+		if (dimensionNo > 0) {
+			List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(indexName);
+			list->Append(new IndexArrayAssociation(indexName, arrayName, dimensionNo));
+		}
 	}
 }
 
@@ -360,6 +376,8 @@ void PLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 		IndexRangeCondition *cond = rangeConditions->Nth(i);
 		cond->validateIndexAssociations(loopScope, ignoreTypeFailures);
 	}
+
+	this->indexScope = IndexScope::currentScope;
 	IndexScope::currentScope->goBackToOldScope();
 
 	loopScope->detach_from_parent();
@@ -373,6 +391,43 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 		mergeAccessedVariables(table, cond->getAccessedGlobalVariables(globalReferences));
 	}
 	return table;	
+}
+
+void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	IndexScope::currentScope->enterScope(indexScope);
+	
+	List<IndexArrayAssociation*> *associateList = indexScope->getAllPreferredAssociations();
+	int indentIncrease = 0;
+	for (int i = 0; i < associateList->NumElements(); i++) {
+		IndexArrayAssociation *association = associateList->Nth(i);
+		int newIndent = indentLevel + indentIncrease;
+		// create a scope for the for loop corresponding to this association
+		stream << std::endl;
+		for (int i = 0; i < newIndent; i++) stream << '\t';
+		stream << "{// scope entrance for parallel loop on index " << association->getIndex() << "\n";
+		// declare the index variable
+		for (int i = 0; i < newIndent; i++) stream << '\t';
+		stream << "int " << association->getIndex() << ";\n"; 
+		// convert the index access to a range loop iteration and generate code for that
+		DataStructure *structure = space->getLocalStructure(association->getArray());
+		RangeExpr *rangeExpr = association->convertToRangeExpr(structure->getType());
+		rangeExpr->generateLoopForRangeExpr(stream, indentLevel + indentIncrease, space);
+		indentIncrease++;	
+	}
+
+	// close the for loops and the scopes
+	for (int i = associateList->NumElements() - 1; i >= 0; i--) {
+		indentIncrease--;	
+		IndexArrayAssociation *association = associateList->Nth(i);
+		int newIndent = indentLevel + indentIncrease;
+		for (int i = 0; i < newIndent; i++) stream << '\t';
+		stream << "}\n"; 
+		for (int i = 0; i < newIndent; i++) stream << '\t';
+		stream << "}// scope exit for parallel loop on index " << association->getIndex() << "\n"; 
+	}	
+
+	IndexScope::currentScope->goBackToOldScope();
 }
 
 //--------------------------------------- Sequential For Loop -------------------------------------------/
@@ -408,6 +463,8 @@ void SLoopStmt::performTypeInference(Scope *executionScope) {
 void SLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 
 	Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
+	IndexScope::currentScope->deriveNewScope();
+	
 	if (loopScope->lookup(id->getName()) != NULL) {
 		ReportError::ConflictingDefinition(id, ignoreTypeFailures);
 	} else {
@@ -418,6 +475,10 @@ void SLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 	if (stepExpr != NULL) stepExpr->resolveType(loopScope, ignoreTypeFailures);
 
 	body->checkSemantics(loopScope, ignoreTypeFailures);
+	
+	this->indexScope = IndexScope::currentScope;
+	IndexScope::currentScope->goBackToOldScope();
+
 	loopScope->detach_from_parent();
 	this->scope = loopScope;
 }
@@ -441,7 +502,23 @@ Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 }
 
 void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+
+	// as a preprocessing step check if the sequential loop is based on an array dimension 
+	// traversal and create an entry in the index scope if it is so.	
+	RangeExpr *range = new RangeExpr(id, rangeExpr, stepExpr, true, *id->GetLocation());
+	// check if the range corresponds to some array dimension access and if so then add an index 
+	// mapping in the index scope for this loop
+	const char *baseVar = range->getBaseArrayForRange(space);
+	if (baseVar != NULL) {
+		int dimensionNo = range->getDimensionForRange(space);
+		const char *indexName = id->getName();
+		indexScope->initiateAssociationList(indexName);
+		List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(indexName);
+		list->Append(new IndexArrayAssociation(indexName, baseVar, dimensionNo));
+	}
 	
+	IndexScope::currentScope->enterScope(indexScope);
+
 	std::ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
 	
@@ -449,8 +526,6 @@ void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
         stream << indent.str() << "{ // scope entrance for sequential loop\n";
 	// declares any variable created in the nested scope of this loop
 	declareVariablesInScope(stream, indentLevel);
-	// create a range expression from the context
-	RangeExpr *range = new RangeExpr(id, rangeExpr, stepExpr, true, *id->GetLocation());
         // translate the range expression into a for loop
         std::ostringstream rangeLoop;
         range->generateLoopForRangeExpr(rangeLoop, indentLevel, space);
@@ -461,6 +536,8 @@ void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
         stream << indent.str() << "}\n";
         // exit the scope created for the loop 
         stream << indent.str() << "} // scope exit for sequential loop\n";
+
+	IndexScope::currentScope->goBackToOldScope();
 }
 
 //---------------------------------------------- While Loop ----------------------------------------------------/

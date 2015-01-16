@@ -9,6 +9,9 @@
 	an IndexScope class is defined along with the IndexArrayAssociation class.  
 */
 
+class RangeExpr;
+class Type;
+
 class IndexArrayAssociation {
  protected:
 	const char *index;
@@ -19,14 +22,25 @@ class IndexArrayAssociation {
 	const char *getArray() { return array; }
 	const char *getIndex() { return index; }
 	int getDimensionNo() { return dimensionNo; }
+
+	// a helper method for code generation
+	RangeExpr *convertToRangeExpr(Type *arrayType);
 };
 
 class IndexScope {
   protected:
+	// keeps track of the list of index accessed done on different arrays using a particular index
 	Hashtable<List<IndexArrayAssociation*>*> *mappings;
 	IndexScope *parent;
+	// stores information about the order in which indexes appeared in the source code to determine the
+	// loop nesting order for multiply indexed IT loops
+	List<const char*> *orderedIndexList;
+	// stores the names of arrays whose dimesnions the task will like index iteration bounds to be set
+	// based on
+	Hashtable<const char*> *preferredArrayForIndexTraversal;
   public:
 	void deriveNewScope();
+	void enterScope(IndexScope *newScope);
 	void goBackToOldScope();
 	static IndexScope *currentScope;
 	List<IndexArrayAssociation*> *getAssociationsForArray(const char *array);
@@ -34,6 +48,12 @@ class IndexScope {
 	void initiateAssociationList(const char *index);
 	IndexScope *getScopeForAssociation(const char *index);
 	void saveAssociation(IndexArrayAssociation *association);
+	void setPreferredArrayForIndex(const char *index, const char *array);
+	IndexArrayAssociation *getPreferredAssociation(const char *index);
+	// returns the preferred association list for all indexes in the scope in the order prescribed by
+	// ordered-index-list entries.
+	List<IndexArrayAssociation*> *getAllPreferredAssociations();
+	
   private:
 	IndexScope();	
 };

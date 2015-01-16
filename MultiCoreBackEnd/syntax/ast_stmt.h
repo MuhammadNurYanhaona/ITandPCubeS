@@ -19,6 +19,7 @@
 
 class Expr;
 class Space;
+class IndexScope;	
 
 class Stmt : public Node {
   public:
@@ -126,9 +127,11 @@ class IndexRangeCondition: public Node {
 	List<Identifier*> *indexes;
 	Identifier *collection;
 	Expr *restrictions;
+	int dimensionNo;
   public:
 	IndexRangeCondition(List<Identifier*> *indexes, 
-			Identifier *collection, Expr *restrictions, yyltype loc);		
+			Identifier *collection, int dimensionNo, 
+			Expr *restrictions, yyltype loc);
     
 	// Syntex Analysis Routines	
     	const char *GetPrintNameForNode() { return "RangeCondition"; }
@@ -147,6 +150,7 @@ class IndexRangeCondition: public Node {
 class LoopStmt: public Stmt {
   protected:
 	Scope *scope;
+	IndexScope *indexScope;
   public:
 	LoopStmt() : Stmt() { scope = NULL; }
      	LoopStmt(yyltype loc) : Stmt(loc) { scope == NULL; }
@@ -154,6 +158,8 @@ class LoopStmt: public Stmt {
 	// Semantic Analysis Routines	
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
+	void setIndexScope(IndexScope *indexScope);
+	IndexScope *getIndexScope();
 	
 	// a helper routine for code generation that declares variables in the scope
 	void declareVariablesInScope(std::ostringstream &stream, int indentLevel);	
@@ -178,7 +184,7 @@ class PLoopStmt: public LoopStmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// Code Generation Routines
-	void generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class SLoopStmt: public LoopStmt {
