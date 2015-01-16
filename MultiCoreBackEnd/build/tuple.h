@@ -4,19 +4,49 @@
 #include <iostream>
 #include <vector>
 
-class LUFEnvironment;
-class LUFPartition;
+class Point;
+class Rectangle;
+class Coefficients;
+class PlacementStatistic;
+class MCAEEnvironment;
+class MCAEPartition;
 
-class LUFEnvironment {
+class Point {
   public:
-	float* a;
-	float* u;
-	float* l;
-	int* p;
+	float x;
+	float y;
 };
 
-class LUFPartition {
+class Rectangle {
   public:
+	int top;
+	int right;
+	int bottom;
+	int left;
+};
+
+class Coefficients {
+  public:
+	int order;
+	float values[2];
+};
+
+class PlacementStatistic {
+  public:
+	int pointsInside;
+	int pointsOutside;
+};
+
+class MCAEEnvironment {
+  public:
+	Rectangle* grid;
+	std::vector<Coefficients> shape;
+	float area;
+};
+
+class MCAEPartition {
+  public:
+	int p;
 };
 
 #endif

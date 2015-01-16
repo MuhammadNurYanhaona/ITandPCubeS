@@ -644,36 +644,19 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 			stream << indent.str() << "}\n";
 		// otherwise it is a for loop based on a range condition that we need to translate
 		} else {
-			RangeExpr *rangeExpr = dynamic_cast<RangeExpr*>(repeatCond);
-			const char *indexVar = rangeExpr->getIndexExpr();
-			const char *rangeCond = rangeExpr->getRangeExpr();
-			const char *stepCond = rangeExpr->getStepExpr();
-			
 			// create a scope for repeat loop
 			stream << indent.str() << "{ // scope entrance for repeat loop\n";
-			// create two new variables for setting appropriate loop  condition checking and index 
-			// increment, and one variable to multiply index properly during looping
-			stream << indent.str() << "int iterationBound = " << rangeCond << ".max";
-			stream << stmtSeparator;
-			stream << indent.str() << "int indexIncrement = " << stepCond << stmtSeparator;
-			stream << indent.str() << "int indexMultiplier = 1" << stmtSeparator;
-			stream << indent.str() << "if (" << rangeCond << ".min > " << rangeCond << ".max) {\n";
-			stream << indent.str() << "\titerationBound *= -1" << stmtSeparator;
-			stream << indent.str() << "\tindexIncrement *= -1" << stmtSeparator;
-			stream << indent.str() << "\tindexMultiplier = -1" << stmtSeparator;
-			stream << indent.str() << "}\n";
-			// write the for loop corresponding to the repeat instruction
-			stream << indent.str() << "for (" << indexVar << " = " << rangeCond << ".min; \n";
-			stream << indent.str() << "\t\tindexMultiplier * " << indexVar << " <= iterationBound; \n";
-			stream << indent.str() << "\t\t" << indexVar << " += indexIncrement) {\n";
+			// translate the range expression into a for loop
+			RangeExpr *rangeExpr = dynamic_cast<RangeExpr*>(repeatCond);
+			std::ostringstream rangeLoop;
+			rangeExpr->generateLoopForRangeExpr(rangeLoop, indentation, space);
+			stream << rangeLoop.str();
+			// translate the repeat body
 			CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
+			// close the range loop
 			stream << indent.str() << "}\n";
 			// exit the scope created for the repeat loop 
 			stream << indent.str() << "} // scope exit for repeat loop\n";
-
-			delete indexVar;
-			delete rangeCond;
-			delete stepCond;
 		}
 	} else {
 		CompositeStage::generateInvocationCode(stream, indentation, containerSpace);

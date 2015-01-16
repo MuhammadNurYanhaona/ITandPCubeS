@@ -27,7 +27,7 @@ void Expr::performTypeInference(Scope *executionScope) {
 	inferType(executionScope, this->type);	
 }
 
-void Expr::generateCode(std::ostringstream &stream, int indentLevel) {
+void Expr::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
         for (int i = 0; i < indentLevel; i++) stream << '\t';
         translate(stream, indentLevel, 0);
         stream << ";\n";
@@ -891,186 +891,6 @@ List<FieldAccess*> *FieldAccess::getTerminalFieldAccesses() {
 	return base->getTerminalFieldAccesses();
 }
 
-//------------------------------------------------ Range Expressions --------------------------------------------------/
-
-RangeExpr::RangeExpr(Identifier *i, Expr *r, Expr *s, bool l, yyltype loc) : Expr(loc) {
-	Assert(i != NULL && r != NULL);
-	index = i;
-	index->SetParent(this);
-	range = r;
-	range->SetParent(this);
-	step = s;
-	if (step != NULL) {
-		step->SetParent(this);
-	}
-	loopingRange = l;
-}
-
-void RangeExpr::PrintChildren(int indentLevel) {
-	index->Print(indentLevel + 1, "(Index) ");
-	range->Print(indentLevel + 1, "(Range) ");
-	if (step != NULL) step->Print(indentLevel + 1, "(Step) ");
-}
-
-void RangeExpr::resolveType(Scope *scope, bool ignoreFailure) {
-	
-	VariableSymbol *symbol = (VariableSymbol*) scope->lookup(index->getName());
-	Type *indexType = NULL;
-	if (symbol != NULL) indexType = symbol->getType();
-	if (indexType == NULL) {
-		symbol = new VariableSymbol(index->getName(), Type::intType);
-		index->setSymbol(symbol);	
-		bool success = scope->insert_inferred_symbol(symbol);
-		if (!success) {
-			ReportError::UndefinedSymbol(index, ignoreFailure);
-		}
-	} else if (indexType != Type::intType && indexType != Type::errorType) {
-		 ReportError::IncompatibleTypes(index->GetLocation(), indexType, 
-				Type::intType, ignoreFailure);	
-	}
-	
-	range->resolveType(scope, ignoreFailure);
-	Type *rangeType = range->getType();
-	if (rangeType == NULL && !ignoreFailure) {
-		ReportError::UnknownExpressionType(range, ignoreFailure);
-	} else if (rangeType != NULL && rangeType != Type::rangeType) {
-		 ReportError::IncompatibleTypes(range->GetLocation(), rangeType, 
-				Type::rangeType, ignoreFailure);	
-	}
-
-	if (step != NULL) {
-		step->resolveType(scope, ignoreFailure);
-		Type *stepType = step->getType();
-		if (stepType == NULL) {
-			step->inferType(scope, Type::intType);
-		} else if (!Type::intType->isAssignableFrom(stepType)) {
-		 	ReportError::IncompatibleTypes(step->GetLocation(), stepType, 
-					Type::intType, ignoreFailure);	
-		}
-	}
-	
-	this->type = Type::boolType;
-}
-
-Hashtable<VariableAccess*> *RangeExpr::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
-	
-	Hashtable<VariableAccess*> *table = range->getAccessedGlobalVariables(globalReferences);
-	Iterator<VariableAccess*> iter = table->GetIterator();
-	VariableAccess *accessLog;
-	while ((accessLog = iter.GetNextValue()) != NULL) {
-		if (accessLog->isMetadataAccessed()) accessLog->getMetadataAccessFlags()->flagAsRead();
-		if (accessLog->isContentAccessed()) accessLog->getContentAccessFlags()->flagAsRead();
-	}
-
-	const char *indexName = index->getName();
-	if (globalReferences->isGlobalVariable(indexName)) {
-		accessLog = new VariableAccess(indexName);
-		accessLog->markContentAccess();
-		if (loopingRange) { 
-			accessLog->getContentAccessFlags()->flagAsWritten();
-		}
-		accessLog->getContentAccessFlags()->flagAsRead();
-		if (table->Lookup(indexName) != NULL) {
-			table->Lookup(indexName)->mergeAccessInfo(accessLog);
-		} else table->Enter(indexName, accessLog, true);
-	}
-	
-	if (step == NULL) return table;
-	Hashtable<VariableAccess*> *sTable = step->getAccessedGlobalVariables(globalReferences);
-	iter = sTable->GetIterator();
-	while ((accessLog = iter.GetNextValue()) != NULL) {
-		if (accessLog->isMetadataAccessed()) accessLog->getMetadataAccessFlags()->flagAsRead();
-		if (accessLog->isContentAccessed()) accessLog->getContentAccessFlags()->flagAsRead();
-	}
-	mergeAccessedVariables(table, sTable);
-
-	return table;
-}
-
-void RangeExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
-
-	// get the appropriate back-end name for the index variable
-	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
-        const char *indexVar = transformer->getTransformedName(index->getName(), false, false);
-	// translate the range condition
-	std::ostringstream rangeStr;
-	range->translate(rangeStr, indentLevel, 0);
-	std::string rangeCond = rangeStr.str();
-
-	// by default a range expression is translated as a boolean condition
-	
-	// check if the index variable is larger than or equal to the min value of range
-	stream << indexVar << " >= " << rangeCond << ".min &&";
-	// and less than or equal to the max value of range
-	stream << indexVar << " <= "<< rangeCond << ".max && ";
-	// and range mean is less than range max
-	stream  << rangeCond << ".min <" << rangeCond << ".max";
-	// otherwise, do the exact inverse calculation
-	stream << " || ";	
-	stream << indexVar << " <= " << rangeCond << ".min &&";
-	stream << indexVar << " >= " << rangeCond << ".max";
-}
-
-const char *RangeExpr::getIndexExpr() {
-	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
-        return transformer->getTransformedName(index->getName(), false, false);
-}
-
-const char *RangeExpr::getRangeExpr() {
-	std::ostringstream rangeStr;
-	range->translate(rangeStr, 0, 0);
-	return strdup(rangeStr.str().c_str());
-}
-
-const char *RangeExpr::getStepExpr() {
-	std::ostringstream stepStr;
-	if (step == NULL) stepStr << "1";
-	else step->translate(stepStr, 0, 0);
-	std::string stepCond = stepStr.str();
-	return strdup(stepCond.c_str());
-}
-
-List<FieldAccess*> *RangeExpr::getTerminalFieldAccesses() {
-	if (indexField == NULL) {
-		indexField = new FieldAccess(NULL, index, *index->GetLocation());
-	}
-	List<FieldAccess*> *list = new List<FieldAccess*>;
-	list->Append(indexField);
-	Expr::copyNewFields(list, range->getTerminalFieldAccesses());
-	if (step != NULL) Expr::copyNewFields(list, step->getTerminalFieldAccesses());
-	return list;
-}
-
-const char *RangeExpr::getBaseArrayForRange(Space *executionSpace) {
-	FieldAccess *rangeField = dynamic_cast<FieldAccess*>(range);
-	if (rangeField == NULL) return NULL;
-	if (rangeField->isTerminalField()) return NULL;
-	const char *baseVar = getBaseVarName();
-	DataStructure *structure = executionSpace->getLocalStructure(baseVar);
-	if (structure == NULL) return NULL;
-	ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
-	if (array == NULL) return NULL;
-	return baseVar;
-}
-
-// This implementation assumes that we know the range is related to some dimension of an array
-int RangeExpr::getDimensionForRange(Space *executionSpace) {
-	FieldAccess *rangeField = dynamic_cast<FieldAccess*>(range);
-	Expr *base = rangeField->getBase();
-	FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
-	Identifier *field = baseField->getField();
-	DimensionIdentifier *dimensionId = dynamic_cast<DimensionIdentifier*>(field);
-	return dimensionId->getDimensionNo();	
-}
-
-SubpartitionRangeExpr::SubpartitionRangeExpr(char s, yyltype loc) : Expr(loc) {
-	spaceId = s;
-}
-
-void SubpartitionRangeExpr::PrintChildren(int indentLevel) {
-	printf("Space %c", spaceId);
-}
-
 //---------------------------------------------- Assignment Expression ------------------------------------------------/
 
 AssignmentExpr::AssignmentExpr(Expr *l, Expr *r, yyltype loc) : Expr(loc) {
@@ -1206,7 +1026,7 @@ void AssignmentExpr::translate(std::ostringstream &stream, int indentLevel, int 
 	right->translate(stream, indentLevel, currentLineLength);
 }
 
-void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel) {
+void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 
 	// If the right is also an assignment expression then this is a compound statement. Break it up into
 	// several simple statements.
@@ -1214,7 +1034,7 @@ void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel) {
 	Expr *rightPart = right;
 	if (rightExpr != NULL) {
 		rightPart = rightExpr->left;
-		rightExpr->generateCode(stream, indentLevel);	
+		rightExpr->generateCode(stream, indentLevel, space);	
 	}
 
 	// If this is a dimension assignment statement with multiple dimensions of an array assigned once to

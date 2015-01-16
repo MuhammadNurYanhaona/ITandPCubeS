@@ -18,6 +18,7 @@
 #include <sstream>
 
 class Expr;
+class Space;
 
 class Stmt : public Node {
   public:
@@ -52,7 +53,7 @@ class Stmt : public Node {
 
 	// back end code generation routine; subclasses should provide appropriate 
 	// implementations
-	virtual void generateCode(std::ostringstream &stream, int indentLevel) {};
+	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space) {};
 };
 
 class StmtBlock : public Stmt {
@@ -74,7 +75,7 @@ class StmtBlock : public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// Code Generation Routines
-	void generateCode(std::ostringstream &stream, int indentLevel);
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class ConditionalStmt: public Stmt {
@@ -96,7 +97,7 @@ class ConditionalStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// Code Generation Routines
-	void generateCode(std::ostringstream &stream, int indentLevel, bool first);
+	void generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space);
 };
 
 class IfStmt: public Stmt {
@@ -117,7 +118,7 @@ class IfStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// Code Generation Routines
-	void generateCode(std::ostringstream &stream, int indentLevel);
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class IndexRangeCondition: public Node {
@@ -153,6 +154,9 @@ class LoopStmt: public Stmt {
 	// Semantic Analysis Routines	
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
+	
+	// a helper routine for code generation that declares variables in the scope
+	void declareVariablesInScope(std::ostringstream &stream, int indentLevel);	
 };
 
 class PLoopStmt: public LoopStmt {
@@ -174,7 +178,7 @@ class PLoopStmt: public LoopStmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// Code Generation Routines
-	void generateCode(std::ostringstream &stream, int indentLevel) {}
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 };
 
 class SLoopStmt: public LoopStmt {
@@ -198,7 +202,7 @@ class SLoopStmt: public LoopStmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// Code Generation Routines
-	void generateCode(std::ostringstream &stream, int indentLevel) {}
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class WhileStmt: public Stmt {
@@ -220,7 +224,7 @@ class WhileStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// Code Generation Routines
-	void generateCode(std::ostringstream &stream, int indentLevel);
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 #endif

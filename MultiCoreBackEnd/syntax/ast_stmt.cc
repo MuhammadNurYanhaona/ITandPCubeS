@@ -4,6 +4,7 @@
 #include "ast_expr.h"
 #include "ast_def.h"
 #include "../semantics/symbol.h"
+#include "../semantics/task_space.h"
 #include "../utils/hashtable.h"
 #include "errors.h"
 #include "../static-analysis/loop_index.h"
@@ -23,6 +24,24 @@ void Stmt::mergeAccessedVariables(Hashtable<VariableAccess*> *first,
 			first->Enter(accessLog->getName(), new VariableAccess(accessLog->getName()), true);
 		}
                	first->Lookup(accessLog->getName())->mergeAccessInfo(accessLog);
+        }
+}
+
+//------------------------------------------ Loop Statement -----------------------------------------/
+
+void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLevel) {
+	
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+        
+	Iterator<Symbol*> iterator = scope->get_local_symbols();
+        Symbol *symbol;
+        while ((symbol = iterator.GetNextValue()) != NULL) {
+                VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
+                if (variable == NULL) continue;
+                Type *type = variable->getType();
+                const char *name = variable->getName();
+                stream << indent.str() << type->getCppDeclaration(name) << ";\n";
         }
 }
 
@@ -63,10 +82,10 @@ Hashtable<VariableAccess*> *StmtBlock::getAccessedGlobalVariables(TaskGlobalRefe
 	return table;
 }
 
-void StmtBlock::generateCode(std::ostringstream &stream, int indentLevel) {
+void StmtBlock::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 	for (int i = 0; i < stmts->NumElements(); i++) {
 		Stmt *stmt = stmts->Nth(i);
-		stmt->generateCode(stream, indentLevel);
+		stmt->generateCode(stream, indentLevel, space);
 	}	
 }
 	
@@ -106,7 +125,7 @@ Hashtable<VariableAccess*> *ConditionalStmt::getAccessedGlobalVariables(TaskGlob
 	return table;
 }
 
-void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, bool first) {
+void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space) {
 	if (first) {
 		for (int i = 0; i < indentLevel; i++) stream << '\t';	
 		stream << "if (";
@@ -116,7 +135,7 @@ void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, 
 			stream << "true";
 		}
 		stream << ") {\n";
-		stmt->generateCode(stream, indentLevel + 1);	
+		stmt->generateCode(stream, indentLevel + 1, space);	
 		for (int i = 0; i < indentLevel; i++) stream << '\t';	
 		stream << "}";
 	} else {
@@ -127,7 +146,7 @@ void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, 
 		} else {
 			stream << " else {\n";
 		}
-		stmt->generateCode(stream, indentLevel + 1);	
+		stmt->generateCode(stream, indentLevel + 1, space);	
 		for (int i = 0; i < indentLevel; i++) stream << '\t';	
 		stream << "}";
 	}
@@ -168,10 +187,10 @@ Hashtable<VariableAccess*> *IfStmt::getAccessedGlobalVariables(TaskGlobalReferen
 	return table;
 }
 
-void IfStmt::generateCode(std::ostringstream &stream, int indentLevel) {
+void IfStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 	for (int i = 0; i < ifBlocks->NumElements(); i++) {
 		ConditionalStmt *stmt = ifBlocks->Nth(i);
-		stmt->generateCode(stream, indentLevel, i == 0);
+		stmt->generateCode(stream, indentLevel, i == 0, space);
 	}
 	stream << '\n';
 }
@@ -356,7 +375,7 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 	return table;	
 }
 
-//--------------------------------------- Sequential Loop -------------------------------------------/
+//--------------------------------------- Sequential For Loop -------------------------------------------/
 
 SLoopStmt::SLoopStmt(Identifier *i, Expr *re, Expr *se, Stmt *b, yyltype loc) : LoopStmt(loc) {
 	Assert(i != NULL && re != NULL && b != NULL);
@@ -421,6 +440,31 @@ Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 	return table; 
 }
 
+void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	
+	// create a scope for loop
+        stream << indent.str() << "{ // scope entrance for sequential loop\n";
+	// declares any variable created in the nested scope of this loop
+	declareVariablesInScope(stream, indentLevel);
+	// create a range expression from the context
+	RangeExpr *range = new RangeExpr(id, rangeExpr, stepExpr, true, *id->GetLocation());
+        // translate the range expression into a for loop
+        std::ostringstream rangeLoop;
+        range->generateLoopForRangeExpr(rangeLoop, indentLevel, space);
+        stream << rangeLoop.str();
+        // translate the loop body
+	body->generateCode(stream, indentLevel + 1, space);	
+        // close the range loop
+        stream << indent.str() << "}\n";
+        // exit the scope created for the loop 
+        stream << indent.str() << "} // scope exit for sequential loop\n";
+}
+
+//---------------------------------------------- While Loop ----------------------------------------------------/
+
 WhileStmt::WhileStmt(Expr *c, Stmt *b, yyltype loc) : Stmt(loc) {
 	Assert(c != NULL && b != NULL);
 	condition = c;
@@ -451,7 +495,7 @@ Hashtable<VariableAccess*> *WhileStmt::getAccessedGlobalVariables(
 	return table;
 }
 
-void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel) {
+void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 	for (int i = 0; i < indentLevel; i++) stream << '\t';
 	stream << "while (";
 	if (condition != NULL) {
@@ -460,7 +504,7 @@ void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel) {
 		stream << "true";
 	}
 	stream << ") {\n";
-	body->generateCode(stream, indentLevel + 1);
+	body->generateCode(stream, indentLevel + 1, space);
 	for (int i = 0; i < indentLevel; i++) stream << '\t';
 	stream << "}\n";
 }

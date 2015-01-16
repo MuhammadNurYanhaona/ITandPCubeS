@@ -355,10 +355,13 @@ void InitializeInstr::generateCode(std::ostringstream &stream) {
 		stream << "\t" << type->getCppDeclaration(name) << ";\n";
 	}
 
+	TaskDef *taskDef = (TaskDef*) this->parent;
+	Space *space = taskDef->getPartitionHierarchy()->getRootSpace();
+
 	// translate statements into C++ code
 	for (int i = 0; i < code->NumElements(); i++) {
 		Stmt *stmt = code->Nth(i);
-		stmt->generateCode(stream, 1);
+		stmt->generateCode(stream, 1, space);
 	}		
 }
 

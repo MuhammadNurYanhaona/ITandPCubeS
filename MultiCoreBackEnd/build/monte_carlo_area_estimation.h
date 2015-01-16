@@ -1,5 +1,5 @@
-#ifndef _H_luf
-#define _H_luf
+#ifndef _H_mcae
+#define _H_mcae
 
 // for error reporting and diagnostics
 #include <iostream>
@@ -27,15 +27,16 @@
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-namespace luf {
+namespace mcae {
 
 /*-----------------------------------------------------------------------------------
 constants for LPSes
 ------------------------------------------------------------------------------------*/
 const int Space_Root = 0;
-const int Space_A = 1;
+const int Space_C = 1;
 const int Space_B = 2;
-const int Space_Count = 3;
+const int Space_A = 3;
+const int Space_Count = 4;
 
 /*-----------------------------------------------------------------------------------
 constants for PPS counts
@@ -49,23 +50,30 @@ const int Space_1_Par_2_PPUs = 4;
 /*-----------------------------------------------------------------------------------
 constants for total and par core thread counts
 ------------------------------------------------------------------------------------*/
-const int Total_Threads = 16;
-const int Threads_Par_Core = 1;
+const int Total_Threads = 64;
+const int Threads_Par_Core = 4;
 
 /*-----------------------------------------------------------------------------------
 functions for retrieving partition counts in different LPSes
 ------------------------------------------------------------------------------------*/
-int *getLPUsCountOfSpaceB(int ppuCount, Dimension aDim2);
+int *getLPUsCountOfSpaceB(int ppuCount, Dimension point_placementsDim1, Dimension point_placementsDim2);
+int *getLPUsCountOfSpaceA(int ppuCount, Dimension point_placementsDim3, int p);
 
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
-PartitionDimension **getaPartForSpaceBLpu(PartitionDimension **aParentLpuDims, 
+PartitionDimension **getgridPartForSpaceBLpu(PartitionDimension **gridParentLpuDims, 
 		int *lpuCount, int *lpuId);
-PartitionDimension **getlPartForSpaceBLpu(PartitionDimension **lParentLpuDims, 
+PartitionDimension **getlocal_prePartForSpaceBLpu(PartitionDimension **local_preParentLpuDims, 
 		int *lpuCount, int *lpuId);
-PartitionDimension **getuPartForSpaceBLpu(PartitionDimension **uParentLpuDims, 
+PartitionDimension **getpoint_placementsPartForSpaceBLpu(PartitionDimension **point_placementsParentLpuDims, 
 		int *lpuCount, int *lpuId);
+PartitionDimension **getstatsPartForSpaceBLpu(PartitionDimension **statsParentLpuDims, 
+		int *lpuCount, int *lpuId);
+PartitionDimension **getsub_estimatesPartForSpaceBLpu(PartitionDimension **sub_estimatesParentLpuDims, 
+		int *lpuCount, int *lpuId);
+PartitionDimension **getpoint_placementsPartForSpaceALpu(PartitionDimension **point_placementsParentLpuDims, 
+		int *lpuCount, int *lpuId, int p);
 
 /*-----------------------------------------------------------------------------------
 Data structures representing LPS and LPU contents 
@@ -73,56 +81,74 @@ Data structures representing LPS and LPU contents
 
 class SpaceRoot_Content {
   public:
-	float *a;
-	float *l;
-	float *l_column;
-	int *p;
-	float *u;
+	Rectangle *grid;
+	float *local_pre;
+	int *point_placements;
+	PlacementStatistic *stats;
+	float *sub_estimates;
 };
 
 class SpaceRoot_LPU : public LPU {
   public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *l;
-	PartitionDimension **lPartDims;
-	float *l_column;
-	PartitionDimension **l_columnPartDims;
-	int *p;
-	PartitionDimension **pPartDims;
-	float *u;
-	PartitionDimension **uPartDims;
+	Rectangle *grid;
+	PartitionDimension **gridPartDims;
+	float *local_pre;
+	PartitionDimension **local_prePartDims;
+	int *point_placements;
+	PartitionDimension **point_placementsPartDims;
+	PlacementStatistic *stats;
+	PartitionDimension **statsPartDims;
+	float *sub_estimates;
+	PartitionDimension **sub_estimatesPartDims;
 };
 
-class SpaceA_Content {
+class SpaceC_Content {
   public:
-	int *p;
+	float *sub_estimates;
 };
 
-class SpaceA_LPU : public LPU {
+class SpaceC_LPU : public LPU {
   public:
-	int *p;
-	PartitionDimension **pPartDims;
+	float *sub_estimates;
+	PartitionDimension **sub_estimatesPartDims;
 };
 
 class SpaceB_Content {
   public:
-	float *a;
-	float *l;
-	float *l_column;
-	float *u;
+	Rectangle *grid;
+	float *local_pre;
+	int *point_placements;
+	PlacementStatistic *stats;
+	float *sub_estimates;
 };
 
 class SpaceB_LPU : public LPU {
   public:
-	float *a;
-	PartitionDimension **aPartDims;
-	float *l;
-	PartitionDimension **lPartDims;
-	float *l_column;
-	PartitionDimension **l_columnPartDims;
-	float *u;
-	PartitionDimension **uPartDims;
+	Rectangle *grid;
+	PartitionDimension **gridPartDims;
+	float *local_pre;
+	PartitionDimension **local_prePartDims;
+	int *point_placements;
+	PartitionDimension **point_placementsPartDims;
+	PlacementStatistic *stats;
+	PartitionDimension **statsPartDims;
+	float *sub_estimates;
+	PartitionDimension **sub_estimatesPartDims;
+	int lpuId[2];
+};
+
+class SpaceA_Content {
+  public:
+	Rectangle *grid;
+	int *point_placements;
+};
+
+class SpaceA_LPU : public LPU {
+  public:
+	Rectangle *grid;
+	PartitionDimension **gridPartDims;
+	int *point_placements;
+	PartitionDimension **point_placementsPartDims;
 	int lpuId[1];
 };
 
@@ -132,18 +158,19 @@ Data structures for Array-Metadata and Environment-Links
 
 class ArrayMetadata {
   public:
-	Dimension aDims[2];
-	Dimension lDims[2];
-	Dimension l_columnDims[1];
-	Dimension pDims[1];
-	Dimension uDims[2];
+	Dimension gridDims[2];
+	Dimension local_preDims[2];
+	Dimension point_placementsDims[3];
+	Dimension statsDims[2];
+	Dimension sub_estimatesDims[2];
 };
 ArrayMetadata arrayMetadata;
 
 class EnvironmentLinks {
   public:
-	float *a;
-	Dimension aDims[2];
+	Rectangle *grid;
+	Dimension gridDims[2];
+	std::vector<Coefficients> shape;
 };
 EnvironmentLinks environmentLinks;
 
@@ -153,12 +180,15 @@ Data structures for Task-Global and Thread-Local scalar variables
 
 class TaskGlobals {
   public:
-	int pivot;
+	float area;
+	float cell_size;
+	int maxIterations;
+	float precision;
+	std::vector<Coefficients> shape;
 };
 
 class ThreadLocals {
   public:
-	int k;
 	Epoch t;
 };
 
@@ -185,41 +215,29 @@ function for the initialize block
 ------------------------------------------------------------------------------------*/
 void initializeTask(TaskGlobals taskGlobals, 
 		ThreadLocals threadLocals, 
-		LUFPartition partition);
+		MCAEPartition partition, 
+		float precision, 
+		float cell_size, 
+		int maxIterations);
 
 /*-----------------------------------------------------------------------------------
 functions for compute stages 
 ------------------------------------------------------------------------------------*/
 
-void Prepare(SpaceB_LPU lpu, 
+void Calculate_Point_Position(SpaceA_LPU lpu, 
 		ArrayMetadata arrayMetadata, 
 		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, LUFPartition partition);
+		ThreadLocals threadLocals, MCAEPartition partition);
 
-void Select_Pivot(SpaceB_LPU lpu, 
+void Refine_Subarea_Estimate(SpaceB_LPU lpu, 
 		ArrayMetadata arrayMetadata, 
 		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, LUFPartition partition);
+		ThreadLocals threadLocals, MCAEPartition partition);
 
-void Store_Pivot(SpaceA_LPU lpu, 
+void Estimate_Total_Area(SpaceC_LPU lpu, 
 		ArrayMetadata arrayMetadata, 
 		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, LUFPartition partition);
-
-void Interchange_Rows(SpaceB_LPU lpu, 
-		ArrayMetadata arrayMetadata, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, LUFPartition partition);
-
-void Update_Lower(SpaceB_LPU lpu, 
-		ArrayMetadata arrayMetadata, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, LUFPartition partition);
-
-void Update_Upper(SpaceB_LPU lpu, 
-		ArrayMetadata arrayMetadata, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, LUFPartition partition);
+		ThreadLocals threadLocals, MCAEPartition partition);
 
 
 /*-----------------------------------------------------------------------------------
@@ -229,7 +247,7 @@ The run method for thread simulating the task flow
 void run(ArrayMetadata arrayMetadata, 
 		TaskGlobals taskGlobals, 
 		ThreadLocals threadLocals, 
-		LUFPartition partition, ThreadStateImpl threadState);
+		MCAEPartition partition, ThreadStateImpl threadState);
 
 
 }

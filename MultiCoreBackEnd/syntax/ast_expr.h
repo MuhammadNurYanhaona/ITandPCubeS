@@ -55,7 +55,7 @@ class Expr : public Stmt {
 	virtual const char *getBaseVarName() { return NULL; }
 	
 	// Helper functions for code generation
-	virtual void generateCode(std::ostringstream &stream, int indentLevel);
+	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 	virtual void translate(std::ostringstream &stream, 
 			int indentLevel, int currentLineLength);
 	virtual List<FieldAccess*> *getTerminalFieldAccesses();
@@ -316,6 +316,9 @@ class RangeExpr : public Expr {
 	// need to elaborate on this logic. 
 	const char *getBaseArrayForRange(Space *executionSpace);
 	int getDimensionForRange(Space *executionSpace);
+	// To generate a for loop without the closing parenthesis if we need a standard implementation
+	// of translation of the range expression
+	void generateLoopForRangeExpr(std::ostringstream &stream, int indentation, Space *space);
 };
 
 class SubpartitionRangeExpr : public Expr {
@@ -354,7 +357,7 @@ class AssignmentExpr : public Expr {
 	// direct assignment of multiple dimensions from one array to another. That need to be tackled
 	// by overriding generate-code. TODO later we have to find out a better way of doing this or 
 	// rethink that array assignment feature all together.
-	void generateCode(std::ostringstream &stream, int indentLevel);
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class SubRangeExpr : public Expr {
