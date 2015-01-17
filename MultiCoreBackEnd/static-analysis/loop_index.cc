@@ -4,6 +4,10 @@
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_type.h"
 #include "../syntax/ast.h"
+#include "../semantics/task_space.h"
+
+#include <iostream>
+#include <sstream>
 
 //----------------------------------------------- Index Array Association ------------------------------------------/
 
@@ -11,6 +15,30 @@ IndexArrayAssociation::IndexArrayAssociation(const char *index, const char *arra
 	this->index = index;
 	this->array = array;
 	this->dimensionNo = dimensionNo;
+}
+
+bool IndexArrayAssociation::isEqual(IndexArrayAssociation *other) {
+	return strcmp(this->index, other->index) == 0 
+			&& strcmp(this->array, other->array) == 0
+			&& this->dimensionNo == other->dimensionNo;
+}
+
+List<IndexArrayAssociation*> *IndexArrayAssociation::filterList(List<IndexArrayAssociation*> *list) {
+	if (list->NumElements() == 0) return list;
+	List<IndexArrayAssociation*> *filteredList = new List<IndexArrayAssociation*>;
+	filteredList->Append(list->Nth(0));
+	for (int i = 1; i < list->NumElements(); i++) {
+		IndexArrayAssociation *current = list->Nth(i);
+		bool found = false;
+		for (int j = 0; j < filteredList->NumElements(); j++) {
+			if (current->isEqual(filteredList->Nth(j))) {
+				found = true;
+				break;
+			}
+		}
+		if (!found) filteredList->Append(current);
+	}
+	return filteredList;
 }
 
 RangeExpr *IndexArrayAssociation::convertToRangeExpr(Type *arrayType) {
@@ -25,6 +53,30 @@ RangeExpr *IndexArrayAssociation::convertToRangeExpr(Type *arrayType) {
 	Identifier *rangeId = new Identifier(yylloc, "range");
 	FieldAccess *rangeAccess = new FieldAccess(dimensionAccess, rangeId, yylloc);
 	return new RangeExpr(id, rangeAccess, NULL, true, yylloc);
+}
+
+void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+
+	ArrayDataStructure *structure = (ArrayDataStructure*) space->getStructure(array);
+	int dimensionCount = structure->getDimensionality();
+	if (dimensionNo < dimensionCount - 1) {
+		std::ostringstream xform;
+		xform << index;
+		bool firstEntry = true;
+		for (int i = dimensionCount - 1; i > dimensionNo; i--) {
+			if (!firstEntry) {
+				xform << '\n' << indent.str() << "\t\t";
+			}
+			xform << " * " << array << "StoreDims[" << i << "].length";
+			firstEntry = false;
+		}
+		stream << indent.str();
+		stream << "int " << index << "_" << array << "_" << dimensionNo;
+		stream << " = " << xform.str() << ";\n";
+	}
 }
 
 //----------------------------------------------------- Index Scope ------------------------------------------------/

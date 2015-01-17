@@ -8,6 +8,7 @@
 #include "../utils/hashtable.h"
 #include "errors.h"
 #include "../static-analysis/loop_index.h"
+#include "../codegen/name_transformer.h"
 
 #include <iostream>
 #include <sstream>
@@ -396,33 +397,81 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 	
 	IndexScope::currentScope->enterScope(indexScope);
+
+	// create an array for indexes that are single entry in the execution space so that we do not have to
+	// create loops for them
+	List<const char*> *forbiddenIndexes = new List<const char*>;
 	
 	List<IndexArrayAssociation*> *associateList = indexScope->getAllPreferredAssociations();
 	int indentIncrease = 0;
 	for (int i = 0; i < associateList->NumElements(); i++) {
+		
 		IndexArrayAssociation *association = associateList->Nth(i);
+		const char *index = association->getIndex();
+		const char *arrayName = association->getArray();
+		int dimensionNo = association->getDimensionNo();
 		int newIndent = indentLevel + indentIncrease;
+		
+		std::ostringstream indent;
+		for (int j = 0; j < newIndent; j++) indent << '\t';
 		// create a scope for the for loop corresponding to this association
-		stream << std::endl;
-		for (int i = 0; i < newIndent; i++) stream << '\t';
-		stream << "{// scope entrance for parallel loop on index " << association->getIndex() << "\n";
-		// declare the index variable
-		for (int i = 0; i < newIndent; i++) stream << '\t';
-		stream << "int " << association->getIndex() << ";\n"; 
-		// convert the index access to a range loop iteration and generate code for that
-		DataStructure *structure = space->getLocalStructure(association->getArray());
-		RangeExpr *rangeExpr = association->convertToRangeExpr(structure->getType());
-		rangeExpr->generateLoopForRangeExpr(stream, indentLevel + indentIncrease, space);
-		indentIncrease++;	
+		stream << std::endl << indent.str();
+		stream << "{// scope entrance for parallel loop on index " << index << "\n";
+		// check if the index is a single entry
+		bool forbidden = false;
+		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
+		// Dimension No starts from 1 in Data Structures
+		if (array->isSingleEntryInDimension(dimensionNo + 1)) {
+			forbiddenIndexes->Append(index);
+			forbidden = true;
+			// declare the initialized index variable
+			stream << indent.str() << "int " << association->getIndex() << " = ";
+			stream << ntransform::NameTransformer::transformer->getTransformedName(arrayName, true, true);
+			stream << '[' << dimensionNo << "].range.min;\n"; 
+		}
+
+		if (!forbidden) {
+			// declare the uninitialized index variable
+			stream << indent.str() << "int " << index << ";\n"; 
+			// convert the index access to a range loop iteration and generate code for that
+			DataStructure *structure = space->getLocalStructure(association->getArray());
+			RangeExpr *rangeExpr = association->convertToRangeExpr(structure->getType());
+			rangeExpr->generateLoopForRangeExpr(stream, newIndent, space);
+			indentIncrease++;
+			newIndent++;	
+		}	
+
+		// generate auxiliary code for multi to unidimensional array indexing transformations
+		// for all array accesses that use this index
+		List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(index);
+		list = IndexArrayAssociation::filterList(list);
+		for (int j = 0; j < list->NumElements(); j++) {
+			IndexArrayAssociation *otherAssoc = list->Nth(j);
+			otherAssoc->generateTransform(stream, newIndent, space);
+		}
+	
 	}
+
+	// TODO translate the body of the for loop	
 
 	// close the for loops and the scopes
 	for (int i = associateList->NumElements() - 1; i >= 0; i--) {
-		indentIncrease--;	
 		IndexArrayAssociation *association = associateList->Nth(i);
+		const char *index = association->getIndex();
+		bool permitted = true;
+		for (int j = 0; j < forbiddenIndexes->NumElements(); j++) {
+			if (strcmp(forbiddenIndexes->Nth(j), index) == 0) {
+				permitted = false;
+				break;
+			}
+		}
 		int newIndent = indentLevel + indentIncrease;
-		for (int i = 0; i < newIndent; i++) stream << '\t';
-		stream << "}\n"; 
+		if (permitted) {
+			indentIncrease--;	
+			newIndent = indentLevel + indentIncrease;
+			for (int i = 0; i < newIndent; i++) stream << '\t';
+			stream << "}\n";
+		} 
 		for (int i = 0; i < newIndent; i++) stream << '\t';
 		stream << "}// scope exit for parallel loop on index " << association->getIndex() << "\n"; 
 	}	

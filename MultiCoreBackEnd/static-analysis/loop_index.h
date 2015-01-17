@@ -4,6 +4,9 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 
+#include <iostream>
+#include <sstream>
+
 /*	Classes in this header files are used to determine which index of a parallel loop iteration maps to 
 	what array variables and their dimensions. A minimal scope management is needed for this task. Thus
 	an IndexScope class is defined along with the IndexArrayAssociation class.  
@@ -11,6 +14,7 @@
 
 class RangeExpr;
 class Type;
+class Space;
 
 class IndexArrayAssociation {
  protected:
@@ -22,9 +26,16 @@ class IndexArrayAssociation {
 	const char *getArray() { return array; }
 	const char *getIndex() { return index; }
 	int getDimensionNo() { return dimensionNo; }
+	bool isEqual(IndexArrayAssociation *other);
+	static List<IndexArrayAssociation*> *filterList(List<IndexArrayAssociation*> *list);
 
-	// a helper method for code generation
+	// helper methods for code generation
 	RangeExpr *convertToRangeExpr(Type *arrayType);
+	// This method is been added to aid multidimensional to unidimensional index transform. Doing the
+	// transformation here (equivalent to doing it just after the creation of an index loop) instead of
+	// doing that inside an array access expression has the benefit of hoisting repetative computations
+	// out of nested loops.	
+	void generateTransform(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class IndexScope {

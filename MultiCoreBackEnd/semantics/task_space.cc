@@ -218,6 +218,13 @@ bool ArrayDataStructure::isDimensionLocallyReordered(int dimensionNo) {
 	return partConfig->doesReorderStoredData();
 }
 
+bool ArrayDataStructure::isSingleEntryInDimension(int dimensionNo) {
+	for (int i = 0; i < afterPartitionDimensions->NumElements(); i++) {
+		if (afterPartitionDimensions->Nth(i) == dimensionNo) return false;
+	}
+	return true;
+}
+
 //----------------------------------------------------- Token ---------------------------------------------------/
 
 int Token::wildcardTokenId = -1;

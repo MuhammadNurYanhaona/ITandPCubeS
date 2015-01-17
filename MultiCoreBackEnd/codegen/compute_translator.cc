@@ -93,6 +93,13 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 			for (int j = 0; j < dimensions; j++) {
 				programFile << stmtIndent;	
 				programFile << arrayName << "PartDims[" << j << "] = *lpu.";
+				programFile << arrayName << "PartDims[" << j << "]->partitionDim;\n"; 
+			}
+			programFile << stmtIndent << "Dimension ";
+			programFile  << arrayName << "StoreDims[" << dimensions << "];\n";
+			for (int j = 0; j < dimensions; j++) {
+				programFile << stmtIndent;	
+				programFile << arrayName << "PartDims[" << j << "] = *lpu.";
 				programFile << arrayName << "PartDims[" << j << "]->storageDim;\n"; 
 			}
 		}

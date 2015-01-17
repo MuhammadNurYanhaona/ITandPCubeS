@@ -377,9 +377,16 @@ void mcae::Calculate_Point_Position(SpaceA_LPU lpu,
 
 	//create local variables for array dimensions 
 	Dimension gridPartDims[2];
+	gridPartDims[0] = *lpu.gridPartDims[0]->partitionDim;
+	gridPartDims[1] = *lpu.gridPartDims[1]->partitionDim;
+	Dimension gridStoreDims[2];
 	gridPartDims[0] = *lpu.gridPartDims[0]->storageDim;
 	gridPartDims[1] = *lpu.gridPartDims[1]->storageDim;
 	Dimension point_placementsPartDims[3];
+	point_placementsPartDims[0] = *lpu.point_placementsPartDims[0]->partitionDim;
+	point_placementsPartDims[1] = *lpu.point_placementsPartDims[1]->partitionDim;
+	point_placementsPartDims[2] = *lpu.point_placementsPartDims[2]->partitionDim;
+	Dimension point_placementsStoreDims[3];
 	point_placementsPartDims[0] = *lpu.point_placementsPartDims[0]->storageDim;
 	point_placementsPartDims[1] = *lpu.point_placementsPartDims[1]->storageDim;
 	point_placementsPartDims[2] = *lpu.point_placementsPartDims[2]->storageDim;
@@ -388,51 +395,31 @@ void mcae::Calculate_Point_Position(SpaceA_LPU lpu,
 	Point point;
 
 	{// scope entrance for parallel loop on index i
-	int i;
-	int iterationBound = point_placementsPartDims[0].range.max;
+	int i = point_placementsPartDims[0].range.min;
+	int i_grid_0 = i * gridStoreDims[1].length;
+	int i_point_placements_0 = i * point_placementsStoreDims[2].length
+			 * point_placementsStoreDims[1].length;
+
+	{// scope entrance for parallel loop on index j
+	int j = point_placementsPartDims[1].range.min;
+	int j_point_placements_1 = j * point_placementsStoreDims[2].length;
+
+	{// scope entrance for parallel loop on index k
+	int k;
+	int iterationBound = point_placementsPartDims[2].range.max;
 	int indexIncrement = 1;
 	int indexMultiplier = 1;
-	if (point_placementsPartDims[0].range.min > point_placementsPartDims[0].range.max) {
+	if (point_placementsPartDims[2].range.min > point_placementsPartDims[2].range.max) {
 		iterationBound *= -1;
 		indexIncrement *= -1;
 		indexMultiplier = -1;
 	}
-	for (i = point_placementsPartDims[0].range.min; 
-			indexMultiplier * i <= iterationBound; 
-			i += indexIncrement) {
-
-		{// scope entrance for parallel loop on index j
-		int j;
-		int iterationBound = point_placementsPartDims[1].range.max;
-		int indexIncrement = 1;
-		int indexMultiplier = 1;
-		if (point_placementsPartDims[1].range.min > point_placementsPartDims[1].range.max) {
-			iterationBound *= -1;
-			indexIncrement *= -1;
-			indexMultiplier = -1;
-		}
-		for (j = point_placementsPartDims[1].range.min; 
-				indexMultiplier * j <= iterationBound; 
-				j += indexIncrement) {
-
-			{// scope entrance for parallel loop on index k
-			int k;
-			int iterationBound = point_placementsPartDims[2].range.max;
-			int indexIncrement = 1;
-			int indexMultiplier = 1;
-			if (point_placementsPartDims[2].range.min > point_placementsPartDims[2].range.max) {
-				iterationBound *= -1;
-				indexIncrement *= -1;
-				indexMultiplier = -1;
-			}
-			for (k = point_placementsPartDims[2].range.min; 
-					indexMultiplier * k <= iterationBound; 
-					k += indexIncrement) {
-			}
-			}// scope exit for parallel loop on index k
-		}
-		}// scope exit for parallel loop on index j
+	for (k = point_placementsPartDims[2].range.min; 
+			indexMultiplier * k <= iterationBound; 
+			k += indexIncrement) {
 	}
+	}// scope exit for parallel loop on index k
+	}// scope exit for parallel loop on index j
 	}// scope exit for parallel loop on index i
 }
 
@@ -443,19 +430,35 @@ void mcae::Refine_Subarea_Estimate(SpaceB_LPU lpu,
 
 	//create local variables for array dimensions 
 	Dimension gridPartDims[2];
+	gridPartDims[0] = *lpu.gridPartDims[0]->partitionDim;
+	gridPartDims[1] = *lpu.gridPartDims[1]->partitionDim;
+	Dimension gridStoreDims[2];
 	gridPartDims[0] = *lpu.gridPartDims[0]->storageDim;
 	gridPartDims[1] = *lpu.gridPartDims[1]->storageDim;
 	Dimension local_prePartDims[2];
+	local_prePartDims[0] = *lpu.local_prePartDims[0]->partitionDim;
+	local_prePartDims[1] = *lpu.local_prePartDims[1]->partitionDim;
+	Dimension local_preStoreDims[2];
 	local_prePartDims[0] = *lpu.local_prePartDims[0]->storageDim;
 	local_prePartDims[1] = *lpu.local_prePartDims[1]->storageDim;
 	Dimension point_placementsPartDims[3];
+	point_placementsPartDims[0] = *lpu.point_placementsPartDims[0]->partitionDim;
+	point_placementsPartDims[1] = *lpu.point_placementsPartDims[1]->partitionDim;
+	point_placementsPartDims[2] = *lpu.point_placementsPartDims[2]->partitionDim;
+	Dimension point_placementsStoreDims[3];
 	point_placementsPartDims[0] = *lpu.point_placementsPartDims[0]->storageDim;
 	point_placementsPartDims[1] = *lpu.point_placementsPartDims[1]->storageDim;
 	point_placementsPartDims[2] = *lpu.point_placementsPartDims[2]->storageDim;
 	Dimension statsPartDims[2];
+	statsPartDims[0] = *lpu.statsPartDims[0]->partitionDim;
+	statsPartDims[1] = *lpu.statsPartDims[1]->partitionDim;
+	Dimension statsStoreDims[2];
 	statsPartDims[0] = *lpu.statsPartDims[0]->storageDim;
 	statsPartDims[1] = *lpu.statsPartDims[1]->storageDim;
 	Dimension sub_estimatesPartDims[2];
+	sub_estimatesPartDims[0] = *lpu.sub_estimatesPartDims[0]->partitionDim;
+	sub_estimatesPartDims[1] = *lpu.sub_estimatesPartDims[1]->partitionDim;
+	Dimension sub_estimatesStoreDims[2];
 	sub_estimatesPartDims[0] = *lpu.sub_estimatesPartDims[0]->storageDim;
 	sub_estimatesPartDims[1] = *lpu.sub_estimatesPartDims[1]->storageDim;
 
@@ -468,35 +471,17 @@ void mcae::Refine_Subarea_Estimate(SpaceB_LPU lpu,
 	local_points = arrayMetadata.point_placementsDims[2].length;
 
 	{// scope entrance for parallel loop on index i
-	int i;
-	int iterationBound = sub_estimatesPartDims[0].range.max;
-	int indexIncrement = 1;
-	int indexMultiplier = 1;
-	if (sub_estimatesPartDims[0].range.min > sub_estimatesPartDims[0].range.max) {
-		iterationBound *= -1;
-		indexIncrement *= -1;
-		indexMultiplier = -1;
-	}
-	for (i = sub_estimatesPartDims[0].range.min; 
-			indexMultiplier * i <= iterationBound; 
-			i += indexIncrement) {
+	int i = sub_estimatesPartDims[0].range.min;
+	int i_point_placements_0 = i * point_placementsStoreDims[2].length
+			 * point_placementsStoreDims[1].length;
+	int i_stats_0 = i * statsStoreDims[1].length;
+	int i_sub_estimates_0 = i * sub_estimatesStoreDims[1].length;
+	int i_local_pre_0 = i * local_preStoreDims[1].length;
 
-		{// scope entrance for parallel loop on index j
-		int j;
-		int iterationBound = sub_estimatesPartDims[1].range.max;
-		int indexIncrement = 1;
-		int indexMultiplier = 1;
-		if (sub_estimatesPartDims[1].range.min > sub_estimatesPartDims[1].range.max) {
-			iterationBound *= -1;
-			indexIncrement *= -1;
-			indexMultiplier = -1;
-		}
-		for (j = sub_estimatesPartDims[1].range.min; 
-				indexMultiplier * j <= iterationBound; 
-				j += indexIncrement) {
-		}
-		}// scope exit for parallel loop on index j
-	}
+	{// scope entrance for parallel loop on index j
+	int j = sub_estimatesPartDims[1].range.min;
+	int j_point_placements_1 = j * point_placementsStoreDims[2].length;
+	}// scope exit for parallel loop on index j
 	}// scope exit for parallel loop on index i
 }
 
@@ -507,6 +492,9 @@ void mcae::Estimate_Total_Area(SpaceC_LPU lpu,
 
 	//create local variables for array dimensions 
 	Dimension sub_estimatesPartDims[2];
+	sub_estimatesPartDims[0] = *lpu.sub_estimatesPartDims[0]->partitionDim;
+	sub_estimatesPartDims[1] = *lpu.sub_estimatesPartDims[1]->partitionDim;
+	Dimension sub_estimatesStoreDims[2];
 	sub_estimatesPartDims[0] = *lpu.sub_estimatesPartDims[0]->storageDim;
 	sub_estimatesPartDims[1] = *lpu.sub_estimatesPartDims[1]->storageDim;
 
@@ -523,6 +511,7 @@ void mcae::Estimate_Total_Area(SpaceC_LPU lpu,
 	for (i = sub_estimatesPartDims[0].range.min; 
 			indexMultiplier * i <= iterationBound; 
 			i += indexIncrement) {
+		int i_sub_estimates_0 = i * sub_estimatesStoreDims[1].length;
 
 		{// scope entrance for parallel loop on index j
 		int j;

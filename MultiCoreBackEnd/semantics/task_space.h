@@ -151,6 +151,9 @@ class ArrayDataStructure : public DataStructure {
 	// specified. The latter check for only local reordering.
 	bool isDimensionReordered(int dimensionNo, Space *comparisonBound);
 	bool isDimensionLocallyReordered(int dimensionNo);
+	// This is used to determine if we need to have a for loop to iterate over the entries along a given
+	// dimension of the array
+	bool isSingleEntryInDimension(int dimensionNo);
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions
