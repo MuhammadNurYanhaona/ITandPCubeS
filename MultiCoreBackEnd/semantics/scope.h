@@ -45,6 +45,7 @@ class Scope {
 	void copy_symbol(Symbol *symbol);
         Iterator<Symbol*> get_local_symbols() { return symbolTable->GetIterator(); }
         void describe(int indent);
+	Scope *get_nearest_scope(ScopeType type);
 };
 
 

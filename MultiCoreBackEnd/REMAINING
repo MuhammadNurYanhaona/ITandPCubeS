@@ -4,3 +4,10 @@
 3. Annotate communication arcs to reflect partitions and replications
 4. Put synchronization markers in place 
 5. Update syntax to support iterating over manually created ranges
+6. Current implemention of loop iteration generation is not translating any
+   loop in the initializing section properly (Jan 16, 2015 status) due to the
+   assumption about default prefix and suffixes to be added to such a loop
+   iteration's variables which works for compute stages but is not appropriate
+   for initialize section. We need to fix this issue. It should not involve
+   some minor refactoring and including a tag in code generation that add 
+   different prefixes based on the code been translated at the time

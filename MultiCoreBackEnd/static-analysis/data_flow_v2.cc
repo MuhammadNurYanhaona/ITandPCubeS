@@ -180,7 +180,7 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 	bool first = true;
         while ((symbol = iterator.GetNextValue()) != NULL) {
 		if (first) {
-			stream << "\n\t//declare the local variables of this compute stage\n"; 
+			stream << "\n\t// declare local variables of this compute stage\n"; 
 			first = false;
 		}
                 VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
@@ -191,9 +191,11 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
         }
 
         // translate statements into C++ code
+	stream <<  "\n\t//----------------------- Computation Begins --------------------------------\n";
 	std::ostringstream codeStream;
 	code->generateCode(codeStream, 1, space);
 	stream << codeStream.str();
+	stream <<  "\n\t//------------------------ Computation Ends ---------------------------------\n";
 }
 
 void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {

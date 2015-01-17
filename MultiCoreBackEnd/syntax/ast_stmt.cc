@@ -3,6 +3,7 @@
 #include "ast_stmt.h"
 #include "ast_expr.h"
 #include "ast_def.h"
+#include "../semantics/scope.h"
 #include "../semantics/symbol.h"
 #include "../semantics/task_space.h"
 #include "../utils/hashtable.h"
@@ -30,6 +31,10 @@ void Stmt::mergeAccessedVariables(Hashtable<VariableAccess*> *first,
 
 //------------------------------------------ Loop Statement -----------------------------------------/
 
+void LoopStmt::setIndexScope(IndexScope *indexScope) { this->indexScope = indexScope; }
+
+IndexScope *LoopStmt::getIndexScope() { return indexScope; }
+
 void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLevel) {
 	
 	std::ostringstream indent;
@@ -44,6 +49,91 @@ void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLev
                 const char *name = variable->getName();
                 stream << indent.str() << type->getCppDeclaration(name) << ";\n";
         }
+}
+
+void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, Space *space, Stmt *body) {
+	
+	IndexScope::currentScope->enterScope(indexScope);
+
+	// create an array for indexes that are single entry in the execution space so that we do not have to
+	// create loops for them
+	List<const char*> *forbiddenIndexes = new List<const char*>;
+	
+	List<IndexArrayAssociation*> *associateList = indexScope->getAllPreferredAssociations();
+	int indentIncrease = 0;
+	for (int i = 0; i < associateList->NumElements(); i++) {
+		
+		IndexArrayAssociation *association = associateList->Nth(i);
+		const char *index = association->getIndex();
+		const char *arrayName = association->getArray();
+		int dimensionNo = association->getDimensionNo();
+		int newIndent = indentLevel + indentIncrease;
+		
+		std::ostringstream indent;
+		for (int j = 0; j < newIndent; j++) indent << '\t';
+		// create a scope for the for loop corresponding to this association
+		stream << std::endl << indent.str();
+		stream << "{// scope entrance for parallel loop on index " << index << "\n";
+		// check if the index is a single entry
+		bool forbidden = false;
+		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
+		// Dimension No starts from 1 in Data Structures
+		if (array->isSingleEntryInDimension(dimensionNo + 1)) {
+			forbiddenIndexes->Append(index);
+			forbidden = true;
+			// declare the initialized index variable
+			stream << indent.str() << "int " << association->getIndex() << " = ";
+			stream << ntransform::NameTransformer::transformer->getTransformedName(arrayName, true, true);
+			stream << '[' << dimensionNo << "].range.min;\n"; 
+		}
+
+		if (!forbidden) {
+			// declare the uninitialized index variable
+			stream << indent.str() << "int " << index << ";\n"; 
+			// convert the index access to a range loop iteration and generate code for that
+			DataStructure *structure = space->getLocalStructure(association->getArray());
+			RangeExpr *rangeExpr = association->convertToRangeExpr(structure->getType());
+			rangeExpr->generateLoopForRangeExpr(stream, newIndent, space);
+			indentIncrease++;
+			newIndent++;	
+		}	
+
+		// generate auxiliary code for multi to unidimensional array indexing transformations
+		// for all array accesses that use this index
+		List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(index);
+		list = IndexArrayAssociation::filterList(list);
+		for (int j = 0; j < list->NumElements(); j++) {
+			IndexArrayAssociation *otherAssoc = list->Nth(j);
+			otherAssoc->generateTransform(stream, newIndent, space);
+		}
+	
+	}
+
+	// TODO translate the body of the for loop	
+
+	// close the for loops and the scopes
+	for (int i = associateList->NumElements() - 1; i >= 0; i--) {
+		IndexArrayAssociation *association = associateList->Nth(i);
+		const char *index = association->getIndex();
+		bool permitted = true;
+		for (int j = 0; j < forbiddenIndexes->NumElements(); j++) {
+			if (strcmp(forbiddenIndexes->Nth(j), index) == 0) {
+				permitted = false;
+				break;
+			}
+		}
+		int newIndent = indentLevel + indentIncrease;
+		if (permitted) {
+			indentIncrease--;	
+			newIndent = indentLevel + indentIncrease;
+			for (int i = 0; i < newIndent; i++) stream << '\t';
+			stream << "}\n";
+		} 
+		for (int i = 0; i < newIndent; i++) stream << '\t';
+		stream << "}// scope exit for parallel loop on index " << association->getIndex() << "\n"; 
+	}	
+
+	IndexScope::currentScope->goBackToOldScope();
 }
 
 //------------------------------------------ Statement Block ----------------------------------------/
@@ -195,12 +285,6 @@ void IfStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *sp
 	}
 	stream << '\n';
 }
-
-//----------------------------------------- Loop Generic _-------------------------------------------/
-
-void LoopStmt::setIndexScope(IndexScope *indexScope) { this->indexScope = indexScope; }
-
-IndexScope *LoopStmt::getIndexScope() { return indexScope; }
 
 //----------------------------------------- Parallel Loop -------------------------------------------/
 
@@ -395,88 +479,7 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 }
 
 void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
-	
-	IndexScope::currentScope->enterScope(indexScope);
-
-	// create an array for indexes that are single entry in the execution space so that we do not have to
-	// create loops for them
-	List<const char*> *forbiddenIndexes = new List<const char*>;
-	
-	List<IndexArrayAssociation*> *associateList = indexScope->getAllPreferredAssociations();
-	int indentIncrease = 0;
-	for (int i = 0; i < associateList->NumElements(); i++) {
-		
-		IndexArrayAssociation *association = associateList->Nth(i);
-		const char *index = association->getIndex();
-		const char *arrayName = association->getArray();
-		int dimensionNo = association->getDimensionNo();
-		int newIndent = indentLevel + indentIncrease;
-		
-		std::ostringstream indent;
-		for (int j = 0; j < newIndent; j++) indent << '\t';
-		// create a scope for the for loop corresponding to this association
-		stream << std::endl << indent.str();
-		stream << "{// scope entrance for parallel loop on index " << index << "\n";
-		// check if the index is a single entry
-		bool forbidden = false;
-		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
-		// Dimension No starts from 1 in Data Structures
-		if (array->isSingleEntryInDimension(dimensionNo + 1)) {
-			forbiddenIndexes->Append(index);
-			forbidden = true;
-			// declare the initialized index variable
-			stream << indent.str() << "int " << association->getIndex() << " = ";
-			stream << ntransform::NameTransformer::transformer->getTransformedName(arrayName, true, true);
-			stream << '[' << dimensionNo << "].range.min;\n"; 
-		}
-
-		if (!forbidden) {
-			// declare the uninitialized index variable
-			stream << indent.str() << "int " << index << ";\n"; 
-			// convert the index access to a range loop iteration and generate code for that
-			DataStructure *structure = space->getLocalStructure(association->getArray());
-			RangeExpr *rangeExpr = association->convertToRangeExpr(structure->getType());
-			rangeExpr->generateLoopForRangeExpr(stream, newIndent, space);
-			indentIncrease++;
-			newIndent++;	
-		}	
-
-		// generate auxiliary code for multi to unidimensional array indexing transformations
-		// for all array accesses that use this index
-		List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(index);
-		list = IndexArrayAssociation::filterList(list);
-		for (int j = 0; j < list->NumElements(); j++) {
-			IndexArrayAssociation *otherAssoc = list->Nth(j);
-			otherAssoc->generateTransform(stream, newIndent, space);
-		}
-	
-	}
-
-	// TODO translate the body of the for loop	
-
-	// close the for loops and the scopes
-	for (int i = associateList->NumElements() - 1; i >= 0; i--) {
-		IndexArrayAssociation *association = associateList->Nth(i);
-		const char *index = association->getIndex();
-		bool permitted = true;
-		for (int j = 0; j < forbiddenIndexes->NumElements(); j++) {
-			if (strcmp(forbiddenIndexes->Nth(j), index) == 0) {
-				permitted = false;
-				break;
-			}
-		}
-		int newIndent = indentLevel + indentIncrease;
-		if (permitted) {
-			indentIncrease--;	
-			newIndent = indentLevel + indentIncrease;
-			for (int i = 0; i < newIndent; i++) stream << '\t';
-			stream << "}\n";
-		} 
-		for (int i = 0; i < newIndent; i++) stream << '\t';
-		stream << "}// scope exit for parallel loop on index " << association->getIndex() << "\n"; 
-	}	
-
-	IndexScope::currentScope->goBackToOldScope();
+	LoopStmt::generateIndexLoops(stream, indentLevel, space, body);
 }
 
 //--------------------------------------- Sequential For Loop -------------------------------------------/
@@ -493,6 +496,7 @@ SLoopStmt::SLoopStmt(Identifier *i, Expr *re, Expr *se, Stmt *b, yyltype loc) : 
 	}
 	body = b;
 	body->SetParent(this);
+	isArrayIndexTraversal = false;
 }
     	
 void SLoopStmt::PrintChildren(int indentLevel) {
@@ -511,6 +515,7 @@ void SLoopStmt::performTypeInference(Scope *executionScope) {
 
 void SLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 
+	// create a loop scope for normal variables and an index scope for index variables and enter both
 	Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
 	IndexScope::currentScope->deriveNewScope();
 	
@@ -520,6 +525,61 @@ void SLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 		VariableSymbol *var = new VariableSymbol(new VariableDef(id, Type::intType));
 		loopScope->insert_symbol(var);
 	}
+
+	// Try to find out if the range corresponding to a dimension of some global array. If it is so 
+	// then create an entry in the index scope.
+	const char *potentialArray = rangeExpr->getBaseVarName();
+	Scope *taskScope = executionScope->get_nearest_scope(TaskScope);
+	if (potentialArray != NULL && taskScope != NULL) {
+		Symbol *symbol = taskScope->local_lookup(potentialArray);
+		bool attemptResolve = false;
+		if (symbol != NULL) {
+			VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
+			if (variable != NULL) {
+				Type *varType = variable->getType();
+				if (dynamic_cast<ArrayType*>(varType) != NULL &&
+						dynamic_cast<StaticArrayType*>(varType) == NULL) {
+					attemptResolve = true;
+				}
+			}
+		}
+		// It seems finding out if an expression is a dimension access of a task global array is
+		// a messy effort. The expression is expected  to look like array.dimension#No.range. So
+		// there is a need to do a three level unfolding of expression. It would be nice if we 
+		// could generalize this procedure somewhere. TODO may be worth attempting in the future.
+		bool dimensionFound = false;
+		int dimension = 0;
+		if (attemptResolve) {
+			FieldAccess *rangeField = dynamic_cast<FieldAccess*>(rangeExpr);
+			if (rangeField != NULL) {
+        			Expr *base = rangeField->getBase();	
+        			FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+				if (baseField != NULL) {
+					Expr *arrayExpr = baseField->getBase();
+					FieldAccess *arrayAccess = dynamic_cast<FieldAccess*>(arrayExpr);
+        				Identifier *field = baseField->getField();
+        				DimensionIdentifier *dimensionId = 
+							dynamic_cast<DimensionIdentifier*>(field);
+					if (arrayAccess != NULL 
+							&& arrayAccess->isTerminalField() 
+							&& dimensionId != NULL) {
+						dimensionFound = true;
+						// this is a coversion between 1 based to 0 based indexing
+						dimension = dimensionId->getDimensionNo() - 1;
+					}
+				}
+			}
+		}
+		if (dimensionFound) {
+			const char *indexName = id->getName();
+			IndexScope::currentScope->initiateAssociationList(indexName);
+			List<IndexArrayAssociation*> *list 
+					= IndexScope::currentScope->getAssociationsForIndex(indexName);
+			list->Append(new IndexArrayAssociation(indexName, potentialArray, dimension));
+			isArrayIndexTraversal = true;
+		}
+	}
+
 	rangeExpr->resolveType(loopScope, ignoreTypeFailures);
 	if (stepExpr != NULL) stepExpr->resolveType(loopScope, ignoreTypeFailures);
 
@@ -552,41 +612,30 @@ Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 
 void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 
-	// as a preprocessing step check if the sequential loop is based on an array dimension 
-	// traversal and create an entry in the index scope if it is so.	
-	RangeExpr *range = new RangeExpr(id, rangeExpr, stepExpr, true, *id->GetLocation());
-	// check if the range corresponds to some array dimension access and if so then add an index 
-	// mapping in the index scope for this loop
-	const char *baseVar = range->getBaseArrayForRange(space);
-	if (baseVar != NULL) {
-		int dimensionNo = range->getDimensionForRange(space);
-		const char *indexName = id->getName();
-		indexScope->initiateAssociationList(indexName);
-		List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(indexName);
-		list->Append(new IndexArrayAssociation(indexName, baseVar, dimensionNo));
+	if(isArrayIndexTraversal) {
+		LoopStmt::generateIndexLoops(stream, indentLevel, space, body);
+	} else {
+		IndexScope::currentScope->enterScope(indexScope);
+		std::ostringstream indent;
+		for (int i = 0; i < indentLevel; i++) indent << '\t';	
+		// create a scope for loop
+        	stream << indent.str() << "{ // scope entrance for sequential loop\n";
+		// declares any variable created in the nested scope of this loop
+		declareVariablesInScope(stream, indentLevel);
+		// create a range expression representing the sequential loop	
+		RangeExpr *range = new RangeExpr(id, rangeExpr, stepExpr, true, *id->GetLocation());
+        	// translate the range expression into a for loop
+        	std::ostringstream rangeLoop;
+        	range->generateLoopForRangeExpr(rangeLoop, indentLevel, space);
+        	stream << rangeLoop.str();
+        	// translate the loop body
+		body->generateCode(stream, indentLevel + 1, space);	
+        	// close the range loop
+        	stream << indent.str() << "}\n";
+        	// exit the scope created for the loop 
+        	stream << indent.str() << "} // scope exit for sequential loop\n";
+		IndexScope::currentScope->goBackToOldScope();
 	}
-	
-	IndexScope::currentScope->enterScope(indexScope);
-
-	std::ostringstream indent;
-	for (int i = 0; i < indentLevel; i++) indent << '\t';
-	
-	// create a scope for loop
-        stream << indent.str() << "{ // scope entrance for sequential loop\n";
-	// declares any variable created in the nested scope of this loop
-	declareVariablesInScope(stream, indentLevel);
-        // translate the range expression into a for loop
-        std::ostringstream rangeLoop;
-        range->generateLoopForRangeExpr(rangeLoop, indentLevel, space);
-        stream << rangeLoop.str();
-        // translate the loop body
-	body->generateCode(stream, indentLevel + 1, space);	
-        // close the range loop
-        stream << indent.str() << "}\n";
-        // exit the scope created for the loop 
-        stream << indent.str() << "} // scope exit for sequential loop\n";
-
-	IndexScope::currentScope->goBackToOldScope();
 }
 
 //---------------------------------------------- While Loop ----------------------------------------------------/

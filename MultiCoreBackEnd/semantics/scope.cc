@@ -84,4 +84,10 @@ void Scope::describe(int indent) {
         }
 }
 
+Scope *Scope::get_nearest_scope(ScopeType type) {
+	if (this->type == type) return this;
+	if (this->parent == NULL) return NULL;
+	return parent->get_nearest_scope(type);
+}
+
 
