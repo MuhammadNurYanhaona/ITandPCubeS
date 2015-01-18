@@ -80,30 +80,6 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		headerFile << ");\n\n";
 		programFile << ") {\n";
 
-		// create local variables for all array dimensions so that later on name-transformer
-		// that add prefix/suffix to accessed global variables can work properly
-		programFile << '\n' << stmtIndent << "// create local variables for array dimensions \n";
-		List<const char*> *localArrays = space->getLocallyUsedArrayNames();
-		for (int i = 0; i < localArrays->NumElements(); i++) {
-			const char *arrayName = localArrays->Nth(i);
-			ArrayDataStructure *array = (ArrayDataStructure*) space->getStructure(arrayName);
-			int dimensions = array->getDimensionality();
-			programFile << stmtIndent << "Dimension ";
-			programFile  << arrayName << "PartDims[" << dimensions << "];\n";
-			for (int j = 0; j < dimensions; j++) {
-				programFile << stmtIndent;	
-				programFile << arrayName << "PartDims[" << j << "] = *lpu.";
-				programFile << arrayName << "PartDims[" << j << "]->partitionDim;\n"; 
-			}
-			programFile << stmtIndent << "Dimension ";
-			programFile  << arrayName << "StoreDims[" << dimensions << "];\n";
-			for (int j = 0; j < dimensions; j++) {
-				programFile << stmtIndent;	
-				programFile << arrayName << "PartDims[" << j << "] = *lpu.";
-				programFile << arrayName << "PartDims[" << j << "]->storageDim;\n"; 
-			}
-		}
-
 		// then invoke the translate code function in the stage to generate C++ equivalent of 
 		// the code content
 		execStage->translateCode(programFile); 

@@ -52,6 +52,7 @@ Task "Monte Carlo Area Estimation":
 		}
 		"Refine Subarea Estimate" (Space B) {
 			local_points = point_placements.dimension3.length
+			local_points = local_points
 			do { 
 				do {
 					internal_points = reduce ("sum", point_placements[i][j][k])

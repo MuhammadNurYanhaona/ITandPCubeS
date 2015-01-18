@@ -10,6 +10,7 @@
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
+#include "../codegen/name_transformer.h"
 
 #include <iostream>
 #include <fstream>
@@ -104,6 +105,25 @@ bool FlowStage::isDataModifierRelevant(FlowStage *modifier) {
 	return (this->space == syncStage->space || this->space->isParentSpace(syncStage->space));
 }
 
+List<const char*> *FlowStage::filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap) {
+	if (accessMap == NULL) {
+		accessMap = this->accessMap;
+	}
+	List<const char*> *arrayList = new List<const char*>;
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+	VariableAccess *accessLog;
+	while ((accessLog = iterator.GetNextValue()) != NULL) {
+		const char *varName = accessLog->getName();
+		DataStructure *structure = space->getLocalStructure(varName);
+		if (structure == NULL) continue;
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array != NULL) {
+			arrayList->Append(varName);
+		}
+	}
+	return arrayList;
+}
+
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(0, space, NULL) {
@@ -173,29 +193,58 @@ void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 }
 
 void ExecutionStage::translateCode(std::ofstream &stream) {
+		
+	// reset the name transformer to user common "lpu." prefix for array access in case it is been modified
+	ntransform::NameTransformer::transformer->setLpuPrefix("lpu.");
 
-	// declare all local variables found in the scope
-        Iterator<Symbol*> iterator = scope->get_local_symbols();
-        Symbol *symbol;
-	bool first = true;
-        while ((symbol = iterator.GetNextValue()) != NULL) {
-		if (first) {
-			stream << "\n\t// declare local variables of this compute stage\n"; 
-			first = false;
-		}
-                VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
-                if (variable == NULL) continue;
-                Type *type = variable->getType();
-                const char *name = variable->getName();
-                stream << "\t" << type->getCppDeclaration(name) << ";\n";
+	// create local variables for all array dimensions so that later on name-transformer that add 
+	// prefix/suffix to accessed global variables can work properly
+	stream <<  "\n\t//-------------------- Local Copies of Metadata -----------------------------\n\n";
+	std::string stmtIndent = "\t";
+        List<const char*> *localArrays = filterInArraysFromAccessMap();
+	for (int i = 0; i < localArrays->NumElements(); i++) {
+        	const char *arrayName = localArrays->Nth(i);
+        	ArrayDataStructure *array = (ArrayDataStructure*) space->getStructure(arrayName);
+        	int dimensions = array->getDimensionality();
+        	stream << stmtIndent << "Dimension ";
+                stream  << arrayName << "PartDims[" << dimensions << "];\n";
+                for (int j = 0; j < dimensions; j++) {
+                	stream << stmtIndent;
+                	stream << arrayName << "PartDims[" << j << "] = *lpu.";
+                        stream << arrayName << "PartDims[" << j << "]->partitionDim;\n";
+                }
+                stream << stmtIndent << "Dimension ";
+                stream  << arrayName << "StoreDims[" << dimensions << "];\n";
+                for (int j = 0; j < dimensions; j++) {
+                	stream << stmtIndent;
+               		stream << arrayName << "StoreDims[" << j << "] = *lpu.";
+                        stream << arrayName << "PartDims[" << j << "]->storageDim;\n";
+        	}
         }
 
+	// declare any local variables found in the computation	
+	std::ostringstream localVars;
+        Iterator<Symbol*> iterator = scope->get_local_symbols();
+       	Symbol *symbol;
+	bool symbolFound = false;
+        while ((symbol = iterator.GetNextValue()) != NULL) {
+                VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
+                if (variable == NULL) continue;
+		symbolFound = true;
+                Type *type = variable->getType();
+                const char *name = variable->getName();
+        	localVars << stmtIndent << type->getCppDeclaration(name) << ";\n";
+        }
+	if (symbolFound) {
+		stream <<  "\n\t//------------------- Local Variable Declarations ---------------------------\n\n";
+		stream << localVars.str();
+	}
+
         // translate statements into C++ code
-	stream <<  "\n\t//----------------------- Computation Begins --------------------------------\n";
+	stream <<  "\n\t//----------------------- Computation Begins --------------------------------\n\n";
 	std::ostringstream codeStream;
 	code->generateCode(codeStream, 1, space);
 	stream << codeStream.str();
-	stream <<  "\n\t//------------------------ Computation Ends ---------------------------------\n";
 }
 
 void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
@@ -632,13 +681,38 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 	
 	std::string stmtSeparator = ";\n";
 	
-	// if it is not a sub-partition repeat block then we have to add a while or for loopd depending on the
+	// if it is not a sub-partition repeat block then we have to add a while or for loop depending on the
 	// condition
 	if (type == Conditional_Repeat) {
 		
-		// translate the repeat condition
 		std::ostringstream indent;
 		for (int i = 0; i < indentation; i++) indent << '\t';
+		
+		// create a scope for repeat loop
+		stream << indent.str() << "{ // scope entrance for repeat loop\n";
+
+		// get the name of the lpu for the execution LPS
+		std::ostringstream lpuName;
+		lpuName << "space" << space->getName() << "Lpu->";
+
+		// If the repeat condition involves accessing metadata of some task global array then we need 
+		// to create local copies of its metadata so that name transformer can work properly 
+        	List<const char*> *localArrays = filterInArraysFromAccessMap(repeatConditionAccessMap);
+		for (int i = 0; i < localArrays->NumElements(); i++) {
+        		const char *arrayName = localArrays->Nth(i);
+        		ArrayDataStructure *array = (ArrayDataStructure*) space->getStructure(arrayName);
+        		int dimensions = array->getDimensionality();
+        		stream << indent.str() << "Dimension ";
+                	stream  << arrayName << "StoreDims[" << dimensions << "];\n";
+                	for (int j = 0; j < dimensions; j++) {
+                		stream << indent.str();
+               			stream << arrayName << "StoreDims[" << j << "] = *" << lpuName.str();
+                        	stream << arrayName << "PartDims[" << j << "]->storageDim;\n";
+        		}
+        	}
+
+		// update the name transformer for probable array access within repeat condition
+		ntransform::NameTransformer::transformer->setLpuPrefix(lpuName.str().c_str());
 		
 		// if the repeat condition is a logical expression then it is a while loop in the source code
 		if (dynamic_cast<LogicalExpr*>(repeatCond) != NULL) {
@@ -649,8 +723,6 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 			stream << indent.str() << "}\n";
 		// otherwise it is a for loop based on a range condition that we need to translate
 		} else {
-			// create a scope for repeat loop
-			stream << indent.str() << "{ // scope entrance for repeat loop\n";
 			// translate the range expression into a for loop
 			RangeExpr *rangeExpr = dynamic_cast<RangeExpr*>(repeatCond);
 			std::ostringstream rangeLoop;
@@ -660,9 +732,9 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 			CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
 			// close the range loop
 			stream << indent.str() << "}\n";
-			// exit the scope created for the repeat loop 
-			stream << indent.str() << "} // scope exit for repeat loop\n";
 		}
+		// exit the scope created for the repeat loop 
+		stream << indent.str() << "} // scope exit for repeat loop\n";
 	} else {
 		CompositeStage::generateInvocationCode(stream, indentation, containerSpace);
 	}

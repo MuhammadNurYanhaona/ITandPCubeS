@@ -720,7 +720,7 @@ void RepeatControl::validateScopes(Scope *rootScope, PartitionHierarchy *partiti
 	if (symbol != NULL) {
 		rootScope->insert_symbol(symbol);
 	}
-	rangeExpr->resolveType(rootScope, false);
+	rangeExpr->resolveType(rootScope, executionSpace == NULL);
 	// remove the lpuId variable if exists
 	if (symbol != NULL) {
 		rootScope->remove_symbol(symbol->getName());

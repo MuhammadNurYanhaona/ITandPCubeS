@@ -89,5 +89,3 @@ Scope *Scope::get_nearest_scope(ScopeType type) {
 	if (this->parent == NULL) return NULL;
 	return parent->get_nearest_scope(type);
 }
-
-

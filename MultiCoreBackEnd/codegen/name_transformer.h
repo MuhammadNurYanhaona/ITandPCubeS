@@ -2,6 +2,8 @@
 #define _H_name_transfer
 
 #include "../utils/list.h"
+#include <iostream>
+#include <string>
 
 class TaskDef;
 
@@ -37,6 +39,13 @@ namespace ntransform {
 		List<const char*> *taskGlobals;
 		List<const char*> *threadLocals;
 		List<const char*> *globalArrays;
+		std::string lpuPrefix;
+		// this flag is used to indicate that the name transformer is working outside of the
+		// compute block. This helps to handle name transformation in initialize functions for
+		// a task. TODO in the future, however, we have to come up with a better mechanism to
+		// make the name transformer flexible as we need to handle other contexts such as 
+		// the coordinator program and functions.
+		bool localAccessDisabled;
 		NameTransformer();
 	  public:
 		static NameTransformer *transformer;
@@ -45,6 +54,9 @@ namespace ntransform {
 		bool isTaskGlobal(const char *varName);
 		bool isThreadLocal(const char *varName);
 		bool isGlobalArray(const char *varName);
+		void setLpuPrefix(const char *prefix) { lpuPrefix = std::string(prefix); }
+		void disableLocalAccess() { localAccessDisabled = true; }
+		void enableLocalAccess() { localAccessDisabled = false; }
 		void reset();
 	};
 }

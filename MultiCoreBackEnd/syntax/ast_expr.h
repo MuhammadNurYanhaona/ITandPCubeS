@@ -253,6 +253,11 @@ class FieldAccess : public Expr {
 	// the access as metadata and data for an array are kept separate. 
 	bool metadata;
 	bool local;
+	// a flag to indicate if this field is an index access on an array where the index is part of 
+	// some loop range traversal. In that case, we can just replace the field name with some other
+	// back-end variable that holds the result of computation of multi to unidirectional index 
+	// transform
+	bool index; 
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "FieldAccess"; }
@@ -276,6 +281,13 @@ class FieldAccess : public Expr {
 	Identifier *getField() { return field; }
 	bool isEqual(FieldAccess *other);
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	void markAsIndex() { index = true; }
+	bool isIndex() { return index; }
+	// if the field access is an array index access where the index correspond to some loop iteration
+	// index then the actual memory location for the index is available in a generated back-end 
+	// variable. This method writes the name of that variable on the stream as a replacement of source
+	// index
+	void translateIndex(std::ostringstream &stream, const char *array, int dimension);
 };
 
 class RangeExpr : public Expr {
@@ -394,6 +406,9 @@ class ArrayAccess : public Expr {
 	
 	// for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	Expr *getEndpointOfArrayAccess();
+	void generate1DIndexAccess(std::ostringstream &stream, const char *array, ArrayType *type);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
 };
 
 class FunctionCall : public Expr {

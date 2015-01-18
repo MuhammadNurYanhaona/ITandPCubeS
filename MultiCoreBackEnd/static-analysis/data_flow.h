@@ -99,6 +99,9 @@ class FlowStage {
 	// needing such collective support, then only a single PPU should enter and execute it. The method below 
 	// need to be overridden by subclasses to reflect intended behavior. 
 	virtual bool isGroupEntry() { return false; }
+	// This method is required to determine what variables need to be copied in local socpe from the LPU for
+	// the flow stage to simplify code generation.
+	List<const char*> *filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap = NULL);
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.

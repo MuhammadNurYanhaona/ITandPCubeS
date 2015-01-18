@@ -22,6 +22,8 @@ void NameTransformer::reset() {
 	taskGlobals = new List<const char*>;
 	threadLocals = new List<const char*>;
 	globalArrays = new List<const char*>;
+	lpuPrefix = "lpu.";
+	localAccessDisabled = false;		
 }
 
 bool NameTransformer::isTaskGlobal(const char *varName) {
@@ -55,7 +57,7 @@ const char *NameTransformer::getTransformedName(const char *varName, bool metada
 		return strdup(xformedName.str().c_str());
 	} else if (isGlobalArray(varName)) {
 		if (metadata) {
-			if (local) {
+			if (local && !localAccessDisabled) {
 				xformedName << varName << "PartDims";
 				return strdup(xformedName.str().c_str());
 			} else {
@@ -63,7 +65,7 @@ const char *NameTransformer::getTransformedName(const char *varName, bool metada
 				return strdup(xformedName.str().c_str());
 			}
 		} else {
-			xformedName << "lpu." << varName;
+			xformedName << lpuPrefix << varName;
 			return strdup(xformedName.str().c_str());
 		}
 	}
@@ -94,4 +96,8 @@ void NameTransformer::setTransformer(TaskDef *taskDef) {
 			transformer->globalArrays->Append(varName);
 		}
 	}
+	// default static array parameter used to indentify which LPU is currently been executed
+	transformer->globalArrays->Append("lpuId");
 }
+
+

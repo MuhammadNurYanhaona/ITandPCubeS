@@ -72,7 +72,7 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, S
 		std::ostringstream indent;
 		for (int j = 0; j < newIndent; j++) indent << '\t';
 		// create a scope for the for loop corresponding to this association
-		stream << std::endl << indent.str();
+		stream << indent.str();
 		stream << "{// scope entrance for parallel loop on index " << index << "\n";
 		// check if the index is a single entry
 		bool forbidden = false;

@@ -30,6 +30,7 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
 	field->SetParent(this);
 	metadata = false;
 	local = false;
+	index = false;
 }
 
 void FieldAccess::PrintChildren(int indentLevel) {
@@ -260,4 +261,10 @@ List<FieldAccess*> *FieldAccess::getTerminalFieldAccesses() {
 		return list;
 	}
 	return base->getTerminalFieldAccesses();
+}
+
+void FieldAccess::translateIndex(std::ostringstream &stream, const char *array, int dimension) {
+	stream << field->getName();
+	stream << '_' << array;
+	stream << '_' << dimension;	
 }
