@@ -421,7 +421,7 @@ void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int cur
 		case OR: stream << " || "; break;
 		case NOT: stream << "!"; break;
 		case EQ: stream << " == "; break;
-		case NE: stream << "!="; break;
+		case NE: stream << " != "; break;
 		case GT: stream << " > "; break;
 		case LT: stream << " < "; break;
 		case GTE: stream << " >= "; break;

@@ -109,7 +109,8 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, S
 	
 	}
 
-	// TODO translate the body of the for loop	
+	// translate the body of the for loop
+	body->generateCode(stream, indentLevel + indentIncrease, space);
 
 	// close the for loops and the scopes
 	for (int i = associateList->NumElements() - 1; i >= 0; i--) {

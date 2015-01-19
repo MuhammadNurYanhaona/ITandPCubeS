@@ -211,7 +211,8 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *
 	// the stream
 	FieldAccess *indexAccess = dynamic_cast<FieldAccess*>(index);
 	if (indexAccess != NULL && indexAccess->isIndex()) {
-		indexAccess->translateIndex(stream, array, dimension);
+		if (dimension == dimensionCount - 1) index->translate(stream, 0, 0);
+		else indexAccess->translateIndex(stream, array, dimension);
 	// Otherwise, there might be a need for translating the index
 	} else {
 		// If indexing is done on the last dimension of the array then there is nothing to do here

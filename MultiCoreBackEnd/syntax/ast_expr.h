@@ -207,6 +207,7 @@ class ReductionExpr : public Expr {
 
 	// for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"reduction\""; }
 };
 
 class EpochValue : public Expr {
@@ -239,6 +240,7 @@ class EpochExpr : public Expr {
 	const char *getBaseVarName() { return root->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"epoch-expr\""; }
 };
 
 class FieldAccess : public Expr {
@@ -385,6 +387,7 @@ class SubRangeExpr : public Expr {
 	void inferType(Scope *scope, Type *rootType); 
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"subrange\""; }
 };
 
 class ArrayAccess : public Expr {
@@ -422,6 +425,7 @@ class FunctionCall : public Expr {
 	void resolveType(Scope *scope, bool ignoreType);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"function-call\""; }
 };
 
 class OptionalInvocationParams : public Node {

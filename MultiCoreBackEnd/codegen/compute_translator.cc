@@ -54,6 +54,7 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 			std::string stageName(execStage->getName());
 			string_utils::shrinkWhitespaces(stageName);
 			const char *newName = string_utils::replaceChar(stageName.c_str(), ' ', '_');
+			newName = string_utils::toLower(newName);
 			execStage->setName(newName);
 		}
 		headerFile << execStage->getName() << "(";

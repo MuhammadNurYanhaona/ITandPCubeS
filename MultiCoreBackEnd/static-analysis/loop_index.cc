@@ -26,8 +26,7 @@ bool IndexArrayAssociation::isEqual(IndexArrayAssociation *other) {
 List<IndexArrayAssociation*> *IndexArrayAssociation::filterList(List<IndexArrayAssociation*> *list) {
 	if (list->NumElements() == 0) return list;
 	List<IndexArrayAssociation*> *filteredList = new List<IndexArrayAssociation*>;
-	filteredList->Append(list->Nth(0));
-	for (int i = 1; i < list->NumElements(); i++) {
+	for (int i = 0; i < list->NumElements(); i++) {
 		IndexArrayAssociation *current = list->Nth(i);
 		bool found = false;
 		for (int j = 0; j < filteredList->NumElements(); j++) {
