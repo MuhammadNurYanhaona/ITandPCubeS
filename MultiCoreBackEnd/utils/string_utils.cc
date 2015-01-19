@@ -126,3 +126,38 @@ char *string_utils::substr(const char *str, int begin, int end) {
 	strncpy(buffer, source, length);
 	return buffer;
 }
+
+const char* string_utils::breakLongLine(int indent, std::string originalLine) {
+
+	std::string line(originalLine);
+	int length = line.length() + indent * TAB_SPACE - indent;
+	if (length <= MAXIMUM_LINE_LENGTH) return line.c_str();
+	int brokenLineLength = IDEAL_LINE_LENGTH - indent * TAB_SPACE;
+	std::ostringstream stream;
+	std::string delim = " ";
+	size_t pos;
+	std::string token;
+	bool first = true;
+	while ((pos = line.find(delim, brokenLineLength)) != std::string::npos) {
+		token = line.substr(0, pos);
+		trim(token);
+		line.erase(0, pos);
+		if (first) {
+			for (int i = 0; i < indent; i++) stream << "\t";
+			indent += 2;
+			brokenLineLength = IDEAL_LINE_LENGTH - indent * TAB_SPACE;
+			first = false;
+		} else {
+			stream << "\n";
+			for (int i = 0; i < indent; i++) stream << "\t";
+		}
+		stream << token;
+	}
+	trim(line);
+	if (line.length() > 0) {
+		stream << "\n";
+		for (int i = 0; i < indent; i++) stream << "\t";
+		stream << line;
+	}
+	return strdup(stream.str().c_str());
+}

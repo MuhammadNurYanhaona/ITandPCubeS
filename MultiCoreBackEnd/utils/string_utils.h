@@ -8,6 +8,10 @@
 */
 
 namespace string_utils {
+
+	const int TAB_SPACE = 8;
+	const int IDEAL_LINE_LENGTH = 60;
+	const int MAXIMUM_LINE_LENGTH = 80;
 	
 	// remove whitespaces from the beginning and the end of any string
 	void trim(std::string &str);
@@ -40,6 +44,9 @@ namespace string_utils {
 
 	// get the substring from begin to end with both indexes included
 	char *substr(const char *str, int begin, int end);
+
+	// break a long line into multiple lines without compromising the content
+	const char *breakLongLine(int indent, std::string originalLine);
 }
 
 #endif

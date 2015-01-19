@@ -18,6 +18,7 @@
 #include <sstream>
 
 class Expr;
+class LogicalExpr;
 class Space;
 class IndexScope;	
 
@@ -145,6 +146,9 @@ class IndexRangeCondition: public Node {
 	
 	// Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+
+	// Code Generation Routines
+	LogicalExpr *getRestrictions();
 };
 
 class LoopStmt: public Stmt {
@@ -164,7 +168,21 @@ class LoopStmt: public Stmt {
 	// a helper routine for code generation that declares variables in the scope
 	void declareVariablesInScope(std::ostringstream &stream, int indentLevel);	
 	// Code Generation Routine
-	void generateIndexLoops(std::ostringstream &stream, int indentLevel, Space *space, Stmt *body);
+	void generateIndexLoops(std::ostringstream &stream, int indentLevel, 
+			Space *space, Stmt *body, List<LogicalExpr*> *indexRestrictions = NULL);
+	// a helper routine that decides what index restrictions can be applied to the current 
+	// index loop iteration among the list of such restrictions and creates a and filter in 
+	// the remaining expressions in an argument list
+	// @param indexesInvisible is a hashmap of indexes that will be available in some lower
+	//        level nested loop; there not visible to the current loop
+	// @param currentExprList is the list of restrictions that are still not been applied to
+	//        some outer level for loop and therefore subject to consideration
+	// @param remainingExprList the list that should hold the expressions that do not enter 
+	//        the current logical expression
+	// @return a list of logical expressions that are applicable to current Loop  
+	List<LogicalExpr*> *getApplicableExprs(Hashtable<const char*> *indexesInvisible, 
+			List<LogicalExpr*> *currentExprList, 
+			List<LogicalExpr*> *remainingExprList);
 };
 
 class PLoopStmt: public LoopStmt {
@@ -187,6 +205,11 @@ class PLoopStmt: public LoopStmt {
 	
 	// Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+	// a function for retrieving a list of boolean expressions that may be part of the range conditions
+	// associated with this loop. A mechanism was needed to break such additional index traversal
+	// restrictions into simpler boolean expressions and then place those expressions in appropriate for
+	// loop to avoid unnecessary iterations in nested loops.
+	List<LogicalExpr*> *getIndexRestrictions();
 };
 
 class SLoopStmt: public LoopStmt {

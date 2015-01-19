@@ -51,9 +51,16 @@ void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLev
         }
 }
 
-void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, Space *space, Stmt *body) {
+void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, 
+			Space *space, Stmt *body, List<LogicalExpr*> *indexRestrictions) {
 	
 	IndexScope::currentScope->enterScope(indexScope);
+
+	// create two helper lists to keep track of the index restrictions that remains to be examined as we
+	// put different restrictions in appropriate index traversal loops
+	List<LogicalExpr*> *allRestrictions = indexRestrictions;
+	List<LogicalExpr*> *remainingRestrictions = new List<LogicalExpr*>;
+
 
 	// create an array for indexes that are single entry in the execution space so that we do not have to
 	// create loops for them
@@ -96,7 +103,7 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, S
 			rangeExpr->generateLoopForRangeExpr(stream, newIndent, space);
 			indentIncrease++;
 			newIndent++;	
-		}	
+		}
 
 		// generate auxiliary code for multi to unidimensional array indexing transformations
 		// for all array accesses that use this index
@@ -106,7 +113,29 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, S
 			IndexArrayAssociation *otherAssoc = list->Nth(j);
 			otherAssoc->generateTransform(stream, newIndent, space);
 		}
-	
+
+		// check any additional restrictions been provided and apply it to the loop as a iteration 
+		// escaping conditional statement
+		if (allRestrictions != NULL && allRestrictions->NumElements() > 0) {
+			remainingRestrictions = new List<LogicalExpr*>;
+			Hashtable<const char*> *invisibleIndexes = new Hashtable<const char*>;
+			for (int j = i + 1; j < associateList->NumElements(); j++) {
+				IndexArrayAssociation *otherAssoc = associateList->Nth(j);
+				const char *otherIndex = otherAssoc->getIndex();
+				invisibleIndexes->Enter(otherIndex, otherIndex, true);
+			}
+			List<LogicalExpr*> *applicableRestrictions = getApplicableExprs(invisibleIndexes, 
+					allRestrictions, remainingRestrictions);
+			if (applicableRestrictions != NULL && applicableRestrictions->NumElements() > 0) {
+				for (int k = 0; k < applicableRestrictions->NumElements(); k++) {	
+					for (int in = 0; in < newIndent; in++) stream << '\t';
+					stream << "if (";
+					applicableRestrictions->Nth(k)->translate(stream, newIndent, 0);
+					stream << ") continue;\n";
+				}
+			}
+			allRestrictions = remainingRestrictions;
+		}  	
 	}
 
 	// translate the body of the for loop
@@ -135,6 +164,29 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel, S
 	}	
 
 	IndexScope::currentScope->goBackToOldScope();
+}
+
+List<LogicalExpr*> *LoopStmt::getApplicableExprs(Hashtable<const char*> *indexesInvisible, 
+                        List<LogicalExpr*> *currentExprList, 
+                        List<LogicalExpr*> *remainingExprList) {
+
+	List<LogicalExpr*> *includedExprList = new List<LogicalExpr*>;
+	for (int i = 0; i < currentExprList->NumElements(); i++) {
+		LogicalExpr *expr = currentExprList->Nth(i);
+		List<FieldAccess*> *fieldAccessesInExpr = expr->getTerminalFieldAccesses();
+		bool invisibleIndexUsed = false;
+		for (int j = 0; j < fieldAccessesInExpr->NumElements(); j++) {
+			const char *fieldName = fieldAccessesInExpr->Nth(j)->getField()->getName();
+			if (indexesInvisible->Lookup(fieldName) != NULL) {
+				invisibleIndexUsed = true;
+				break;
+			}
+		}
+		if (invisibleIndexUsed) remainingExprList->Append(expr);
+		else includedExprList->Append(expr);	
+	}
+	
+	return includedExprList;
 }
 
 //------------------------------------------ Statement Block ----------------------------------------/
@@ -418,6 +470,11 @@ void IndexRangeCondition::validateIndexAssociations(Scope *scope, bool ignoreFai
 	}
 }
 
+LogicalExpr *IndexRangeCondition::getRestrictions() { 
+	if (restrictions == NULL) return NULL;
+	return dynamic_cast<LogicalExpr*>(restrictions); 
+}
+
 PLoopStmt::PLoopStmt(List<IndexRangeCondition*> *rc, Stmt *b, yyltype loc) : LoopStmt(loc) {
 	Assert(rc != NULL && b != NULL);
 	rangeConditions = rc;
@@ -480,7 +537,21 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 }
 
 void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
-	LoopStmt::generateIndexLoops(stream, indentLevel, space, body);
+	LoopStmt::generateIndexLoops(stream, indentLevel, space, body, getIndexRestrictions());
+}
+
+List<LogicalExpr*> *PLoopStmt::getIndexRestrictions() {
+	List<LogicalExpr*> *restrictionList = new List<LogicalExpr*>;
+	for (int i = 0; i < rangeConditions->NumElements(); i++) {
+		IndexRangeCondition *cond = rangeConditions->Nth(i);
+		LogicalExpr *restriction = cond->getRestrictions();
+		if (restriction != NULL) {
+			List<LogicalExpr*> *containedExprList = restriction->getANDBreakDown();
+			for (int j = 0; j < containedExprList->NumElements(); j++)
+			restrictionList->Append(containedExprList->Nth(j));
+		}
+	}
+	return restrictionList;
 }
 
 //--------------------------------------- Sequential For Loop -------------------------------------------/

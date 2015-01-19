@@ -25,14 +25,13 @@ Task "Substitution":
 			if (index_range.min < index_range.max) { 
 				do {
 					result = reduce("sum", m[i][k] * v_element)
-					v[k] = v[k] - result
 				} for i in m and i > k
 			} else {
 				do {
 					result = reduce ("sum", m[i][k] * v_element)
-					v[k] = v[k] - result
 				} for i in m and i < k
 			}
+			v[k] = v[k] - result
 		}
 		Repeat: from "Calculate Next Element" for k in index_range
 	Partition: 
