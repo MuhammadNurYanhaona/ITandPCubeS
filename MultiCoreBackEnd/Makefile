@@ -5,17 +5,22 @@
 
 .PHONY: clean strip
 
-# Set the default target. When you make with no arguments,
-# this will be the target built.
+# Set the default target. When you make with no arguments, this will be the target built.
 COMPILER = icc
 PRODUCTS = $(COMPILER) 
 default: $(PRODUCTS)
 
 # Set up the list of source and object files
-SRCS = $(shell find . ! -name "hashtable.cc" -name "*.cc")
+SRCS = $(shell find . ! -name "hashtable.cc" -name "*.cc" -not -path "./build/*")
+
+# Set up the list of source to compile generated code for any IT program
+BUILD_SRCS = $(shell find . -name "*.cc" -not -name "hashtable.cc" -not -name "main.cc")
 
 # OBJS can deal with either .cc or .c files listed in SRCS
 OBJS = y.tab.o lex.yy.o $(patsubst %.cc, %.o, $(filter %.cc,$(SRCS))) $(patsubst %.c, %.o, $(filter %.c, $(SRCS)))
+
+# objects for compiling any generated code for IT program
+BUILD_OBJS = y.tab.o lex.yy.o $(patsubst %.cc, %.o, $(filter %.cc, $(BUILD_SRCS)))
 
 JUNK =  *.o */*.o lex.yy.c dpp.yy.c y.tab.c y.tab.h *.core core $(COMPILER).purify purify.log 
 
@@ -63,7 +68,6 @@ y.tab.h y.tab.c: IT.y
 	$(CC) $(CFLAGS) -c -o $@ $*.cc
 
 # rules to build compiler (icc)
-
 $(COMPILER) : $(OBJS)
 	$(LD) -o $@ $(OBJS) $(LIBS)
 
@@ -87,4 +91,9 @@ depend:
 
 clean:
 	rm -f $(JUNK) y.output $(PRODUCTS)
+
+# make build will compile and generate executable for any IT program compiled by the IT compiler 
+build: $(BUILD_OBJS)
+	$(LD) -o it-program.o $(BUILD_OBJS) $(LIBS) 
+	
 

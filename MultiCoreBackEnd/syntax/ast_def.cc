@@ -164,6 +164,21 @@ List<TupleDef*> *ProgramDef::getTuples() {
 	return tupleList;	
 }
 
+CoordinatorDef *ProgramDef::getProgramController() {
+	for (int i = 0; i < components->NumElements(); i++) {
+                Node *node = components->Nth(i);
+		CoordinatorDef *controller = dynamic_cast<CoordinatorDef*>(node);
+		if (controller != NULL) return controller;
+	}
+	return NULL;
+}
+
+bool ProgramDef::isIsolatedTaskProgram() {
+	List<TaskDef*> *taskList = getTasks();
+	if (taskList->NumElements() != 1) return false;
+	return getProgramController() == NULL;
+}
+
 //----------------------------------------- Tuple Definition ------------------------------------------/
 
 TupleDef::TupleDef(Identifier *i, List<VariableDef*> *c) : Definition(*i->GetLocation()) {

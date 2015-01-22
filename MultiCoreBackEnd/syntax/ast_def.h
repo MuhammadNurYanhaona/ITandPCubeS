@@ -9,6 +9,7 @@
 
 class TaskDef;
 class TupleDef;
+class CoordinatorDef;
 
 class Definition : public Node {	
   public:
@@ -55,7 +56,9 @@ class ProgramDef : public Definition {
 	void printTasks();
 	Node *getTaskDefinition(const char *taskName); 
 	List<TaskDef*> *getTasks();
-	List<TupleDef*> *getTuples(); 
+	List<TupleDef*> *getTuples();
+	CoordinatorDef *getProgramController();
+	bool isIsolatedTaskProgram(); 
 };
 
 class TupleDef : public Definition {

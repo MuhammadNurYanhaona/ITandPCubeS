@@ -22,8 +22,7 @@ Task "Matrix Multiply":
 			c: block_size(k, l)
 			a: block_size(k), replicated
 			b: replicated, block_size(l)
-			// block-by-block flow of data inside a PCU is governed by the 
-			// sub-partition specification 
+			// block-by-block flow of data inside a PCU is governed by the sub-partition specification 
 			Sub-partition <1D> <unordered> {
 				a<dim2>, b<dim1>: block_size(q)
 			}

@@ -20,7 +20,9 @@
 #include "../syntax/ast_def.h"
 #include "../syntax/errors.h"
 #include "../syntax/ast_task.h"
+#include "../syntax/ast_type.h"
 #include "../static-analysis/task_global.h"
+#include "../semantics/task_space.h"
 
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
                 const char *outputDirectory,
@@ -101,6 +103,214 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 			programFile, initials, mappingConfig);
 
 	closeNameSpace(headerFile);
+}
+
+void TaskGenerator::generateTaskMain() {
+	
+	std::ofstream stream;
+	stream.open(programFile, std::ofstream::out | std::ofstream::app);
+	stream << "/*-----------------------------------------------------------------------------------\n";
+        stream << "main function\n";
+        stream << "------------------------------------------------------------------------------------*/\n";
+	
+	std::string indent = "\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+
+	// write the function signature
+	stream << "\nint main() {\n\n";
+	stream << indent << "std::cout << \"Starting " << taskDef->getName() << " Task\\n\"" << stmtSeparator;
+	stream << std::endl;
+		
+	// declares a list of default task related variables
+	stream << indent << "// declaring common task related variables\n";
+	stream << indent << "TaskGlobals taskGlobals" << stmtSeparator; 	
+	stream << indent << "ThreadLocals threadLocals" << stmtSeparator;
+	stream << indent << "EnvironmentLinks envLinks" << stmtSeparator;
+	stream << indent << "ArrayMetadata metadata" << stmtSeparator;
+	const char *upperInitials = string_utils::getInitials(taskDef->getName());
+	stream << indent << upperInitials << "Environment environment" << stmtSeparator;
+	stream << indent << upperInitials << "Partition partition" << stmtSeparator;
+	stream << std::endl;
+
+	// generate prompts to read metadata of arrays and values of other structures in environment links
+	List<const char*> *externalEnvLinks = initiateEnvLinks(stream);
+
+	// read in partition parameters
+	readPartitionParameters(stream);
+
+	// read any initialization parameter that are not already covered as environment links and invoke the
+	// initialize function
+	inovokeTaskInitializer(stream, externalEnvLinks);
+	
+	// close the function definition
+	stream << std::endl << indent << "return 0" << stmtSeparator;
+	stream << "}\n";
+	stream.close();
+}
+
+List<const char*> *TaskGenerator::initiateEnvLinks(std::ofstream &stream) {
+	
+        PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
+	Space *rootLps = lpsHierarchy->getRootSpace();
+
+	List<const char*> *externalEnvLinks = new List<const char*>;
+	std::string indent = "\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	
+	stream << indent << "// initializing variables that are environmental links \n";
+	stream << indent << "std::cout << \"initializing environmental links\\n\"" << stmtSeparator;
+
+	List<EnvironmentLink*> *envLinks = taskDef->getEnvironmentLinks();
+	for (int i = 0; i < envLinks->NumElements(); i++) {
+                EnvironmentLink *link = envLinks->Nth(i);
+		
+		// TODO instead of returning the isExternal clause should result in creating optional input prompts
+		// for variables that might or might not be external as we support link-or-create flag for an
+		// environment variable. Current logic only deals with linked variables spefified by the link flag.  
+                if (!link->isExternal()) continue;
+
+                const char *linkName = link->getVariable()->getName();
+		externalEnvLinks->Append(linkName);
+                DataStructure *structure = rootLps->getLocalStructure(linkName);
+                ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+                if (array != NULL) {
+			ArrayType *arrayType = (ArrayType*) array->getType();
+                        Type *elemType = arrayType->getTerminalElementType();
+			if (isUnsupportedInputType(elemType, linkName)) {
+				stream << indent << "//TODO put custom initializing code for " << linkName << "\n";
+			} else {
+				stream << indent;
+				stream << "inprompt::readArrayDimensionInfo(\"" << linkName << "\"" << paramSeparator;
+				stream << array->getDimensionality() << paramSeparator;
+				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
+			}
+		} else {
+			Type *type = structure->getType();
+			if (isUnsupportedInputType(type, linkName)) {
+				stream << indent << "//TODO put custom initializing code for " << linkName << "\n";
+			} else {
+				stream << indent;
+				stream << "envLinks." << linkName << " = ";
+				if (type == Type::boolType) {
+					stream << "inprompt::readBoolean";
+				} else {	
+					stream << "inprompt::readPrimitive";
+					stream << " <" << type->getName() << "> "; 
+				}
+				stream <<"(\"" << linkName << "\")";
+				stream << stmtSeparator;	
+			}
+		}
+	}
+	return externalEnvLinks;
+}
+
+bool TaskGenerator::isUnsupportedInputType(Type *type, const char *varName) {
+
+	ListType *list = dynamic_cast<ListType*>(type);
+	MapType *map = dynamic_cast<MapType*>(type);
+        NamedType *object = dynamic_cast<NamedType*>(type);
+        if (list != NULL || map != NULL || object != NULL) {
+        	std::cout << "We still don't know how to input complex types from an external source ";
+        	std::cout << "\nSo cannot initiate " << varName;
+                std::cout << "\nModify the generated code to include your custom initializer\n";
+		return true;
+        } else {
+		return false;
+        }
+}
+
+void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
+	
+	List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
+	std::string indent = "\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	
+	stream << std::endl << indent << "// determining values of partition parameters\n";
+	stream << indent << "std::cout << \"determining partition parameters\\n\"" << stmtSeparator;
+	
+	// Following variable is needed by the thread-state/LPU management library. We used this additional 
+	// structure along with a partition variable to be able to use statically defined library code
+	// for the most part.
+	stream << indent << "int *partitionArgs = NULL" << stmtSeparator;
+	int parameterCount = partitionArgs->NumElements();
+	if (parameterCount > 0) {
+		stream << indent << "partitionArgs = new int[" << parameterCount << "]" << stmtSeparator;
+	}
+	
+	// Display prompt for partition parameters one by one and assign them in appropriate field of the
+	// partition object of the task and in appropriate index within the partitionArgs array
+	for (int i = 0; i < partitionArgs->NumElements(); i++) {
+		const char *argName = partitionArgs->Nth(i)->getName();
+		stream << indent << "partition." << argName << " = inprompt::readPrimitive <int> ";
+		stream << "(\"" << argName << "\")" << stmtSeparator;
+		stream << indent << "partitionArgs[" << i << "] = partition." << argName;
+		stream << stmtSeparator; 
+	} 	
+}
+
+void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const char*> *externalEnvLinks) {
+	
+	InitializeInstr *initSection = taskDef->getInitSection();
+	List<const char*> *initArguments = NULL;
+	List<Type*> *argumentTypes = NULL;
+	if (initSection != NULL) {
+		initArguments = initSection->getArguments();
+		argumentTypes = initSection->getArgumentTypes();
+	}
+	
+	std::string indent = "\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	
+	stream << std::endl << indent << "// determining values of initialization parameters\n";
+	stream << indent << "std::cout << \"determining initialization parameters\\n\"" << stmtSeparator;
+
+	// If there are init arguments then we have to create local variables for them and generate prompts 
+	// to read them from the console. We maintain a flag to indicate if there are init arguments that
+	// we cannot currently read from external input (such as user defined objects and lists). If there
+	// are such parameters then the programmer needs to update the generated main function to initialize
+	// them and invoke the initialize function
+	bool initFunctionInvocable = true;
+	if (initArguments != NULL) {
+		for (int i = 0; i < initArguments->NumElements(); i++) {
+			const char *argName = initArguments->Nth(i);
+			Type *argumentType = argumentTypes->Nth(i);
+			stream << indent << argumentType->getCppDeclaration(argName) << stmtSeparator;
+			if (isUnsupportedInputType(argumentType, argName)) {
+				initFunctionInvocable = false;
+				stream << indent << "//TODO initialize " << argName << " here\n";			
+			} else {
+				if (Type::boolType == argumentType) {
+					stream << indent << argName << " = readBoolean(\"";
+					stream << argName << "\")" << stmtSeparator; 	
+				} else {
+					stream << indent << argName << " = readPrimitive ";
+					stream << "<" << argumentType->getName() << "> (\"";
+					stream << argName << "\")" << stmtSeparator;
+				}
+			}
+		}
+	}
+
+	stream << std::endl << indent << "// invoking the initializer function\n";
+	stream << indent << "std::cout << \"invoking task initializer function\\n\"" << stmtSeparator;
+	// Invoke the initializer function if it is invocable or write a comment directing code modifications
+	if (!initFunctionInvocable) {	
+		stream << indent << "//TODO invoke the initializeTask function after making required changes\n";
+		stream << indent << "//";			
+	}
+	stream << indent << "initializeTask(metadata, envLinks, taskGlobals, threadLocals, partition";
+	if (initArguments != NULL) {
+		for (int i = 0; i < initArguments->NumElements(); i++) {
+			const char *argName = initArguments->Nth(i);
+			stream << paramSeparator << argName;
+		}
+	}
+	stream << ")" << stmtSeparator;
 }
 
 

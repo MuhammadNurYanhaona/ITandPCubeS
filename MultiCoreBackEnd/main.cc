@@ -23,7 +23,7 @@
 
 int main(int argc, const char *argv[]) {
 
-	//**************************************************** Command Line Arguments Reader
+	//***************************************************** Command Line Arguments Reader
 	// read the input arguments and keep track of the appropriate files
 	const char *sourceFile, *pcubesFile, *mappingFile;
 	if (argc < 4) {
@@ -51,11 +51,11 @@ int main(int argc, const char *argv[]) {
 	// set the default output directory and common header file parameters
 	const char *outputDir = "build/";
 	const char *tupleHeader = "build/tuple.h";
-	//**********************************************************************************
+	//***********************************************************************************
 
 
 	
-	//*************************************************************** Front End Compiler
+	//**************************************************************** Front End Compiler
  	/* Entry point to the entire program. InitScanner() is used to set up the scanner.
 	 * InitParser() is used to set up the parser. The call to yyparse() will attempt to
 	 * parse a complete program from the input. 
@@ -70,21 +70,28 @@ int main(int argc, const char *argv[]) {
 	// Do static analysis analysis on the validated program
 	ProgramDef::program->performStaticAnalysis();	
 	if (ReportError::NumErrors() > 0) return -1;
-	//**********************************************************************************
+	//***********************************************************************************
 
 
 
-	//**************************************************************** Back End Compiler
+	//***************************************************************** Back End Compiler
 	// parse PCubeS description of the multicore hardware
 	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription(pcubesFile);
 	// iterate over list of tasks and generate code for each of them in separate files
 	List<TaskDef*> *taskList = ProgramDef::program->getTasks();
+	TaskGenerator *firstTaskGenerator= NULL;
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		TaskDef *taskDef = taskList->Nth(i);
 		TaskGenerator *generator = new TaskGenerator(taskDef, outputDir, mappingFile);
 		generator->generate(pcubesConfig);
+		if (i == 0) firstTaskGenerator = generator;
 	}
 	// generate classes for the list of tuples present in the source in a header file
 	generateClassesForTuples(tupleHeader, ProgramDef::program->getTuples());
+	// if the program file consist of an isolated task then generate a main function based
+	// on the task definition	
+	if (ProgramDef::program->isIsolatedTaskProgram()) {
+		firstTaskGenerator->generateTaskMain();
+	}
 }
 

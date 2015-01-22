@@ -555,9 +555,14 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
         programFile << "function for the initialize block\n";
         programFile << "------------------------------------------------------------------------------------*/\n";
 
-	// put three default parameters for task-globals, thread-locals, and partition configuration
+	// put five default parameters for metadata, env-Links, task-globals, thread-locals, and partition 
+	// configuration
 	std::ostringstream functionHeader;
-        functionHeader << "initializeTask(TaskGlobals taskGlobals";
+        functionHeader << "initializeTask(ArrayMetadata arrayMetadata";
+	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent; 
+        functionHeader << "EnvironmentLinks environmentLinks";
+	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent; 
+        functionHeader << "TaskGlobals taskGlobals";
 	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent; 
 	functionHeader << "ThreadLocals threadLocals";
 	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent;

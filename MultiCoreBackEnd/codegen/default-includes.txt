@@ -23,3 +23,6 @@
 // for routines related to partition functions
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
+
+// to input-output
+#include "../runtime/input_prompt.h"

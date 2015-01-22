@@ -1,22 +1,25 @@
 #ifndef _H_structure
 #define _H_structure
 
-/* structure definitions for built-in object types */
+/* class definitions for built-in object types */
 
-typedef struct {
+class Range {
+  public:
 	int min;
 	int max;
-} Range;
+};
 
-typedef struct {
+class Dimension {
+  public:
 	int length;
 	Range range;
-} Dimension;
+};
 
-typedef struct {
+class Epoch {
+  public:
 	int begin;
 	int current;
-} Epoch;
+};
 
 /* structure to demarcate the region of a dimension of an array that falls inside a single LPU */
 
