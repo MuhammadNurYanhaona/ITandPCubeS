@@ -3,6 +3,7 @@
 
 // for error reporting and diagnostics
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <cstdlib>
 #include <stdio.h>
@@ -37,7 +38,8 @@ constants for LPSes
 ------------------------------------------------------------------------------------*/
 const int Space_Root = 0;
 const int Space_A = 1;
-const int Space_Count = 2;
+const int Space_A_Sub = 2;
+const int Space_Count = 3;
 
 /*-----------------------------------------------------------------------------------
 constants for PPS counts
@@ -58,6 +60,7 @@ const int Threads_Par_Core = 1;
 functions for retrieving partition counts in different LPSes
 ------------------------------------------------------------------------------------*/
 int *getLPUsCountOfSpaceA(int ppuCount, Dimension cDim1, int k, Dimension cDim2, int l);
+int *getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q);
 
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
@@ -68,6 +71,10 @@ PartitionDimension **getbPartForSpaceALpu(PartitionDimension **bParentLpuDims,
 		int *lpuCount, int *lpuId, int l);
 PartitionDimension **getcPartForSpaceALpu(PartitionDimension **cParentLpuDims, 
 		int *lpuCount, int *lpuId, int k, int l);
+PartitionDimension **getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDims, 
+		int *lpuCount, int *lpuId, int q);
+PartitionDimension **getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDims, 
+		int *lpuCount, int *lpuId, int q);
 
 /*-----------------------------------------------------------------------------------
 Data structures representing LPS and LPU contents 
@@ -106,6 +113,24 @@ class SpaceA_LPU : public LPU {
 	float *c;
 	PartitionDimension **cPartDims;
 	int lpuId[2];
+};
+
+class SpaceA_Sub_Content {
+  public:
+	float *a;
+	float *b;
+	float *c;
+};
+
+class SpaceA_Sub_LPU : public LPU {
+  public:
+	float *a;
+	PartitionDimension **aPartDims;
+	float *b;
+	PartitionDimension **bPartDims;
+	float *c;
+	PartitionDimension **cPartDims;
+	int lpuId[1];
 };
 
 /*-----------------------------------------------------------------------------------
@@ -152,6 +177,10 @@ Thread-State implementation class for the task
 
 class ThreadStateImpl : public ThreadState {
   public:
+	ThreadStateImpl(int lpsCount, int *lpsDimensions, 
+			int *partitionArgs, 
+			ThreadIds *threadIds) 
+		: ThreadState(lpsCount, lpsDimensions, partitionArgs, threadIds) {}
 	void setLpsParentIndexMap();
         void setRootLpu();
         int *computeLpuCounts(int lpsId);
@@ -172,7 +201,7 @@ void initializeTask(ArrayMetadata arrayMetadata,
 functions for compute stages 
 ------------------------------------------------------------------------------------*/
 
-void mm_function0(SpaceA_LPU lpu, 
+void block_multiply_matrices(SpaceA_Sub_LPU lpu, 
 		ArrayMetadata arrayMetadata, 
 		TaskGlobals taskGlobals, 
 		ThreadLocals threadLocals, MMPartition partition);

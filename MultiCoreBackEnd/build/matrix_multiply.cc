@@ -8,6 +8,7 @@ header files included for different purposes
 ------------------------------------------------------------------------------------*/
 // for error reporting and diagnostics
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <cstdlib>
 #include <stdio.h>
@@ -45,6 +46,12 @@ int *mm::getLPUsCountOfSpaceA(int ppuCount, Dimension cDim1, int k, Dimension cD
 	int *count = new int[2];
 	count[0] = block_size_partitionCount(cDim1, ppuCount, k);
 	count[1] = block_size_partitionCount(cDim2, ppuCount, l);
+	return count;
+}
+
+int *mm::getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q) {
+	int *count = new int[1];
+	count[0] = block_size_partitionCount(aDim2, ppuCount, q);
 	return count;
 }
 
@@ -88,6 +95,28 @@ PartitionDimension **mm::getcPartForSpaceALpu(PartitionDimension **cParentLpuDim
 	return cLpuDims;
 }
 
+PartitionDimension **mm::getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDims, 
+		int *lpuCount, int *lpuId, int q) {
+	PartitionDimension **aLpuDims = new PartitionDimension*[2];
+	aLpuDims[0] = aParentLpuDims[0];
+	aLpuDims[1] = new PartitionDimension;
+	aLpuDims[1]->storageDim = aParentLpuDims[1]->partitionDim;
+	aLpuDims[1]->partitionDim = block_size_getRange(*aParentLpuDims[1]->partitionDim, 
+			lpuCount[0], lpuId[0], q, 0, 0);
+	return aLpuDims;
+}
+
+PartitionDimension **mm::getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDims, 
+		int *lpuCount, int *lpuId, int q) {
+	PartitionDimension **bLpuDims = new PartitionDimension*[2];
+	bLpuDims[0] = new PartitionDimension;
+	bLpuDims[0]->storageDim = bParentLpuDims[0]->partitionDim;
+	bLpuDims[0]->partitionDim = block_size_getRange(*bParentLpuDims[0]->partitionDim, 
+			lpuCount[0], lpuId[0], q, 0, 0);
+	bLpuDims[1] = bParentLpuDims[1];
+	return bLpuDims;
+}
+
 /*-----------------------------------------------------------------------------------
 function to generate PPU IDs and PPU group IDs for a thread
 ------------------------------------------------------------------------------------*/
@@ -95,15 +124,25 @@ function to generate PPU IDs and PPU group IDs for a thread
 ThreadIds *mm::getPpuIdsForThread(int threadNo)  {
 
 	ThreadIds *threadIds = new ThreadIds;
+	threadIds->threadNo = threadNo;
+	threadIds->lpsCount = Space_Count;
 	threadIds->ppuIds = new PPU_Ids[Space_Count];
 	int idsArray[Space_Count];
 	idsArray[Space_Root] = threadNo;
+
+	// for Space Root
+	threadIds->ppuIds[Space_Root].lpsName = "Root";
+	threadIds->ppuIds[Space_Root].groupId = 0;
+	threadIds->ppuIds[Space_Root].groupSize = Total_Threads;
+	threadIds->ppuIds[Space_Root].ppuCount = 1;
+	threadIds->ppuIds[Space_Root].id = (threadNo == 0) ? 0 : INVALID_ID;
 
 	int threadCount;
 	int groupSize;
 	int groupThreadId;
 
 	// for Space A;
+	threadIds->ppuIds[Space_A].lpsName = "A";
 	threadCount = Total_Threads;
 	groupSize = threadCount / 16;
 	groupThreadId = idsArray[Space_Root] % groupSize;
@@ -114,6 +153,14 @@ ThreadIds *mm::getPpuIdsForThread(int threadNo)  {
 			= threadIds->ppuIds[Space_A].groupId;
 	else threadIds->ppuIds[Space_A].id = INVALID_ID;
 	idsArray[Space_A] = groupThreadId;
+
+	// for Space A_Sub;
+	threadIds->ppuIds[Space_A_Sub].lpsName = "A_Sub";
+	threadIds->ppuIds[Space_A_Sub].groupId = 0;
+	threadIds->ppuIds[Space_A_Sub].ppuCount = 1;
+	threadIds->ppuIds[Space_A_Sub].groupSize = threadIds->ppuIds[Space_A].groupSize;
+	threadIds->ppuIds[Space_A_Sub].id = 0;
+	idsArray[Space_A_Sub] = idsArray[Space_A];
 
 	return threadIds;
 }
@@ -127,6 +174,7 @@ void ThreadStateImpl::setLpsParentIndexMap() {
 	lpsParentIndexMap = new int[Space_Count];
 	lpsParentIndexMap[Space_Root] = INVALID_ID;
 	lpsParentIndexMap[Space_A] = Space_Root;
+	lpsParentIndexMap[Space_A_Sub] = Space_A;
 }
 
 // Construction of task specific root LPU
@@ -177,6 +225,14 @@ int *ThreadStateImpl::computeLpuCounts(int lpsId) {
 				*spaceRootLpu->cPartDims[1]->partitionDim, 
 				partitionArgs[1]);
 	}
+	if (lpsId == Space_A_Sub) {
+		int ppuCount = threadIds->ppuIds[Space_A_Sub].ppuCount;
+		SpaceA_LPU *spaceALpu = (SpaceA_LPU*) 
+				lpsStates[Space_A]->lpu;
+		return getLPUsCountOfSpaceA_Sub(ppuCount, 
+				*spaceALpu->aPartDims[1]->partitionDim, 
+				partitionArgs[2]);
+	}
 	return NULL;
 }
 
@@ -200,6 +256,23 @@ LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) 
 		currentLpu->cPartDims = getcPartForSpaceALpu(
 				spaceRootLpu->cPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[0], partitionArgs[1]);
+		return currentLpu;
+	}
+	if (lpsId == Space_A_Sub) {
+		SpaceA_LPU *spaceALpu = (SpaceA_LPU*) 
+				lpsStates[Space_A]->lpu;
+		SpaceA_Sub_LPU *currentLpu = new SpaceA_Sub_LPU;
+		currentLpu->lpuId[0] = nextLpuId[0];
+		currentLpu->a = NULL;
+		currentLpu->aPartDims = getaPartForSpaceA_SubLpu(
+				spaceALpu->aPartDims, lpuCounts, nextLpuId, 
+				partitionArgs[2]);
+		currentLpu->b = NULL;
+		currentLpu->bPartDims = getbPartForSpaceA_SubLpu(
+				spaceALpu->bPartDims, lpuCounts, nextLpuId, 
+				partitionArgs[2]);
+		currentLpu->c = NULL;
+		currentLpu->cPartDims = spaceALpu->cPartDims;
 		return currentLpu;
 	}
 	return NULL;
@@ -227,7 +300,7 @@ void mm::initializeTask(ArrayMetadata arrayMetadata,
 functions for compute stages 
 ------------------------------------------------------------------------------------*/
 
-void mm::mm_function0(SpaceA_LPU lpu, 
+void mm::block_multiply_matrices(SpaceA_Sub_LPU lpu, 
 		ArrayMetadata arrayMetadata, 
 		TaskGlobals taskGlobals, 
 		ThreadLocals threadLocals, MMPartition partition) {
@@ -325,13 +398,26 @@ void mm::run(ArrayMetadata arrayMetadata,
 	LPU *lpu = NULL;
 	while((lpu = threadState.getNextLpu(Space_A, Space_Root, spaceALpuId)) != NULL) {
 		spaceALpu = (SpaceA_LPU*) lpu;
-		if (threadState.isValidPpu(Space_A)) {
-			// invoking user computation
-			mm_function0(*spaceALpu, 
-					arrayMetadata,
-					taskGlobals,
-					threadLocals, partition);
+		{ // scope entrance for iterating LPUs of Space A_Sub
+		int spaceA_SubLpuId = INVALID_ID;
+		int spaceA_SubIteration = 0;
+		SpaceA_Sub_LPU *spaceA_SubLpu = NULL;
+		LPU *lpu = NULL;
+		while((lpu = threadState.getNextLpu(Space_A_Sub, Space_A, spaceA_SubLpuId)) != NULL) {
+			spaceA_SubLpu = (SpaceA_Sub_LPU*) lpu;
+			//this is a comment correspond to a sync stage
+			if (threadState.isValidPpu(Space_A_Sub)) {
+				// invoking user computation
+				block_multiply_matrices(*spaceA_SubLpu, 
+						arrayMetadata,
+						taskGlobals,
+						threadLocals, partition);
+			}
+			spaceA_SubLpuId = spaceA_SubLpu->id;
+			spaceA_SubIteration++;
 		}
+		threadState.removeIterationBound(Space_A);
+		} // scope exit for iterating LPUs of Space A_Sub
 		spaceALpuId = spaceALpu->id;
 		spaceAIteration++;
 	}
@@ -354,6 +440,10 @@ int main() {
 	MMEnvironment environment;
 	MMPartition partition;
 
+	// creating a program log file
+	std::cout << "Creating diagnostic log: it-program.log\n";
+	std::ofstream logFile;
+	logFile.open("it-program.log");
 	// initializing variables that are environmental links 
 	std::cout << "initializing environmental links\n";
 	inprompt::readArrayDimensionInfo("a", 2, envLinks.aDims);
@@ -362,11 +452,13 @@ int main() {
 	// determining values of partition parameters
 	std::cout << "determining partition parameters\n";
 	int *partitionArgs = NULL;
-	partitionArgs = new int[2];
+	partitionArgs = new int[3];
 	partition.k = inprompt::readPrimitive <int> ("k");
 	partitionArgs[0] = partition.k;
 	partition.l = inprompt::readPrimitive <int> ("l");
 	partitionArgs[1] = partition.l;
+	partition.q = inprompt::readPrimitive <int> ("q");
+	partitionArgs[2] = partition.q;
 
 	// determining values of initialization parameters
 	std::cout << "determining initialization parameters\n";
@@ -375,5 +467,31 @@ int main() {
 	std::cout << "invoking task initializer function\n";
 	initializeTask(metadata, envLinks, taskGlobals, threadLocals, partition);
 
+	// setting the global metadata variable
+	arrayMetadata = metadata;
+
+	// declaring and initializing state variables for threads 
+	ThreadLocals threadLocalsList[Total_Threads];
+	for (int i = 0; i < Total_Threads; i++) {
+		threadLocalsList[i] = threadLocals;
+	}
+	int lpsDimensions[Space_Count];
+	lpsDimensions[Space_Root] = 0;
+	lpsDimensions[Space_A] = 2;
+	lpsDimensions[Space_A_Sub] = 1;
+	std::cout << "generating PPU Ids for threads\n";
+	ThreadIds *threadIdsList[Total_Threads];
+	for (int i = 0; i < Total_Threads; i++) {
+		threadIdsList[i] = getPpuIdsForThread(i);
+		threadIdsList[i]->print(logFile);
+	}
+	std::cout << "initiating thread-states\n";
+	ThreadStateImpl *threadStateList[Total_Threads];
+	for (int i = 0; i < Total_Threads; i++) {
+		threadStateList[i] = new ThreadStateImpl(Space_Count, 
+				lpsDimensions, partitionArgs, threadIdsList[i]);
+	}
+
+	logFile.close();
 	return 0;
 }

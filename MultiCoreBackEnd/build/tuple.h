@@ -4,49 +4,21 @@
 #include <iostream>
 #include <vector>
 
-class Point;
-class Rectangle;
-class Coefficients;
-class PlacementStatistic;
-class MCAEEnvironment;
-class MCAEPartition;
+class MMEnvironment;
+class MMPartition;
 
-class Point {
+class MMEnvironment {
   public:
-	float x;
-	float y;
+	float* a;
+	float* b;
+	float* c;
 };
 
-class Rectangle {
+class MMPartition {
   public:
-	int top;
-	int right;
-	int bottom;
-	int left;
-};
-
-class Coefficients {
-  public:
-	int order;
-	float values[2];
-};
-
-class PlacementStatistic {
-  public:
-	int pointsInside;
-	int pointsOutside;
-};
-
-class MCAEEnvironment {
-  public:
-	Rectangle* grid;
-	std::vector<Coefficients> shape;
-	float area;
-};
-
-class MCAEPartition {
-  public:
-	int p;
+	int k;
+	int l;
+	int q;
 };
 
 #endif

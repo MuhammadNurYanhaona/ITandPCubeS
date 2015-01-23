@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <deque>
 
 #include "code_generator.h"
 #include "thread_state_mgmt.h"
@@ -45,6 +46,8 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 
 	initials = string_utils::getInitials(taskDef->getName());
 	initials = string_utils::toLower(initials);
+
+	mappingRoot = NULL;
 }
 
 void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
@@ -55,9 +58,11 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
 	initializeOutputFiles(headerFile, programFile, initials);
 
+	// interpret mapping configuration
         PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
         MappingNode *mappingConfig = parseMappingConfiguration(taskDef->getName(),
                         mappingFile, lpsHierarchy, pcubesConfig);
+	this->mappingRoot = mappingConfig;
         
 	// generate constansts needed for various reasons
         generateLPSConstants(headerFile, mappingConfig);
@@ -107,6 +112,10 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
 void TaskGenerator::generateTaskMain() {
 	
+	std::cout << "\n-----------------------------------------------------------------\n";
+	std::cout << "Generating a main fcuntion for task: " << taskDef->getName();
+	std::cout << "\n-----------------------------------------------------------------\n";
+	
 	std::ofstream stream;
 	stream.open(programFile, std::ofstream::out | std::ofstream::app);
 	stream << "/*-----------------------------------------------------------------------------------\n";
@@ -133,6 +142,12 @@ void TaskGenerator::generateTaskMain() {
 	stream << indent << upperInitials << "Partition partition" << stmtSeparator;
 	stream << std::endl;
 
+	// create a log file for overall program log printing
+	stream << indent << "// creating a program log file\n";
+	stream << indent << "std::cout << \"Creating diagnostic log: it-program.log\\n\"" << stmtSeparator;
+	stream << indent << "std::ofstream logFile" << stmtSeparator;
+	stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator;
+
 	// generate prompts to read metadata of arrays and values of other structures in environment links
 	List<const char*> *externalEnvLinks = initiateEnvLinks(stream);
 
@@ -142,9 +157,18 @@ void TaskGenerator::generateTaskMain() {
 	// read any initialization parameter that are not already covered as environment links and invoke the
 	// initialize function
 	inovokeTaskInitializer(stream, externalEnvLinks);
-	
-	// close the function definition
-	stream << std::endl << indent << "return 0" << stmtSeparator;
+
+	// assign the metadata created in the static arraymetadata object so that thread initialization can
+	// be done
+	stream << std::endl << indent << "// setting the global metadata variable\n";
+	stream << indent << "arrayMetadata = metadata" << stmtSeparator;
+
+	// generate thread-state objects for the intended number of threads and initialize their root LPUs
+	initiateThreadStates(stream);
+
+	// close the log file and end the function definition
+	stream << std::endl << indent << "logFile.close()" << stmtSeparator;
+	stream << indent << "return 0" << stmtSeparator;
 	stream << "}\n";
 	stream.close();
 }
@@ -224,6 +248,8 @@ bool TaskGenerator::isUnsupportedInputType(Type *type, const char *varName) {
 
 void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
 	
+	std::cout << "Generating code for taking input partition parameters\n";
+
 	List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
 	std::string indent = "\t";
 	std::string stmtSeparator = ";\n";
@@ -254,6 +280,8 @@ void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
 
 void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const char*> *externalEnvLinks) {
 	
+	std::cout << "Generating code for invoking the task initializer function\n";
+
 	InitializeInstr *initSection = taskDef->getInitSection();
 	List<const char*> *initArguments = NULL;
 	List<Type*> *argumentTypes = NULL;
@@ -313,4 +341,54 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const cha
 	stream << ")" << stmtSeparator;
 }
 
+void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
+	
+	std::cout << "Generating state variables for threads\n";
+
+	std::string indent = "\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	
+	stream << std::endl << indent << "// declaring and initializing state variables for threads \n";	
+
+	// declare an array of task-locals so that each thread can have its own copy for this for independent 
+	// updates
+	stream << indent << "ThreadLocals threadLocalsList[Total_Threads]" << stmtSeparator;
+	// generate a loop copying the initialized task-local variable into entries of the array
+	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << indent << "threadLocalsList[i] = threadLocals" << stmtSeparator;
+	stream << indent << "}\n";
+
+	// iterate over the mapping configuration and create an array of LPS dimensionality information
+	stream << indent << "int lpsDimensions[Space_Count]" << stmtSeparator;
+	std::deque<MappingNode*> nodeQueue;
+        nodeQueue.push_back(mappingRoot);
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+                Space *lps = node->mappingConfig->LPS;
+                stream << indent << "lpsDimensions[Space_" << lps->getName() << "] = ";
+		stream << lps->getDimensionCount() << stmtSeparator;
+        }
+	
+	// create an array of thread IDs and initiate them
+	stream << indent << "std::cout << \"generating PPU Ids for threads\\n\"" << stmtSeparator;
+	stream << indent << "ThreadIds *threadIdsList[Total_Threads]" << stmtSeparator;
+	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << indent << "threadIdsList[i] = getPpuIdsForThread(i)" << stmtSeparator;
+	stream << indent << indent << "threadIdsList[i]->print(logFile)" << stmtSeparator;
+	stream << indent << "}\n";
+
+	// finally create an array of Thread-State variables and initiate them	
+	stream << indent << "std::cout << \"initiating thread-states\\n\"" << stmtSeparator;
+	stream << indent << "ThreadStateImpl *threadStateList[Total_Threads]" << stmtSeparator;
+	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << indent << "threadStateList[i] = new ThreadStateImpl(Space_Count, ";
+	stream << std::endl << indent << indent << indent << indent;
+	stream << "lpsDimensions, partitionArgs, threadIdsList[i])" << stmtSeparator;
+	stream << indent << "}\n";
+}
 

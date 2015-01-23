@@ -1,5 +1,6 @@
 // for error reporting and diagnostics
 #include <iostream>
+#include <fstream>
 #include <string>
 #include <cstdlib>
 #include <stdio.h>

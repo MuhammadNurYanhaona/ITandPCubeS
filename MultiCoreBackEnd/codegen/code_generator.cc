@@ -168,6 +168,9 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 	functionBody << " {\n\n" << statementIndent;
 	functionBody << "ThreadIds *threadIds = new ThreadIds";
 	functionBody << statementSeparator;
+	functionBody << statementIndent << "threadIds->threadNo = threadNo" << statementSeparator;
+	functionBody << statementIndent << "threadIds->lpsCount = Space_Count" << statementSeparator;
+
 	// allocate a new array to hold the PPU Ids of the thread
 	functionBody << statementIndent<< "threadIds->ppuIds = new PPU_Ids[Space_Count]" << statementSeparator;
 	// declare a local array to hold the index of the thread in different PPS group for ID assignment
@@ -175,6 +178,20 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 	functionBody << statementIndent << "int idsArray[Space_Count]" << statementSeparator;
 	functionBody << statementIndent << "idsArray[Space_Root] = threadNo" << statementSeparator; 
 
+	// enter default values for the root LPS
+	std::ostringstream rootVarStr;
+	rootVarStr << "threadIds->ppuIds[Space_";
+	rootVarStr << mappingRoot->mappingConfig->LPS->getName() << "]";
+	std::string rootName = rootVarStr.str();
+	functionBody << std::endl << statementIndent << "// for Space Root\n";
+	functionBody << statementIndent << rootName << ".lpsName = \"Root\"" << statementSeparator;
+	functionBody << statementIndent << rootName << ".groupId = 0" << statementSeparator;
+	functionBody << statementIndent << rootName << ".groupSize = Total_Threads" << statementSeparator;
+	functionBody << statementIndent << rootName << ".ppuCount = 1" << statementSeparator;
+	functionBody << statementIndent << rootName << ".id = (threadNo == 0) ? 0 : INVALID_ID";
+	functionBody << statementSeparator;
+	
+	// then begin processing for other LPSes
 	std::deque<MappingNode*> nodeQueue;
         for (int i = 0; i < mappingRoot->children->NumElements(); i++) {
         	nodeQueue.push_back(mappingRoot->children->Nth(i));
@@ -215,6 +232,9 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 		std::ostringstream groupThreadIdStr; 
 	
 		functionBody << statementIndent << "// for Space " << lps->getName() << statementSeparator;
+		functionBody << statementIndent << varName << ".lpsName = \"" << lps->getName();
+		functionBody << "\"" << statementSeparator;
+
 		// if the current LPS is a subpartition then most of the fields of a thread Id can be 
 		// copied from its parent LPU configuration
 		if (lps->isSubpartitionSpace()) {

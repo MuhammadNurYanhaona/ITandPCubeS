@@ -12,6 +12,7 @@
 #include "../utils/list.h"
 
 class PPS_Definition;
+class MappingNode;
 
 // This is basically a coordinator class that generates data structures, constansts, and functions
 // corresponding to a single IT task in matching header and program file. It is a coordinator as
@@ -26,6 +27,7 @@ class TaskGenerator {
 	const char *headerFile;
 	const char *programFile;
 	const char *initials;
+	MappingNode *mappingRoot;
   public:
 	TaskGenerator(TaskDef *taskDef, 
 		const char *outputDirectory, 
@@ -54,7 +56,10 @@ class TaskGenerator {
 	void readPartitionParameters(std::ofstream &stream);
 	// a supporting function for task main that get input initialization parameters and invoke
 	// tasks initialization function
-	void inovokeTaskInitializer(std::ofstream &stream, List<const char*> *externalEnvLinks);	 		
+	void inovokeTaskInitializer(std::ofstream &stream, List<const char*> *externalEnvLinks);
+	// a supporting function for generating an array of thread-state objects, one for each thread,
+	// then initializing them	
+	void initiateThreadStates(std::ofstream &stream);	 		
 };
 
 #endif
