@@ -22,7 +22,7 @@ void NameTransformer::reset() {
 	taskGlobals = new List<const char*>;
 	threadLocals = new List<const char*>;
 	globalArrays = new List<const char*>;
-	lpuPrefix = "lpu.";
+	lpuPrefix = "lpu->";
 	localAccessDisabled = false;		
 }
 
@@ -50,10 +50,10 @@ bool NameTransformer::isGlobalArray(const char *varName) {
 const char *NameTransformer::getTransformedName(const char *varName, bool metadata, bool local) {
 	std::ostringstream xformedName;
 	if (isTaskGlobal(varName)) {
-		xformedName << "taskGlobals." << varName;
+		xformedName << "taskGlobals->" << varName;
 		return strdup(xformedName.str().c_str());
 	} else if (isThreadLocal(varName)) {
-		xformedName << "threadLocals." << varName;
+		xformedName << "threadLocals->" << varName;
 		return strdup(xformedName.str().c_str());
 	} else if (isGlobalArray(varName)) {
 		if (metadata) {
@@ -61,7 +61,7 @@ const char *NameTransformer::getTransformedName(const char *varName, bool metada
 				xformedName << varName << "PartDims";
 				return strdup(xformedName.str().c_str());
 			} else {
-				xformedName << "arrayMetadata." << varName << "Dims";
+				xformedName << "arrayMetadata->" << varName << "Dims";
 				return strdup(xformedName.str().c_str());
 			}
 		} else {

@@ -2,6 +2,7 @@
 #define _H_lpu_management
 
 #include "structure.h"
+#include <fstream>
 
 /* Remember that there is a partial ordering of logical processing spaces (LPS). Thereby, the number of
    LPUs for a child LPS at a particular point of computation depends on the size of the data structure
@@ -68,9 +69,24 @@ class MockLpuCounter : public LpuCounter {
 
 /* base class for LPUs of all LPSes; task specific subclasses will add other necessary fields  */
 class LPU {
-  public: 
+  public:
 	int id;
+	bool valid;
+	
+	LPU() { id = 0; valid = false; } 
+	void setId(int id) { this->id = id; }	
+	void setValidBit(bool valid) { this->valid = valid; }
+	bool isValid() { return valid; }
 };
+
+/* base class for task metadata object that holds the dimension information of all arrays been used */
+class Metadata {
+  public:
+	const char *taskName;
+	Metadata() { taskName = NULL; }
+	void setTaskName(const char *taskName) { this->taskName = taskName; }
+	const char *getTaskName() { return taskName; }
+};	
 
 /* class for holding all necessary state information for an LPS of a thread */
 class LpsState {
@@ -88,8 +104,8 @@ class LpsState {
 	void markAsIterationBound() { iterationBound = true; }
 	bool isIterationBound() { return iterationBound; }
 	void removeIterationBound() { iterationBound = false; }
-	void setCurrentLpu(LPU *currentLpu) { lpu = currentLpu; }
-	LPU *getCurrentLpu() { return lpu; }
+	LPU *getCurrentLpu();
+	void invalidateCurrentLpu() { lpu->setValidBit(false); }
 	LpuCounter *getCounter() { return counter; }
 };
 
@@ -110,19 +126,35 @@ class ThreadState {
 	// a reference to the partition arguments (all are integers) passed during task invocation is 
 	// maintaines as these arguments are needed for LPU calculation	
 	int *partitionArgs;
+	
   public:
 	ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, ThreadIds *threadIds);
 		
 	virtual void setLpsParentIndexMap() = 0;
-	virtual void setRootLpu() = 0;
+	virtual void setRootLpu(Metadata *metadata) = 0;
+	virtual void initializeLPUs() = 0;
 	virtual int *computeLpuCounts(int lpsId) = 0;
 	virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;
 
+	// The get-Next-Lpu management routine is at the heart of recursive LPU management for threads by
+	// the runtime library. It takes as input the ID of the LPS on which the thread is attempting to
+	// execute any compute-stage and the ID of the LPS from which the flow of control descended to current
+	// LPS under concern. Alongside, it takes input the ID of the last LPU been executed in current LPS
+	// to distinguish between first-time and subsequent requests. Internally, it runs a recursive 
+	// procedure to set up LPUs on not only the current LPS but also any LPS in-between the container 
+	// and the current. Furthermore, it maintains the state of those LPSes as computation continues on
+	// LPUs after LPUs. It returns NULL when the recursive process has no more LPUs to return.	
 	LPU *getNextLpu(int lpsId, int containerLpsId, int currentLpuId);
+
 	void removeIterationBound(int lpsId);
 	ThreadIds *getThreadIds() { return threadIds; }
-	bool isValidPpu(int lpsId); 
+	bool isValidPpu(int lpsId);
+	void initiateLogFile(const char *fileNamePrefix); 
 	virtual ~ThreadState() {}
+	
+	// a log file for diagnostics
+	std::ofstream threadLog;
+	void logExecution(const char *stageName, int spaceId);
 };
 
 

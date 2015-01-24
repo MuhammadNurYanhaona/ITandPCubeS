@@ -1,0 +1,6 @@
+Starting Matrix Multiply Task
+Creating diagnostic log: it-program.log
+initializing environmental links
+Enter the dimension lengths for 2D array "a"
+The format is "Dim1-Range * Dim2-Range"
+Here a range has the form "Start-Index:End-Index"

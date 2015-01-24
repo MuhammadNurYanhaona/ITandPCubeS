@@ -59,62 +59,59 @@ int *mm::getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q) {
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
 
-PartitionDimension **mm::getaPartForSpaceALpu(PartitionDimension **aParentLpuDims, 
+void mm::getaPartForSpaceALpu(PartDimension *aLpuDims, 
+		PartDimension *aParentLpuDims, 
 		int *lpuCount, int *lpuId, int k) {
-	PartitionDimension **aLpuDims = new PartitionDimension*[2];
-	aLpuDims[0] = new PartitionDimension;
-	aLpuDims[0]->storageDim = aParentLpuDims[0]->partitionDim;
-	aLpuDims[0]->partitionDim = block_size_getRange(*aParentLpuDims[0]->partitionDim, 
+	aLpuDims[0].storage = aParentLpuDims[0].storage;
+	aLpuDims[0].partition = block_size_getRange(aParentLpuDims[0].partition, 
 			lpuCount[0], lpuId[0], k, 0, 0);
 	aLpuDims[1] = aParentLpuDims[1];
-	return aLpuDims;
 }
 
-PartitionDimension **mm::getbPartForSpaceALpu(PartitionDimension **bParentLpuDims, 
+void mm::getbPartForSpaceALpu(PartDimension *bLpuDims, 
+		PartDimension *bParentLpuDims, 
 		int *lpuCount, int *lpuId, int l) {
-	PartitionDimension **bLpuDims = new PartitionDimension*[2];
-	bLpuDims[0] = new PartitionDimension;
-	bLpuDims[0]->storageDim = bParentLpuDims[0]->partitionDim;
-	bLpuDims[0]->partitionDim = block_size_getRange(*bParentLpuDims[0]->partitionDim, 
+	bLpuDims[0].storage = bParentLpuDims[0].storage;
+	bLpuDims[0].partition = block_size_getRange(bParentLpuDims[0].partition, 
 			lpuCount[1], lpuId[1], l, 0, 0);
 	bLpuDims[1] = bParentLpuDims[1];
-	return bLpuDims;
 }
 
-PartitionDimension **mm::getcPartForSpaceALpu(PartitionDimension **cParentLpuDims, 
+void mm::getcPartForSpaceALpu(PartDimension *cLpuDims, 
+		PartDimension *cParentLpuDims, 
 		int *lpuCount, int *lpuId, int k, int l) {
-	PartitionDimension **cLpuDims = new PartitionDimension*[2];
-	cLpuDims[0] = new PartitionDimension;
-	cLpuDims[0]->storageDim = cParentLpuDims[0]->partitionDim;
-	cLpuDims[0]->partitionDim = block_size_getRange(*cParentLpuDims[0]->partitionDim, 
+	cLpuDims[0].storage = cParentLpuDims[0].storage;
+	cLpuDims[0].partition = block_size_getRange(cParentLpuDims[0].partition, 
 			lpuCount[0], lpuId[0], k, 0, 0);
-	cLpuDims[1] = new PartitionDimension;
-	cLpuDims[1]->storageDim = cParentLpuDims[1]->partitionDim;
-	cLpuDims[1]->partitionDim = block_size_getRange(*cParentLpuDims[1]->partitionDim, 
+	cLpuDims[1].storage = cParentLpuDims[1].storage;
+	cLpuDims[1].partition = block_size_getRange(cParentLpuDims[1].partition, 
 			lpuCount[1], lpuId[1], l, 0, 0);
-	return cLpuDims;
 }
 
-PartitionDimension **mm::getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDims, 
+void mm::getaPartForSpaceA_SubLpu(PartDimension *aLpuDims, 
+		PartDimension *aParentLpuDims, 
 		int *lpuCount, int *lpuId, int q) {
-	PartitionDimension **aLpuDims = new PartitionDimension*[2];
 	aLpuDims[0] = aParentLpuDims[0];
-	aLpuDims[1] = new PartitionDimension;
-	aLpuDims[1]->storageDim = aParentLpuDims[1]->partitionDim;
-	aLpuDims[1]->partitionDim = block_size_getRange(*aParentLpuDims[1]->partitionDim, 
+	aLpuDims[1].storage = aParentLpuDims[1].storage;
+	aLpuDims[1].partition = block_size_getRange(aParentLpuDims[1].partition, 
 			lpuCount[0], lpuId[0], q, 0, 0);
-	return aLpuDims;
 }
 
-PartitionDimension **mm::getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDims, 
+void mm::getbPartForSpaceA_SubLpu(PartDimension *bLpuDims, 
+		PartDimension *bParentLpuDims, 
 		int *lpuCount, int *lpuId, int q) {
-	PartitionDimension **bLpuDims = new PartitionDimension*[2];
-	bLpuDims[0] = new PartitionDimension;
-	bLpuDims[0]->storageDim = bParentLpuDims[0]->partitionDim;
-	bLpuDims[0]->partitionDim = block_size_getRange(*bParentLpuDims[0]->partitionDim, 
+	bLpuDims[0].storage = bParentLpuDims[0].storage;
+	bLpuDims[0].partition = block_size_getRange(bParentLpuDims[0].partition, 
 			lpuCount[0], lpuId[0], q, 0, 0);
 	bLpuDims[1] = bParentLpuDims[1];
-	return bLpuDims;
+}
+
+/*-----------------------------------------------------------------------------------
+Functions for ArrayMetadata and EnvironmentLinks 
+------------------------------------------------------------------------------------*/
+
+mm::ArrayMetadata::ArrayMetadata() : Metadata() {
+	setTaskName("Matrix Multiply");
 }
 
 /*-----------------------------------------------------------------------------------
@@ -175,39 +172,48 @@ void ThreadStateImpl::setLpsParentIndexMap() {
 	lpsParentIndexMap[Space_Root] = INVALID_ID;
 	lpsParentIndexMap[Space_A] = Space_Root;
 	lpsParentIndexMap[Space_A_Sub] = Space_A;
+	threadLog << "set up parent LPS index map" << std::endl;
+	threadLog.flush();
 }
 
 // Construction of task specific root LPU
-void ThreadStateImpl::setRootLpu() {
+void ThreadStateImpl::setRootLpu(Metadata *metadata) {
+
+	ArrayMetadata *arrayMetadata = (ArrayMetadata*) metadata;
+
 	SpaceRoot_LPU *lpu = new SpaceRoot_LPU;
 	lpu->a = NULL;
-	lpu->aPartDims = new PartitionDimension*[2];
-	lpu->aPartDims[0] = new PartitionDimension;
-	lpu->aPartDims[0]->storageDim = lpu->aPartDims[0]->partitionDim
-			= &arrayMetadata.aDims[0];
-	lpu->aPartDims[1] = new PartitionDimension;
-	lpu->aPartDims[1]->storageDim = lpu->aPartDims[1]->partitionDim
-			= &arrayMetadata.aDims[1];
+	lpu->aPartDims[0].partition = arrayMetadata->aDims[0];
+	lpu->aPartDims[0].storage = arrayMetadata->aDims[0].getNormalizedDimension();
+	lpu->aPartDims[1].partition = arrayMetadata->aDims[1];
+	lpu->aPartDims[1].storage = arrayMetadata->aDims[1].getNormalizedDimension();
 
 	lpu->b = NULL;
-	lpu->bPartDims = new PartitionDimension*[2];
-	lpu->bPartDims[0] = new PartitionDimension;
-	lpu->bPartDims[0]->storageDim = lpu->bPartDims[0]->partitionDim
-			= &arrayMetadata.bDims[0];
-	lpu->bPartDims[1] = new PartitionDimension;
-	lpu->bPartDims[1]->storageDim = lpu->bPartDims[1]->partitionDim
-			= &arrayMetadata.bDims[1];
+	lpu->bPartDims[0].partition = arrayMetadata->bDims[0];
+	lpu->bPartDims[0].storage = arrayMetadata->bDims[0].getNormalizedDimension();
+	lpu->bPartDims[1].partition = arrayMetadata->bDims[1];
+	lpu->bPartDims[1].storage = arrayMetadata->bDims[1].getNormalizedDimension();
 
 	lpu->c = NULL;
-	lpu->cPartDims = new PartitionDimension*[2];
-	lpu->cPartDims[0] = new PartitionDimension;
-	lpu->cPartDims[0]->storageDim = lpu->cPartDims[0]->partitionDim
-			= &arrayMetadata.cDims[0];
-	lpu->cPartDims[1] = new PartitionDimension;
-	lpu->cPartDims[1]->storageDim = lpu->cPartDims[1]->partitionDim
-			= &arrayMetadata.cDims[1];
+	lpu->cPartDims[0].partition = arrayMetadata->cDims[0];
+	lpu->cPartDims[0].storage = arrayMetadata->cDims[0].getNormalizedDimension();
+	lpu->cPartDims[1].partition = arrayMetadata->cDims[1];
+	lpu->cPartDims[1].storage = arrayMetadata->cDims[1].getNormalizedDimension();
 
+	lpu->setValidBit(true);
 	lpsStates[Space_Root]->lpu = lpu;
+	threadLog << "set up root LPU" << std::endl;
+	threadLog.flush();
+}
+
+// Initialization of LPU pointers of different LPSes
+void ThreadStateImpl::initializeLPUs() {
+	lpsStates[Space_A]->lpu = new SpaceA_LPU;
+	lpsStates[Space_A]->lpu->setValidBit(false);
+	lpsStates[Space_A_Sub]->lpu = new SpaceA_Sub_LPU;
+	lpsStates[Space_A_Sub]->lpu->setValidBit(false);
+	threadLog << "initialized LPU pointers" << std::endl;
+	threadLog.flush();
 }
 
 // Implementation of task specific compute-LPU-Count function 
@@ -217,20 +223,20 @@ int *ThreadStateImpl::computeLpuCounts(int lpsId) {
 	}
 	if (lpsId == Space_A) {
 		int ppuCount = threadIds->ppuIds[Space_A].ppuCount;
-		SpaceRoot_LPU *spaceRootLpu = (SpaceRoot_LPU*) 
-				lpsStates[Space_Root]->lpu;
+		SpaceRoot_LPU *spaceRootLpu
+				 = (SpaceRoot_LPU*) lpsStates[Space_Root]->lpu;
 		return getLPUsCountOfSpaceA(ppuCount, 
-				*spaceRootLpu->cPartDims[0]->partitionDim, 
+				spaceRootLpu->cPartDims[0].partition, 
 				partitionArgs[0], 
-				*spaceRootLpu->cPartDims[1]->partitionDim, 
+				spaceRootLpu->cPartDims[1].partition, 
 				partitionArgs[1]);
 	}
 	if (lpsId == Space_A_Sub) {
 		int ppuCount = threadIds->ppuIds[Space_A_Sub].ppuCount;
-		SpaceA_LPU *spaceALpu = (SpaceA_LPU*) 
-				lpsStates[Space_A]->lpu;
+		SpaceA_LPU *spaceALpu
+				 = (SpaceA_LPU*) lpsStates[Space_A]->lpu;
 		return getLPUsCountOfSpaceA_Sub(ppuCount, 
-				*spaceALpu->aPartDims[1]->partitionDim, 
+				spaceALpu->aPartDims[1].partition, 
 				partitionArgs[2]);
 	}
 	return NULL;
@@ -239,40 +245,45 @@ int *ThreadStateImpl::computeLpuCounts(int lpsId) {
 // Implementation of task specific compute-Next-LPU function 
 LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) {
 	if (lpsId == Space_A) {
-		SpaceRoot_LPU *spaceRootLpu = (SpaceRoot_LPU*) 
-				lpsStates[Space_Root]->lpu;
-		SpaceA_LPU *currentLpu = new SpaceA_LPU;
+		SpaceRoot_LPU *spaceRootLpu
+				 = (SpaceRoot_LPU*) lpsStates[Space_Root]->lpu;
+		SpaceA_LPU *currentLpu
+				 = (SpaceA_LPU*) lpsStates[Space_A]->lpu;
 		currentLpu->lpuId[0] = nextLpuId[0];
 		currentLpu->lpuId[1] = nextLpuId[1];
 		currentLpu->a = NULL;
-		currentLpu->aPartDims = getaPartForSpaceALpu(
+		getaPartForSpaceALpu(currentLpu->aPartDims, 
 				spaceRootLpu->aPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[0]);
 		currentLpu->b = NULL;
-		currentLpu->bPartDims = getbPartForSpaceALpu(
+		getbPartForSpaceALpu(currentLpu->bPartDims, 
 				spaceRootLpu->bPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[1]);
 		currentLpu->c = NULL;
-		currentLpu->cPartDims = getcPartForSpaceALpu(
+		getcPartForSpaceALpu(currentLpu->cPartDims, 
 				spaceRootLpu->cPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[0], partitionArgs[1]);
+		currentLpu->setValidBit(true);
 		return currentLpu;
 	}
 	if (lpsId == Space_A_Sub) {
-		SpaceA_LPU *spaceALpu = (SpaceA_LPU*) 
-				lpsStates[Space_A]->lpu;
-		SpaceA_Sub_LPU *currentLpu = new SpaceA_Sub_LPU;
+		SpaceA_LPU *spaceALpu
+				 = (SpaceA_LPU*) lpsStates[Space_A]->lpu;
+		SpaceA_Sub_LPU *currentLpu
+				 = (SpaceA_Sub_LPU*) lpsStates[Space_A_Sub]->lpu;
 		currentLpu->lpuId[0] = nextLpuId[0];
 		currentLpu->a = NULL;
-		currentLpu->aPartDims = getaPartForSpaceA_SubLpu(
+		getaPartForSpaceA_SubLpu(currentLpu->aPartDims, 
 				spaceALpu->aPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[2]);
 		currentLpu->b = NULL;
-		currentLpu->bPartDims = getbPartForSpaceA_SubLpu(
+		getbPartForSpaceA_SubLpu(currentLpu->bPartDims, 
 				spaceALpu->bPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[2]);
 		currentLpu->c = NULL;
-		currentLpu->cPartDims = spaceALpu->cPartDims;
+		currentLpu->cPartDims[0] = spaceALpu->cPartDims[0];
+		currentLpu->cPartDims[1] = spaceALpu->cPartDims[1];
+		currentLpu->setValidBit(true);
 		return currentLpu;
 	}
 	return NULL;
@@ -282,49 +293,49 @@ LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) 
 function for the initialize block
 ------------------------------------------------------------------------------------*/
 
-void mm::initializeTask(ArrayMetadata arrayMetadata, 
+void mm::initializeTask(ArrayMetadata *arrayMetadata, 
 		EnvironmentLinks environmentLinks, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, 
+		TaskGlobals *taskGlobals, 
+		ThreadLocals *threadLocals, 
 		MMPartition partition) {
 
-	arrayMetadata.aDims[0] = environmentLinks.aDims[0];
-	arrayMetadata.aDims[1] = environmentLinks.aDims[1];
-	arrayMetadata.bDims[0] = environmentLinks.bDims[0];
-	arrayMetadata.bDims[1] = environmentLinks.bDims[1];
-	arrayMetadata.cDims[0] = arrayMetadata.aDims[0];
-	arrayMetadata.cDims[1] = arrayMetadata.bDims[1];
+	arrayMetadata->aDims[0] = environmentLinks.aDims[0];
+	arrayMetadata->aDims[1] = environmentLinks.aDims[1];
+	arrayMetadata->bDims[0] = environmentLinks.bDims[0];
+	arrayMetadata->bDims[1] = environmentLinks.bDims[1];
+	arrayMetadata->cDims[0] = arrayMetadata->aDims[0];
+	arrayMetadata->cDims[1] = arrayMetadata->bDims[1];
 }
 
 /*-----------------------------------------------------------------------------------
 functions for compute stages 
 ------------------------------------------------------------------------------------*/
 
-void mm::block_multiply_matrices(SpaceA_Sub_LPU lpu, 
-		ArrayMetadata arrayMetadata, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, MMPartition partition) {
+void mm::block_multiply_matrices(SpaceA_Sub_LPU *lpu, 
+		ArrayMetadata *arrayMetadata, 
+		TaskGlobals *taskGlobals, 
+		ThreadLocals *threadLocals, MMPartition partition) {
 
 	//-------------------- Local Copies of Metadata -----------------------------
 
 	Dimension aPartDims[2];
-	aPartDims[0] = *lpu.aPartDims[0]->partitionDim;
-	aPartDims[1] = *lpu.aPartDims[1]->partitionDim;
+	aPartDims[0] = lpu->aPartDims[0].partition;
+	aPartDims[1] = lpu->aPartDims[1].partition;
 	Dimension aStoreDims[2];
-	aStoreDims[0] = *lpu.aPartDims[0]->storageDim;
-	aStoreDims[1] = *lpu.aPartDims[1]->storageDim;
+	aStoreDims[0] = lpu->aPartDims[0].storage;
+	aStoreDims[1] = lpu->aPartDims[1].storage;
 	Dimension bPartDims[2];
-	bPartDims[0] = *lpu.bPartDims[0]->partitionDim;
-	bPartDims[1] = *lpu.bPartDims[1]->partitionDim;
+	bPartDims[0] = lpu->bPartDims[0].partition;
+	bPartDims[1] = lpu->bPartDims[1].partition;
 	Dimension bStoreDims[2];
-	bStoreDims[0] = *lpu.bPartDims[0]->storageDim;
-	bStoreDims[1] = *lpu.bPartDims[1]->storageDim;
+	bStoreDims[0] = lpu->bPartDims[0].storage;
+	bStoreDims[1] = lpu->bPartDims[1].storage;
 	Dimension cPartDims[2];
-	cPartDims[0] = *lpu.cPartDims[0]->partitionDim;
-	cPartDims[1] = *lpu.cPartDims[1]->partitionDim;
+	cPartDims[0] = lpu->cPartDims[0].partition;
+	cPartDims[1] = lpu->cPartDims[1].partition;
 	Dimension cStoreDims[2];
-	cStoreDims[0] = *lpu.cPartDims[0]->storageDim;
-	cStoreDims[1] = *lpu.cPartDims[1]->storageDim;
+	cStoreDims[0] = lpu->cPartDims[0].storage;
+	cStoreDims[1] = lpu->cPartDims[1].storage;
 
 	//----------------------- Computation Begins --------------------------------
 
@@ -341,8 +352,8 @@ void mm::block_multiply_matrices(SpaceA_Sub_LPU lpu,
 	for (i = cPartDims[0].range.min; 
 			indexMultiplier * i <= iterationBound; 
 			i += indexIncrement) {
-		int i_c_0 = i * cStoreDims[1].length;
-		int i_a_0 = i * aStoreDims[1].length;
+		int i_c_0 = (i - cPartDims[0].getPositiveRange().min) * cStoreDims[1].getLength();
+		int i_a_0 = (i - aPartDims[0].getPositiveRange().min) * aStoreDims[1].getLength();
 		{// scope entrance for parallel loop on index j
 		int j;
 		int iterationBound = cPartDims[1].range.max;
@@ -356,6 +367,8 @@ void mm::block_multiply_matrices(SpaceA_Sub_LPU lpu,
 		for (j = cPartDims[1].range.min; 
 				indexMultiplier * j <= iterationBound; 
 				j += indexIncrement) {
+			int j_c_1 = (j - cPartDims[1].getPositiveRange().min);
+			int j_b_1 = (j - bPartDims[1].getPositiveRange().min);
 			{// scope entrance for parallel loop on index k
 			int k;
 			int iterationBound = aPartDims[1].range.max;
@@ -369,8 +382,9 @@ void mm::block_multiply_matrices(SpaceA_Sub_LPU lpu,
 			for (k = aPartDims[1].range.min; 
 					indexMultiplier * k <= iterationBound; 
 					k += indexIncrement) {
-				int k_b_0 = k * bStoreDims[1].length;
-				lpu.c[i_c_0 + j] = lpu.c[i_c_0 + j] + lpu.a[i_a_0 + k] * lpu.b[k_b_0 + j];
+				int k_a_1 = (k - aPartDims[1].getPositiveRange().min);
+				int k_b_0 = (k - bPartDims[0].getPositiveRange().min) * bStoreDims[1].getLength();
+				lpu->c[i_c_0 + j_c_1] = lpu->c[i_c_0 + j_c_1] + lpu->a[i_a_0 + k_a_1] * lpu->b[k_b_0 + j_b_1];
 			}
 			}// scope exit for parallel loop on index k
 		}
@@ -383,40 +397,35 @@ void mm::block_multiply_matrices(SpaceA_Sub_LPU lpu,
 The run method for thread simulating the task flow 
 ------------------------------------------------------------------------------------*/
 
-void mm::run(ArrayMetadata arrayMetadata, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, 
-		MMPartition partition, ThreadStateImpl threadState) {
+void mm::run(ArrayMetadata *arrayMetadata, 
+		TaskGlobals *taskGlobals, 
+		ThreadLocals *threadLocals, 
+		MMPartition partition, ThreadStateImpl *threadState) {
 
 	// set the root LPU in the thread state so that calculation can start
-	threadState.setRootLpu();
+	threadState->setRootLpu(arrayMetadata);
 
 	{ // scope entrance for iterating LPUs of Space A
 	int spaceALpuId = INVALID_ID;
 	int spaceAIteration = 0;
 	SpaceA_LPU *spaceALpu = NULL;
 	LPU *lpu = NULL;
-	while((lpu = threadState.getNextLpu(Space_A, Space_Root, spaceALpuId)) != NULL) {
+	while((lpu = threadState->getNextLpu(Space_A, Space_Root, spaceALpuId)) != NULL) {
 		spaceALpu = (SpaceA_LPU*) lpu;
 		{ // scope entrance for iterating LPUs of Space A_Sub
 		int spaceA_SubLpuId = INVALID_ID;
 		int spaceA_SubIteration = 0;
 		SpaceA_Sub_LPU *spaceA_SubLpu = NULL;
 		LPU *lpu = NULL;
-		while((lpu = threadState.getNextLpu(Space_A_Sub, Space_A, spaceA_SubLpuId)) != NULL) {
+		while((lpu = threadState->getNextLpu(Space_A_Sub, Space_A, spaceA_SubLpuId)) != NULL) {
 			spaceA_SubLpu = (SpaceA_Sub_LPU*) lpu;
 			//this is a comment correspond to a sync stage
-			if (threadState.isValidPpu(Space_A_Sub)) {
-				// invoking user computation
-				block_multiply_matrices(*spaceA_SubLpu, 
-						arrayMetadata,
-						taskGlobals,
-						threadLocals, partition);
+			if (threadState->isValidPpu(Space_A_Sub)) {
 			}
 			spaceA_SubLpuId = spaceA_SubLpu->id;
 			spaceA_SubIteration++;
 		}
-		threadState.removeIterationBound(Space_A);
+		threadState->removeIterationBound(Space_A);
 		} // scope exit for iterating LPUs of Space A_Sub
 		spaceALpuId = spaceALpu->id;
 		spaceAIteration++;
@@ -436,7 +445,7 @@ int main() {
 	TaskGlobals taskGlobals;
 	ThreadLocals threadLocals;
 	EnvironmentLinks envLinks;
-	ArrayMetadata metadata;
+	ArrayMetadata *metadata = new ArrayMetadata;
 	MMEnvironment environment;
 	MMPartition partition;
 
@@ -465,15 +474,16 @@ int main() {
 
 	// invoking the initializer function
 	std::cout << "invoking task initializer function\n";
-	initializeTask(metadata, envLinks, taskGlobals, threadLocals, partition);
+	initializeTask(metadata, envLinks, &taskGlobals, &threadLocals, partition);
 
 	// setting the global metadata variable
-	arrayMetadata = metadata;
+	arrayMetadata = *metadata;
 
 	// declaring and initializing state variables for threads 
-	ThreadLocals threadLocalsList[Total_Threads];
+	ThreadLocals *threadLocalsList[Total_Threads];
 	for (int i = 0; i < Total_Threads; i++) {
-		threadLocalsList[i] = threadLocals;
+		threadLocalsList[i] = new ThreadLocals;
+		*threadLocalsList[i] = threadLocals;
 	}
 	int lpsDimensions[Space_Count];
 	lpsDimensions[Space_Root] = 0;
@@ -490,6 +500,15 @@ int main() {
 	for (int i = 0; i < Total_Threads; i++) {
 		threadStateList[i] = new ThreadStateImpl(Space_Count, 
 				lpsDimensions, partitionArgs, threadIdsList[i]);
+		threadStateList[i]->initiateLogFile("mm");
+		threadStateList[i]->initializeLPUs();
+		threadStateList[i]->setLpsParentIndexMap();
+	}
+
+	// starting threads
+	std::cout << "starting threads\n";
+	for (int i = 0; i < Total_Threads; i++) {
+		run(metadata, &taskGlobals, threadLocalsList[i], partition, threadStateList[i]);
 	}
 
 	logFile.close();

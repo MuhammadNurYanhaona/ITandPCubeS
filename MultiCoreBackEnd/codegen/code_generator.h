@@ -31,6 +31,13 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile,
 		MappingNode *mappingRoot,
 		List<EnvironmentLink*> *envLinks);
 
+/* function definition for generating print routines for envLinks and array metadata objects; it 
+   also generate the constructor for array-metadata */
+void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials, 
+		const char *outputFile, 
+		MappingNode *mappingRoot, 
+		List<const char*> *externalLinks);
+
 /* function definition to generate data structures representing LPUs of different LPSes */
 void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot);
 

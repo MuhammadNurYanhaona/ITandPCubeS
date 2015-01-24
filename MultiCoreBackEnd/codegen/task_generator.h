@@ -59,7 +59,10 @@ class TaskGenerator {
 	void inovokeTaskInitializer(std::ofstream &stream, List<const char*> *externalEnvLinks);
 	// a supporting function for generating an array of thread-state objects, one for each thread,
 	// then initializing them	
-	void initiateThreadStates(std::ofstream &stream);	 		
+	void initiateThreadStates(std::ofstream &stream);
+	// a supporting function that starts threads once initialization is done for all necessary 
+	// data	structures
+	void startThreads(std::ofstream &stream);  		
 };
 
 #endif

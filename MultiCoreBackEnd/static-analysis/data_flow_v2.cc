@@ -195,7 +195,7 @@ void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 void ExecutionStage::translateCode(std::ofstream &stream) {
 		
 	// reset the name transformer to user common "lpu." prefix for array access in case it is been modified
-	ntransform::NameTransformer::transformer->setLpuPrefix("lpu.");
+	ntransform::NameTransformer::transformer->setLpuPrefix("lpu->");
 
 	// create local variables for all array dimensions so that later on name-transformer that add 
 	// prefix/suffix to accessed global variables can work properly
@@ -210,15 +210,15 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
                 stream  << arrayName << "PartDims[" << dimensions << "];\n";
                 for (int j = 0; j < dimensions; j++) {
                 	stream << stmtIndent;
-                	stream << arrayName << "PartDims[" << j << "] = *lpu.";
-                        stream << arrayName << "PartDims[" << j << "]->partitionDim;\n";
+                	stream << arrayName << "PartDims[" << j << "] = lpu->";
+                        stream << arrayName << "PartDims[" << j << "].partition;\n";
                 }
                 stream << stmtIndent << "Dimension ";
                 stream  << arrayName << "StoreDims[" << dimensions << "];\n";
                 for (int j = 0; j < dimensions; j++) {
                 	stream << stmtIndent;
-               		stream << arrayName << "StoreDims[" << j << "] = *lpu.";
-                        stream << arrayName << "PartDims[" << j << "]->storageDim;\n";
+               		stream << arrayName << "StoreDims[" << j << "] = lpu->";
+                        stream << arrayName << "PartDims[" << j << "].storage;\n";
         	}
         }
 
@@ -259,9 +259,10 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	// valid ID corresponding to this stage's LPS should go on executing the code
 	if (!isGroupEntry()) {
 		nextIndent << '\t';
-		stream << indent.str() << "if (threadState.isValidPpu(Space_" << space->getName();
+		stream << indent.str() << "if (threadState->isValidPpu(Space_" << space->getName();
 		stream << ")) {\n";
 	}
+/*
 	// invoke the related method with current LPU parameter
 	stream << nextIndent.str() << "// invoking user computation\n";
 	stream << nextIndent.str();
@@ -271,7 +272,11 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	stream << '\n' << nextIndent.str() << "arrayMetadata,";
 	stream << '\n' << nextIndent.str() << "taskGlobals,";
 	stream << '\n' << nextIndent.str() << "threadLocals, partition);\n";
-
+*/
+/*	stream << nextIndent.str() << "threadState->threadLog << \"Executing compute stage " << name;
+	stream << "\" << std::endl;\n";
+	stream << nextIndent.str() << "threadState->threadLog.flush();\n";
+*/	
 	// close the if condition if applicable
 	if (!isGroupEntry()) {
 		stream << indent.str() << "}\n";
@@ -586,7 +591,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		stream << stmtSeparator;
 		// declare another variable to assign the value of get-Next-LPU call
 		stream << indent.str() << "LPU *lpu = NULL" << stmtSeparator;
-		stream << indent.str() << "while((lpu = threadState.getNextLpu(";
+		stream << indent.str() << "while((lpu = threadState->getNextLpu(";
 		stream << "Space_" << spaceName << paramSeparator << "Space_" << containerSpace->getName();
 		stream << paramSeparator << "space" << spaceName << "LpuId)) != NULL) {\n";
 		// cast the common LPU variable to LPS specific LPU		
@@ -630,7 +635,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		stream << indent.str() << "}\n";
 		// at the end remove checkpoint if the container LPS is not the root LPS
 		if (!containerSpace->isRoot()) {
-			stream << indent.str() << "threadState.removeIterationBound(Space_";
+			stream << indent.str() << "threadState->removeIterationBound(Space_";
 			stream << containerSpace->getName() << ')' << stmtSeparator;
 		}
 		// exit from the scope

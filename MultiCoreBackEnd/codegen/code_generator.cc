@@ -366,8 +366,8 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 			programFile << statementIndent << elemType << " *" << array->getName();
 			programFile << statementSeparator;
 			int dimensions = array->getDimensionality();
-			programFile << statementIndent << "PartitionDimension **";
-			programFile << array->getName() << "PartDims";
+			programFile << statementIndent << "PartDimension ";
+			programFile << array->getName() << "PartDims[" << array->getDimensionality() << "]";
 			programFile << statementSeparator;	
 		}
 		// add a specific lpu_id static array with dimensionality equals to the dimensions of the LPS
@@ -404,7 +404,7 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
 	
 	// construct an array metadata object by listing all arrays present in the root LPS
 	Space *rootLps = mappingRoot->mappingConfig->LPS;
-	programFile << "\nclass ArrayMetadata {\n";
+	programFile << "\nclass ArrayMetadata : public Metadata {\n";
 	programFile << "  public:\n";
 	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
 	for (int i = 0; i < localArrays->NumElements(); i++) {
@@ -414,6 +414,8 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
 		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
 		programFile << statementSeparator;
 	}
+	programFile << statementIndent << "ArrayMetadata()" << statementSeparator;
+	programFile << statementIndent << "void print(std::ofstream stream)" << statementSeparator;
 	programFile << "};\n";
 	programFile << "ArrayMetadata arrayMetadata" << statementSeparator;
 	
@@ -443,10 +445,42 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
 		}
 		linkList->Append(linkName);
 	}	
+	programFile << statementIndent << "void print(std::ofstream stream)" << statementSeparator;
 	programFile << "};\n";
 	programFile << "EnvironmentLinks environmentLinks" << statementSeparator << std::endl;
 	programFile.close();
 	return linkList;
+}
+
+void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials, 
+		const char *outputFile, MappingNode *mappingRoot,
+                List<const char*> *externalLinks) {
+
+	std::cout << "Generating function implementations for array metadata and environment links\n";
+	
+	std::string statementSeparator = ";\n";
+        std::string statementIndent = "\t";
+	std::ofstream programFile;
+        
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+        if (programFile.is_open()) {
+                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+                programFile << "Functions for ArrayMetadata and EnvironmentLinks " << std::endl;
+                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
+	}
+	
+	Space *rootLps = mappingRoot->mappingConfig->LPS;
+
+	// generate constructor for array metadata 
+	programFile << std::endl << initials << "::ArrayMetadata::ArrayMetadata() : Metadata() {\n";
+	programFile << statementIndent << "setTaskName";
+	programFile << "(\"" << taskName << "\")" << statementSeparator;  
+	programFile << "}" << std::endl << std::endl; 
+	
+	programFile.close();
 }
 
 void closeNameSpace(const char *headerFile) {
@@ -578,13 +612,13 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
 	// put five default parameters for metadata, env-Links, task-globals, thread-locals, and partition 
 	// configuration
 	std::ostringstream functionHeader;
-        functionHeader << "initializeTask(ArrayMetadata arrayMetadata";
+        functionHeader << "initializeTask(ArrayMetadata *arrayMetadata";
 	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent; 
         functionHeader << "EnvironmentLinks environmentLinks";
 	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent; 
-        functionHeader << "TaskGlobals taskGlobals";
+        functionHeader << "TaskGlobals *taskGlobals";
 	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent; 
-	functionHeader << "ThreadLocals threadLocals";
+	functionHeader << "ThreadLocals *threadLocals";
 	functionHeader << parameterSeparator << '\n' << statementIndent << statementIndent;
 	functionHeader << string_utils::getInitials(taskDef->getName());
 	functionHeader << "Partition partition";

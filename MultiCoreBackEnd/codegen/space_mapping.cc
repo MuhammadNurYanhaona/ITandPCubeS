@@ -29,7 +29,8 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		std::cout << "could not open PCubeS specification file" << std::endl;
 		std::exit(EXIT_FAILURE);
 	}
-	std::cout << "Parsing the PCubeS description........................................" << std::endl;
+	
+	std::cout << "Parsing the PCubeS description-----------------------------------" << std::endl;
 
 	while (std::getline(pcubesfile, line)) {
 		// trim line and escape it if it is a comment	
@@ -458,13 +459,14 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 	// set the parameters default to all get-LPU routines	
 	std::ostringstream functionHeader;
 	functionHeader << "get" << arrayName << "PartForSpace" << space->getName() << "Lpu(";
-	functionHeader << "PartitionDimension **" << parentVar << parameterSeparator;
+	functionHeader << "PartDimension *" << currentVar << parameterSeparator;
+	functionHeader << std::endl << statementIndent << statementIndent;
+	functionHeader << "PartDimension *" << parentVar << parameterSeparator;
 	functionHeader << std::endl << statementIndent << statementIndent;
 	functionHeader << "int *lpuCount";
 	functionHeader << parameterSeparator << "int *lpuId";
 	std::ostringstream functionBody;
-	functionBody << " {\n" << statementIndent << "PartitionDimension **" << currentVar;
-	functionBody << " = new PartitionDimension*[" << dimensionCount << "]" << statementSeparator;
+	functionBody << " {\n";
 
 	for (int i = 0; i < dimensionCount; i++) {
 		PartitionFunctionConfig *partConfig = array->getPartitionSpecForDimension(i + 1);
@@ -478,23 +480,18 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 		// Otherwise, we need to allocate a new metadata variable for this dimension; invoke the
 		// mentioned partition function; and set up other references properly.
 		} else {
-			// allocate a new metadata variable	
+			// copy parent's storage dimension into current LPU's storage dimension
 			functionBody << statementIndent;
-			functionBody << currentVar << '[' << i << "] = new PartitionDimension"; 
-			functionBody << statementSeparator;
-
-			// copy parent's partition dimension into current LPU's storage dimension
-			functionBody << statementIndent;
-			functionBody << currentVar << '[' << i << "]->storageDim = ";
-			functionBody << parentVar << '[' << i << "]->partitionDim";
+			functionBody << currentVar << '[' << i << "].storage = ";
+			functionBody << parentVar << '[' << i << "].storage";
 			functionBody << statementSeparator;
 
 			// assign the result of partition function invocation to current LPU's partition
 			// dimension and register any partition argument needs to be passed
 			functionBody << statementIndent;
-			functionBody << currentVar << '[' << i << "]->partitionDim = ";
-			functionBody << partConfig->getName() << "_getRange(*";
-			functionBody <<	parentVar << '[' << i << "]->partitionDim" << parameterSeparator;
+			functionBody << currentVar << '[' << i << "].partition = ";
+			functionBody << partConfig->getName() << "_getRange(";
+			functionBody <<	parentVar << '[' << i << "].partition" << parameterSeparator;
 			functionBody << std::endl << statementIndent << statementIndent << statementIndent;
 		
 			// determine which LPU-Count and ID should be used by determining the aligment of
@@ -569,12 +566,11 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 		}
 	}
 	functionHeader << ")";
-	functionBody << statementIndent << "return " << arrayName << "LpuDims" << statementSeparator;
 	functionBody << "}\n";
 	
 	// write function signature in the header file and the specification in the program file
-	headerFile << "PartitionDimension **" << functionHeader.str() << statementSeparator;
-	programFile << "PartitionDimension **" << initials << "::" << functionHeader.str() << functionBody.str();
+	headerFile << "void " << functionHeader.str() << statementSeparator;
+	programFile << "void " << initials << "::" << functionHeader.str() << functionBody.str();
 
 	// get the list of argument index from the used argument name list 
 	for (int i = 0; i < argNameList->NumElements(); i++) {

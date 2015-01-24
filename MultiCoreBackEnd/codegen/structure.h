@@ -8,28 +8,38 @@
 
 class Range {
   public:
+	Range() { min = 0, max = 0; }
 	int min;
 	int max;
 };
 
 class Dimension {
   public:
-	int length;
 	Range range;
+	int getLength();
+	void setLength(int length);
+	bool isIncreasing();
+	Range getPositiveRange();
+	Range adjustPositiveSubRange(Range positiveSubRange);
+	Dimension getNormalizedDimension();
+	void print(std::ofstream &stream);
 };
 
 class Epoch {
   public:
+	Epoch() { begin = 0; current = 0; }
 	int begin;
 	int current;
 };
 
 /* structure to demarcate the region of a dimension of an array that falls inside a single LPU */
 
-typedef struct {
-        Dimension *storageDim;
-        Dimension *partitionDim;
-} PartitionDimension;
+class PartDimension {
+  public:
+        Dimension storage;
+        Dimension partition;
+	void print(std::ofstream &stream);
+};
 
 /* structure for holding a sequence of LPU ids */
 

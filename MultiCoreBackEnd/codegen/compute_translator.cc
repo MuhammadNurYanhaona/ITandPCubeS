@@ -62,16 +62,16 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 
 		// get the LPS where this function should execute to generate the LPU argument
 		Space *space = execStage->getSpace();
-		headerFile << "Space" << space->getName() << "_LPU lpu";
-		programFile << "Space" << space->getName() << "_LPU lpu";
+		headerFile << "Space" << space->getName() << "_LPU *lpu";
+		programFile << "Space" << space->getName() << "_LPU *lpu";
 		
 		// then add the default arrayMetadata, task-global and thread-local arguments
-		headerFile << paramSeparator << paramIndent << "ArrayMetadata arrayMetadata";
-		programFile << paramSeparator << paramIndent << "ArrayMetadata arrayMetadata";
-		headerFile << paramSeparator << paramIndent << "TaskGlobals taskGlobals";
-		programFile << paramSeparator << paramIndent << "TaskGlobals taskGlobals";
-		headerFile << paramSeparator << paramIndent << "ThreadLocals threadLocals";
-		programFile << paramSeparator << paramIndent << "ThreadLocals threadLocals";
+		headerFile << paramSeparator << paramIndent << "ArrayMetadata *arrayMetadata";
+		programFile << paramSeparator << paramIndent << "ArrayMetadata *arrayMetadata";
+		headerFile << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
+		programFile << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
+		headerFile << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
+		programFile << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
 
 		// then add a parameter for the partition arguments
 		headerFile << paramSeparator << initialsUpper << "Partition partition";
@@ -149,13 +149,13 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	// create a stream for writing the arguments default to all thread run functions
 	std::ostringstream defaultArgs;
 	// add the default arrayMetadata, task-global and thread-local arguments
-	defaultArgs << "ArrayMetadata arrayMetadata";
-	defaultArgs << paramSeparator << paramIndent << "TaskGlobals taskGlobals";
-	defaultArgs << paramSeparator << paramIndent << "ThreadLocals threadLocals";
+	defaultArgs << "ArrayMetadata *arrayMetadata";
+	defaultArgs << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
+	defaultArgs << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
 	// then add a parameter for the partition arguments
 	defaultArgs << paramSeparator << paramIndent << upperInitials << "Partition partition";
 	// then add a parameter for the thread state variable
-	defaultArgs << paramSeparator << "ThreadStateImpl threadState";	
+	defaultArgs << paramSeparator << "ThreadStateImpl *threadState";	
 
 	// write the function signature in both header and program files
 	headerFile << "void run(" << defaultArgs.str() << ");\n\n";
@@ -163,7 +163,7 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 
 	// first set the root LPU for the thread so the computation can start
 	programFile << "\n\t// set the root LPU in the thread state so that calculation can start\n";
-	programFile << "\tthreadState.setRootLpu();\n\n";
+	programFile << "\tthreadState->setRootLpu(arrayMetadata);\n\n";
 
 	// invoke recursive flow stage invocation code to implement the logic of the run method
 	CompositeStage *computation = taskDef->getComputation();

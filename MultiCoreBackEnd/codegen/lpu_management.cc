@@ -1,5 +1,7 @@
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 #include "lpu_management.h"
 #include "structure.h"
@@ -123,6 +125,12 @@ LpsState::LpsState(int lpsDimensions, PPU_Ids ppuIds) {
 	lpu = NULL;
 }
 
+LPU *LpsState::getCurrentLpu() {
+	if (lpu->isValid()) return lpu; 
+	return NULL; 
+}
+
+
 /*******************************************  Thread State  ***********************************************/
 
 ThreadState::ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, ThreadIds *threadIds) {
@@ -143,20 +151,29 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		LpsState *state = lpsStates[lpsId];
 		LpuCounter *counter = state->getCounter();
 		int nextLpuId = counter->getNextLpuId(currentLpuId);
+		
 		// if next LPU is valid then just compute it, update LPS state and return the LPU to the caller
 		if (nextLpuId != INVALID_ID) {
 			int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
 			int *lpuCounts = counter->getLpuCounts();
 			LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
-			state->setCurrentLpu(lpu);
+			
+			// log LPU execution
+			for (int i = 0; i < lpsId; i++) threadLog << '\t';
+			threadLog << "Next LPU: " << nextLpuId << std::endl;
+			threadLog.flush();	
+		
+			// set the LPU Id so that recursion can advance to the next LPU in next call 
+			lpu->setId(nextLpuId);	
 			return lpu;
+
 		// otherwise there is a possible need for recursively going up in the LPS hierarchy and 
 		// recompute some parent LPUs before we can decide if anymore LPUs are there in the current LPS
 		// to execute	
 		} else {
 			// reset state regardless of subsequent changes			
 			counter->resetCounter();
-			state->setCurrentLpu(NULL);
+			state->invalidateCurrentLpu();
 			
 			// if parent is checkpointed then there is no further scope for recursion and we should
 			// declare that no new LPUs to be executed
@@ -188,7 +205,14 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
 				int *lpuCounts = counter->getLpuCounts();
 				LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
-				state->setCurrentLpu(lpu);
+				
+				// log LPU execution
+				for (int i = 0; i < lpsId; i++) threadLog << '\t';
+				threadLog << "Return LPU: " << nextLpuId << std::endl;
+				threadLog.flush();
+	
+				// set the LPU Id so that recursion can advance to the next LPU in next call 
+				lpu->setId(nextLpuId);	
 				return lpu;	
 			}
 		}
@@ -216,11 +240,20 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				
 	// finally, compute next LPU to execute, save state, and return the LPU
 	int nextLpuId = counter->getNextLpuId(INVALID_ID);
-	int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
-	int *lpuCounts = counter->getLpuCounts();
-	LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
-	state->setCurrentLpu(lpu);
-	return lpu;	
+	if (nextLpuId != INVALID_ID) {
+		int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
+		int *lpuCounts = counter->getLpuCounts();
+		LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
+		
+		// log LPU execution
+		for (int i = 0; i < lpsId; i++) threadLog << '\t';
+		threadLog << "Start LPU: " << nextLpuId << std::endl;
+		threadLog.flush();	
+		
+		// set the LPU Id so that recursion can advance to the next LPU in next call 
+		lpu->setId(nextLpuId);	
+		return lpu;
+	} else return NULL;	
 }
 
 void ThreadState::removeIterationBound(int lpsId) {
@@ -231,4 +264,19 @@ void ThreadState::removeIterationBound(int lpsId) {
 bool ThreadState::isValidPpu(int lpsId) {
 	PPU_Ids ppu = threadIds->ppuIds[lpsId];
 	return ppu.id != INVALID_ID;
+}
+
+void ThreadState::initiateLogFile(const char *fileNamePrefix) {
+	std::ostringstream fileName;
+	fileName << fileNamePrefix;
+	fileName << "_" << threadIds->threadNo << ".log";
+	threadLog.open(fileName.str().c_str());
+	if (!threadLog.is_open()) {
+		std::cout << "Could not open log file for Thread-" << threadIds->threadNo << "\n";
+	}
+}
+
+void ThreadState::logExecution(const char *stageName, int spaceId) {
+	for (int i = 0; i <= spaceId; i++) threadLog << '\t';
+	threadLog << "Executed: " << stageName << std::endl;
 }

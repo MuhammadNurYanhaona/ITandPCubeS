@@ -65,15 +65,20 @@ int *getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q);
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
-PartitionDimension **getaPartForSpaceALpu(PartitionDimension **aParentLpuDims, 
+void getaPartForSpaceALpu(PartDimension *aLpuDims, 
+		PartDimension *aParentLpuDims, 
 		int *lpuCount, int *lpuId, int k);
-PartitionDimension **getbPartForSpaceALpu(PartitionDimension **bParentLpuDims, 
+void getbPartForSpaceALpu(PartDimension *bLpuDims, 
+		PartDimension *bParentLpuDims, 
 		int *lpuCount, int *lpuId, int l);
-PartitionDimension **getcPartForSpaceALpu(PartitionDimension **cParentLpuDims, 
+void getcPartForSpaceALpu(PartDimension *cLpuDims, 
+		PartDimension *cParentLpuDims, 
 		int *lpuCount, int *lpuId, int k, int l);
-PartitionDimension **getaPartForSpaceA_SubLpu(PartitionDimension **aParentLpuDims, 
+void getaPartForSpaceA_SubLpu(PartDimension *aLpuDims, 
+		PartDimension *aParentLpuDims, 
 		int *lpuCount, int *lpuId, int q);
-PartitionDimension **getbPartForSpaceA_SubLpu(PartitionDimension **bParentLpuDims, 
+void getbPartForSpaceA_SubLpu(PartDimension *bLpuDims, 
+		PartDimension *bParentLpuDims, 
 		int *lpuCount, int *lpuId, int q);
 
 /*-----------------------------------------------------------------------------------
@@ -90,11 +95,11 @@ class SpaceRoot_Content {
 class SpaceRoot_LPU : public LPU {
   public:
 	float *a;
-	PartitionDimension **aPartDims;
+	PartDimension aPartDims[2];
 	float *b;
-	PartitionDimension **bPartDims;
+	PartDimension bPartDims[2];
 	float *c;
-	PartitionDimension **cPartDims;
+	PartDimension cPartDims[2];
 };
 
 class SpaceA_Content {
@@ -107,11 +112,11 @@ class SpaceA_Content {
 class SpaceA_LPU : public LPU {
   public:
 	float *a;
-	PartitionDimension **aPartDims;
+	PartDimension aPartDims[2];
 	float *b;
-	PartitionDimension **bPartDims;
+	PartDimension bPartDims[2];
 	float *c;
-	PartitionDimension **cPartDims;
+	PartDimension cPartDims[2];
 	int lpuId[2];
 };
 
@@ -125,11 +130,11 @@ class SpaceA_Sub_Content {
 class SpaceA_Sub_LPU : public LPU {
   public:
 	float *a;
-	PartitionDimension **aPartDims;
+	PartDimension aPartDims[2];
 	float *b;
-	PartitionDimension **bPartDims;
+	PartDimension bPartDims[2];
 	float *c;
-	PartitionDimension **cPartDims;
+	PartDimension cPartDims[2];
 	int lpuId[1];
 };
 
@@ -137,11 +142,13 @@ class SpaceA_Sub_LPU : public LPU {
 Data structures for Array-Metadata and Environment-Links 
 ------------------------------------------------------------------------------------*/
 
-class ArrayMetadata {
+class ArrayMetadata : public Metadata {
   public:
 	Dimension aDims[2];
 	Dimension bDims[2];
 	Dimension cDims[2];
+	ArrayMetadata();
+	void print(std::ofstream stream);
 };
 ArrayMetadata arrayMetadata;
 
@@ -151,6 +158,7 @@ class EnvironmentLinks {
 	Dimension aDims[2];
 	float *b;
 	Dimension bDims[2];
+	void print(std::ofstream stream);
 };
 EnvironmentLinks environmentLinks;
 
@@ -182,7 +190,8 @@ class ThreadStateImpl : public ThreadState {
 			ThreadIds *threadIds) 
 		: ThreadState(lpsCount, lpsDimensions, partitionArgs, threadIds) {}
 	void setLpsParentIndexMap();
-        void setRootLpu();
+        void setRootLpu(Metadata *metadata);
+	void initializeLPUs();
         int *computeLpuCounts(int lpsId);
         LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
 };
@@ -191,30 +200,30 @@ class ThreadStateImpl : public ThreadState {
 /*-----------------------------------------------------------------------------------
 function for the initialize block
 ------------------------------------------------------------------------------------*/
-void initializeTask(ArrayMetadata arrayMetadata, 
+void initializeTask(ArrayMetadata *arrayMetadata, 
 		EnvironmentLinks environmentLinks, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, 
+		TaskGlobals *taskGlobals, 
+		ThreadLocals *threadLocals, 
 		MMPartition partition);
 
 /*-----------------------------------------------------------------------------------
 functions for compute stages 
 ------------------------------------------------------------------------------------*/
 
-void block_multiply_matrices(SpaceA_Sub_LPU lpu, 
-		ArrayMetadata arrayMetadata, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, MMPartition partition);
+void block_multiply_matrices(SpaceA_Sub_LPU *lpu, 
+		ArrayMetadata *arrayMetadata, 
+		TaskGlobals *taskGlobals, 
+		ThreadLocals *threadLocals, MMPartition partition);
 
 
 /*-----------------------------------------------------------------------------------
 The run method for thread simulating the task flow 
 ------------------------------------------------------------------------------------*/
 
-void run(ArrayMetadata arrayMetadata, 
-		TaskGlobals taskGlobals, 
-		ThreadLocals threadLocals, 
-		MMPartition partition, ThreadStateImpl threadState);
+void run(ArrayMetadata *arrayMetadata, 
+		TaskGlobals *taskGlobals, 
+		ThreadLocals *threadLocals, 
+		MMPartition partition, ThreadStateImpl *threadState);
 
 
 }

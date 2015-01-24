@@ -211,23 +211,16 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *
 	// the stream
 	FieldAccess *indexAccess = dynamic_cast<FieldAccess*>(index);
 	if (indexAccess != NULL && indexAccess->isIndex()) {
-		if (dimension == dimensionCount - 1) index->translate(stream, 0, 0);
-		else indexAccess->translateIndex(stream, array, dimension);
+		indexAccess->translateIndex(stream, array, dimension);
 	// Otherwise, there might be a need for translating the index
 	} else {
-		// If indexing is done on the last dimension of the array then there is nothing to do here
-		// except writing the expression in the strem	
-		if (dimension == dimensionCount - 1) {
-			index->translate(stream, 0, 0);
-		// Otherwise, there is a translation of mulit-to-uni directional index access
-		} else {
-			stream << '('; 
-			index->translate(stream, 0, 0); 
-			stream << ')';
-			std::ostringstream xform;
-                	for (int i = dimensionCount - 1; i > dimension; i--) {
-                        	stream << " * " << array << "StoreDims[" << i << "].length";
-                	}
-		}
+		stream << '('; 
+		index->translate(stream, 0, 0);
+                stream << " - " << array << "partDims[" << dimension << "].getPositiveRange().min";
+		stream << ')';
+		std::ostringstream xform;
+                for (int i = dimensionCount - 1; i > dimension; i--) {
+                        stream << " * " << array << "StoreDims[" << i << "].getLength()";
+                }
 	}
 }

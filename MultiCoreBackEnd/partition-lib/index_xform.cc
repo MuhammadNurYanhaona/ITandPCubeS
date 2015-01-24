@@ -3,7 +3,7 @@
 
 bool block_count_isIndexIncluded(int originalIndex,
                 int lpuId, int lpuCount, Dimension d, int count) {
-        int size = d.length / lpuCount;
+        int size = d.getLength() / lpuCount;
         return (originalIndex >= size * lpuId && originalIndex < size * (lpuId + 1));
 }
 

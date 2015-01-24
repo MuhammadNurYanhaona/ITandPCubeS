@@ -5,7 +5,8 @@ class ThreadStateImpl : public ThreadState {
 			ThreadIds *threadIds) 
 		: ThreadState(lpsCount, lpsDimensions, partitionArgs, threadIds) {}
 	void setLpsParentIndexMap();
-        void setRootLpu();
+        void setRootLpu(Metadata *metadata);
+	void initializeLPUs();
         int *computeLpuCounts(int lpsId);
         LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
 };
