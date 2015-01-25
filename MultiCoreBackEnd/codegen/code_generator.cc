@@ -354,7 +354,11 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 			programFile << statementIndent << elemType << " *" << array->getName();
 			programFile << statementSeparator;	
 		}
-		programFile << "};\n\n";
+		programFile << "};\n";
+		
+		// declare a global reference of this object to be used during LPU generation
+		programFile << "Space" << lps->getName() << "_Content space" << lps->getName() << "Content";
+		programFile << statementSeparator << std::endl;
 
 		// create the object for representing an LPU of the LPS
 		programFile << "class Space" << lps->getName() << "_LPU : public LPU {\n";
@@ -380,6 +384,241 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 	}
 	
 	programFile << std::endl;
+	programFile.close();
+}
+
+void generateFnToInitiateRootLPSContent(const char *headerFileName, const char *programFileName,
+                const char *initials,
+                MappingNode *mappingRoot,
+                List<const char*> *externalEnvLinks) {
+
+	std::cout << "Generating functions for initializing LPS contents\n";
+
+        std::string stmtSeparator = ";\n";
+        std::string stmtIndent = "\t";
+	std::string paramSeparator = ", ";
+	std::ofstream programFile, headerFile;
+        
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open header/program file";
+		std::exit(EXIT_FAILURE);
+	}
+                
+	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
+        headerFile << "function to initialize the content reference objects of LPSes\n";
+        headerFile << "------------------------------------------------------------------------------------*/\n";
+	programFile << "/*-----------------------------------------------------------------------------------\n";
+        programFile << "function to initialize the content reference objects of LPSes\n";
+        programFile << "------------------------------------------------------------------------------------*/\n";
+
+	Space *rootLps = mappingRoot->mappingConfig->LPS;
+
+	std::string functionHeader;
+        functionHeader = "initializeRootLPSContent(EnvironmentLinks *envLinks, ArrayMetadata *metadata)";
+	std::ostringstream lpsVarStr;
+	lpsVarStr << "space" << rootLps->getName() << "Content";
+	std::string lpsVar = lpsVarStr.str();
+        
+	std::ostringstream functionBody;
+	functionBody << "{\n";
+	// Iterate over all the arrays that can be found in the root LPS. Then allocate or initialize them. Note that 
+	// this is an unoptimized implementation. TODO in the optimized case, we should only allocate variable in 
+	// LPSes where they are needed
+	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
+	for (int i = 0; i < localArrays->NumElements(); i++) {
+		const char *arrayName = localArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
+		ArrayType *arrayType = (ArrayType*) array->getType();
+		Type *elemType = arrayType->getTerminalElementType();
+		bool isInEnvLinks = false;
+		for (int j = 0; j < externalEnvLinks->NumElements(); j++) {
+			if (strcmp(arrayName, externalEnvLinks->Nth(j)) == 0) {
+				isInEnvLinks = true;
+				break;
+			}
+		}
+		// if the variable in environment links then copy its reference from there
+		if (isInEnvLinks) {
+			functionBody << stmtIndent;
+			functionBody << lpsVar << "." << arrayName << " = envLinks->" << arrayName;
+			functionBody << stmtSeparator;
+		// otherwise allocate an array for the variable
+		} else {
+			int dimensionCount = array->getDimensionality();
+			functionBody << stmtIndent;
+			functionBody << lpsVar << "." << arrayName << " = allocate::allocateArray ";
+			functionBody << "<" << elemType->getName() << "> (";
+			functionBody << dimensionCount << paramSeparator;
+			functionBody << "metadata->" << arrayName << "Dims)";
+			functionBody << stmtSeparator;
+			
+			// if the array contains primitive type objects then zero fill it
+			ListType *list = dynamic_cast<ListType*>(elemType);
+        		MapType *map = dynamic_cast<MapType*>(elemType);
+        		NamedType *object = dynamic_cast<NamedType*>(elemType);
+			if (list == NULL && map == NULL && object == NULL) {
+				functionBody << stmtIndent;
+				functionBody << "allocate::zeroFillArray ";
+				functionBody << "<" << elemType->getName() << "> (0";
+				functionBody << paramSeparator << lpsVar << "." << arrayName;
+				functionBody << paramSeparator << dimensionCount << paramSeparator;
+				functionBody << "metadata->" << arrayName << "Dims)";
+				functionBody << stmtSeparator;
+			}
+		}
+		// mark the variable to be allocated in the root LPS
+		array->getUsageStat()->flagAllocated();
+	}	
+	functionBody << "}\n";
+
+	headerFile << "void " << functionHeader << ";\n";	
+	programFile << std::endl << "void " << initials << "::"; 
+	programFile <<functionHeader << " " << functionBody.str();
+	programFile << std::endl;
+
+	headerFile.close();
+	programFile.close();
+}
+
+void generateFnToInitiateLPSesContent(const char *headerFileName, const char *programFileName,
+                const char *initials,
+                MappingNode *mappingRoot) {
+        
+	std::string stmtSeparator = ";\n";
+        std::string stmtIndent = "\t";
+	std::string paramSeparator = ", ";
+	std::ofstream programFile, headerFile;
+        
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open header/program file";
+		std::exit(EXIT_FAILURE);
+	}
+                
+	std::string functionHeader;
+        functionHeader = "initializeLPSesContents(ArrayMetadata *metadata)";
+	
+	std::ostringstream functionBody;
+	functionBody << "{\n";
+
+	// Since Root LPS content is initialized elsewhere we start the computation from immediate children
+	// of the Root LPS
+	std::deque<MappingNode*> nodeQueue;
+        for (int i = 0; i < mappingRoot->children->NumElements(); i++) {
+        	nodeQueue.push_back(mappingRoot->children->Nth(i));
+        }
+
+	// Until the queue is empty get information about LPSes one by one in order and initialize their contents
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		// get the LPS reference from the mapping configuration
+		Space *lps = node->mappingConfig->LPS;
+
+		// get the list of data structures for current LPS
+		List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
+		
+		// filter the list and keep only those structures that are been accessed in the current LPS
+		List<const char*> *filteredArrays = new List<const char*>;
+		for (int i = 0; i < localArrays->NumElements(); i++) {
+			const char *arrayName = localArrays->Nth(i);
+			DataStructure *structure = lps->getLocalStructure(arrayName);
+			if (structure->getUsageStat()->isAccessed()) {
+				filteredArrays->Append(arrayName);
+			}
+		} 
+
+		// populate a map of parent LPSes for different data structures indicating where the structure is 
+		// last been allocated.
+		Hashtable<Space*> *allocatingParentMap = new Hashtable<Space*>;
+		for (int i = 0; i < filteredArrays->NumElements(); i++) {
+			const char *arrayName = filteredArrays->Nth(i);
+			ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(arrayName);
+			Space *allocatingParentLps = mappingRoot->mappingConfig->LPS;
+			Space *currentLps =  lps;
+			while ((currentLps = currentLps->getParent()) != NULL) {
+				DataStructure *structure = currentLps->getLocalStructure(arrayName);
+				if (structure == NULL) continue;
+				if (structure->getUsageStat()->isAllocated()) {
+					allocatingParentLps = currentLps;
+					break;
+				}
+			}
+			allocatingParentMap->Enter(arrayName, allocatingParentLps, true);
+		}
+
+		// now we have sufficient information about allocating data structures or copying references to them
+		// start by writing a comment indicating what LPS we are handling at this moment
+		functionBody << stmtIndent << "//Processing Space " << lps->getName() << " contents\n";
+	
+		// get the variable name for the content references of current LPS
+		std::ostringstream lpsVarStr;
+		lpsVarStr << "space" << lps->getName() << "Content";
+		std::string lpsVar = lpsVarStr.str();
+
+		// iterate over the accessed data structure list
+		for (int i = 0; i < filteredArrays->NumElements(); i++) {
+			const char *arrayName = filteredArrays->Nth(i);
+			ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(arrayName);
+			Space *allocatingParent = allocatingParentMap->Lookup(arrayName);
+			
+			// if the data structure is used multiple time in the LPS and been reordered from its earlier
+			// LPSes content then it should be allocated in the current LPS
+			if (array->getUsageStat()->isMultipleAccess() && array->isReordered(allocatingParent)) {
+				
+				int dimensionCount = array->getDimensionality();
+				ArrayType *arrayType = (ArrayType*) array->getType();
+				Type *elemType = arrayType->getTerminalElementType();
+				
+				functionBody << stmtIndent;
+				functionBody << lpsVar << "." << arrayName << " = allocate::allocateArray ";
+				functionBody << "<" << elemType->getName() << "> (";
+				functionBody << dimensionCount << paramSeparator;
+				functionBody << "metadata->" << arrayName << "Dims)";
+				functionBody << stmtSeparator;			
+			
+				// if the array contains primitive type objects then zero fill it
+				ListType *list = dynamic_cast<ListType*>(elemType);
+        			MapType *map = dynamic_cast<MapType*>(elemType);
+        			NamedType *object = dynamic_cast<NamedType*>(elemType);
+				if (list == NULL && map == NULL && object == NULL) {
+					functionBody << stmtIndent;
+					functionBody << "allocate::zeroFillArray ";
+					functionBody << "<" << elemType->getName() << "> (0";
+					functionBody << paramSeparator << lpsVar << "." << arrayName;
+					functionBody << paramSeparator << dimensionCount << paramSeparator;
+					functionBody << "metadata->" << arrayName << "Dims)";
+					functionBody << stmtSeparator;
+				}
+
+				// flag the array as been allocated in current LPS
+				array->getUsageStat()->flagAllocated();
+				
+			// otherwise it should get the reference from the allocating parent
+			} else {
+				functionBody << stmtIndent;
+				functionBody << lpsVar << "." << arrayName  << " = ";
+				functionBody << "space" << allocatingParent->getName() << "Content";
+				functionBody << "." << arrayName;
+				functionBody << stmtSeparator;
+			}
+		}
+	}	
+
+	functionBody << "}\n";
+
+	headerFile << "void " << functionHeader << ";\n";	
+	programFile << "void " << initials << "::"; 
+	programFile <<functionHeader << " " << functionBody.str();
+	programFile << std::endl;
+
+	headerFile.close();
 	programFile.close();
 }
 

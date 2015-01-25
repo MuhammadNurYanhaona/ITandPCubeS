@@ -124,6 +124,31 @@ List<const char*> *FlowStage::filterInArraysFromAccessMap(Hashtable<VariableAcce
 	return arrayList;
 }
 
+void FlowStage::calculateLPSUsageStatistics() {
+	if (space->isDynamic() && executeCond != NULL) {
+		List<const char*> *localStructures = space->getLocalDataStructureNames();
+		for (int i = 0; i < localStructures->NumElements(); i++) {
+			const char *varName = localStructures->Nth(i);
+			space->getLocalStructure(varName)->getUsageStat()->resetAccessCount();
+		}
+	}
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+	VariableAccess *accessLog;
+	while ((accessLog = iterator.GetNextValue()) != NULL) {
+		if (!accessLog->isContentAccessed()) continue;
+		const char *varName = accessLog->getName();
+		DataStructure *structure = space->getLocalStructure(varName);
+		AccessFlags *accessFlags = accessLog->getContentAccessFlags();
+		LPSVarUsageStat *usageStat = structure->getUsageStat();
+		if (accessFlags->isRead() || accessFlags->isWritten()) {
+			usageStat->addAccess();
+		}
+		if (accessFlags->isReduced()) {
+			usageStat->flagReduced();
+		}
+	}
+}
+
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(0, space, NULL) {
@@ -655,6 +680,13 @@ bool CompositeStage::isGroupEntry() {
 	return (stageGroups->NumElements() > 1 || space != stageGroups->Nth(0)->Nth(0)->getSpace());
 }
 
+void CompositeStage::calculateLPSUsageStatistics() {
+	for (int i = 1; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->calculateLPSUsageStatistics();
+	}	
+}
+
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/
 
 RepeatCycle::RepeatCycle(int index, Space *space, RepeatCycleType type, Expr *executeCond) 
@@ -680,6 +712,28 @@ void RepeatCycle::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 	CompositeStage::performDependencyAnalysis(hierarchy);	
 	FlowStage::performDependencyAnalysis(repeatConditionAccessMap, hierarchy);
 	CompositeStage::performDependencyAnalysis(hierarchy);	
+}
+
+void RepeatCycle::calculateLPSUsageStatistics() {
+	Iterator<VariableAccess*> iterator = repeatConditionAccessMap->GetIterator();
+	VariableAccess *accessLog;
+	while ((accessLog = iterator.GetNextValue()) != NULL) {
+		if (!accessLog->isContentAccessed()) continue;
+		const char *varName = accessLog->getName();
+		DataStructure *structure = space->getLocalStructure(varName);
+		AccessFlags *accessFlags = accessLog->getContentAccessFlags();
+		LPSVarUsageStat *usageStat = structure->getUsageStat();
+		// As repeat condition is supposed to be evaluated multiple times, any data structure been used
+		// here should be marked as multiple access. Thus, we add access information twice.
+		if (accessFlags->isRead() || accessFlags->isWritten()) {
+			usageStat->addAccess();
+			usageStat->addAccess();
+		}
+	}
+	// Two calls have been made for evaluating the usage statistics in nested computation stages assuming that
+	// a repeat cycle will in most cases executes at least twice.
+	CompositeStage::calculateLPSUsageStatistics();
+	CompositeStage::calculateLPSUsageStatistics();
 }
 
 void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {

@@ -102,6 +102,11 @@ class FlowStage {
 	// This method is required to determine what variables need to be copied in local socpe from the LPU for
 	// the flow stage to simplify code generation.
 	List<const char*> *filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap = NULL);
+
+	// This is a static analysis routine that mainly serves the purpose of annotating a task with information 
+	// about different data structure usage in different LPSes. This knowledge is important regarding data 
+	// structure generation and memory allocation for variables in any backend; 
+	virtual void calculateLPSUsageStatistics();
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -117,6 +122,8 @@ class SyncStage : public FlowStage {
 		bool filterOutNonReads, bool filterOutNonWritten);
 	bool isLoaderSync() { return (mode == Load || mode == Load_And_Configure); }
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
+	// For now usage statistics is not been gathered for sync stages 
+	void calculateLPSUsageStatistics() {}
 };
 
 /*	This class is equivalent to a ComputeStage with executable code from abstract syntax tree
@@ -161,6 +168,7 @@ class CompositeStage : public FlowStage {
 	virtual void print(int indent);
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void reorganizeDynamicStages();
+	virtual void calculateLPSUsageStatistics();
 
 	// helper functions for code generation
 	List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();
@@ -181,6 +189,7 @@ class RepeatCycle : public CompositeStage {
 	void addSyncStagesOnReturn(List<FlowStage*> *stageList);
 	void setRepeatConditionAccessMap(Hashtable<VariableAccess*> *map) { repeatConditionAccessMap = map; }
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	void calculateLPSUsageStatistics();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 

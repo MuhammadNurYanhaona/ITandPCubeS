@@ -87,6 +87,11 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	List<TaskGlobalScalar*> *globalScalars 
 			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
 	generateClassesForGlobalScalars(headerFile, globalScalars);
+
+	// generate functions to initialize LPS content references
+	generateFnToInitiateRootLPSContent(headerFile, programFile, initials,
+                mappingConfig, envLinkList);
+	generateFnToInitiateLPSesContent(headerFile, programFile, initials, mappingConfig);
         
 	// generate thread management functions and classes
         generateFnForThreadIdsAllocation(headerFile, 
@@ -148,7 +153,7 @@ void TaskGenerator::generateTaskMain() {
 	stream << indent << "// creating a program log file\n";
 	stream << indent << "std::cout << \"Creating diagnostic log: it-program.log\\n\"" << stmtSeparator;
 	stream << indent << "std::ofstream logFile" << stmtSeparator;
-	stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator;
+	stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator << std::endl;
 
 	// generate prompts to read metadata of arrays and values of other structures in environment links
 	List<const char*> *externalEnvLinks = initiateEnvLinks(stream);
@@ -164,6 +169,12 @@ void TaskGenerator::generateTaskMain() {
 	// be done
 	stream << std::endl << indent << "// setting the global metadata variable\n";
 	stream << indent << "arrayMetadata = *metadata" << stmtSeparator;
+
+	// invoke functions to initialize array references in different LPSes
+	stream << std::endl << indent << "// allocating memories for data structures\n";
+	stream << indent << "std::cout << \"Allocating memories\\n\"" << stmtSeparator;
+	stream << indent << initials << "::initializeRootLPSContent(&envLinks, metadata)" << stmtSeparator;
+	stream << indent << initials << "::initializeLPSesContents(metadata)" << stmtSeparator;
 
 	// generate thread-state objects for the intended number of threads and initialize their root LPUs
 	initiateThreadStates(stream);
@@ -210,9 +221,23 @@ List<const char*> *TaskGenerator::initiateEnvLinks(std::ofstream &stream) {
 			if (isUnsupportedInputType(elemType, linkName)) {
 				stream << indent << "//TODO put custom initializing code for " << linkName << "\n";
 			} else {
+				// create a prompt to get the dimensions information for the variable under concern
 				stream << indent;
 				stream << "inprompt::readArrayDimensionInfo(\"" << linkName << "\"" << paramSeparator;
-				stream << array->getDimensionality() << paramSeparator;
+				int dimensionCount = array->getDimensionality();
+				stream << dimensionCount << paramSeparator;
+				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
+				// then allocate an array for the variable
+				stream << indent;
+				stream << "envLinks." << linkName << " = allocate::allocateArray ";
+				stream << '<' << elemType->getName() << "> ";	
+				stream << '(' << dimensionCount << paramSeparator;
+				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
+				// finally randomly initialize the array
+				stream << indent << "allocate::randomFillPrimitiveArray ";
+				stream << '<' << elemType->getName() << "> ";
+				stream << "(envLinks." << linkName << paramSeparator;	
+				stream << dimensionCount << paramSeparator;
 				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
 			}
 		} else {

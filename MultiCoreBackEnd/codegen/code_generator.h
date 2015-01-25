@@ -41,6 +41,20 @@ void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials
 /* function definition to generate data structures representing LPUs of different LPSes */
 void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot);
 
+/* function definition to generate a routine to initialze the content of the root LPS */
+void generateFnToInitiateRootLPSContent(const char *headerFile, 
+		const char *programFile, 
+		const char *initials,
+		MappingNode *mappingRoot, 
+		List<const char*> *externalEnvLinks);
+
+/* function definition to generate a routine to initialize the content of different LPSes except 
+   the Root LPS content */
+void generateFnToInitiateLPSesContent(const char *headerFile, 
+		const char *programFile, 
+		const char *initials, 
+		MappingNode *mappingRoot);
+
 /* function definition to close the namespace of the header file after all update is done */
 void closeNameSpace(const char *headerFile);
 

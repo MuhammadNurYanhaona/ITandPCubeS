@@ -7,6 +7,7 @@
 #include "../syntax/ast.h"
 #include "../syntax/location.h"
 #include "../syntax/ast_type.h"
+#include "../static-analysis/usage_statistic.h"
 
 /*	Partition Order specifies in what order individual partitions (or subpartitions) of a space will be
 	generated and processed by the runtime. This parameter is mostly relevant for subpartitioned spaces
@@ -98,6 +99,9 @@ class DataStructure {
 	DataStructure *source;
 	List<DataStructure*> *dependents;
 	Space *space;
+	// a variable used for static analysis to make decision about the memory allocation requirement for the
+	// data structure under concern
+	LPSVarUsageStat *usageStat;
 
 	// this variable is only useful for subpartitioned data structures. If it true, it signifies that
 	// the immediate parent space of the subpartition space, i.e., the space some of whose data 
@@ -116,7 +120,8 @@ class DataStructure {
 	Type *getType();
 	void flagAsNonStorable() { nonStorable = true; }
 	bool isNonStorable() { return nonStorable; }
-	virtual bool hasOverlappingsAmongPartitions() { return false; }	
+	virtual bool hasOverlappingsAmongPartitions() { return false; }
+	LPSVarUsageStat *getUsageStat() { return usageStat; };	
 };
 
 class ArrayDataStructure : public DataStructure {
@@ -151,6 +156,10 @@ class ArrayDataStructure : public DataStructure {
 	// specified. The latter check for only local reordering.
 	bool isDimensionReordered(int dimensionNo, Space *comparisonBound);
 	bool isDimensionLocallyReordered(int dimensionNo);
+	// Following two functions do the same thing as the preceeding two do -- only these functions take in
+	// into account all dimensions of the array
+	bool isReordered(Space *comparisonBound);
+	bool isLocallyReordered();
 	// This is used to determine if we need to have a for loop to iterate over the entries along a given
 	// dimension of the array
 	bool isSingleEntryInDimension(int dimensionNo);

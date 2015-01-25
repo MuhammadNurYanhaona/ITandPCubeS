@@ -25,5 +25,7 @@
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-// to input-output
+// to input-output and initialization
 #include "../runtime/input_prompt.h"
+#include "../runtime/allocator.h"
+

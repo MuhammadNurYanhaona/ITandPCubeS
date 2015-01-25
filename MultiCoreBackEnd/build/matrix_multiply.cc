@@ -33,8 +33,10 @@ header files included for different purposes
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-// to input-output
+// to input-output and initialization
 #include "../runtime/input_prompt.h"
+#include "../runtime/allocator.h"
+
 
 using namespace mm;
 
@@ -112,6 +114,26 @@ Functions for ArrayMetadata and EnvironmentLinks
 
 mm::ArrayMetadata::ArrayMetadata() : Metadata() {
 	setTaskName("Matrix Multiply");
+}
+
+/*-----------------------------------------------------------------------------------
+function to initialize the content reference objects of LPSes
+------------------------------------------------------------------------------------*/
+
+void mm::initializeRootLPSContent(EnvironmentLinks *envLinks, ArrayMetadata *metadata) {
+	spaceRootContent.a = envLinks->a;
+	spaceRootContent.b = envLinks->b;
+	spaceRootContent.c = allocate::allocateArray <float> (2, metadata->cDims);
+	allocate::zeroFillArray <float> (0, spaceRootContent.c, 2, metadata->cDims);
+}
+
+void mm::initializeLPSesContents(ArrayMetadata *metadata) {
+	//Processing Space A contents
+	spaceAContent.c = spaceRootContent.c;
+	//Processing Space A_Sub contents
+	spaceA_SubContent.a = spaceRootContent.a;
+	spaceA_SubContent.b = spaceRootContent.b;
+	spaceA_SubContent.c = spaceRootContent.c;
 }
 
 /*-----------------------------------------------------------------------------------
@@ -251,15 +273,15 @@ LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) 
 				 = (SpaceA_LPU*) lpsStates[Space_A]->lpu;
 		currentLpu->lpuId[0] = nextLpuId[0];
 		currentLpu->lpuId[1] = nextLpuId[1];
-		currentLpu->a = NULL;
+		currentLpu->a = spaceAContent.a;
 		getaPartForSpaceALpu(currentLpu->aPartDims, 
 				spaceRootLpu->aPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[0]);
-		currentLpu->b = NULL;
+		currentLpu->b = spaceAContent.b;
 		getbPartForSpaceALpu(currentLpu->bPartDims, 
 				spaceRootLpu->bPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[1]);
-		currentLpu->c = NULL;
+		currentLpu->c = spaceAContent.c;
 		getcPartForSpaceALpu(currentLpu->cPartDims, 
 				spaceRootLpu->cPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[0], partitionArgs[1]);
@@ -272,15 +294,15 @@ LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) 
 		SpaceA_Sub_LPU *currentLpu
 				 = (SpaceA_Sub_LPU*) lpsStates[Space_A_Sub]->lpu;
 		currentLpu->lpuId[0] = nextLpuId[0];
-		currentLpu->a = NULL;
+		currentLpu->a = spaceA_SubContent.a;
 		getaPartForSpaceA_SubLpu(currentLpu->aPartDims, 
 				spaceALpu->aPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[2]);
-		currentLpu->b = NULL;
+		currentLpu->b = spaceA_SubContent.b;
 		getbPartForSpaceA_SubLpu(currentLpu->bPartDims, 
 				spaceALpu->bPartDims, lpuCounts, nextLpuId, 
 				partitionArgs[2]);
-		currentLpu->c = NULL;
+		currentLpu->c = spaceA_SubContent.c;
 		currentLpu->cPartDims[0] = spaceALpu->cPartDims[0];
 		currentLpu->cPartDims[1] = spaceALpu->cPartDims[1];
 		currentLpu->setValidBit(true);
@@ -453,10 +475,15 @@ int main() {
 	std::cout << "Creating diagnostic log: it-program.log\n";
 	std::ofstream logFile;
 	logFile.open("it-program.log");
+
 	// initializing variables that are environmental links 
 	std::cout << "initializing environmental links\n";
 	inprompt::readArrayDimensionInfo("a", 2, envLinks.aDims);
+	envLinks.a = allocate::allocateArray <float> (2, envLinks.aDims);
+	allocate::randomFillPrimitiveArray <float> (envLinks.a, 2, envLinks.aDims);
 	inprompt::readArrayDimensionInfo("b", 2, envLinks.bDims);
+	envLinks.b = allocate::allocateArray <float> (2, envLinks.bDims);
+	allocate::randomFillPrimitiveArray <float> (envLinks.b, 2, envLinks.bDims);
 
 	// determining values of partition parameters
 	std::cout << "determining partition parameters\n";
@@ -478,6 +505,11 @@ int main() {
 
 	// setting the global metadata variable
 	arrayMetadata = *metadata;
+
+	// allocating memories for data structures
+	std::cout << "Allocating memories\n";
+	mm::initializeRootLPSContent(&envLinks, metadata);
+	mm::initializeLPSesContents(metadata);
 
 	// declaring and initializing state variables for threads 
 	ThreadLocals *threadLocalsList[Total_Threads];

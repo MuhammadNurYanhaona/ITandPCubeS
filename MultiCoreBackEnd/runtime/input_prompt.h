@@ -30,7 +30,7 @@ namespace inprompt {
         	return value;
 	}
 
-	// read data for an array from an input file
+	// read data for an array from an input file; TODO not implemented yet
 	template <class type> void readArray(const char *arrayName, 
 			int dimensionCount, Dimension *dimensions, type *array);
 

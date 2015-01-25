@@ -6,6 +6,7 @@
 #include "../syntax/location.h"
 #include "../partition-lib/partition_function.h"
 #include "../syntax/errors.h"
+#include "../static-analysis/usage_statistic.h"
 #include "symbol.h"
 
 //------------------------------------------------- DataDimensionConfig -----------------------------------------------/
@@ -109,6 +110,7 @@ DataStructure::DataStructure(VariableDef *definition) {
 	this->dependents = new List<DataStructure*>;
 	this->space = NULL;
 	this->nonStorable = false;
+	this->usageStat = new LPSVarUsageStat;
 }
 
 DataStructure::DataStructure(DataStructure *source) {
@@ -118,6 +120,7 @@ DataStructure::DataStructure(DataStructure *source) {
 	this->dependents = new List<DataStructure*>;
 	this->space = NULL;
 	this->nonStorable = false;
+	this->usageStat = new LPSVarUsageStat;
 }
 
 void DataStructure::setSpaceReference(Space *space) {
@@ -216,6 +219,27 @@ bool ArrayDataStructure::isDimensionLocallyReordered(int dimensionNo) {
 	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
 	if (partConfig == NULL) return false;
 	return partConfig->doesReorderStoredData();
+}
+
+bool ArrayDataStructure::isLocallyReordered() {
+	for (int i = 0; i < sourceDimensions->NumElements(); i++) {
+		int dimensionNo = sourceDimensions->Nth(i);
+		if (isDimensionLocallyReordered(dimensionNo)) return true;
+	}
+	return false;
+}
+
+bool ArrayDataStructure::isReordered(Space *comparisonBound) {
+	if (isLocallyReordered()) return true;
+	if (this->space == comparisonBound) return false;
+        if (source == NULL) return false;
+	ArrayDataStructure *sourceArray = (ArrayDataStructure*) source;
+	if (source->getSpace() == comparisonBound) {
+		return sourceArray->isLocallyReordered();
+	}
+	else if (source->getSpace()->isParentSpace(comparisonBound)) {
+		return sourceArray->isReordered(comparisonBound);		
+	} else return false;
 }
 
 bool ArrayDataStructure::isSingleEntryInDimension(int dimensionNo) {

@@ -28,8 +28,10 @@
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
-// to input-output
+// to input-output and initialization
 #include "../runtime/input_prompt.h"
+#include "../runtime/allocator.h"
+
 
 namespace mm {
 
@@ -91,6 +93,7 @@ class SpaceRoot_Content {
 	float *b;
 	float *c;
 };
+SpaceRoot_Content spaceRootContent;
 
 class SpaceRoot_LPU : public LPU {
   public:
@@ -108,6 +111,7 @@ class SpaceA_Content {
 	float *b;
 	float *c;
 };
+SpaceA_Content spaceAContent;
 
 class SpaceA_LPU : public LPU {
   public:
@@ -126,6 +130,7 @@ class SpaceA_Sub_Content {
 	float *b;
 	float *c;
 };
+SpaceA_Sub_Content spaceA_SubContent;
 
 class SpaceA_Sub_LPU : public LPU {
   public:
@@ -173,6 +178,12 @@ class TaskGlobals {
 class ThreadLocals {
   public:
 };
+
+/*-----------------------------------------------------------------------------------
+function to initialize the content reference objects of LPSes
+------------------------------------------------------------------------------------*/
+void initializeRootLPSContent(EnvironmentLinks *envLinks, ArrayMetadata *metadata);
+void initializeLPSesContents(ArrayMetadata *metadata);
 
 /*-----------------------------------------------------------------------------------
 function to generate PPU IDs and PPU group IDs for a thread

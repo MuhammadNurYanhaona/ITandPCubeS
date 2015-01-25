@@ -343,7 +343,8 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 			for (int i = 0; i < localArrays->NumElements(); i++) {
 				const char *arrayName = localArrays->Nth(i);
 				const char *parentLpu = arrayToParentLpus->Lookup(arrayName);
-				functionBody << doubleIndent << "currentLpu->" << arrayName << " = NULL";
+				functionBody << doubleIndent << "currentLpu->" << arrayName << " = ";
+				functionBody << "space" << lpsName << "Content." << arrayName;
 				functionBody << statementSeparator;
 				
 				ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(arrayName);
@@ -360,7 +361,8 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 			for (int i = 0; i < localArrays->NumElements(); i++) {
 				const char *arrayName = localArrays->Nth(i);
 				ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(arrayName);
-				functionBody << doubleIndent << "currentLpu->" << arrayName << " = NULL";
+				functionBody << doubleIndent << "currentLpu->" << arrayName << " = ";
+				functionBody << "space" << lpsName << "Content." << arrayName;
 				functionBody << statementSeparator;
 				
 				// if the structure is replicated then just copy its information from the parent
