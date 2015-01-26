@@ -517,6 +517,7 @@ ArrayDataStructure* DataConfigurationSpec::addPartitionConfiguration(Space *spac
 				Token *token = new Token(newDef, Token::wildcardTokenId);
 				space->storeToken(currentCoordinate, token);
 				currentCoordinate++;
+				currentDataDimensionIndex++;
 			} else {
 				// a partition function specification does its own validation
 				PartitionFunctionConfig *pFnConfig = instr->generateConfiguration(partitionDimensions, 

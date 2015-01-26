@@ -78,8 +78,9 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
                         = generateAllGetPartForLPURoutines(headerFile, programFile, 
 					initials, mappingConfig, partitionArgs);
         
-	// generate task specific data structures 
+	// generate task specific data structures and their functions 
         generateLpuDataStructures(headerFile, mappingConfig);
+	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
         List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
 			mappingConfig, taskDef->getEnvironmentLinks());
 	generateFnForMetadataAndEnvLinks(taskDef->getName(), initials, 
@@ -169,6 +170,7 @@ void TaskGenerator::generateTaskMain() {
 	// be done
 	stream << std::endl << indent << "// setting the global metadata variable\n";
 	stream << indent << "arrayMetadata = *metadata" << stmtSeparator;
+	stream << indent << "metadata->print(logFile)" << stmtSeparator;	
 
 	// invoke functions to initialize array references in different LPSes
 	stream << std::endl << indent << "// allocating memories for data structures\n";

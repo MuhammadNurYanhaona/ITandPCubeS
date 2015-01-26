@@ -249,6 +249,20 @@ bool ArrayDataStructure::isSingleEntryInDimension(int dimensionNo) {
 	return true;
 }
 
+void ArrayDataStructure::print() {
+	std::cout << "Variable " << getName() << " coordinate arrangements:\n";
+	for (int i = 0; i < sourceDimensions->NumElements(); i++) {
+		int dimensionNo = sourceDimensions->Nth(i);
+		PartitionFunctionConfig *config = getPartitionSpecForDimension(dimensionNo);
+		if (config == NULL) {
+			std::cout << "\treplicated in Dimension: " << dimensionNo;
+		} else {
+			std::cout << "\tpartitioned in Dimension: " << dimensionNo;
+		}
+		std::cout << std::endl;
+	}
+}
+
 //----------------------------------------------------- Token ---------------------------------------------------/
 
 int Token::wildcardTokenId = -1;

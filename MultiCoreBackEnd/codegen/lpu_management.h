@@ -77,6 +77,7 @@ class LPU {
 	void setId(int id) { this->id = id; }	
 	void setValidBit(bool valid) { this->valid = valid; }
 	bool isValid() { return valid; }
+	virtual void print(std::ofstream &stream, int indentLevel) {}
 };
 
 /* base class for task metadata object that holds the dimension information of all arrays been used */
@@ -86,6 +87,7 @@ class Metadata {
 	Metadata() { taskName = NULL; }
 	void setTaskName(const char *taskName) { this->taskName = taskName; }
 	const char *getTaskName() { return taskName; }
+	virtual void print(std::ofstream &stream) {}
 };	
 
 /* class for holding all necessary state information for an LPS of a thread */

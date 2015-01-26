@@ -379,10 +379,70 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 			programFile << statementIndent << "int lpuId[";
 			programFile << lps->getDimensionCount() << "]";
 			programFile << statementSeparator;
-		}	
+		}
+		// define a print function for the LPU
+		programFile << std::endl;
+		programFile << statementIndent << "void print(std::ofstream &stream, int indent)" << statementSeparator;	
 		programFile << "};\n";
 	}
 	
+	programFile << std::endl;
+	programFile.close();
+}
+
+void generatePrintFnForLpuDataStructures(const char *initials, const char *outputFile, MappingNode *mappingRoot) {
+
+	std::cout << "Generating print functions for LPUs\n";
+	
+	std::string statementSeparator = ";\n";
+        std::string statementIndent = "\t";
+	std::ofstream programFile;
+        
+	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+        if (programFile.is_open()) {
+                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
+                programFile << "Print functions for LPUs " << std::endl;
+                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+	} else {
+		std::cout << "Unable to open output program file";
+		std::exit(EXIT_FAILURE);
+	}
+
+	std::deque<MappingNode*> nodeQueue;
+        nodeQueue.push_back(mappingRoot);
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		Space *lps = node->mappingConfig->LPS;
+		
+		programFile << std::endl;
+		programFile << "void " << initials << "::Space" << lps->getName() << "_LPU::print";
+		programFile << "(std::ofstream &stream, int indentLevel) {\n";
+		
+		List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
+		for (int i = 0; i < localArrays->NumElements(); i++) {
+			const char *arrayName = localArrays->Nth(i);
+			ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(arrayName);
+			int dimensions = array->getDimensionality();
+			programFile << statementIndent << "for (int i = 0; i < indentLevel; i++) ";
+			programFile << "stream << '\\t'" << statementSeparator;
+			programFile << statementIndent << "stream << \"Array: " << arrayName << "\"";
+			programFile << " << std::endl";
+			programFile << statementSeparator;
+			for (int j = 0; j < dimensions; j++) {
+				programFile << statementIndent;
+				programFile << arrayName << "PartDims[" << j;
+				programFile  << "].print(stream, indentLevel + 1)";
+				programFile << statementSeparator;
+			}
+		}
+		programFile << statementIndent << "stream.flush()" << statementSeparator;
+		programFile << "}\n";
+	}
+
 	programFile << std::endl;
 	programFile.close();
 }
@@ -653,8 +713,9 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
 		programFile << "Dimension " << array->getName() << "Dims[" << dimensions << "]";
 		programFile << statementSeparator;
 	}
+	programFile << std::endl;
 	programFile << statementIndent << "ArrayMetadata()" << statementSeparator;
-	programFile << statementIndent << "void print(std::ofstream stream)" << statementSeparator;
+	programFile << statementIndent << "void print(std::ofstream &stream)" << statementSeparator;
 	programFile << "};\n";
 	programFile << "ArrayMetadata arrayMetadata" << statementSeparator;
 	
@@ -683,8 +744,9 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
 			programFile << statementIndent << declaration << statementSeparator;
 		}
 		linkList->Append(linkName);
-	}	
-	programFile << statementIndent << "void print(std::ofstream stream)" << statementSeparator;
+	}
+	programFile << std::endl;	
+	programFile << statementIndent << "void print(std::ofstream &stream)" << statementSeparator;
 	programFile << "};\n";
 	programFile << "EnvironmentLinks environmentLinks" << statementSeparator << std::endl;
 	programFile.close();
@@ -717,7 +779,28 @@ void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials
 	programFile << std::endl << initials << "::ArrayMetadata::ArrayMetadata() : Metadata() {\n";
 	programFile << statementIndent << "setTaskName";
 	programFile << "(\"" << taskName << "\")" << statementSeparator;  
-	programFile << "}" << std::endl << std::endl; 
+	programFile << "}" << std::endl << std::endl;
+
+	// generate a print function for array metadata
+	programFile << "void " << initials << "::ArrayMetadata::" << "print(std::ofstream &stream) {\n";
+	programFile << statementIndent << "stream << \"Array Metadata\" << std::endl" << statementSeparator;
+	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
+	for (int i = 0; i < localArrays->NumElements(); i++) {
+		const char *arrayName = localArrays->Nth(i);
+		programFile << statementIndent << "stream << \"Array: " << arrayName << "\"";
+		programFile << statementSeparator;
+		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
+		int dimensions = array->getDimensionality();
+		for (int j = 0; j < dimensions; j++) {
+			programFile << statementIndent << "stream << ' '" << statementSeparator;
+			programFile << statementIndent;
+			programFile << arrayName << "Dims[" << j << "].print(stream)";
+			programFile << statementSeparator;
+		}
+		programFile << statementIndent << "stream << std::endl" << statementSeparator;
+	}
+	programFile << statementIndent << "stream.flush()" << statementSeparator;
+	programFile << "}" << std::endl << std::endl;
 	
 	programFile.close();
 }

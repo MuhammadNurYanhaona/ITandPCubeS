@@ -163,6 +163,9 @@ class ArrayDataStructure : public DataStructure {
 	// This is used to determine if we need to have a for loop to iterate over the entries along a given
 	// dimension of the array
 	bool isSingleEntryInDimension(int dimensionNo);
+	// This is a print function to display how different dimensions of the array are partitioned in this 
+	// LPS under concern. This function is purely for diagnostic purpose and has not been perfected.
+	void print();
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions

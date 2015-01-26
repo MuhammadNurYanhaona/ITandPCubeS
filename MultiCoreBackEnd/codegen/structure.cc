@@ -45,17 +45,17 @@ Dimension Dimension::getNormalizedDimension() {
 }
 
 void Dimension::print(std::ofstream &stream) {
-	stream << "min " << range.min;
-	stream << " max " << range.max;
+	stream << range.min << "--" << range.max;
 }
 
 //----------------------------------------- Part Dimension  ---------------------------------------------/
 
-void PartDimension::print(std::ofstream &stream) {
+void PartDimension::print(std::ofstream &stream, int indentLevel) {
+	
+	for (int i = 0; i < indentLevel; i++) stream << "\t";
 	stream << "storage: ";
 	storage.print(stream);
-	stream << std::endl;
-	stream << "partition: ";
+	stream << " partition: ";
 	partition.print(stream);
 	stream << std::endl;
 }

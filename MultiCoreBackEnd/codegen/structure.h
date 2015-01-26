@@ -38,7 +38,7 @@ class PartDimension {
   public:
         Dimension storage;
         Dimension partition;
-	void print(std::ofstream &stream);
+	void print(std::ofstream &stream, int indentLevel);
 };
 
 /* structure for holding a sequence of LPU ids */

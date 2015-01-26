@@ -161,7 +161,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 			// log LPU execution
 			for (int i = 0; i < lpsId; i++) threadLog << '\t';
 			threadLog << "Next LPU: " << nextLpuId << std::endl;
-			threadLog.flush();	
+			lpu->print(threadLog, lpsId + 1);
 		
 			// set the LPU Id so that recursion can advance to the next LPU in next call 
 			lpu->setId(nextLpuId);	
@@ -209,7 +209,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				// log LPU execution
 				for (int i = 0; i < lpsId; i++) threadLog << '\t';
 				threadLog << "Return LPU: " << nextLpuId << std::endl;
-				threadLog.flush();
+				lpu->print(threadLog, lpsId + 1);
 	
 				// set the LPU Id so that recursion can advance to the next LPU in next call 
 				lpu->setId(nextLpuId);	
@@ -248,7 +248,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		// log LPU execution
 		for (int i = 0; i < lpsId; i++) threadLog << '\t';
 		threadLog << "Start LPU: " << nextLpuId << std::endl;
-		threadLog.flush();	
+		lpu->print(threadLog, lpsId + 1);
 		
 		// set the LPU Id so that recursion can advance to the next LPU in next call 
 		lpu->setId(nextLpuId);	
