@@ -287,21 +287,20 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 		stream << indent.str() << "if (threadState->isValidPpu(Space_" << space->getName();
 		stream << ")) {\n";
 	}
-/*
+
 	// invoke the related method with current LPU parameter
 	stream << nextIndent.str() << "// invoking user computation\n";
 	stream << nextIndent.str();
-	stream << name << "(*space" << space->getName() << "Lpu, ";
+	stream << name << "(space" << space->getName() << "Lpu, ";
 	// along with other default arguments
-	nextIndent << "\t\t";
-	stream << '\n' << nextIndent.str() << "arrayMetadata,";
-	stream << '\n' << nextIndent.str() << "taskGlobals,";
-	stream << '\n' << nextIndent.str() << "threadLocals, partition);\n";
-*/
-/*	stream << nextIndent.str() << "threadState->threadLog << \"Executing compute stage " << name;
-	stream << "\" << std::endl;\n";
-	stream << nextIndent.str() << "threadState->threadLog.flush();\n";
-*/	
+	stream << '\n' << nextIndent.str() << "\t\tarrayMetadata,";
+	stream << '\n' << nextIndent.str() << "\t\ttaskGlobals,";
+	stream << '\n' << nextIndent.str() << "\t\tthreadLocals, partition);\n";
+	
+	// write a log entry for the stage executed
+	stream << nextIndent.str() << "threadState->logExecution(\"";
+	stream << name << "\", Space_" << space->getName() << ");\n"; 	
+	
 	// close the if condition if applicable
 	if (!isGroupEntry()) {
 		stream << indent.str() << "}\n";
@@ -681,7 +680,7 @@ bool CompositeStage::isGroupEntry() {
 }
 
 void CompositeStage::calculateLPSUsageStatistics() {
-	for (int i = 1; i < stageList->NumElements(); i++) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->calculateLPSUsageStatistics();
 	}	

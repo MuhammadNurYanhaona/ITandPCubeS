@@ -82,6 +82,9 @@ int main(int argc, const char *argv[]) {
 	TaskGenerator *firstTaskGenerator= NULL;
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		TaskDef *taskDef = taskList->Nth(i);
+		// do static analysis of the task to determine what data structure has been 
+		// accessed in what LPS before code generation starts
+		taskDef->getComputation()->calculateLPSUsageStatistics();
 		TaskGenerator *generator = new TaskGenerator(taskDef, outputDir, mappingFile);
 		generator->generate(pcubesConfig);
 		if (i == 0) firstTaskGenerator = generator;

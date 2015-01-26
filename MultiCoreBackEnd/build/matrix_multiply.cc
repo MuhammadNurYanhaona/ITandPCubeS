@@ -51,12 +51,6 @@ int *mm::getLPUsCountOfSpaceA(int ppuCount, Dimension cDim1, int k, Dimension cD
 	return count;
 }
 
-int *mm::getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q) {
-	int *count = new int[1];
-	count[0] = block_size_partitionCount(aDim2, ppuCount, q);
-	return count;
-}
-
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
 -----------------------------------------------------------------------------------*/
@@ -90,24 +84,6 @@ void mm::getcPartForSpaceALpu(PartDimension *cLpuDims,
 			lpuCount[1], lpuId[1], l, 0, 0);
 }
 
-void mm::getaPartForSpaceA_SubLpu(PartDimension *aLpuDims, 
-		PartDimension *aParentLpuDims, 
-		int *lpuCount, int *lpuId, int q) {
-	aLpuDims[0] = aParentLpuDims[0];
-	aLpuDims[1].storage = aParentLpuDims[1].storage;
-	aLpuDims[1].partition = block_size_getRange(aParentLpuDims[1].partition, 
-			lpuCount[0], lpuId[0], q, 0, 0);
-}
-
-void mm::getbPartForSpaceA_SubLpu(PartDimension *bLpuDims, 
-		PartDimension *bParentLpuDims, 
-		int *lpuCount, int *lpuId, int q) {
-	bLpuDims[0].storage = bParentLpuDims[0].storage;
-	bLpuDims[0].partition = block_size_getRange(bParentLpuDims[0].partition, 
-			lpuCount[0], lpuId[0], q, 0, 0);
-	bLpuDims[1] = bParentLpuDims[1];
-}
-
 /*-----------------------------------------------------------------------------------
 Functions for ArrayMetadata and EnvironmentLinks 
 ------------------------------------------------------------------------------------*/
@@ -129,11 +105,9 @@ void mm::initializeRootLPSContent(EnvironmentLinks *envLinks, ArrayMetadata *met
 
 void mm::initializeLPSesContents(ArrayMetadata *metadata) {
 	//Processing Space A contents
+	spaceAContent.a = spaceRootContent.a;
+	spaceAContent.b = spaceRootContent.b;
 	spaceAContent.c = spaceRootContent.c;
-	//Processing Space A_Sub contents
-	spaceA_SubContent.a = spaceRootContent.a;
-	spaceA_SubContent.b = spaceRootContent.b;
-	spaceA_SubContent.c = spaceRootContent.c;
 }
 
 /*-----------------------------------------------------------------------------------
@@ -173,14 +147,6 @@ ThreadIds *mm::getPpuIdsForThread(int threadNo)  {
 	else threadIds->ppuIds[Space_A].id = INVALID_ID;
 	idsArray[Space_A] = groupThreadId;
 
-	// for Space A_Sub;
-	threadIds->ppuIds[Space_A_Sub].lpsName = "A_Sub";
-	threadIds->ppuIds[Space_A_Sub].groupId = 0;
-	threadIds->ppuIds[Space_A_Sub].ppuCount = 1;
-	threadIds->ppuIds[Space_A_Sub].groupSize = threadIds->ppuIds[Space_A].groupSize;
-	threadIds->ppuIds[Space_A_Sub].id = 0;
-	idsArray[Space_A_Sub] = idsArray[Space_A];
-
 	return threadIds;
 }
 
@@ -193,7 +159,6 @@ void ThreadStateImpl::setLpsParentIndexMap() {
 	lpsParentIndexMap = new int[Space_Count];
 	lpsParentIndexMap[Space_Root] = INVALID_ID;
 	lpsParentIndexMap[Space_A] = Space_Root;
-	lpsParentIndexMap[Space_A_Sub] = Space_A;
 	threadLog << "set up parent LPS index map" << std::endl;
 	threadLog.flush();
 }
@@ -232,8 +197,6 @@ void ThreadStateImpl::setRootLpu(Metadata *metadata) {
 void ThreadStateImpl::initializeLPUs() {
 	lpsStates[Space_A]->lpu = new SpaceA_LPU;
 	lpsStates[Space_A]->lpu->setValidBit(false);
-	lpsStates[Space_A_Sub]->lpu = new SpaceA_Sub_LPU;
-	lpsStates[Space_A_Sub]->lpu->setValidBit(false);
 	threadLog << "initialized LPU pointers" << std::endl;
 	threadLog.flush();
 }
@@ -252,14 +215,6 @@ int *ThreadStateImpl::computeLpuCounts(int lpsId) {
 				partitionArgs[0], 
 				spaceRootLpu->cPartDims[1].partition, 
 				partitionArgs[1]);
-	}
-	if (lpsId == Space_A_Sub) {
-		int ppuCount = threadIds->ppuIds[Space_A_Sub].ppuCount;
-		SpaceA_LPU *spaceALpu
-				 = (SpaceA_LPU*) lpsStates[Space_A]->lpu;
-		return getLPUsCountOfSpaceA_Sub(ppuCount, 
-				spaceALpu->aPartDims[1].partition, 
-				partitionArgs[2]);
 	}
 	return NULL;
 }
@@ -288,26 +243,6 @@ LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) 
 		currentLpu->setValidBit(true);
 		return currentLpu;
 	}
-	if (lpsId == Space_A_Sub) {
-		SpaceA_LPU *spaceALpu
-				 = (SpaceA_LPU*) lpsStates[Space_A]->lpu;
-		SpaceA_Sub_LPU *currentLpu
-				 = (SpaceA_Sub_LPU*) lpsStates[Space_A_Sub]->lpu;
-		currentLpu->lpuId[0] = nextLpuId[0];
-		currentLpu->a = spaceA_SubContent.a;
-		getaPartForSpaceA_SubLpu(currentLpu->aPartDims, 
-				spaceALpu->aPartDims, lpuCounts, nextLpuId, 
-				partitionArgs[2]);
-		currentLpu->b = spaceA_SubContent.b;
-		getbPartForSpaceA_SubLpu(currentLpu->bPartDims, 
-				spaceALpu->bPartDims, lpuCounts, nextLpuId, 
-				partitionArgs[2]);
-		currentLpu->c = spaceA_SubContent.c;
-		currentLpu->cPartDims[0] = spaceALpu->cPartDims[0];
-		currentLpu->cPartDims[1] = spaceALpu->cPartDims[1];
-		currentLpu->setValidBit(true);
-		return currentLpu;
-	}
 	return NULL;
 }
 
@@ -333,7 +268,7 @@ void mm::initializeTask(ArrayMetadata *arrayMetadata,
 functions for compute stages 
 ------------------------------------------------------------------------------------*/
 
-void mm::block_multiply_matrices(SpaceA_Sub_LPU *lpu, 
+void mm::mm_function0(SpaceA_LPU *lpu, 
 		ArrayMetadata *arrayMetadata, 
 		TaskGlobals *taskGlobals, 
 		ThreadLocals *threadLocals, MMPartition partition) {
@@ -434,21 +369,14 @@ void mm::run(ArrayMetadata *arrayMetadata,
 	LPU *lpu = NULL;
 	while((lpu = threadState->getNextLpu(Space_A, Space_Root, spaceALpuId)) != NULL) {
 		spaceALpu = (SpaceA_LPU*) lpu;
-		{ // scope entrance for iterating LPUs of Space A_Sub
-		int spaceA_SubLpuId = INVALID_ID;
-		int spaceA_SubIteration = 0;
-		SpaceA_Sub_LPU *spaceA_SubLpu = NULL;
-		LPU *lpu = NULL;
-		while((lpu = threadState->getNextLpu(Space_A_Sub, Space_A, spaceA_SubLpuId)) != NULL) {
-			spaceA_SubLpu = (SpaceA_Sub_LPU*) lpu;
-			//this is a comment correspond to a sync stage
-			if (threadState->isValidPpu(Space_A_Sub)) {
-			}
-			spaceA_SubLpuId = spaceA_SubLpu->id;
-			spaceA_SubIteration++;
+		if (threadState->isValidPpu(Space_A)) {
+			// invoking user computation
+			mm_function0(spaceALpu, 
+					arrayMetadata,
+					taskGlobals,
+					threadLocals, partition);
+			threadState->logExecution("mm_function0", Space_A);
 		}
-		threadState->removeIterationBound(Space_A);
-		} // scope exit for iterating LPUs of Space A_Sub
 		spaceALpuId = spaceALpu->id;
 		spaceAIteration++;
 	}
@@ -488,13 +416,11 @@ int main() {
 	// determining values of partition parameters
 	std::cout << "determining partition parameters\n";
 	int *partitionArgs = NULL;
-	partitionArgs = new int[3];
+	partitionArgs = new int[2];
 	partition.k = inprompt::readPrimitive <int> ("k");
 	partitionArgs[0] = partition.k;
 	partition.l = inprompt::readPrimitive <int> ("l");
 	partitionArgs[1] = partition.l;
-	partition.q = inprompt::readPrimitive <int> ("q");
-	partitionArgs[2] = partition.q;
 
 	// determining values of initialization parameters
 	std::cout << "determining initialization parameters\n";
@@ -520,7 +446,6 @@ int main() {
 	int lpsDimensions[Space_Count];
 	lpsDimensions[Space_Root] = 0;
 	lpsDimensions[Space_A] = 2;
-	lpsDimensions[Space_A_Sub] = 1;
 	std::cout << "generating PPU Ids for threads\n";
 	ThreadIds *threadIdsList[Total_Threads];
 	for (int i = 0; i < Total_Threads; i++) {

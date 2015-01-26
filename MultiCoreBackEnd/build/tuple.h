@@ -18,7 +18,6 @@ class MMPartition {
   public:
 	int k;
 	int l;
-	int q;
 };
 
 #endif

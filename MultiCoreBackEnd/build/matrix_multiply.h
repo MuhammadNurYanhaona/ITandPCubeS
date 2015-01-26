@@ -40,8 +40,7 @@ constants for LPSes
 ------------------------------------------------------------------------------------*/
 const int Space_Root = 0;
 const int Space_A = 1;
-const int Space_A_Sub = 2;
-const int Space_Count = 3;
+const int Space_Count = 2;
 
 /*-----------------------------------------------------------------------------------
 constants for PPS counts
@@ -62,7 +61,6 @@ const int Threads_Par_Core = 1;
 functions for retrieving partition counts in different LPSes
 ------------------------------------------------------------------------------------*/
 int *getLPUsCountOfSpaceA(int ppuCount, Dimension cDim1, int k, Dimension cDim2, int l);
-int *getLPUsCountOfSpaceA_Sub(int ppuCount, Dimension aDim2, int q);
 
 /*-----------------------------------------------------------------------------------
 functions for getting data ranges along different dimensions of an LPU
@@ -76,12 +74,6 @@ void getbPartForSpaceALpu(PartDimension *bLpuDims,
 void getcPartForSpaceALpu(PartDimension *cLpuDims, 
 		PartDimension *cParentLpuDims, 
 		int *lpuCount, int *lpuId, int k, int l);
-void getaPartForSpaceA_SubLpu(PartDimension *aLpuDims, 
-		PartDimension *aParentLpuDims, 
-		int *lpuCount, int *lpuId, int q);
-void getbPartForSpaceA_SubLpu(PartDimension *bLpuDims, 
-		PartDimension *bParentLpuDims, 
-		int *lpuCount, int *lpuId, int q);
 
 /*-----------------------------------------------------------------------------------
 Data structures representing LPS and LPU contents 
@@ -122,25 +114,6 @@ class SpaceA_LPU : public LPU {
 	float *c;
 	PartDimension cPartDims[2];
 	int lpuId[2];
-};
-
-class SpaceA_Sub_Content {
-  public:
-	float *a;
-	float *b;
-	float *c;
-};
-SpaceA_Sub_Content spaceA_SubContent;
-
-class SpaceA_Sub_LPU : public LPU {
-  public:
-	float *a;
-	PartDimension aPartDims[2];
-	float *b;
-	PartDimension bPartDims[2];
-	float *c;
-	PartDimension cPartDims[2];
-	int lpuId[1];
 };
 
 /*-----------------------------------------------------------------------------------
@@ -221,7 +194,7 @@ void initializeTask(ArrayMetadata *arrayMetadata,
 functions for compute stages 
 ------------------------------------------------------------------------------------*/
 
-void block_multiply_matrices(SpaceA_Sub_LPU *lpu, 
+void mm_function0(SpaceA_LPU *lpu, 
 		ArrayMetadata *arrayMetadata, 
 		TaskGlobals *taskGlobals, 
 		ThreadLocals *threadLocals, MMPartition partition);
