@@ -40,6 +40,9 @@ YACC = bison
 # STL has some signed/unsigned comparisons we want to suppress
 CFLAGS = -g  -Wall -Wno-unused -Wno-sign-compare 
 
+# We need flag to enable the POSIX thread library during compiling generated code
+RFLAG = -pthread
+
 # The -d flag tells lex to set up for debugging. Can turn on/off by
 # setting value of global yy_flex_debug inside the scanner itself
 LEXFLAGS = -d
@@ -52,6 +55,9 @@ YACCFLAGS = -dvty
 
 # Link with standard c library, math library, and lex library
 LIBS = -lc -lm -lfl
+
+# Link with POSIX thread library
+BUILD_LIBS = -pthread
 
 # Rules for various parts of the target
 
@@ -68,7 +74,7 @@ y.tab.h y.tab.c: IT.y
 	$(YACC) $(YACCFLAGS) IT.y
 
 .cc.o: $*.cc
-	$(CC) $(CFLAGS) -c -o $@ $*.cc
+	$(CC) $(CFLAGS) $(RFLAG) -c -o $@ $*.cc
 
 # rules to build compiler (icc)
 $(COMPILER) : $(OBJS)
@@ -97,6 +103,6 @@ clean:
 
 # make build will compile and generate executable for any IT program compiled by the IT compiler 
 build: $(BUILD_OBJS)
-	$(LD) -o ./bin/it-program.o $(BUILD_OBJS) $(LIBS) 
+	$(LD) -o ./bin/it-program.o $(BUILD_OBJS) $(LIBS) $(BUILD_LIBS)
 	
 

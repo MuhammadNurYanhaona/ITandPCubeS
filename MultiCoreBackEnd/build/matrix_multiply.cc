@@ -37,6 +37,9 @@ header files included for different purposes
 #include "../runtime/input_prompt.h"
 #include "../runtime/allocator.h"
 
+// for threading
+#include <pthread.h>
+
 
 using namespace mm;
 
@@ -537,6 +540,24 @@ void mm::run(ArrayMetadata *arrayMetadata,
 }
 
 /*-----------------------------------------------------------------------------------
+PThreads run function
+------------------------------------------------------------------------------------*/
+
+void *mm::runPThreads(void *argument) {
+	PThreadArg *pthreadArg = (PThreadArg *) argument;
+	ThreadStateImpl *threadState = pthreadArg->threadState;
+	std::cout << "Thread " << threadState->getThreadNo() << " has started";
+	std::cout << " executing task: " << pthreadArg->taskName << std::endl;
+	run(pthreadArg->metadata, 
+			pthreadArg->taskGlobals, 
+			pthreadArg->threadLocals, 
+			pthreadArg->partition, 
+			threadState);
+	std::cout << "Thread " << threadState->getThreadNo() << " has ended" << std::endl;
+	pthread_exit(NULL);
+}
+
+/*-----------------------------------------------------------------------------------
 main function
 ------------------------------------------------------------------------------------*/
 
@@ -621,10 +642,26 @@ int main() {
 
 	// starting threads
 	std::cout << "starting threads\n";
+	pthread_t threads[Total_Threads];
+	PThreadArg *threadArgs[Total_Threads];
 	for (int i = 0; i < Total_Threads; i++) {
-		run(metadata, &taskGlobals, threadLocalsList[i], partition, threadStateList[i]);
+		threadArgs[i] = new PThreadArg;
+		threadArgs[i]->taskName = "Matrix Multiply";
+		threadArgs[i]->metadata = metadata;
+		threadArgs[i]->taskGlobals = &taskGlobals;
+		threadArgs[i]->threadLocals = threadLocalsList[i];
+		threadArgs[i]->threadState = threadStateList[i];
+	}
+	int state;
+	for (int i = 0; i < Total_Threads; i++) {
+		state = pthread_create(&threads[i], NULL, runPThreads, (void *) threadArgs[i]);
+		if (state) {
+			std::cout << "Could not start some PThread" << std::endl;
+			std::exit(EXIT_FAILURE);
+		}
 	}
 
 	logFile.close();
+	pthread_exit(NULL);
 	return 0;
 }

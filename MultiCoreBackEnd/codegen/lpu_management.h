@@ -151,7 +151,8 @@ class ThreadState {
 	void removeIterationBound(int lpsId);
 	ThreadIds *getThreadIds() { return threadIds; }
 	bool isValidPpu(int lpsId);
-	void initiateLogFile(const char *fileNamePrefix); 
+	void initiateLogFile(const char *fileNamePrefix);
+	int getThreadNo() { return threadIds->threadNo; }
 	virtual ~ThreadState() {}
 	
 	// a log file for diagnostics

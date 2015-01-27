@@ -13,6 +13,7 @@
 #include "space_mapping.h"
 #include "name_transformer.h"
 #include "compute_translator.h"
+#include "pthread_mgmt.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -115,6 +116,10 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generateThreadRunFunction(taskDef, headerFile, 
 			programFile, initials, mappingConfig);
 
+	// generate data structure and functions for Pthreads
+	generateArgStructForPthreadRunFn(taskDef->getName(), headerFile);
+	generatePThreadRunFn(headerFile, programFile, initials);
+
 	closeNameSpace(headerFile);
 }
 
@@ -184,8 +189,9 @@ void TaskGenerator::generateTaskMain() {
 	// start threads 
 	startThreads(stream);	
 
-	// close the log file and end the function definition
+	// close the log file, set a wait statement for Pthreads, and end the function definition
 	stream << std::endl << indent << "logFile.close()" << stmtSeparator;
+	stream << indent << "pthread_exit(NULL)" << stmtSeparator;
 	stream << indent << "return 0" << stmtSeparator;
 	stream << "}\n";
 	stream.close();
@@ -439,12 +445,30 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	
 	stream << std::endl << indent << "// starting threads\n";	
 	stream << indent << "std::cout << \"starting threads\\n\"" << stmtSeparator;
-	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
-	stream << indent << indent << "run(metadata" << paramSeparator;
-	stream << "&taskGlobals" << paramSeparator;
-	stream << "threadLocalsList[i]" << paramSeparator;
-	stream << "partition" << paramSeparator;
-	stream << "threadStateList[i])" << stmtSeparator;
+	
+	// declare an array of thread IDs and another array of thread arguments
+	stream << indent << "pthread_t threads[Total_Threads]" << stmtSeparator;
+	stream << indent << "PThreadArg *threadArgs[Total_Threads]" << stmtSeparator;
 
+	// initialize the argument list first
+	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << indent << "threadArgs[i] = new PThreadArg" << stmtSeparator;
+	stream << indent << indent << "threadArgs[i]->taskName = \"" << taskDef->getName() << "\"" << stmtSeparator;
+	stream << indent << indent << "threadArgs[i]->metadata = metadata" << stmtSeparator;
+	stream << indent << indent << "threadArgs[i]->taskGlobals = &taskGlobals" << stmtSeparator;
+	stream << indent << indent << "threadArgs[i]->threadLocals = threadLocalsList[i]" << stmtSeparator;
+	stream << indent << indent << "threadArgs[i]->threadState = threadStateList[i]" << stmtSeparator;
+	stream << indent << "}\n";
+
+	// then create the threads one by one
+	stream << indent << "int state" << stmtSeparator;
+	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << indent << "state = pthread_create(&threads[i], NULL, runPThreads, (void *) threadArgs[i])";
+	stream << stmtSeparator;
+	stream << indent << indent << "if (state) {\n";
+	stream << indent << indent << indent << "std::cout << \"Could not start some PThread\" << std::endl";
+	stream << stmtSeparator;
+	stream << indent << indent << indent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
+	stream << indent << indent << "}\n";
 	stream << indent << "}\n";
 }

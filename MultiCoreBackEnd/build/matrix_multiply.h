@@ -32,6 +32,9 @@
 #include "../runtime/input_prompt.h"
 #include "../runtime/allocator.h"
 
+// for threading
+#include <pthread.h>
+
 
 namespace mm {
 
@@ -244,6 +247,21 @@ void run(ArrayMetadata *arrayMetadata,
 		ThreadLocals *threadLocals, 
 		MMPartition partition, ThreadStateImpl *threadState);
 
+/*-----------------------------------------------------------------------------------
+Data structure and function for Pthreads
+------------------------------------------------------------------------------------*/
+
+class PThreadArg {
+  public:
+	const char *taskName;
+	ArrayMetadata *metadata;
+	TaskGlobals *taskGlobals;
+	ThreadLocals *threadLocals;
+	MMPartition partition;
+	ThreadStateImpl *threadState;
+};
+
+void *runPThreads(void *argument);
 
 }
 #endif
