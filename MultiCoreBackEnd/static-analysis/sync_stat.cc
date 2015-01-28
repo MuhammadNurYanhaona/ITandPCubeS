@@ -1,0 +1,142 @@
+#include "sync_stat.h"
+#include "data_flow.h"
+#include "data_access.h"
+#include "../utils/list.h"
+#include "../utils/hashtable.h"
+#include "../semantics/task_space.h"
+
+#include <iostream>
+#include <sstream>
+
+
+//----------------------------------------------- Sync Requirement -----------------------------------------------/
+
+SyncRequirement::SyncRequirement() {
+	this->variableName = NULL;
+	this->dependentLps = NULL;
+	this->waitingComputation = NULL;
+	this->arc = NULL;
+}
+
+void SyncRequirement::print(int indent) {
+	std::ostringstream indentStr;
+	for (int i = 0; i < indent; i++) indentStr << '\t';
+	std::cout << indentStr.str() << "Dependency on: Space " << dependentLps->getName() << std::endl;
+	std::cout << indentStr.str() << "Waiting Computation: " << waitingComputation->getName() << std::endl; 
+}
+
+//----------------------------------------------- Replication Sync ----------------------------------------------/
+
+void ReplicationSync::print(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	std::cout << "Type: " << "replication sync" << std::endl;
+	SyncRequirement::print(indent);
+}
+
+//---------------------------------------------- Ghost Region Sync ----------------------------------------------/
+
+GhostRegionSync::GhostRegionSync() : SyncRequirement() {
+	overlappingDirections = NULL;
+}
+
+void GhostRegionSync::setOverlappingDirections(List<int> *overlappingDirections) {
+	this->overlappingDirections = overlappingDirections;
+}
+
+void GhostRegionSync::print(int indent) {
+	std::ostringstream indentStr;
+	for (int i = 0; i < indent; i++) indentStr << '\t';
+	std::cout << indentStr.str() << "Type: " << "ghost region sync" << std::endl;
+	std::cout << indentStr.str() << "Directions:";
+	for (int i = 0; i < overlappingDirections->NumElements(); i++) {
+		std::cout << " " << overlappingDirections->Nth(i);
+	}
+	std::cout << std::endl;
+	SyncRequirement::print(indent);
+}
+
+//--------------------------------------------- Up Propagation Sync ---------------------------------------------/
+
+void UpPropagationSync::print(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	std::cout << "Type: " << "up propagation sync" << std::endl;
+	SyncRequirement::print(indent);
+}
+
+//-------------------------------------------- Down Propagation Sync --------------------------------------------/
+
+void DownPropagationSync::print(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	std::cout << "Type: " << "down propagation sync" << std::endl;
+	SyncRequirement::print(indent);
+}
+
+//------------------------------------------- Cross Propagation Sync --------------------------------------------/
+
+void CrossPropagationSync::print(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	std::cout << "Type: " << "cross propagation sync" << std::endl;
+	SyncRequirement::print(indent);
+}
+
+//------------------------------------------ Variable Sync Requirement ------------------------------------------/
+
+VariableSyncReqs::VariableSyncReqs(const char *varName) {
+	this->varName = varName;
+	syncList = new List<SyncRequirement*>;	
+}
+
+void VariableSyncReqs::addSyncRequirement(SyncRequirement *syncReq) {
+	syncList->Append(syncReq);
+}
+
+void VariableSyncReqs::print(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	std::cout << "Variable: " << varName << std::endl;
+	for (int i = 0; i < syncList->NumElements(); i++) {
+		syncList->Nth(i)->print(indent + 1);
+	}	
+}
+
+//-------------------------------------------- Stage Sync Requirement -------------------------------------------/
+
+StageSyncReqs::StageSyncReqs(FlowStage *computation) {
+	this->computation = computation;
+	this->updaterLps = computation->getSpace();
+	varSyncMap = new Hashtable<VariableSyncReqs*>;
+}
+
+void StageSyncReqs::addVariableSyncReq(const char *varName, SyncRequirement *syncReq) {
+	VariableSyncReqs *varSyncReqs = varSyncMap->Lookup(varName);
+	if (varSyncReqs == NULL) {
+		varSyncReqs = new VariableSyncReqs(varName);
+		varSyncMap->Enter(varName, varSyncReqs, true);
+	}
+	varSyncReqs->addSyncRequirement(syncReq);
+}
+
+List<VariableSyncReqs*> *StageSyncReqs::getVarSyncList() {
+	List<VariableSyncReqs*> *syncList = new List<VariableSyncReqs*>;
+	VariableSyncReqs *syncReq;
+	Iterator<VariableSyncReqs*> iterator = varSyncMap->GetIterator();
+	while ((syncReq = iterator.GetNextValue()) != NULL) {
+		syncList->Append(syncReq);
+	}
+	return syncList;
+}
+
+void StageSyncReqs::print(int indent) {
+	List<VariableSyncReqs*> *varSyncList = getVarSyncList();
+	if (varSyncList->NumElements() > 0) {
+		std::ostringstream indentStr;
+		for (int i = 0; i < indent; i++) indentStr << '\t';
+		std::cout << indentStr.str() << "Computation: " << computation->getName() << std::endl;
+		std::cout << indentStr.str() << "Update on: Space " << updaterLps->getName() << std::endl;
+		for (int i = 0; i < varSyncList->NumElements(); i++) {
+			varSyncList->Nth(i)->print(indent + 1);
+		}
+	}
+}
+
+
+

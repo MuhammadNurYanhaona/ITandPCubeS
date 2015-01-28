@@ -14,6 +14,7 @@
 
 class VariableAccess;
 class DataDependencies;
+class StageSyncReqs;
 
 /* 	Task global variables may be synchronized/retrieved in several cases. The cases are
 	Entrance: moving from a higher to a lower space
@@ -52,6 +53,7 @@ class FlowStage {
 	Hashtable<VariableAccess*> *accessMap;
 	Expr *executeCond;  
         DataDependencies *dataDependencies;
+	StageSyncReqs *synchronizationReqs;
   public:
 	FlowStage(int index, Space *space, Expr *executeCond);
 	virtual ~FlowStage() {};
@@ -107,6 +109,14 @@ class FlowStage {
 	// about different data structure usage in different LPSes. This knowledge is important regarding data 
 	// structure generation and memory allocation for variables in any backend; 
 	virtual void calculateLPSUsageStatistics();
+
+	// This analysis examines the dependency arcs associated with this flow stage and determines what should be
+	// encoded as a synchronization requirement and what should results in mere ordering of flow stages during
+	// code execution. 
+	virtual void analyzeSynchronizationNeeds();
+	// Calling these routine make sense only ofter the synchronization requirement analyis is done
+	StageSyncReqs *getAllSyncRequirements();
+	virtual void printSyncRequirements();
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -169,6 +179,8 @@ class CompositeStage : public FlowStage {
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void reorganizeDynamicStages();
 	virtual void calculateLPSUsageStatistics();
+	void analyzeSynchronizationNeeds();
+	void printSyncRequirements();
 
 	// helper functions for code generation
 	List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();

@@ -93,6 +93,17 @@ bool PartitionFunctionConfig::hasOverlappingsAmongPartitions() {
 	return false;
 }
 
+List<int> *PartitionFunctionConfig::getOverlappingPartitionDims() {
+	List<int> *dimensionList = new List<int>;
+	for (int i = 0; i < arguments->NumElements(); i++) {
+		DataDimensionConfig *argument = arguments->Nth(i);
+		if (argument->hasPadding()) {
+			dimensionList->Append(argument->getDimensionNo());
+		}
+	}
+	return dimensionList;
+}
+
 DataDimensionConfig *PartitionFunctionConfig::getArgsForDimension(int dimensionNo) {
 	for (int i = 0; i < arguments->NumElements(); i++) {
 		DataDimensionConfig *argument = arguments->Nth(i);
@@ -183,6 +194,17 @@ bool ArrayDataStructure::hasOverlappingsAmongPartitions() {
 		if (config->hasOverlappingsAmongPartitions()) return true;
 	}
 	return false;
+}
+
+List<int> *ArrayDataStructure::getOverlappingPartitionDims() {
+	List<int> *dimensionList = new List<int>;
+	for (int i = 0; i < partitionSpecs->NumElements(); i++) {
+		PartitionFunctionConfig *config = partitionSpecs->Nth(i);
+		if (config->hasOverlappingsAmongPartitions()) {
+			dimensionList->AppendAll(config->getOverlappingPartitionDims());
+		}
+	}
+	return dimensionList;
 }
 
 PartitionFunctionConfig *ArrayDataStructure::getPartitionSpecForDimension(int dimensionNo) {

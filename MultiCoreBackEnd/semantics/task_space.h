@@ -87,6 +87,7 @@ class PartitionFunctionConfig {
 	void setPartitionOrder(PartitionOrder partitionOrder) { this->partitionOrder = partitionOrder; }
 	bool isOrdered() { return (partitionOrder == AscendingOrder || partitionOrder == DescendingOrder); }
 	bool hasOverlappingsAmongPartitions();
+	List<int> *getOverlappingPartitionDims();
 	DataDimensionConfig *getArgsForDimension(int dimensionNo);
 	const char *getName() { return functionName; }
 	virtual bool doesSupportGhostRegion() { return false; }
@@ -144,6 +145,7 @@ class ArrayDataStructure : public DataStructure {
 	List<int> *getRemainingDimensions() { return afterPartitionDimensions; }
 	void addPartitionSpec(PartitionFunctionConfig *partitionConfig);	
 	bool hasOverlappingsAmongPartitions();
+	List<int> *getOverlappingPartitionDims();
 	PartitionFunctionConfig *getPartitionSpecForDimension(int dimensionNo);	
 	bool isPartitioned() { return partitionSpecs != NULL && partitionSpecs->NumElements() > 0; }
 	int getDimensionality();

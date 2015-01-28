@@ -181,6 +181,7 @@ void TaskDef::analyseCode() {
 	PartitionHierarchy *hierarchy = partition->getPartitionHierarchy();
 	compute->constructComputationFlow(hierarchy->getRootSpace());
 	compute->performDependencyAnalysis(hierarchy);
+	compute->getComputation()->analyzeSynchronizationNeeds();
 }
 
 void TaskDef::print() {

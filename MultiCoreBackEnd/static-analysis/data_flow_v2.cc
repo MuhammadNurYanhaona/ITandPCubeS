@@ -1,4 +1,6 @@
+#include "data_flow.h"
 #include "data_access.h"
+#include "sync_stat.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
@@ -6,7 +8,6 @@
 #include "../syntax/ast_type.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
-#include "data_flow.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
@@ -25,6 +26,7 @@ FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	this->accessMap = new Hashtable<VariableAccess*>;
 	this->dataDependencies = new DataDependencies();
 	this->name = NULL;
+	this->synchronizationReqs = NULL;
 }
 
 void FlowStage::mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap) {
@@ -148,6 +150,64 @@ void FlowStage::calculateLPSUsageStatistics() {
 		}
 	}
 }
+
+void FlowStage::analyzeSynchronizationNeeds() {
+	List<DependencyArc*> *outgoingArcList = dataDependencies->getOutgoingArcs();
+	synchronizationReqs = new StageSyncReqs(this);
+	for (int i = 0; i < outgoingArcList->NumElements(); i++) {
+		DependencyArc *arc = outgoingArcList->Nth(i);
+		const char *varName = arc->getVarName();
+		FlowStage *destination = arc->getDestination();
+		Space *destLps = destination->getSpace();
+		// if the destination and current flow stage's LPSes are the same then two scenarios are there
+		// for us to consider: either the variable is replicated or it has overlapping partitions among
+		// adjacent LPUs
+		if (destLps == space) {
+			if (space->isReplicatedInCurrentSpace(varName)) {
+				ReplicationSync *replication = new ReplicationSync();
+				replication->setVariableName(varName);
+				replication->setDependentLps(destLps);
+				replication->setWaitingComputation(destination);
+				replication->setDependencyArc(arc);
+				synchronizationReqs->addVariableSyncReq(varName, replication);
+			} else {
+				DataStructure *structure = space->getLocalStructure(varName);
+				ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+				if (array == NULL) continue;
+				if (!array->hasOverlappingsAmongPartitions()) continue;
+				List<int> *overlappingDims = array->getOverlappingPartitionDims();
+				GhostRegionSync *ghostRegion = new GhostRegionSync();
+				ghostRegion->setVariableName(varName);
+				ghostRegion->setDependentLps(destLps);
+				ghostRegion->setWaitingComputation(destination);
+				ghostRegion->setDependencyArc(arc);
+				ghostRegion->setOverlappingDirections(overlappingDims);
+				synchronizationReqs->addVariableSyncReq(varName, ghostRegion);
+			}
+		// If the destination and current flow stage's LPSes are not the same then there is definitely
+		// a synchronization need. The specific type of synchronization needed depends on the relative
+		// position of these two LPSes in the partition hierarchy.
+		} else {
+			SyncRequirement *syncReq = NULL;
+			if (space->isParentSpace(destLps)) {
+				syncReq = new UpPropagationSync();
+			} else if (destLps->isParentSpace(space)) {
+				syncReq = new DownPropagationSync();
+			} else {
+				syncReq = new CrossPropagationSync();
+			}
+			syncReq->setVariableName(varName);
+			syncReq->setDependentLps(destLps);
+			syncReq->setWaitingComputation(destination);
+			syncReq->setDependencyArc(arc);
+			synchronizationReqs->addVariableSyncReq(varName, syncReq);
+		}
+	} 	
+}
+
+StageSyncReqs *FlowStage::getAllSyncRequirements() { return synchronizationReqs; }
+
+void FlowStage::printSyncRequirements() { synchronizationReqs->print(0); }
 
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
@@ -683,6 +743,20 @@ void CompositeStage::calculateLPSUsageStatistics() {
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->calculateLPSUsageStatistics();
+	}	
+}
+
+void CompositeStage::analyzeSynchronizationNeeds() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->analyzeSynchronizationNeeds();
+	}	
+}
+
+void CompositeStage::printSyncRequirements() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->printSyncRequirements();
 	}	
 }
 
