@@ -174,6 +174,8 @@ void TaskDef::validateComputeSection(Scope *parentScope) {
 	defineScope->exit_scope();
 }
 
+// Note that the ordering of the function calls within the whole analysis procedure is important as 
+// there are internal depdendency among these analyses through their input/output data structures. 
 void TaskDef::analyseCode() {
 	Scope *scope = symbol->getNestedScope();
 	initialize->performVariableAccessAnalysis(scope);

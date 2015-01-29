@@ -209,6 +209,11 @@ StageSyncReqs *FlowStage::getAllSyncRequirements() { return synchronizationReqs;
 
 void FlowStage::printSyncRequirements() { synchronizationReqs->print(0); }
 
+bool FlowStage::isDependentStage(FlowStage *suspectedDependent) {
+	if (synchronizationReqs == NULL) return false;
+	return synchronizationReqs->isDependentStage(suspectedDependent); 
+}
+
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(0, space, NULL) {
@@ -597,6 +602,11 @@ void CompositeStage::reorganizeDynamicStages() {
 			for (int i = 0; i < toBeNestedStages->NumElements(); i++) {
 				FlowStage *newStage = toBeNestedStages->Nth(i);
 				if (newStage->getSpace() == dynamicSpace) {
+					// TODO probably the correct solution is to wrap up the computation
+					// inside within an conditional block that test the validity of 
+					// entering into this stage. That way we will avoid the problem of
+					// reevaluating active LPUs for this stage and at the same time ensure
+					// that we are not going to execute any unintended code.	
 					newStage->setExecuteCondition(NULL);
 				}
 			}
@@ -632,18 +642,48 @@ List<List<FlowStage*>*> *CompositeStage::getConsecutiveNonLPSCrossingStages() {
 
 	for (int i = 1; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
+		RepeatCycle *repeatCycle = dynamic_cast<RepeatCycle*>(stage);
+		// repeat cycles are never put into any compiler generated group to keep the semantics of the
+		// program intact
+		if (repeatCycle != NULL) {
+			// add the so far group into the stage groups list if it is not empty
+			if (currentGroup->NumElements() > 0) stageGroups->Append(currentGroup);
+			// create a new, isolated group for repeat and add that in the list too 
+			List<FlowStage*> *repeatGroup = new List<FlowStage*>;
+			repeatGroup->Append(repeatCycle);
+			stageGroups->Append(repeatGroup);
+			// then reset the current group
+			currentGroup = new List<FlowStage*>;
 		// if the stage is executing in a different LPS then create a new group
-		if (stage->getSpace() != currentSpace) {
+		}	
+		else if (stage->getSpace() != currentSpace) {
 			currentSpace = stage->getSpace();
-			stageGroups->Append(currentGroup);
+			if (currentGroup->NumElements() > 0) stageGroups->Append(currentGroup);
 			currentGroup = new List<FlowStage*>;
 			currentGroup->Append(stage);
-		// otherwise add the stage in the current group
+		// otherwise add the stage in the current group if there is no synchronization dependency from
+		// current stage to any stage already within the group. If there is a dependency then create a
+		// new group. Note that this policy helps us to drag down LPU-LPU synchronization dependencies 
+		// as transition has been made between computation stages into PPU-PPU dependencies. 
+		//
+		// TODO: to clarify, we haven't implemented synchronization yet (Jan-29-2015) 
 		} else {
-			currentGroup->Append(stage);
+			bool dependencyExists = false;
+			for (int j = 0; j < currentGroup->NumElements(); j++) {
+				FlowStage *earlierStage = currentGroup->Nth(j);
+				if (earlierStage->isDependentStage(stage)) {
+					dependencyExists = true;
+					break;
+				}
+			}
+			if (dependencyExists) {
+				stageGroups->Append(currentGroup);
+				currentGroup = new List<FlowStage*>;
+				currentGroup->Append(stage);
+			} else 	currentGroup->Append(stage);
 		}
 	}
-	stageGroups->Append(currentGroup);
+	if (currentGroup->NumElements() > 0) stageGroups->Append(currentGroup);
 	return stageGroups;
 }
 
@@ -690,6 +730,24 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 	
 	for (int i = 0; i < stageGroups->NumElements(); i++) {
 		List<FlowStage*> *currentGroup = stageGroups->Nth(i);
+		// there should be a special checking for repeat loops. Repeat loops will have the while loop that
+		// iterates over LPUs of the LPS under concern inside its body if it does not use LPS dependent 
+		// variables in repeat evaluation process. Otherwise, it should follow the normal code generation
+		// procedure followed for other stages 
+		if (currentGroup->NumElements() == 1) {
+			FlowStage *stage = currentGroup->Nth(0);
+			RepeatCycle *repeatCycle = dynamic_cast<RepeatCycle*>(stage);
+			if (repeatCycle != NULL && !repeatCycle->isLpsDependent()) {
+				Space *repeatSpace = repeatCycle->getSpace();
+				// temporarily the repeat cycle is assigned to be executed in current LPS to ensure
+				// that LPU iterations for stages inside it proceed accurately
+				repeatCycle->changeSpace(this->space);
+				repeatCycle->generateInvocationCode(stream, nextIndentation, space);
+				// reset the repeat cycle's LPS to the previous one once code generation is done
+				repeatCycle->changeSpace(repeatSpace);
+				continue;
+			}	
+		}
 		Space *groupSpace = currentGroup->Nth(0)->getSpace();
 		// if the LPS of the group is not the same of this one then we need to consider LPS entry, i.e.,
 		// include a while loop for the group to traverse over the LPUs
@@ -870,5 +928,18 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 	} else {
 		CompositeStage::generateInvocationCode(stream, indentation, containerSpace);
 	}
+}
+
+bool RepeatCycle::isLpsDependent() {
+	VariableAccess *accessLog;
+	Iterator<VariableAccess*> iterator = repeatConditionAccessMap->GetIterator();
+	while ((accessLog = iterator.GetNextValue()) != NULL) {
+		if (!accessLog->isContentAccessed()) continue;
+		const char *varName = accessLog->getName();
+		DataStructure *structure = space->getStructure(varName);
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array != NULL) return true;
+	}
+	return false;
 }
 

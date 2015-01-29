@@ -114,9 +114,13 @@ class FlowStage {
 	// encoded as a synchronization requirement and what should results in mere ordering of flow stages during
 	// code execution. 
 	virtual void analyzeSynchronizationNeeds();
+	
 	// Calling these routine make sense only ofter the synchronization requirement analyis is done
 	StageSyncReqs *getAllSyncRequirements();
 	virtual void printSyncRequirements();
+	// this function indicates if there is any synchronization requirement between the execution of the current
+	// and the execution of the stage passed as argument
+	bool isDependentStage(FlowStage *suspectedDependent);
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -203,6 +207,15 @@ class RepeatCycle : public CompositeStage {
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void calculateLPSUsageStatistics();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
+	
+	// This function indicates if the repeat loop condition evaluation includes any LPS dependent varialbe. If
+	// it does not then the repeat loop can be lifted up and can be executed above the LPS indicated by its 
+	// space variable. This result in the distinction between having an LPU iteration (due to multiplexing of
+	// LPUs into PPUs) inside the repeat loop as opposed to outside it.
+	bool isLpsDependent();
+
+	// this is a helper routine for code generation to temporarily change the LPS of a repeat cycle as needed
+	void changeSpace(Space *newSpace) { this->space = newSpace; }
 };
 
 /*	This is a utility class to keep track of the last point of entry to a space as flow of control move from

@@ -125,6 +125,21 @@ List<VariableSyncReqs*> *StageSyncReqs::getVarSyncList() {
 	return syncList;
 }
 
+bool StageSyncReqs::isDependentStage(FlowStage *suspectedDependentStage) {
+	List<VariableSyncReqs*> *varSyncList = getVarSyncList();
+	for (int i = 0; i < varSyncList->NumElements(); i++) {
+		VariableSyncReqs *varSync = varSyncList->Nth(i);
+		List<SyncRequirement*> *syncList = varSync->getSyncList();
+		for (int j = 0; j < syncList->NumElements(); j++) {
+			SyncRequirement *syncReq = syncList->Nth(j);
+			if (suspectedDependentStage == syncReq->getWaitingComputation()) {
+				return true;
+			}	
+		}	
+	}
+	return false;
+}
+
 void StageSyncReqs::print(int indent) {
 	List<VariableSyncReqs*> *varSyncList = getVarSyncList();
 	if (varSyncList->NumElements() > 0) {
@@ -137,6 +152,3 @@ void StageSyncReqs::print(int indent) {
 		}
 	}
 }
-
-
-

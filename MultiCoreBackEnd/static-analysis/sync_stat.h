@@ -107,6 +107,7 @@ class StageSyncReqs {
 	void addVariableSyncReq(const char *varName, SyncRequirement *syncReq);
 	VariableSyncReqs *getVarSyncReqs(const char *varName) { return varSyncMap->Lookup(varName); }
 	List<VariableSyncReqs*> *getVarSyncList();
+	bool isDependentStage(FlowStage *suspectedDependentStage);
 	void print(int indent);		
 };
 

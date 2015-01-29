@@ -259,7 +259,10 @@ class ComputeSection : public Node {
 	void performVariableAccessAnalysis(Scope *taskGlobalScope);
 	void assignFlowStageAndNestingIndexes(List<DataFlowStage*> *currentStageList);
 	// This recursively construct the control flow of the compute block by calling the same method in 
-	// meta-compute and compute stages.
+	// meta-compute and compute stages. The layout of the compute section after abstract syntax tree been
+	// generated is not particularly suitable for later analysis and thereby proper code generation.
+	// Henceforth we include this mechanism to transform the content of the compute section into a new
+	// form that is more appropriate for later stages.
 	void constructComputationFlow(Space *rootSpace);
 	// This is again a recursive process of determining the dependency arcs among flow stages
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
