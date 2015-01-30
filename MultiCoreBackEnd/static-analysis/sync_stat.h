@@ -1,6 +1,9 @@
 #ifndef _H_sync_stat
 #define _H_sync_stat
 
+#include <iostream>
+#include <fstream>
+
 #include "../semantics/task_space.h"
 #include "data_flow.h"
 #include "data_access.h"
@@ -20,12 +23,13 @@
 // the dependent computation resides in.  
 class SyncRequirement {
   protected:
+	const char *syncTypeName;
 	const char *variableName;
 	Space *dependentLps;
 	FlowStage *waitingComputation;
 	DependencyArc *arc;
   public:
-	SyncRequirement();
+	SyncRequirement(const char *syncTypeName);
 	virtual ~SyncRequirement() {}
 	void setVariableName(const char *varName) { this->variableName = varName; }
 	const char *getVariableName() { return variableName; }
@@ -37,14 +41,15 @@ class SyncRequirement {
 	DependencyArc *getDependencyArc() { return arc; }
 	bool isActive() { return arc->isActive(); }
 	void deactivate() { arc->deactivate(); }	
-	virtual void print(int indent);		
+	virtual void print(int indent);
+	void writeDescriptiveComment(std::ofstream &stream, bool forDependent);		
 };
 
 // As the name suggests, this represents a sync requirements among all LPUs within an LPS due to a
 // replicated variable update within one of them
 class ReplicationSync : public SyncRequirement {
   public:	
-	ReplicationSync() : SyncRequirement() {}
+	ReplicationSync() : SyncRequirement("Replication") {}
 	void print(int indent);		
 };
 
@@ -63,14 +68,14 @@ class GhostRegionSync : public SyncRequirement {
 // to be synchronized in an ancestor LPS.
 class UpPropagationSync : public SyncRequirement {
   public:	
-	UpPropagationSync() : SyncRequirement() {}
+	UpPropagationSync() : SyncRequirement("Gather/Reduction") {}
 	void print(int indent);		
 };
 
 // This does the exact opposite of the previous computation
 class DownPropagationSync : public SyncRequirement {
   public:	
-	DownPropagationSync() : SyncRequirement() {}
+	DownPropagationSync() : SyncRequirement("Broadcast/Scatter") {}
 	void print(int indent);		
 };
 
@@ -80,7 +85,7 @@ class DownPropagationSync : public SyncRequirement {
 // calculation and we may have to extend this class further in the future.
 class CrossPropagationSync : public SyncRequirement {
   public:
-	CrossPropagationSync() : SyncRequirement() {}
+	CrossPropagationSync() : SyncRequirement("Redistribution") {}
 	void print(int indent);		
 };
 

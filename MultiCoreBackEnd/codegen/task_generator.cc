@@ -121,11 +121,6 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generatePThreadRunFn(headerFile, programFile, initials);
 
 	closeNameSpace(headerFile);
-	
-	std::cout << "\n-----------------------------------------------------------------\n";
-	std::cout << "Printing synchronization requirement for task: " << taskDef->getName();
-	std::cout << "\n-----------------------------------------------------------------\n";
-	taskDef->getComputation()->printSyncRequirements();
 }
 
 void TaskGenerator::generateTaskMain() {

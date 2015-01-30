@@ -128,7 +128,7 @@ DependencyArc::DependencyArc(FlowStage *source, FlowStage *destination, const ch
 	this->source = source;
         this->destination = destination;
         this->varName = varName;
-	active = false;
+	active = true;
 	DataDependencies *sourceDependencies = source->getDataDependencies();
 	sourceDependencies->addOutgoingArcIfNotExists(this);
 }

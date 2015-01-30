@@ -7,11 +7,13 @@
 
 #include <iostream>
 #include <sstream>
+#include <fstream>
 
 
 //----------------------------------------------- Sync Requirement -----------------------------------------------/
 
-SyncRequirement::SyncRequirement() {
+SyncRequirement::SyncRequirement(const char *syncTypeName) {
+	this->syncTypeName = syncTypeName;
 	this->variableName = NULL;
 	this->dependentLps = NULL;
 	this->waitingComputation = NULL;
@@ -25,6 +27,24 @@ void SyncRequirement::print(int indent) {
 	std::cout << indentStr.str() << "Waiting Computation: " << waitingComputation->getName() << std::endl; 
 }
 
+void SyncRequirement::writeDescriptiveComment(std::ofstream &stream, bool forDependent) {
+	stream << "// ";
+	if (forDependent) {
+		stream << syncTypeName << " sync dependency on Space " << dependentLps->getName(); 
+		stream << " upon stage " << waitingComputation->getName() << " ";
+		stream <<" due to update on \"";
+		stream << variableName << "\" by \"";
+		stream << arc->getSource()->getName() << "\"";
+		stream << '\n'; 
+	} else {
+		stream << "Need to signal update done on \"";
+		stream << variableName << "\" to synchronize";
+		stream << syncTypeName << " dependency on Space ";
+		stream << dependentLps->getName(); 
+		stream << '\n'; 
+	}
+}
+
 //----------------------------------------------- Replication Sync ----------------------------------------------/
 
 void ReplicationSync::print(int indent) {
@@ -35,7 +55,7 @@ void ReplicationSync::print(int indent) {
 
 //---------------------------------------------- Ghost Region Sync ----------------------------------------------/
 
-GhostRegionSync::GhostRegionSync() : SyncRequirement() {
+GhostRegionSync::GhostRegionSync() : SyncRequirement("Ghost-Region") {
 	overlappingDirections = NULL;
 }
 

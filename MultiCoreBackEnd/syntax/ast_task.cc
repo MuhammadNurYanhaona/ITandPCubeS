@@ -185,6 +185,7 @@ void TaskDef::analyseCode() {
 	compute->performDependencyAnalysis(hierarchy);
 	compute->getComputation()->assignIndexAndGroupNo(0, 0);
 	compute->getComputation()->analyzeSynchronizationNeeds();
+	compute->getComputation()->deriveSynchronizationDependencies();
 }
 
 void TaskDef::print() {

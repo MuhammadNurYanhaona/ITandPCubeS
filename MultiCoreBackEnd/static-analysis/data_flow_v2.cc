@@ -736,7 +736,20 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
 	
 	for (int i = 0; i < stageGroups->NumElements(); i++) {
+		
 		List<FlowStage*> *currentGroup = stageGroups->Nth(i);
+
+		// first generate code for waiting on all synchronization dependencies before diving into 
+		// multiplexed LPU iterations.
+		List<SyncRequirement*> *syncDependencies = getSyncDependeciesOfGroup(currentGroup);
+		generateSyncCodeForGroupTransitions(stream, nextIndentation, syncDependencies);
+
+		// Sync stages -- not synchronization dependencies -- that dictate additional data movement 
+		// operations are not needed (according to our current (date: Jan-30-2015) understanding); so we
+		// filter them out.	
+		currentGroup = filterOutSyncStages(currentGroup);
+		if (currentGroup->NumElements() == 0) continue;
+
 		// there should be a special checking for repeat loops. Repeat loops will have the while loop that
 		// iterates over LPUs of the LPS under concern inside its body if it does not use LPS dependent 
 		// variables in repeat evaluation process. Otherwise, it should follow the normal code generation
@@ -811,12 +824,23 @@ void CompositeStage::calculateLPSUsageStatistics() {
 	}	
 }
 
-void CompositeStage::analyzeSynchronizationNeeds() {
-	
+void CompositeStage::analyzeSynchronizationNeeds() {	
 	// evaluate synchronization requirements and dependencies within its nested stages
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->analyzeSynchronizationNeeds();
+	}
+}
+
+void CompositeStage::deriveSynchronizationDependencies() {
+	
+	// derive dependencies within its nested composite stages
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+		if (compositeStage != NULL) {
+			compositeStage->deriveSynchronizationDependencies();
+		}
 	}
 
 	// get the first and last flow index within the group to know the boundary of this composite stage
@@ -839,7 +863,7 @@ void CompositeStage::analyzeSynchronizationNeeds() {
 				this->syncDependencies->addDependency(sync);
 			}
 		}
-	}	
+	}
 }
 
 void CompositeStage::printSyncRequirements() {
@@ -877,6 +901,61 @@ List<SyncRequirement*> *CompositeStage::getSyncDependeciesOfGroup(List<FlowStage
 		syncList->AppendAll(activeDependencies);
 	}
 	return syncList;
+}
+
+void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, int indentation,
+                        List<SyncRequirement*> *syncDependencies) {
+
+	// Note that all synchronization we are dealing here is strictly within the boundary of composite stage under
+	// concern. Now if there is a synchronization dependency to a nested stage for the execution of another stage
+	// that comes after it, it means that the dependency is between a latter iteration on the dependent stage on
+	// an earlier iteration on the source stage. This is because, otherwise the dependent stage will execute before
+	// the source stage and there should not be any dependency. Now, such dependency is only valid for iterations 
+	// except the first one. So there should be a checking on iteration number before we apply waiting on such
+	// dependencies. On the other hand, if the source stage executes earlier than the dependent stage then it applies
+	// always, i.e., it is independent of any loop iteration, if exists, that sorrounds the composite stage.
+	// Therefore, we use following two lists to partition the list of synchronization requirements into forward and
+	// backword dependencies. 
+	List<SyncRequirement*> *forwardSyncs = new List<SyncRequirement*>;
+	List<SyncRequirement*> *backwordSyncs = new List<SyncRequirement*>;
+
+	for (int i = 0; i < syncDependencies->NumElements(); i++) {
+		SyncRequirement *sync = syncDependencies->Nth(i);
+		DependencyArc *arc = sync->getDependencyArc();
+		FlowStage *source = arc->getSource();
+		FlowStage *destination = arc->getDestination();
+		if (source->getIndex() < destination->getIndex()) {
+			forwardSyncs->Append(sync);
+		} else backwordSyncs->Append(sync);
+	}
+
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentation; i++) indentStr << '\t';
+	
+	// write the code for forwards sync requirements. Now we are just printing the requirements that should be replaced
+	// with actual waiting logic later.
+	for (int i = 0; i < forwardSyncs->NumElements(); i++) {
+		SyncRequirement *sync = forwardSyncs->Nth(i);
+		stream << indentStr.str();
+		sync->writeDescriptiveComment(stream, true);
+	}
+
+	// write the code for backword sync requirements within an if block
+	if (backwordSyncs->NumElements() > 0) {
+		stream << indentStr.str() << "if (repeatIteration > 0) { \n";
+		for (int i = 0; i < backwordSyncs->NumElements(); i++) {
+			SyncRequirement *sync = backwordSyncs->Nth(i);
+			stream << indentStr.str() << '\t';
+			sync->writeDescriptiveComment(stream, true);
+		}
+		stream << indentStr.str() << "}\n";
+	}
+
+	// finally deactive all sync dependencies as they are already been taken care of here	
+	for (int i = 0; i < syncDependencies->NumElements(); i++) {
+		SyncRequirement *sync = syncDependencies->Nth(i);
+		sync->deactivate();
+	}
 }
 
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/
@@ -942,6 +1021,9 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 		// create a scope for repeat loop
 		stream << indent.str() << "{ // scope entrance for repeat loop\n";
 
+		// declare a repeat iteration number tracking variable
+		stream << indent.str() << "int repeatIteration = 0" << stmtSeparator;
+
 		// get the name of the lpu for the execution LPS
 		std::ostringstream lpuName;
 		lpuName << "space" << space->getName() << "Lpu->";
@@ -971,6 +1053,8 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 			repeatCond->translate(condition, indentation, 0);
 			stream << indent.str() << "while (" << condition.str() << ") {\n";
 			CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
+			// increase the loop iteration counter
+			stream << indent.str() << "\trepeatIteration++" << stmtSeparator;
 			stream << indent.str() << "}\n";
 		// otherwise it is a for loop based on a range condition that we need to translate
 		} else {
@@ -981,12 +1065,17 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 			stream << rangeLoop.str();
 			// translate the repeat body
 			CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
+			// increase the loop iteration counter
+			stream << indent.str() << "\trepeatIteration++" << stmtSeparator;
 			// close the range loop
 			stream << indent.str() << "}\n";
 		}
 		// exit the scope created for the repeat loop 
 		stream << indent.str() << "} // scope exit for repeat loop\n";
 	} else {
+		// TODO probably we need to maintain a repeat iteration counter in this case two. Then we should
+		// change this straightforward superclass's code execution strategy. We should investigate this
+		// in the future 
 		CompositeStage::generateInvocationCode(stream, indentation, containerSpace);
 	}
 }

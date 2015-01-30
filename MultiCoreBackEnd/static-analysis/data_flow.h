@@ -211,15 +211,37 @@ class CompositeStage : public FlowStage {
 	void reorganizeDynamicStages();
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
+	
+	// composite stages do not have any synchronization dependencies of their own rather; they derive depend-
+	// encies from stages nested within them. The analyze-synchronization-needs routines is not enough for
+	// composite stages as all synchronization dependencies of nested stages are not resolved and available
+	// for their composite stages to be derived from when the control of recursion is on the composite stages.
+	// (All dependencies are resolved only after the recursion ends.) So this additional recursion is done
+	// for composite stages after previous analysis.
+	void deriveSynchronizationDependencies();
+
 	void printSyncRequirements();
 	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo);
 
 	// helper functions for code generation
+	// A composite stage organize the stages within into groups based on their LPSes so that iterations over 
+	// LPUs happens in group basis instead of individual computation basis. This reduces the number of times
+	// we need to invoke the LPU generation library at runtime.
 	List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();
+	// override for the code generation method inherited from Flow-Stage class
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace);
+	// For multi-core backends there is no need to generate codes for sync-stages; therefore, we filter them
+	// out during nested stages grouping.
 	static List<FlowStage*> *filterOutSyncStages(List<FlowStage*> *originalList);
+	// For multi-core backends our current decision is to drag down LPU-LPU synchronization to PPU-PPU syn-
+	// chronization. As we group flow-stages during code generations and iterations over multiplexed LPUs
+	// take place on a group basis, we need to know all synchronization dependencies the stages of a group
+	// has and resolve them before we start code generation for the stages. The following two functions help
+	// in doing that.
 	static List<SyncRequirement*> *getSyncDependeciesOfGroup(List<FlowStage*> *group);
+	void generateSyncCodeForGroupTransitions(std::ofstream &stream, int indentation, 
+			List<SyncRequirement*> *syncDependencies);
 	bool isGroupEntry();
 };
 

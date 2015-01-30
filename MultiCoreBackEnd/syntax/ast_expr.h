@@ -42,16 +42,31 @@ class Expr : public Stmt {
         void checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 		resolveType(executionScope, ignoreTypeFailures);
 	}
+	// As IT uses static typing with type inference, a single pass over the abstract syntax tree is not
+	// sufficient to determine the types of all variables. An impressive solution would be to do recursive
+	// type resolving until no new type can be resolved for IT. We did a simpler solution where, we first
+	// try to resolve type and ignore any failure in the resolution process. Then we try to infer types of
+	// variables with unresolved types using information from varibles with already known types. Finally
+	// we do another type resolving and this time through errors if we some variables' types still remain
+	// unresolved.
 	virtual void resolveType(Scope *scope, bool ignoreFailure) {}
 	virtual void inferType(Scope *scope, Type *rootType) {}   
 	void inferType(Scope *scope) { inferType(scope, type); }   
 	Type *getType() { return type; }
 	
 	// Helper functions for static analysis
+	// This function decides, as its name suggests, the global variables been accessed by the expression.
+	// It can track assignment of global array reference assignments to some local variables and then 
+	// indirect changes to the global array through that local reference. This analysis is required to 
+	// determine the execution order, communication, and synchronization dependencies among compute stages.
 	virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences) {
 		return new Hashtable<VariableAccess*>;
 	}
+	// This function finds out the root object within which an element been accessed or modified by some
+	// expression. It makes sense only for array-access and field-access type expression. The function is
+	// however added to the common expression class to simply some recursive array/field access finding
+ 	// process.
 	virtual const char *getBaseVarName() { return NULL; }
 	
 	// Helper functions for code generation
