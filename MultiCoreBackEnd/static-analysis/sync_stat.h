@@ -34,7 +34,9 @@ class SyncRequirement {
 	void setWaitingComputation(FlowStage *computation) { this->waitingComputation = computation; }
 	FlowStage *getWaitingComputation() { return waitingComputation; }
 	void setDependencyArc(DependencyArc *arc) { this->arc = arc; }
-	DependencyArc *getDependencyArc() { return arc; }	
+	DependencyArc *getDependencyArc() { return arc; }
+	bool isActive() { return arc->isActive(); }
+	void deactivate() { arc->deactivate(); }	
 	virtual void print(int indent);		
 };
 
@@ -109,6 +111,21 @@ class StageSyncReqs {
 	List<VariableSyncReqs*> *getVarSyncList();
 	bool isDependentStage(FlowStage *suspectedDependentStage);
 	void print(int indent);		
+};
+
+// This class holds all synchronization dependencies into a flow stage (composite, computation, or data mover)
+// due to execution of other stages
+class StageSyncDependencies {
+  protected:
+	FlowStage *computation;
+	Space *dependentLps;
+	List<SyncRequirement*> *syncList;
+  public:
+	StageSyncDependencies(FlowStage *computation);
+	void addDependency(SyncRequirement *syncReq);
+	void addAllDependencies(List<SyncRequirement*> *syncReqList);
+	List<SyncRequirement*> *getActiveDependencies();
+	List<SyncRequirement*> *getDependencyList() { return syncList; }
 };
 
 #endif

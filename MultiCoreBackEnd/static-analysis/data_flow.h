@@ -15,6 +15,18 @@
 class VariableAccess;
 class DataDependencies;
 class StageSyncReqs;
+class StageSyncDependencies;
+class SyncRequirement;
+
+/* An important point to remember about synchronization related enums and classes in this headers is that
+   they corresponds to situations where there is a need for definite data movements along with signaling 
+   the fact that an update has taken place. The information regarding the signaling requirement is retained 
+   in the dependency arcs and some other variables that are kept in each flow stages. Forgetting this issue
+   may produce confusions in the understanding of the intended implementation of synchronization stages.
+   To clarify this distinction with an example, Entrance, return and Exit syncs are put in place only for 
+   dynamic and subpartitioned LPSes. Reappearance syncs are only for LPSes having overlapping ghost regions
+   in some data structure partitions.      
+*/
 
 /* 	Task global variables may be synchronized/retrieved in several cases. The cases are
 	Entrance: moving from a higher to a lower space
@@ -40,25 +52,34 @@ enum SyncMode { Load, Load_And_Configure, Ghost_Region_Update, Restore };
 */
 enum RepeatCycleType { Subpartition_Repeat, Conditional_Repeat };
 
-
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using
 	the compute and meta-compute stages that we get from the abstract syntax tree, we derive a modified
 	set of flow stages that are easier to reason with for later part of the compiler. 
 */
 class FlowStage {
   protected:
-	int index;
 	const char *name;
 	Space *space;
 	Hashtable<VariableAccess*> *accessMap;
 	Expr *executeCond;  
-        DataDependencies *dataDependencies;
+	
+	// index indicates the position of a flow stage compared to other stages and group No specifies its
+	// container stage's, if exists, index 
+	int index;
+	int groupNo;
+        
+	// three data structures that track all communication and synchronization requirements related to
+	// a flow stage
+	DataDependencies *dataDependencies;
 	StageSyncReqs *synchronizationReqs;
+	StageSyncDependencies *syncDependencies;
   public:
 	FlowStage(int index, Space *space, Expr *executeCond);
 	virtual ~FlowStage() {};
 	void setIndex(int index) { this->index = index; }
 	int getIndex() { return index; }
+	void setGroupNo(int groupNo) { this->groupNo = groupNo; }
+	int getGroupNo() { return groupNo; }
 	const char *getName() { return name; }
 	void setName(const char *name) { this->name = name; }
 	Space *getSpace() { return space; }
@@ -78,6 +99,11 @@ class FlowStage {
 	void performDependencyAnalysis(Hashtable<VariableAccess*> *accessLogs, PartitionHierarchy *hierarchy);
 	DataDependencies *getDataDependencies() { return dataDependencies; }
 	bool isDataModifierRelevant(FlowStage *modifier);
+
+	// A recursive process to assign index and group no to flow stages; composite flow stage override this method
+	// to implement recursion. For other stages default implementation works, which just assign the passed
+	// arguments. 
+	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo);
 
 	// This virtual method is added so that loader sync stages for dynamic spaces can be put inside composite 
 	// stages protected by activation conditions alongside their compute stages. The normal flow construction
@@ -117,6 +143,7 @@ class FlowStage {
 	
 	// Calling these routine make sense only ofter the synchronization requirement analyis is done
 	StageSyncReqs *getAllSyncRequirements();
+	StageSyncDependencies *getAllSyncDependencies();
 	virtual void printSyncRequirements();
 	// this function indicates if there is any synchronization requirement between the execution of the current
 	// and the execution of the stage passed as argument
@@ -185,11 +212,14 @@ class CompositeStage : public FlowStage {
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
 	void printSyncRequirements();
+	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo);
 
 	// helper functions for code generation
 	List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace);
+	static List<FlowStage*> *filterOutSyncStages(List<FlowStage*> *originalList);
+	static List<SyncRequirement*> *getSyncDependeciesOfGroup(List<FlowStage*> *group);
 	bool isGroupEntry();
 };
 

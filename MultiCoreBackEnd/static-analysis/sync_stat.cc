@@ -113,6 +113,8 @@ void StageSyncReqs::addVariableSyncReq(const char *varName, SyncRequirement *syn
 		varSyncMap->Enter(varName, varSyncReqs, true);
 	}
 	varSyncReqs->addSyncRequirement(syncReq);
+	FlowStage *dependentStage = syncReq->getWaitingComputation();
+	dependentStage->getAllSyncDependencies()->addDependency(syncReq);
 }
 
 List<VariableSyncReqs*> *StageSyncReqs::getVarSyncList() {
@@ -152,3 +154,30 @@ void StageSyncReqs::print(int indent) {
 		}
 	}
 }
+
+//-------------------------------------------- Stage Sync Dependencies ------------------------------------------/
+
+StageSyncDependencies::StageSyncDependencies(FlowStage *computation) {
+	this->computation = computation;
+	this->dependentLps = computation->getSpace();
+	syncList = new List<SyncRequirement*>;
+}
+
+void StageSyncDependencies::addDependency(SyncRequirement *syncReq) {
+	syncList->Append(syncReq);
+}
+        
+void StageSyncDependencies::addAllDependencies(List<SyncRequirement*> *syncReqList) {
+	syncList->AppendAll(syncReqList);
+}
+        
+List<SyncRequirement*> *StageSyncDependencies::getActiveDependencies() {
+	List<SyncRequirement*> *activeDependencies = new List<SyncRequirement*>;
+	for (int i = 0; i < syncList->NumElements(); i++) {
+		SyncRequirement *currentDependency = syncList->Nth(i);
+		if (currentDependency->isActive()) activeDependencies->Append(currentDependency);	
+	}
+	return activeDependencies;
+}
+
+

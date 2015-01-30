@@ -304,6 +304,10 @@ class TaskDef : public Definition {
 	void validateComputeSection(Scope *rootScope);
 
 	// Static Analysis Routines
+	// AnalyseCode method does a serious of static analysis of the code such as dependency analysis,
+	// synchronization requirements determination, and so on to prepare the intermediate representation
+	// for back-end code generation. In this process it translates the compute section into a new 
+	// recursive compute+data flow form that is easier to handle for later phases of the compiler.
 	void analyseCode();
 	void print();
 

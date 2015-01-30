@@ -27,6 +27,7 @@ FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	this->dataDependencies = new DataDependencies();
 	this->name = NULL;
 	this->synchronizationReqs = NULL;
+	syncDependencies = new StageSyncDependencies(this);
 }
 
 void FlowStage::mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap) {
@@ -105,6 +106,12 @@ bool FlowStage::isDataModifierRelevant(FlowStage *modifier) {
 	SyncStage *syncStage = dynamic_cast<SyncStage*>(modifier);
 	if (syncStage == NULL || !syncStage->isLoaderSync()) return true;
 	return (this->space == syncStage->space || this->space->isParentSpace(syncStage->space));
+}
+
+int FlowStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo) {
+	this->index = currentIndex;
+	this->groupNo = currentGroupNo;
+	return currentIndex + 1;
 }
 
 List<const char*> *FlowStage::filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap) {
@@ -207,6 +214,8 @@ void FlowStage::analyzeSynchronizationNeeds() {
 
 StageSyncReqs *FlowStage::getAllSyncRequirements() { return synchronizationReqs; }
 
+StageSyncDependencies *FlowStage::getAllSyncDependencies() { return syncDependencies; }
+
 void FlowStage::printSyncRequirements() { synchronizationReqs->print(0); }
 
 bool FlowStage::isDependentStage(FlowStage *suspectedDependent) {
@@ -265,9 +274,7 @@ int SyncStage::populateAccessMap(List<VariableAccess*> *accessLogs,
 }
 
 void SyncStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
-	// TODO need to provide an accurate implementation. Now we are just printing a comment
-	for (int i = 0; i < indentation; i++) stream << "\t";
-	stream << "//this is a comment correspond to a sync stage\n";	
+	// for multicore back-ends sync stages do nothing 
 }
 
 //------------------------------------------------ Execution Stage -------------------------------------------------------/
@@ -805,9 +812,33 @@ void CompositeStage::calculateLPSUsageStatistics() {
 }
 
 void CompositeStage::analyzeSynchronizationNeeds() {
+	
+	// evaluate synchronization requirements and dependencies within its nested stages
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->analyzeSynchronizationNeeds();
+	}
+
+	// get the first and last flow index within the group to know the boundary of this composite stage
+	int beginIndex = stageList->Nth(0)->getIndex();
+	int endIndex = stageList->Nth(stageList->NumElements() - 1)->getIndex();
+	
+	// then check those stage and draw out any synchronization dependencies they have due to changes made in
+	// stages outside this composite stage as the dependencies of the current composite stage itself.
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		StageSyncDependencies *nestedDependencies = stage->getAllSyncDependencies();
+		List<SyncRequirement*> *dependencyList = nestedDependencies->getDependencyList();
+		for (int j = 0; j < dependencyList->NumElements(); j++) {
+			SyncRequirement *sync = dependencyList->Nth(j);
+			FlowStage *syncSource = sync->getDependencyArc()->getSource();
+			// if the source's index is within the nesting boundary then the dependency is internal
+			// otherwise, it is external and we have to pull it out.
+			int syncIndex = syncSource->getIndex();
+			if (syncIndex < beginIndex || syncIndex > endIndex) {
+				this->syncDependencies->addDependency(sync);
+			}
+		}
 	}	
 }
 
@@ -816,6 +847,36 @@ void CompositeStage::printSyncRequirements() {
 		FlowStage *stage = stageList->Nth(i);
 		stage->printSyncRequirements();
 	}	
+}
+
+int CompositeStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo) {
+	int nextIndex = FlowStage::assignIndexAndGroupNo(currentIndex, currentGroupNo);
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		nextIndex = stage->assignIndexAndGroupNo(nextIndex, this->index);
+	}
+	return nextIndex;	
+}
+
+List<FlowStage*> *CompositeStage::filterOutSyncStages(List<FlowStage*> *originalList) {
+	List<FlowStage*> *filteredList = new List<FlowStage*>;
+	for (int i = 0; i < originalList->NumElements(); i++) {
+		FlowStage *stage = originalList->Nth(i);
+		SyncStage *sync = dynamic_cast<SyncStage*>(stage);
+		if (sync == NULL) filteredList->Append(stage);
+	}
+	return filteredList;
+}
+
+List<SyncRequirement*> *CompositeStage::getSyncDependeciesOfGroup(List<FlowStage*> *group) {
+	List<SyncRequirement*> *syncList = new List<SyncRequirement*>;
+	for (int i = 0; i < group->NumElements(); i++) {
+		FlowStage *stage = group->Nth(i);
+		StageSyncDependencies *sync = stage->getAllSyncDependencies();
+		List<SyncRequirement*> *activeDependencies = sync->getActiveDependencies();
+		syncList->AppendAll(activeDependencies);
+	}
+	return syncList;
 }
 
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/
