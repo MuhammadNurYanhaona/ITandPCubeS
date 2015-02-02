@@ -49,3 +49,16 @@ bool inprompt::readBoolean(const char *varName) {
 	return strcmp(string_utils::toLower(value.c_str()), "true") == 0;
 }
 
+void inprompt::readArrayDimensionInfoFromFile(std::ifstream &file, int dimensionCount, Dimension *dimensions) {
+        std::string input;
+        std::getline(file, input);
+        std::string delim = "*";
+        List<std::string> *dimensionList = string_utils::tokenizeString(input, delim);
+        for (int i = 0; i < dimensionCount; i++) {
+                std::string token = dimensionList->Nth(i);
+                dimensions[i].range.min = 0;
+                string_utils::trim(token);
+                dimensions[i].range.max = atoi(token.c_str()) - 1;
+        }
+}
+

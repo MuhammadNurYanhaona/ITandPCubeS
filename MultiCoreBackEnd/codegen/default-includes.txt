@@ -27,6 +27,7 @@
 
 // to input-output and initialization
 #include "../runtime/input_prompt.h"
+#include "../runtime/output_prompt.h"
 #include "../runtime/allocator.h"
 
 // for threading
