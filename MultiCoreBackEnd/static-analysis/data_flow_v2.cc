@@ -290,13 +290,19 @@ void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 }
 
 void ExecutionStage::translateCode(std::ofstream &stream) {
-		
+
+	std::string activateHd = 	"\n\t//---------------------- Activating Condition -------------------------------\n\n";
+	std::string localMdHd =  	"\n\t//-------------------- Local Copies of Metadata -----------------------------\n\n";
+	std::string localVarDclHd = 	"\n\t//------------------- Local Variable Declarations ---------------------------\n\n";
+	std::string computeHd = 	"\n\t//----------------------- Computation Begins --------------------------------\n\n";
+	std::string returnHd =  	"\n\t//------------------------- Returning Flag ----------------------------------\n\n";
+	
 	// reset the name transformer to user common "lpu." prefix for array access in case it is been modified
 	ntransform::NameTransformer::transformer->setLpuPrefix("lpu->");
 
 	// create local variables for all array dimensions so that later on name-transformer that add 
 	// prefix/suffix to accessed global variables can work properly
-	stream <<  "\n\t//-------------------- Local Copies of Metadata -----------------------------\n\n";
+	stream <<  localMdHd;
 	std::string stmtIndent = "\t";
         List<const char*> *localArrays = filterInArraysFromAccessMap();
 	for (int i = 0; i < localArrays->NumElements(); i++) {
@@ -318,6 +324,19 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
                         stream << arrayName << "PartDims[" << j << "].storage;\n";
         	}
         }
+	
+	// if the execution block has an activation condition on it then we need to evaluate it before proceeding
+	// into executing anything further
+	if (executeCond != NULL) {
+		stream <<  activateHd;
+		stream << "\tif(!(";
+		std::ostringstream conditionStream;
+		executeCond->translate(conditionStream, 1, 0);
+		stream << conditionStream.str();
+		stream << ")) {\n";
+		stream << "\t\treturn FAILURE_RUN;\n";
+		stream << "\t}\n";	
+	}
 
 	// declare any local variables found in the computation	
 	std::ostringstream localVars;
@@ -333,15 +352,19 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
         	localVars << stmtIndent << type->getCppDeclaration(name) << ";\n";
         }
 	if (symbolFound) {
-		stream <<  "\n\t//------------------- Local Variable Declarations ---------------------------\n\n";
+		stream <<  localVarDclHd;
 		stream << localVars.str();
 	}
 
         // translate statements into C++ code
-	stream <<  "\n\t//----------------------- Computation Begins --------------------------------\n\n";
+	stream <<  computeHd;
 	std::ostringstream codeStream;
 	code->generateCode(codeStream, 1, space);
 	stream << codeStream.str();
+
+        // finally return a successfull run indicator
+	stream <<  returnHd;
+	stream << "\treturn SUCCESS_RUN;\n";	
 }
 
 void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
@@ -729,6 +752,52 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		stream << nextIndent.str() << "space" << spaceName << "Lpu = (Space" << spaceName;
 		stream  << "_LPU*) lpu" << stmtSeparator;
 	}
+
+	// Check if there is any activating condition attached with this container stage. If there is such a
+	// condition then the stages inside should be executed only if the active condition evaluates to true.
+	if (executeCond != NULL) {
+		
+		// first get a hold of the LPU reference
+		std::ostringstream lpuVarName;
+		lpuVarName << "space" << space->getName() << "Lpu->";
+		
+		// then generate local variables for any array been accessed within the condition
+		List<FieldAccess*> *fields = executeCond->getTerminalFieldAccesses();
+		for (int i = 0; i < fields->NumElements(); i++) {
+			DataStructure *structure = space->getLocalStructure(fields->Nth(i)->getField()->getName());
+			if (structure == NULL) continue;
+			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+			if (array == NULL) continue;
+			const char *arrayName = array->getName();
+        		int dimensions = array->getDimensionality();
+        		stream << nextIndent.str() << "Dimension ";
+                	stream  << arrayName << "PartDims[" << dimensions << "];\n";
+        		stream << nextIndent.str() << "Dimension ";
+                	stream  << arrayName << "StoreDims[" << dimensions << "];\n";
+                	for (int j = 0; j < dimensions; j++) {
+                		stream << indent.str();
+               			stream << arrayName << "PartDims[" << j << "] = " << lpuVarName.str();
+                        	stream << arrayName << "PartDims[" << j << "].partition;\n";
+                		stream << indent.str();
+               			stream << arrayName << "StoreDims[" << j << "] = " << lpuVarName.str();
+                        	stream << arrayName << "PartDims[" << j << "].storage;\n";
+        		}
+		}
+		
+		// now set the name transformer's LPU prefix properly so that if the activate condition involves
+		// accessing elements of the LPU, it works correctly
+		ntransform::NameTransformer::transformer->setLpuPrefix(lpuVarName.str().c_str());
+	
+		// then generate an if condition for condition checking
+		stream << nextIndent.str() << "if(!(";
+		std::ostringstream conditionStream;
+		executeCond->translate(conditionStream, nextIndentation, 0);
+		stream << conditionStream.str();
+		stream << ")) {\n";
+		// we skip the current LPU if the condition evaluates to false	
+		stream << nextIndent.str() << "\tcontinue" << stmtSeparator;
+		stream << nextIndent.str() << "}\n";	
+	}
 	
 	// Iterate over groups of flow stages where each group executes within a single LPS. This scheme has the
 	// consequence of generating LPU only one time for all stages of a group then execute all of them before
@@ -1030,19 +1099,26 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 
 		// If the repeat condition involves accessing metadata of some task global array then we need 
 		// to create local copies of its metadata so that name transformer can work properly 
-        	List<const char*> *localArrays = filterInArraysFromAccessMap(repeatConditionAccessMap);
-		for (int i = 0; i < localArrays->NumElements(); i++) {
-        		const char *arrayName = localArrays->Nth(i);
-        		ArrayDataStructure *array = (ArrayDataStructure*) space->getStructure(arrayName);
-        		int dimensions = array->getDimensionality();
-        		stream << indent.str() << "Dimension ";
-                	stream  << arrayName << "StoreDims[" << dimensions << "];\n";
-                	for (int j = 0; j < dimensions; j++) {
-                		stream << indent.str();
-               			stream << arrayName << "StoreDims[" << j << "] = *" << lpuName.str();
-                        	stream << arrayName << "PartDims[" << j << "]->storageDim;\n";
+        	if (isLpsDependent()) {
+			List<const char*> *localArrays = filterInArraysFromAccessMap(repeatConditionAccessMap);
+			for (int i = 0; i < localArrays->NumElements(); i++) {
+        			const char *arrayName = localArrays->Nth(i);
+        			ArrayDataStructure *array = (ArrayDataStructure*) space->getStructure(arrayName);
+        			int dimensions = array->getDimensionality();
+        			stream << indent.str() << "Dimension ";
+                		stream  << arrayName << "PartDims[" << dimensions << "];\n";
+        			stream << indent.str() << "Dimension ";
+                		stream  << arrayName << "StoreDims[" << dimensions << "];\n";
+                		for (int j = 0; j < dimensions; j++) {
+                			stream << indent.str();
+               				stream << arrayName << "PartDims[" << j << "] = " << lpuName.str();
+                        		stream << arrayName << "PartDims[" << j << "].partition;\n";
+                			stream << indent.str();
+               				stream << arrayName << "StoreDims[" << j << "] = " << lpuName.str();
+                        		stream << arrayName << "PartDims[" << j << "].storage;\n";
+        			}
         		}
-        	}
+		}
 
 		// update the name transformer for probable array access within repeat condition
 		ntransform::NameTransformer::transformer->setLpuPrefix(lpuName.str().c_str());

@@ -41,8 +41,8 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		ExecutionStage *execStage = dynamic_cast<ExecutionStage*>(currentStage);
 		if (execStage == NULL) return currentFnNo;
 			
-		headerFile << "void ";
-		programFile << "void " << initialsLower << "::";
+		headerFile << "int ";
+		programFile << "int " << initialsLower << "::";
 
 		// if no name is given by the user to this stage then give it a name
 		if (strlen(execStage->getName()) == 0) {

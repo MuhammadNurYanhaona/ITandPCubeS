@@ -211,28 +211,35 @@ bool FieldAccess::isLocalTerminalField() {
 }
 
 void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+
 	if (base != NULL) {
 		// call the translate function recursively on base if it is not null
 		base->translate(stream, indentLevel, currentLineLength);
 		
-		// skip the field if it is a local flag for an array dimension
 		// if it is an array dimension then access the appropriate index corresponding to that dimension
 		ArrayType *arrayType = dynamic_cast<ArrayType*>(base->getType());
-		if (arrayType != NULL && !strcmp(field->getName(), Identifier::LocalId) == 0) {
-			DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(field);
-			int fieldDimension = dimension->getDimensionNo();
-			// If Dimension No is 0 then this is handled in assignment statement translation when there is
-			// a possibility of multiple dimensions been copied from an array to another
-			if (fieldDimension > 0) {
-				// One is subtracted as dimension no started from 1 in the source code
-				stream << '[' << fieldDimension - 1 << ']';
-			} else if (arrayType->getDimensions() == 1) {
-				stream << "[0]";
+		if (arrayType != NULL) {
+			// skip the field if it is a local flag for an array dimension
+			if (!strcmp(field->getName(), Identifier::LocalId) == 0) {
+				DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(field);
+				int fieldDimension = dimension->getDimensionNo();
+				// If Dimension No is 0 then this is handled in assignment statement translation when 
+				// there is a possibility of multiple dimensions been copied from an array to another
+				if (fieldDimension > 0) {
+					// One is subtracted as dimension no started from 1 in the source code
+					stream << '[' << fieldDimension - 1 << ']';
+				} else if (arrayType->getDimensions() == 1) {
+					stream << "[0]";
+				}
 			}
+		// if it is the length field of a dimension object then convert that into an equivalent function call
+		} else if (base->getType() == Type::dimensionType && strcmp(field->getName(), "length") == 0) {
+			stream << ".getLength()";
 		// otherwise just write the field directly
 		} else {
 			stream << "." << field->getName();
 		}
+
 	// if this is a terminal field then there may be a need for name transformation; so we consult the transformer
 	} else {
 		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
@@ -265,6 +272,6 @@ List<FieldAccess*> *FieldAccess::getTerminalFieldAccesses() {
 
 void FieldAccess::translateIndex(std::ostringstream &stream, const char *array, int dimension) {
 	stream << field->getName();
-	stream << '_' << array;
-	stream << '_' << dimension;	
+	stream << array;
+	stream << dimension;	
 }

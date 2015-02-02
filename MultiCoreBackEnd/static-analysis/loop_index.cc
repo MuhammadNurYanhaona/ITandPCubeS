@@ -63,7 +63,10 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
 	int dimensionCount = structure->getDimensionality();
 	std::ostringstream xform;
 	xform << "(" << index;
-	xform << " - " << array << "PartDims[" << dimensionNo << "].getPositiveRange().min)";
+	// TODO the following line is disabled to make code pleasing to look at for manual inspection. Once
+	// we are done with debugging, we have to enable it.
+	// xform << " - " << array << "PartDims[" << dimensionNo << "].getPositiveRange().min";
+	xform << ")";
 	bool firstEntry = true;
 	for (int i = dimensionCount - 1; i > dimensionNo; i--) {
 		if (!firstEntry) {
@@ -73,7 +76,7 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
 		firstEntry = false;
 	}
 	stream << indent.str();
-	stream << "int " << index << "_" << array << "_" << dimensionNo;
+	stream << "int " << index << array << dimensionNo;
 	stream << " = " << xform.str() << ";\n";
 }
 

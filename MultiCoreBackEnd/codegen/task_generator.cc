@@ -351,10 +351,10 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const cha
 				stream << indent << "//TODO initialize " << argName << " here\n";			
 			} else {
 				if (Type::boolType == argumentType) {
-					stream << indent << argName << " = readBoolean(\"";
+					stream << indent << argName << " = inprompt::readBoolean(\"";
 					stream << argName << "\")" << stmtSeparator; 	
 				} else {
-					stream << indent << argName << " = readPrimitive ";
+					stream << indent << argName << " = inprompt::readPrimitive ";
 					stream << "<" << argumentType->getName() << "> (\"";
 					stream << argName << "\")" << stmtSeparator;
 				}

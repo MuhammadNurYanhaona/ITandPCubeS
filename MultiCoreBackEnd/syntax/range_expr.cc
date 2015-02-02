@@ -124,18 +124,25 @@ void RangeExpr::translate(std::ostringstream &stream, int indentLevel, int curre
 	range->translate(rangeStr, indentLevel, 0);
 	std::string rangeCond = rangeStr.str();
 
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	indent << "\t\t";
+
 	// by default a range expression is translated as a boolean condition
 	
 	// check if the index variable is larger than or equal to the min value of range
-	stream << indexVar << " >= " << rangeCond << ".min &&";
+	stream << '(' << indexVar << " >= " << rangeCond << ".min"; 
+	stream << '\n' << indent.str() << " && ";
 	// and less than or equal to the max value of range
-	stream << indexVar << " <= "<< rangeCond << ".max && ";
+	stream << indexVar << " <= "<< rangeCond << ".max"; 
+	stream << '\n' << indent.str() << " && ";
 	// and range mean is less than range max
-	stream  << rangeCond << ".min <" << rangeCond << ".max";
+	stream  << rangeCond << ".min < " << rangeCond << ".max)";
 	// otherwise, do the exact inverse calculation
-	stream << " || ";	
-	stream << indexVar << " <= " << rangeCond << ".min &&";
-	stream << indexVar << " >= " << rangeCond << ".max";
+	stream << '\n' << indent.str() << " || ";	
+	stream << '(' << indexVar << " <= " << rangeCond << ".min"; 
+	stream << '\n' << indent.str() << " && ";
+	stream << indexVar << " >= " << rangeCond << ".max)";
 }
 
 const char *RangeExpr::getIndexExpr() {

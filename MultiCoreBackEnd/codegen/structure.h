@@ -85,4 +85,8 @@ class LPU_Group {
 /* default invalid value for any LPU or PPU id */
 #define INVALID_ID -1
 
+/* success and failure return types on execution of computation stages */
+#define SUCCESS_RUN 1
+#define FAILURE_RUN 0
+
 #endif
