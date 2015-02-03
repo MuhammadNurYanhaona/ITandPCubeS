@@ -206,6 +206,7 @@ List<const char*> *TaskGenerator::initiateEnvLinks(std::ofstream &stream) {
 
 	List<const char*> *externalEnvLinks = new List<const char*>;
 	std::string indent = "\t";
+	std::string doubleIndent = "\t\t";
 	std::string stmtSeparator = ";\n";
 	std::string paramSeparator = ", ";
 	
@@ -226,29 +227,52 @@ List<const char*> *TaskGenerator::initiateEnvLinks(std::ofstream &stream) {
                 DataStructure *structure = rootLps->getLocalStructure(linkName);
                 ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
                 if (array != NULL) {
+			
 			ArrayType *arrayType = (ArrayType*) array->getType();
                         Type *elemType = arrayType->getTerminalElementType();
+			int dimensionCount = array->getDimensionality();
+
 			if (isUnsupportedInputType(elemType, linkName)) {
 				stream << indent << "//TODO put custom initializing code for " << linkName << "\n";
-			} else {
+			} else {	
+				// first generate a prompt to determine if the user wants to read the array from a
+				// file or to randomly initialize it
+				stream << indent << "if (outprompt::getYesNoAnswer(\"Want to read array";
+				stream << " \\\"" << linkName << "\\\" from a file?\"";
+				stream << ")) {\n";
+
+				// if the response is yes then generate a prompt for reading the array from a file 
+				stream << doubleIndent;
+				stream << "envLinks." << linkName << " = ";
+				stream << "inprompt::readArrayFromFile ";
+				stream << '<' << elemType->getName() << "> ";
+				stream << "(\"" << linkName << "\"" << paramSeparator;
+				stream << std::endl << doubleIndent << doubleIndent;
+				stream << dimensionCount << paramSeparator;
+				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
+					
+				// otherwise, generate code for randomly initialize the array
+				stream << indent << "} else {\n";	
 				// create a prompt to get the dimensions information for the variable under concern
-				stream << indent;
+				stream << doubleIndent;
 				stream << "inprompt::readArrayDimensionInfo(\"" << linkName << "\"" << paramSeparator;
-				int dimensionCount = array->getDimensionality();
 				stream << dimensionCount << paramSeparator;
 				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
 				// then allocate an array for the variable
-				stream << indent;
+				stream << doubleIndent;
 				stream << "envLinks." << linkName << " = allocate::allocateArray ";
 				stream << '<' << elemType->getName() << "> ";	
 				stream << '(' << dimensionCount << paramSeparator;
 				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
 				// finally randomly initialize the array
-				stream << indent << "allocate::randomFillPrimitiveArray ";
+				stream << doubleIndent << "allocate::randomFillPrimitiveArray ";
 				stream << '<' << elemType->getName() << "> ";
 				stream << "(envLinks." << linkName << paramSeparator;	
+				stream << std::endl << doubleIndent << doubleIndent;
 				stream << dimensionCount << paramSeparator;
 				stream << "envLinks." << linkName << "Dims)" << stmtSeparator;
+			
+				stream << indent << "}\n";	
 			}
 		} else {
 			Type *type = structure->getType();
@@ -519,14 +543,27 @@ void TaskGenerator::writeResults(std::ofstream &stream) {
 		if (isUnsupportedInputType(elemType, linkName)) {
 			stream << indent << "//TODO put custom output code for " << linkName << "\n";
 		} else {
+			// first generate a prompt that will ask the user if he wants to write this
+			// array to a file
+			stream << indent << "if (outprompt::getYesNoAnswer(\"Want to save array";
+			stream << " \\\"" << linkName << "\\\" in a file?\"";
+			stream << ")) {\n";
+
+			// then generate the prompt for writing the array to the file specified by
+			// the user
 			int dimensionCount = array->getDimensionality();
-			stream << indent << "outprompt::writeArrayToFile ";
+			stream << doubleIndent << "outprompt::writeArrayToFile ";
 			stream << '<' << elemType->getName() << '>';
 			stream << " (\"" << linkName << "\"" << paramSeparator;
+			stream << std::endl << doubleIndent << doubleIndent;
 			stream << structureRef.str() << '.' << linkName << paramSeparator;
+			stream << std::endl << doubleIndent << doubleIndent;
 			stream << dimensionCount << paramSeparator;
 			stream << "metadata->" << linkName << "Dims)";
-			stream << stmtSeparator;	
+			stream << stmtSeparator;
+			
+			// close the if block at the end	
+			stream << indent << "}\n";	
 		}
 	}
 

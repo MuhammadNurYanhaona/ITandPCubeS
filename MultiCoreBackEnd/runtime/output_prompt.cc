@@ -19,3 +19,13 @@ void outprompt::readNonEmptyLine(std::string &line) {
 		if (line.length() > 0) break;
 	}
 }
+
+bool outprompt::getYesNoAnswer(const char *prompt) {
+	std::cout << prompt << std::endl;
+	std::cout << "Type 'Y' for yes or 'N' for no\n";
+	std::string response;
+	readNonEmptyLine(response);
+	string_utils::trim(response);
+	if ('Y' == response[0]) return true;
+	return false;
+}

@@ -20,6 +20,9 @@ namespace outprompt {
 	// read a nonempty line from the console
         void readNonEmptyLine(std::string &line);
 
+	// write a prompt to determine if the user want to do something or not
+	bool getYesNoAnswer(const char *prompt);
+
 	// this function, as its name suggests, write an array of arbitrary dimensions, containing arbitrary
 	// primitive type contents on a file
 	template <class type> void writeArrayToFile(const char *arrayName,
