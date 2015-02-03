@@ -20,7 +20,7 @@
 // their declarations. Otherwise, the C++ compiler we are using cannot resolve the template types.
 
 namespace inprompt {
-	
+
 	// read and set the dimension lengths of some array having a given number of dimensions
 	void readArrayDimensionInfo(const char *arrayName, int dimensionCount, Dimension *dimensions);
 	

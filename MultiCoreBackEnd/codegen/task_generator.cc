@@ -189,9 +189,11 @@ void TaskGenerator::generateTaskMain() {
 	// start threads 
 	startThreads(stream);	
 
-	// close the log file, set a wait statement for Pthreads, and end the function definition
+	// write all environment variables into files
+	writeResults(stream);
+	
+	// close the log file and exit the function
 	stream << std::endl << indent << "logFile.close()" << stmtSeparator;
-	stream << indent << "pthread_exit(NULL)" << stmtSeparator;
 	stream << indent << "return 0" << stmtSeparator;
 	stream << "}\n";
 	stream.close();
@@ -471,4 +473,64 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << indent << indent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
 	stream << indent << indent << "}\n";
 	stream << indent << "}\n";
+
+	// finally make the main thread wait till all other threads finish execution	
+	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << indent << "pthread_join(threads[i], NULL)" << stmtSeparator;
+	stream << indent << "}\n\n";
+}
+
+void TaskGenerator::writeResults(std::ofstream &stream) {
+
+        PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
+	Space *rootLps = lpsHierarchy->getRootSpace();
+
+	List<const char*> *externalEnvLinks = new List<const char*>;
+	std::string indent = "\t";
+	std::string doubleIndent = "\t\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	
+	stream << indent << "// writing environment variables to files after task completion\n";
+	stream << indent << "std::cout << \"writing results to output files\\n\"" << stmtSeparator;
+
+	List<EnvironmentLink*> *envLinks = taskDef->getEnvironmentLinks();
+	List<const char*> *scalarVarList = new List<const char*>;
+
+	std::ostringstream structureRef;
+	structureRef << "space" << rootLps->getName() << "Content";
+
+	for (int i = 0; i < envLinks->NumElements(); i++) {
+                
+		EnvironmentLink *link = envLinks->Nth(i);
+                const char *linkName = link->getVariable()->getName();
+
+                DataStructure *structure = rootLps->getLocalStructure(linkName);
+                ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+
+		// we will write all scalar variables in a separate file altogether
+		if (array == NULL) {
+			scalarVarList->Append(linkName);
+			continue;
+		}
+
+		ArrayType *arrayType = (ArrayType*) array->getType();
+                Type *elemType = arrayType->getTerminalElementType();
+		if (isUnsupportedInputType(elemType, linkName)) {
+			stream << indent << "//TODO put custom output code for " << linkName << "\n";
+		} else {
+			int dimensionCount = array->getDimensionality();
+			stream << indent << "outprompt::writeArrayToFile ";
+			stream << '<' << elemType->getName() << '>';
+			stream << " (\"" << linkName << "\"" << paramSeparator;
+			stream << structureRef.str() << '.' << linkName << paramSeparator;
+			stream << dimensionCount << paramSeparator;
+			stream << "metadata->" << linkName << "Dims)";
+			stream << stmtSeparator;	
+		}
+	}
+
+	if (scalarVarList->NumElements() > 0) {
+
+	}	
 }

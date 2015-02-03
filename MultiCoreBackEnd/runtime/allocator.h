@@ -41,7 +41,7 @@ namespace allocate {
 		}
 		srand(time(NULL));
 		for (int i = 0; i < length; i++) {
-			array[i] = (type) rand();
+			array[i] = (type) (rand() % 100);
 		}
 	}
 }

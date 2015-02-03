@@ -62,7 +62,10 @@ class TaskGenerator {
 	void initiateThreadStates(std::ofstream &stream);
 	// a supporting function that starts threads once initialization is done for all necessary 
 	// data	structures
-	void startThreads(std::ofstream &stream);  		
+	void startThreads(std::ofstream &stream);
+	// a supporting function that generates prompts and codes for writing results of computations
+	// to external files 
+	void writeResults(std::ofstream &stream); 		
 };
 
 #endif

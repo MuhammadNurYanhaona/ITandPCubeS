@@ -17,6 +17,9 @@
 
 namespace outprompt {
 
+	// read a nonempty line from the console
+        void readNonEmptyLine(std::string &line);
+
 	// this function, as its name suggests, write an array of arbitrary dimensions, containing arbitrary
 	// primitive type contents on a file
 	template <class type> void writeArrayToFile(const char *arrayName,
@@ -26,11 +29,11 @@ namespace outprompt {
 
 		std::cout << "Enter the file path to write array \"" << arrayName << "\"\n";
 		std::string filePath;
-		std::getline(std::cin, filePath);
+		readNonEmptyLine(filePath);
 
 		std::ofstream file(filePath.c_str());
 		if (!file.is_open()) {
-			std::cout << "could not open the specified file\n";
+			std::cout << "could not open output file: \"" << filePath << "\"\n";
 			std::exit(EXIT_FAILURE);
 		}
 
