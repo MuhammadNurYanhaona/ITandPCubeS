@@ -63,10 +63,12 @@ class FlowStage {
 	Hashtable<VariableAccess*> *accessMap;
 	Expr *executeCond;  
 	
-	// index indicates the position of a flow stage compared to other stages and group No specifies its
-	// container stage's, if exists, index 
+	// Index indicates the position of a flow stage compared to other stages and group No specifies its
+	// container stage's, if exists, index. Finally, repeat index is the index of the closest repeat 
+	// cycle then encircles current stage. 
 	int index;
 	int groupNo;
+	int repeatIndex;
         
 	// three data structures that track all communication and synchronization requirements related to
 	// a flow stage
@@ -80,6 +82,8 @@ class FlowStage {
 	int getIndex() { return index; }
 	void setGroupNo(int groupNo) { this->groupNo = groupNo; }
 	int getGroupNo() { return groupNo; }
+	void setRepeatIndex(int repeatIndex) { this->repeatIndex = repeatIndex; }
+	int getRepeatIndex() { return repeatIndex; }
 	const char *getName() { return name; }
 	void setName(const char *name) { this->name = name; }
 	Space *getSpace() { return space; }
@@ -103,7 +107,7 @@ class FlowStage {
 	// A recursive process to assign index and group no to flow stages; composite flow stage override this method
 	// to implement recursion. For other stages default implementation works, which just assign the passed
 	// arguments. 
-	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo);
+	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 
 	// This virtual method is added so that loader sync stages for dynamic spaces can be put inside composite 
 	// stages protected by activation conditions alongside their compute stages. The normal flow construction
@@ -210,6 +214,13 @@ class CompositeStage : public FlowStage {
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void reorganizeDynamicStages();
 	virtual void calculateLPSUsageStatistics();
+
+	// A composite stage by itself does not create any synchronization need. Rather it derives such needs
+	// from stages embedded within it. Here the logic is that if the update within a nested stage creates a
+	// dependency on some stage outside the composite stage boundary then it should be assigned to the 
+	// composite stage. Recursive applying this logic ensures that all synchronization needs fall in the
+ 	// composite stage nesting in such a way that the updater and the receiver of that update are always 
+	// within the same composite stage.
 	void analyzeSynchronizationNeeds();
 	
 	// composite stages do not have any synchronization dependencies of their own rather; they derive depend-
@@ -221,7 +232,7 @@ class CompositeStage : public FlowStage {
 	void deriveSynchronizationDependencies();
 
 	void printSyncRequirements();
-	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo);
+	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 
 	// helper functions for code generation
 	// A composite stage organize the stages within into groups based on their LPSes so that iterations over 
@@ -259,6 +270,7 @@ class RepeatCycle : public CompositeStage {
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void calculateLPSUsageStatistics();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
+	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 	
 	// This function indicates if the repeat loop condition evaluation includes any LPS dependent varialbe. If
 	// it does not then the repeat loop can be lifted up and can be executed above the LPS indicated by its 

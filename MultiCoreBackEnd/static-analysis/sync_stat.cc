@@ -175,6 +175,24 @@ void StageSyncReqs::print(int indent) {
 	}
 }
 
+List<SyncRequirement*> *StageSyncReqs::getAllNonSignaledSyncReqs() {
+	
+	List<SyncRequirement*> *activeSyncList = new List<SyncRequirement*>;
+	List<VariableSyncReqs*> *varSyncList = getVarSyncList();
+	
+	for (int i = 0; i < varSyncList->NumElements(); i++) {
+		VariableSyncReqs *varSyncs = varSyncList->Nth(i);
+		List<SyncRequirement*> *syncList = varSyncs->getSyncList();
+		for (int j = 0; j < syncList->NumElements(); j++) {
+			SyncRequirement *sync = syncList->Nth(j);
+			if (!sync->getDependencyArc()->isSignaled()) {
+				activeSyncList->Append(sync);
+			}	
+		} 
+	}
+	return activeSyncList;
+}
+
 //-------------------------------------------- Stage Sync Dependencies ------------------------------------------/
 
 StageSyncDependencies::StageSyncDependencies(FlowStage *computation) {

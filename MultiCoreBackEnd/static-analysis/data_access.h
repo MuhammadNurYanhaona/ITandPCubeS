@@ -112,6 +112,17 @@ class DependencyArc {
 	// underlying data structure. If there is no replication this should be null. This information is needed to impose
 	// synchronization barriers and exclusive update restriction to critical regions (i.e., shared data structures). 
 	Space *syncRoot;
+	// This is a variable that is use to determine where should the primitives/variables related to this sync dependency
+	// should be put. To give an example, if a stage inside a repeat loop is the source to a sink dependency on a stage
+	// outside then the synchronization should take place after all iterations of the repeat loop.
+	int nestingIndex;
+	// Indicates that update signal has been issued for this dependency already; therefore, there is no need to further
+	// consider it from the source side 
+	bool signaled;
+	// An Id to indicate the index of the arc in the source's list; it is used to determine the variable name correspond
+	// to the arc 
+	int arcId;
+	const char *arcName;
   public:
 	DependencyArc(FlowStage *source, FlowStage *destination, const char *varName);
 	FlowStage *getSource() { return source; }
@@ -120,6 +131,13 @@ class DependencyArc {
 	bool isActive() { return active; }
 	void activate() { active = true; }
 	void deactivate() { active = false; }
+	bool isSignaled() { return signaled; }
+	void signal() { signaled = true; }
+	void setNestingIndex(int nestingIndex) { this->nestingIndex = nestingIndex; }
+	int getNestingIndex();
+	void setArcId(int id) { this->arcId = id; }
+	int getArcId() { return arcId; }
+	const char *getArcName();
 	void print(int indent, bool displaySource, bool displayDestination);
 	void deriveSyncAndCommunicationRoots(PartitionHierarchy *hierarchy);
 };

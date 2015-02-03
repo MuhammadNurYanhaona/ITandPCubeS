@@ -93,6 +93,9 @@ void FlowStage::performDependencyAnalysis(Hashtable<VariableAccess*> *accessLogs
                         if (modifier != NULL && modifier != this && isDataModifierRelevant(modifier)) {
                                 DependencyArc *arc = new DependencyArc(modifier, this, accessLog->getName());
 				arc->deriveSyncAndCommunicationRoots(hierarchy);
+				// Note that setting up outgoing arc on the source of the dependency happens inside
+				// the constructor of the DepedencyArc class. So here we have to consider the 
+				// destination of the arc only.  
                                 dataDependencies->addIncomingArcIfNotExists(arc);
                         }
                 }
@@ -108,9 +111,10 @@ bool FlowStage::isDataModifierRelevant(FlowStage *modifier) {
 	return (this->space == syncStage->space || this->space->isParentSpace(syncStage->space));
 }
 
-int FlowStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo) {
+int FlowStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle) {
 	this->index = currentIndex;
 	this->groupNo = currentGroupNo;
+	this->repeatIndex = currentRepeatCycle;
 	return currentIndex + 1;
 }
 
@@ -894,10 +898,41 @@ void CompositeStage::calculateLPSUsageStatistics() {
 }
 
 void CompositeStage::analyzeSynchronizationNeeds() {	
+	
 	// evaluate synchronization requirements and dependencies within its nested stages
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->analyzeSynchronizationNeeds();
+	}
+	
+	// get the first and last flow index within the group to know the boundary of this composite stage
+	int beginIndex = stageList->Nth(0)->getIndex();
+	int endIndex = stageList->Nth(stageList->NumElements() - 1)->getIndex();
+	
+	// now start extracting boundary crossing synchronizations out
+	synchronizationReqs = new StageSyncReqs(this);
+
+	// now iterate over the nested stages and extract any boundary crossing synchronization founds within
+	// and assign that to current composite stage
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		StageSyncReqs *nestedSyncs = stage->getAllSyncRequirements();
+		List<VariableSyncReqs*> *varSyncList = nestedSyncs->getVarSyncList();
+		for (int j = 0; j < varSyncList->NumElements(); j++) {
+			VariableSyncReqs *varSyncs = varSyncList->Nth(j);
+			List<SyncRequirement*> *syncReqList = varSyncs->getSyncList();
+			for (int k =  0; k < syncReqList->NumElements(); k++) {
+				SyncRequirement *syncReq = syncReqList->Nth(k);
+				FlowStage *waitingStage = syncReq->getWaitingComputation();
+				int sinkIndex = waitingStage->getIndex();
+				if (sinkIndex < beginIndex || sinkIndex > endIndex) {
+					synchronizationReqs->addVariableSyncReq(varSyncs->getVarName(), syncReq);
+					// update the nesting index of the arc so that it can be discovered later
+					// by its nesting index
+					syncReq->getDependencyArc()->setNestingIndex(this->repeatIndex);
+				}
+			}
+		}
 	}
 }
 
@@ -942,11 +977,11 @@ void CompositeStage::printSyncRequirements() {
 	}	
 }
 
-int CompositeStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo) {
-	int nextIndex = FlowStage::assignIndexAndGroupNo(currentIndex, currentGroupNo);
+int CompositeStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle) {
+	int nextIndex = FlowStage::assignIndexAndGroupNo(currentIndex, currentGroupNo, currentRepeatCycle);
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
-		nextIndex = stage->assignIndexAndGroupNo(nextIndex, this->index);
+		nextIndex = stage->assignIndexAndGroupNo(nextIndex, this->index, currentRepeatCycle);
 	}
 	return nextIndex;	
 }
@@ -1074,6 +1109,23 @@ void RepeatCycle::calculateLPSUsageStatistics() {
 	// a repeat cycle will in most cases executes at least twice.
 	CompositeStage::calculateLPSUsageStatistics();
 	CompositeStage::calculateLPSUsageStatistics();
+}
+
+int RepeatCycle::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle) {
+	
+	this->index = currentIndex;
+	this->groupNo = currentGroupNo;
+	this->repeatIndex = currentRepeatCycle;
+
+	int nextIndex = currentIndex + 1;
+	int nextRepeatIndex = currentRepeatCycle + 1;
+
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		nextIndex = stage->assignIndexAndGroupNo(nextIndex, this->index, nextRepeatIndex);
+	}
+	return nextIndex;
+	
 }
 
 void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {

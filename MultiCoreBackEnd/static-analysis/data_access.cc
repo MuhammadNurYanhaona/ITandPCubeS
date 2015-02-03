@@ -6,6 +6,10 @@
 #include "data_access.h"
 #include "../semantics/task_space.h"
 #include "../syntax/ast_task.h"
+#include "../utils/string_utils.h"
+
+#include <algorithm>
+#include <sstream>
 
 //---------------------------------------------- Access Flags ---------------------------------------------------/
 
@@ -129,8 +133,20 @@ DependencyArc::DependencyArc(FlowStage *source, FlowStage *destination, const ch
         this->destination = destination;
         this->varName = varName;
 	active = true;
+	signaled = false;
+	nestingIndex = -1;
+	arcName = NULL;
 	DataDependencies *sourceDependencies = source->getDataDependencies();
 	sourceDependencies->addOutgoingArcIfNotExists(this);
+}
+
+int DependencyArc::getNestingIndex() {
+	if (nestingIndex == -1) {
+		int sourceNesting = source->getRepeatIndex();
+		int destinationNesting = destination->getRepeatIndex();
+		nestingIndex = std::max(sourceNesting, destinationNesting);
+	}
+	return nestingIndex;
 }
 
 void DependencyArc::print(int indent, bool displaySource, bool displayDestination) {
@@ -168,6 +184,17 @@ void DependencyArc::deriveSyncAndCommunicationRoots(PartitionHierarchy *hierarch
 	}
 }
 
+const char *DependencyArc::getArcName() {
+	if (arcName == NULL) {
+		std::ostringstream nameStr;
+		nameStr << varName << "Sig";
+		nameStr << string_utils::getInitials(source->getName());
+		nameStr << arcId;
+		arcName = strdup(nameStr.str().c_str());
+	}
+	return arcName;
+}
+
 //------------------------------------------- Data Dependencies -------------------------------------------------/
 
 DataDependencies::DataDependencies() {
@@ -197,6 +224,7 @@ void DataDependencies::addOutgoingArcIfNotExists(DependencyArc *arc) {
 		return; 
 	}
 	outgoingArcs->Append(arc); 
+	arc->setArcId(outgoingArcs->NumElements());
 }
 
 List<DependencyArc*> *DataDependencies::getActiveDependencies() {

@@ -40,7 +40,8 @@ class SyncRequirement {
 	void setDependencyArc(DependencyArc *arc) { this->arc = arc; }
 	DependencyArc *getDependencyArc() { return arc; }
 	bool isActive() { return arc->isActive(); }
-	void deactivate() { arc->deactivate(); }	
+	void deactivate() { arc->deactivate(); }
+	void signal() { arc->signal(); }	
 	virtual void print(int indent);
 	void writeDescriptiveComment(std::ofstream &stream, bool forDependent);		
 };
@@ -98,7 +99,8 @@ class VariableSyncReqs {
   public:
 	VariableSyncReqs(const char *varName);
 	void addSyncRequirement(SyncRequirement *syncReq);
-	List<SyncRequirement*> *getSyncList() { return syncList; }    
+	List<SyncRequirement*> *getSyncList() { return syncList; }
+	const char *getVarName() { return varName; }   
 	void print(int indent);		
 };
 
@@ -115,6 +117,7 @@ class StageSyncReqs {
 	VariableSyncReqs *getVarSyncReqs(const char *varName) { return varSyncMap->Lookup(varName); }
 	List<VariableSyncReqs*> *getVarSyncList();
 	bool isDependentStage(FlowStage *suspectedDependentStage);
+	List<SyncRequirement*> *getAllNonSignaledSyncReqs();
 	void print(int indent);		
 };
 

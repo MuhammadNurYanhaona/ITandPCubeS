@@ -17,7 +17,7 @@ Task "CSR Matrix Vector Multiplication":
 				}
 				endIndex = rows[i]
 				do {
-					w[i] = reduce ("sum", values[j] * v[columns[j]]) 
+					w[i] = w[i] + values[j] * v[columns[j]] 
 				} for j in columns and j >= beginIndex and j <= endIndex
 			} for i in rows
 		}	
