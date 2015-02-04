@@ -343,6 +343,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		nextIndentation++;
 		nextIndent << '\t';
 		// create a new local scope for traversing LPUs of this new scope
+		stream << std::endl;
 		stream << indent.str() << "{ // scope entrance for iterating LPUs of Space ";
 		stream << spaceName << "\n";
 		// declare a new variable for tracking the last LPU id
@@ -652,21 +653,34 @@ void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, 
 	std::ostringstream indentStr;
 	for (int i = 0; i < indentation; i++) indentStr << '\t';
 	
-	// write the code for forwards sync requirements. Now we are just printing the requirements that should be replaced
-	// with actual waiting logic later.
+	if (syncDependencies->NumElements() > 0) {
+		stream << std::endl << indentStr.str() << "// waiting for synchronization signals\n";
+	}
+	
+	// Write the code for forwards sync requirements. Now we are just printing the requirements that should be replaced
+	// with actual waiting logic later. Note the if condition that ensures that the thread is supposed to wait for the 
+	// signal by checking that if it has a valid ppu-id corresponding to the LPS under concern.
 	for (int i = 0; i < forwardSyncs->NumElements(); i++) {
 		SyncRequirement *sync = forwardSyncs->Nth(i);
-		stream << indentStr.str();
+		Space *dependentLps = sync->getDependentLps();
+		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << dependentLps->getName();
+		stream << ")) {\n";
+		stream << indentStr.str() << '\t';
 		sync->writeDescriptiveComment(stream, true);
+		stream << indentStr.str() << "}\n";
 	}
 
 	// write the code for backword sync requirements within an if block
 	if (backwordSyncs->NumElements() > 0) {
-		stream << indentStr.str() << "if (repeatIteration > 0) { \n";
+		stream << indentStr.str() << "if (repeatIteration > 0) {\n";
 		for (int i = 0; i < backwordSyncs->NumElements(); i++) {
 			SyncRequirement *sync = backwordSyncs->Nth(i);
-			stream << indentStr.str() << '\t';
+			Space *dependentLps = sync->getDependentLps();
+			stream << indentStr.str() << "\tif (threadState->isValidPpu(Space_" << dependentLps->getName();
+			stream << ")) {\n";
+			stream << indentStr.str() << "\t\t";
 			sync->writeDescriptiveComment(stream, true);
+			stream << indentStr.str() << "\t}\n";
 		}
 		stream << indentStr.str() << "}\n";
 	}
@@ -698,13 +712,12 @@ void CompositeStage::declareSynchronizationCounters(std::ofstream &stream, int i
 
 	List<const char*> *counterNameList = getAllOutgoingDependencyNamesAtNestingLevel(nestingIndex);
 	if (counterNameList != NULL && counterNameList->NumElements() > 0) {
-		stream << indent.str() << "// declaration of synchronization counter variables\n";
+		stream << std::endl << indent.str() << "// declaration of synchronization counter variables\n";
 		for (int i = 0; i < counterNameList->NumElements(); i++) {
 			const char *counter = counterNameList->Nth(i);
 			stream << indent.str() << "int " << counter << " = 0";
 			stream << stmtSeparator;
 		}
-		stream << std::endl;
 	}
 }
 
@@ -738,7 +751,11 @@ void CompositeStage::generateSignalCodeForGroupTransitions(std::ofstream &stream
 		SyncRequirement *currentSync = syncRequirements->Nth(i);
 		const char *counterVarName = currentSync->getDependencyArc()->getArcName();
 		// check if the concerned update did take place
-		stream << indent.str() << "if (" << counterVarName << " > 0) {\n";
+		stream << indent.str() << "if (" << counterVarName << " > 0 && ";
+		// also check if the current PPU is a valid candidate for signaling update
+		Space *signalingLps = currentSync->getDependencyArc()->getSource()->getSpace();
+		stream << "threadState->isValidPpu(Space_" << signalingLps->getName();
+		stream << ")) {\n";
 		// then signal synchronization (which is now just writing a comment)
 		stream << indent.str() << '\t';
 		currentSync->writeDescriptiveComment(stream, false);
@@ -827,7 +844,7 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 		for (int i = 0; i < indentation; i++) indent << '\t';
 		
 		// create a scope for repeat loop
-		stream << indent.str() << "{ // scope entrance for repeat loop\n";
+		stream << std::endl << indent.str() << "{ // scope entrance for repeat loop\n";
 
 		// declare a repeat iteration number tracking variable
 		stream << indent.str() << "int repeatIteration = 0" << stmtSeparator;
