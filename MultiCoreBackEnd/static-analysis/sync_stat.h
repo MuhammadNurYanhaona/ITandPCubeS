@@ -113,7 +113,12 @@ class StageSyncReqs {
 	Hashtable<VariableSyncReqs*> *varSyncMap;
   public:
 	StageSyncReqs(FlowStage *computation);
-	void addVariableSyncReq(const char *varName, SyncRequirement *syncReq);
+	
+	// This function along with the obvious first two arguments for adding the sync requirement in current
+	// stage take a boolean flag as the third argument. This is to indicate whether or not we want to add
+	// the dependency on the waiting flow-stage when updating the signaler flow stage which own this list.
+	void addVariableSyncReq(const char *varName, SyncRequirement *syncReq, bool addDependency);
+
 	VariableSyncReqs *getVarSyncReqs(const char *varName) { return varSyncMap->Lookup(varName); }
 	List<VariableSyncReqs*> *getVarSyncList();
 	bool isDependentStage(FlowStage *suspectedDependentStage);

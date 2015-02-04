@@ -126,15 +126,17 @@ StageSyncReqs::StageSyncReqs(FlowStage *computation) {
 	varSyncMap = new Hashtable<VariableSyncReqs*>;
 }
 
-void StageSyncReqs::addVariableSyncReq(const char *varName, SyncRequirement *syncReq) {
+void StageSyncReqs::addVariableSyncReq(const char *varName, SyncRequirement *syncReq, bool addDependency) {
 	VariableSyncReqs *varSyncReqs = varSyncMap->Lookup(varName);
 	if (varSyncReqs == NULL) {
 		varSyncReqs = new VariableSyncReqs(varName);
 		varSyncMap->Enter(varName, varSyncReqs, true);
 	}
 	varSyncReqs->addSyncRequirement(syncReq);
-	FlowStage *dependentStage = syncReq->getWaitingComputation();
-	dependentStage->getAllSyncDependencies()->addDependency(syncReq);
+	if (addDependency) {
+		FlowStage *dependentStage = syncReq->getWaitingComputation();
+		dependentStage->getAllSyncDependencies()->addDependency(syncReq);
+	}
 }
 
 List<VariableSyncReqs*> *StageSyncReqs::getVarSyncList() {

@@ -152,6 +152,11 @@ class FlowStage {
 	// this function indicates if there is any synchronization requirement between the execution of the current
 	// and the execution of the stage passed as argument
 	bool isDependentStage(FlowStage *suspectedDependent);
+
+	// this is a helper method for code generations; it helps in determining where to declare the counter
+	// variables (that is used to determine how many times the updater of a to-be-synchronized data structure
+	// executes)
+	virtual List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -254,6 +259,12 @@ class CompositeStage : public FlowStage {
 	void generateSyncCodeForGroupTransitions(std::ofstream &stream, int indentation, 
 			List<SyncRequirement*> *syncDependencies);
 	bool isGroupEntry();
+	List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
+
+	// this function is used by only the first composite stage (that represents the entire computation) and
+	// repeat cycles to initiate the counters that are used to track if an updater of need-to-be synchronized
+	// variable indeed did executed 
+	void declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingLevel);
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.

@@ -187,8 +187,8 @@ void DependencyArc::deriveSyncAndCommunicationRoots(PartitionHierarchy *hierarch
 const char *DependencyArc::getArcName() {
 	if (arcName == NULL) {
 		std::ostringstream nameStr;
-		nameStr << varName << "Sig";
-		nameStr << string_utils::getInitials(source->getName());
+		nameStr << varName << "Stage";
+		nameStr << source->getIndex() << "Sig";
 		nameStr << arcId;
 		arcName = strdup(nameStr.str().c_str());
 	}
