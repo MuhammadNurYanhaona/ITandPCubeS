@@ -31,15 +31,13 @@ void SyncRequirement::writeDescriptiveComment(std::ofstream &stream, bool forDep
 	stream << "// ";
 	if (forDependent) {
 		stream << syncTypeName << " sync dependency on Space " << dependentLps->getName(); 
-		stream << " upon stage " << waitingComputation->getName() << " ";
 		stream <<" due to update on \"";
-		stream << variableName << "\" by \"";
-		stream << arc->getSource()->getName() << "\"";
+		stream << variableName << "\"";
 		stream << '\n'; 
 	} else {
 		stream << "Need to signal update done on \"";
-		stream << variableName << "\" to synchronize";
-		stream << syncTypeName << " dependency on Space ";
+		stream << variableName << "\" to synchronize \"";
+		stream << syncTypeName << "\" dependency on Space ";
 		stream << dependentLps->getName(); 
 		stream << '\n'; 
 	}
@@ -175,6 +173,19 @@ void StageSyncReqs::print(int indent) {
 			varSyncList->Nth(i)->print(indent + 1);
 		}
 	}
+}
+
+List<SyncRequirement*> *StageSyncReqs::getAllSyncReqirements() {
+	
+	List<SyncRequirement*> *finalSyncList = new List<SyncRequirement*>;
+	List<VariableSyncReqs*> *varSyncList = getVarSyncList();
+	
+	for (int i = 0; i < varSyncList->NumElements(); i++) {
+		VariableSyncReqs *varSyncs = varSyncList->Nth(i);
+		List<SyncRequirement*> *syncList = varSyncs->getSyncList();
+		finalSyncList->AppendAll(syncList);
+	}
+	return finalSyncList;
 }
 
 List<SyncRequirement*> *StageSyncReqs::getAllNonSignaledSyncReqs() {

@@ -421,6 +421,13 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// multiplexed LPU iterations.
 		List<SyncRequirement*> *syncDependencies = getSyncDependeciesOfGroup(currentGroup);
 		generateSyncCodeForGroupTransitions(stream, nextIndentation, syncDependencies);
+		
+		// retrieve all synchronization signals that need to be activated if the stages in the group execute
+		List<SyncRequirement*> *syncSignals = getSyncSignalsOfGroup(currentGroup);
+		// mark these signals as signaled so that they are not reactivated within the nested code
+		for (int j = 0; j < syncSignals->NumElements(); j++) {
+			syncSignals->Nth(j)->signal();
+		}
 
 		// Sync stages -- not synchronization dependencies -- that dictate additional data movement 
 		// operations are not needed (according to our current (date: Jan-30-2015) understanding); so we
@@ -463,6 +470,9 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 				stage->generateInvocationCode(stream, nextIndentation, space);
 			}
 		}
+
+		// finally generate code for signaling execution of the stages within the group
+		generateSignalCodeForGroupTransitions(stream, nextIndentation, syncSignals); 
 	}
 
 	// close the while loop if applicable
@@ -695,6 +705,47 @@ void CompositeStage::declareSynchronizationCounters(std::ofstream &stream, int i
 			stream << stmtSeparator;
 		}
 		stream << std::endl;
+	}
+}
+
+List<SyncRequirement*> *CompositeStage::getSyncSignalsOfGroup(List<FlowStage*> *group) {
+	List<SyncRequirement*> *syncList = new List<SyncRequirement*>;
+	for (int i = 0; i < group->NumElements(); i++) {
+		FlowStage *stage = group->Nth(i);
+		List<SyncRequirement*> *activeStageSignals 
+				= stage->getAllSyncRequirements()->getAllNonSignaledSyncReqs();
+		if (activeStageSignals != NULL) {
+			syncList->AppendAll(activeStageSignals);
+		}
+	}
+	return syncList;
+}
+
+void CompositeStage::generateSignalCodeForGroupTransitions(std::ofstream &stream, int indentation,
+                        List<SyncRequirement*> *syncRequirements) {
+
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+
+	if (syncRequirements->NumElements() > 0) {
+		stream << std::endl << indent.str() << "// issuing synchronization signals\n";
+	}
+
+	// iterate over all the synchronization signals
+	for (int i = 0; i < syncRequirements->NumElements(); i++) {
+		SyncRequirement *currentSync = syncRequirements->Nth(i);
+		const char *counterVarName = currentSync->getDependencyArc()->getArcName();
+		// check if the concerned update did take place
+		stream << indent.str() << "if (" << counterVarName << " > 0) {\n";
+		// then signal synchronization (which is now just writing a comment)
+		stream << indent.str() << '\t';
+		currentSync->writeDescriptiveComment(stream, false);
+		// then reset the counter	 
+		stream << indent.str() << '\t';
+		stream << counterVarName << " = 0" << stmtSeparator;
+		stream << indent.str() << "}\n";
 	}
 }
 

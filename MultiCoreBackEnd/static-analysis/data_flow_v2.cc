@@ -403,11 +403,20 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	// invoke the related method with current LPU parameter
 	stream << nextIndent.str() << "// invoking user computation\n";
 	stream << nextIndent.str();
+	stream << "int stage" << index << "Executed = ";
 	stream << name << "(space" << space->getName() << "Lpu, ";
 	// along with other default arguments
 	stream << '\n' << nextIndent.str() << "\t\tarrayMetadata,";
 	stream << '\n' << nextIndent.str() << "\t\ttaskGlobals,";
 	stream << '\n' << nextIndent.str() << "\t\tthreadLocals, partition);\n";
+
+	// then update all synchronization counters that depend on the execution of this stage for their 
+	// activation
+	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncReqirements();
+	for (int i = 0; i < syncList->NumElements(); i++) {
+		stream << nextIndent.str() << syncList->Nth(i)->getDependencyArc()->getArcName();
+		stream << " += stage" << index << "Executed;\n";
+	}
 	
 	// write a log entry for the stage executed
 	stream << nextIndent.str() << "threadState->logExecution(\"";

@@ -2,7 +2,7 @@
 // a and b in a block-by-block fasion.
 Task "Matrix Multiply":
 	Define:
-		a, b, c: 2D Array of Real single-precision
+		a, b, c: 2D Array of Real double-precision
 	Environment:
 		a, b: link
 		c: create

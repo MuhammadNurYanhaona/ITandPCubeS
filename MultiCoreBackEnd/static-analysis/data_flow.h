@@ -265,6 +265,13 @@ class CompositeStage : public FlowStage {
 	// repeat cycles to initiate the counters that are used to track if an updater of need-to-be synchronized
 	// variable indeed did executed 
 	void declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingLevel);
+	
+	// Just like synchronization dependencies that are dragged down to PPU level, synchronization signals need
+	// to be dragged down to PPU level to keep the scheme consistent. The following two functions are used for
+	// that purpose
+	static List<SyncRequirement*> *getSyncSignalsOfGroup(List<FlowStage*> *group);
+	void generateSignalCodeForGroupTransitions(std::ofstream &stream, int indentation,
+			List<SyncRequirement*> *syncRequirements);
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.
