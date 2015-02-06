@@ -129,9 +129,14 @@ void LastModifierPanel::setLastModifierOfVar(FlowStage *stage, const char *varNa
 //--------------------------------------------- Dependency Arc --------------------------------------------------/
 
 DependencyArc::DependencyArc(FlowStage *source, FlowStage *destination, const char *varName) {
+	
 	this->source = source;
         this->destination = destination;
         this->varName = varName;
+	
+	signalSrc = source;
+	signalSink = destination;
+	reactivator = false;
 	active = true;
 	signaled = false;
 	nestingIndex = -1;

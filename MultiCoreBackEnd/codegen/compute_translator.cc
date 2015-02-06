@@ -163,7 +163,7 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 
 	// first set the root LPU for the thread so the computation can start
 	programFile << "\n\t// set the root LPU in the thread state so that calculation can start\n";
-	programFile << "\tthreadState->setRootLpu(arrayMetadata);\n\n";
+	programFile << "\tthreadState->setRootLpu(arrayMetadata);\n";
 
 	// invoke recursive flow stage invocation code to implement the logic of the run method
 	CompositeStage *computation = taskDef->getComputation();

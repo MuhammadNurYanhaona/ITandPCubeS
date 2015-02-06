@@ -157,6 +157,10 @@ class FlowStage {
 	// variables (that is used to determine how many times the updater of a to-be-synchronized data structure
 	// executes)
 	virtual List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
+
+	// this function is used to determine what reader of a data modified by the current stage should notify it
+	// about completion of read so that this stage can execute again if need may be.
+	virtual void setReactivatorFlagsForSyncReqs();
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -219,13 +223,6 @@ class CompositeStage : public FlowStage {
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void reorganizeDynamicStages();
 	virtual void calculateLPSUsageStatistics();
-
-	// A composite stage by itself does not create any synchronization need. Rather it derives such needs
-	// from stages embedded within it. Here the logic is that if the update within a nested stage creates a
-	// dependency on some stage outside the composite stage boundary then it should be assigned to the 
-	// composite stage. Recursive applying this logic ensures that all synchronization needs fall in the
- 	// composite stage nesting in such a way that the updater and the receiver of that update are always 
-	// within the same composite stage.
 	void analyzeSynchronizationNeeds();
 	
 	// composite stages do not have any synchronization dependencies of their own rather; they derive depend-
@@ -236,6 +233,16 @@ class CompositeStage : public FlowStage {
 	// for composite stages after previous analysis.
 	void deriveSynchronizationDependencies();
 
+	// A composite stage by itself does not create any synchronization need. Rather it derives such needs
+	// from stages embedded within it. Here the logic is that if the update within a nested stage creates a
+	// dependency on some stage outside the composite stage boundary then it should be assigned to the 
+	// composite stage. Recursive applying this logic ensures that all synchronization needs fall in the
+ 	// composite stage nesting in such a way that the updater and the receiver of that update are always 
+	// within the same composite stage. Before this recursive procedure is done, we need to ensure that all
+	// synchronization needs of nested stages along with their synchronization dependencies are set properly.
+	// So this is the last method to envoke in the process of resolving synchronization.
+	void analyzeSynchronizationNeedsForComposites();
+	
 	void printSyncRequirements();
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 
@@ -272,6 +279,8 @@ class CompositeStage : public FlowStage {
 	static List<SyncRequirement*> *getSyncSignalsOfGroup(List<FlowStage*> *group);
 	void generateSignalCodeForGroupTransitions(std::ofstream &stream, int indentation,
 			List<SyncRequirement*> *syncRequirements);
+	
+	void setReactivatorFlagsForSyncReqs();
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.

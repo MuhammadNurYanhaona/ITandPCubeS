@@ -99,10 +99,22 @@ class LastModifierPanel {
 
 class DependencyArc {
   protected:
+	// original source and destination of the dependency relationship
 	FlowStage *source;
 	FlowStage *destination;
+	// signaling source and destination to satisfy the dependency relationship (these may differ from the previous two
+	// as signaling and waiting can happen at upper level composte stages containing the original source and destinations)
+	FlowStage *signalSrc;
+	FlowStage *signalSink;
+	// This is a flag to resolve write-after-read dependencies, which works the opposite direction of the dependency arc. 
+	// Only the last sink stage that is affected by the execution of the signal source should enable the signal that will
+	// allow the source to proceed to next update. Note that this flag and the above to stages are only sensible in the 
+	// context where the dependency arc ensues a synchronization requirement
+	bool reactivator;
+
 	bool active;
 	const char *varName;
+	
 	// The communication root is the first common ancestor Space of the source and destination spaces of a dependency
 	// arc. This is needed to determine how to physically communicate data from source to destination. To be more 
 	// precise. The sender needs to consider (or compose) partition functions from root to the receiver's space to be
@@ -127,6 +139,12 @@ class DependencyArc {
 	DependencyArc(FlowStage *source, FlowStage *destination, const char *varName);
 	FlowStage *getSource() { return source; }
 	FlowStage *getDestination() { return destination; }
+	void setSignalSrc(FlowStage *signalSrc) { this->signalSrc = signalSrc; }
+	FlowStage *getSignalSrc() { return signalSrc; }
+	void setSignalSink(FlowStage *signalSink) { this->signalSink = signalSink; }
+	FlowStage *getSignalSink() { return signalSink; }
+	void setReactivator(bool reactivator) { this->reactivator = reactivator; }
+	bool isReactivator() { return reactivator; }
 	const char *getVarName() { return varName; }
 	bool isActive() { return active; }
 	void activate() { active = true; }
@@ -155,6 +173,10 @@ class DataDependencies {
 	List<DependencyArc*> *getActiveDependencies();
 	List<DependencyArc*> *getOutgoingArcs() { return outgoingArcs; }
 	void print(int indent);
+	// If an update of a varible within a flow stage has after-effect that is exactly the same as that of another variable
+	// then we can combine the two signals and issue a single signal instead. This function is used to do the redundancy
+	// analysis and deactive any redundant signals. 
+	void deactivateRedundantOutgoingArcs();
 };
 
 #endif

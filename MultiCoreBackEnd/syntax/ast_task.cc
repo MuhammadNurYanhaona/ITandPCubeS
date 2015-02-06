@@ -123,17 +123,21 @@ void TaskDef::attachScope(Scope *parentScope) {
 
 void TaskDef::validateScope(Scope *parentScope) {
 	
-	// validate the variables declared in the define section
+	// First the define section needs to be validated and all defined variables need to be put into
+	// the task scope so that further analysis of other sections can be done
 	List<VariableDef*> *varList = define->getDefinitions();
 	for (int i = 0; i < varList->NumElements(); i++) {
                 VariableDef *var = varList->Nth(i);
 		var->validateScope(parentScope);	
 	}
 	
-	// construct and ensure that the task has a valid partition hierarchy
+	// Partition section is validated and a partition hierarchy is constracted before we investigate
+	// the compute section as what is valid for compute section in different stages (i.e., its compute
+	// stages) is dictated by the partition configuration. For example, if a variable does not exist
+	// in an LPS then it cannot be used within any compute stage executing in that LPS.
 	constructPartitionHierarchy();
 	
-	// validate the computation logic based on the partition specifications
+	// Finally, validate the computation logic based on the partition specifications.
 	validateComputeSection(parentScope);
 }
 
@@ -178,14 +182,27 @@ void TaskDef::validateComputeSection(Scope *parentScope) {
 // there are internal depdendency among these analyses through their input/output data structures. 
 void TaskDef::analyseCode() {
 	Scope *scope = symbol->getNestedScope();
+	// determine what task global variable is been used where to prepare for dependency analysis
 	initialize->performVariableAccessAnalysis(scope);
 	compute->performVariableAccessAnalysis(scope);
+	// convert the body of the compute section into a flow definition for execution control and 
+	// data movements	
 	PartitionHierarchy *hierarchy = partition->getPartitionHierarchy();
 	compute->constructComputationFlow(hierarchy->getRootSpace());
+	// determine the read-write dependencies that occur as flow of computation moves along stages	
 	compute->performDependencyAnalysis(hierarchy);
+	// assign stages stage, group, and nesting indexes to aid latter analysis
 	compute->getComputation()->assignIndexAndGroupNo(0, 0, 0);
+	// determine what dependency relationships should be translated into synchronization require-
+	// ments and recursively mark the sources of these synchronization signals	
 	compute->getComputation()->analyzeSynchronizationNeeds();
+	// similar to the above determine the sync stages for all synchronization signals
 	compute->getComputation()->deriveSynchronizationDependencies();
+	// then lift up all sync sources to their proper upper level composite stages
+	compute->getComputation()->analyzeSynchronizationNeedsForComposites();
+	// finally determine which sync stage for a synchronization  will reset the synchronization
+	// primitives so that they can be reused (e.g., for latter iterations)
+	compute->getComputation()->setReactivatorFlagsForSyncReqs();
 }
 
 void TaskDef::print() {

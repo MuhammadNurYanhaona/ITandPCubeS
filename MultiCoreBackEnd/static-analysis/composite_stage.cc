@@ -434,7 +434,12 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// operations are not needed (according to our current (date: Jan-30-2015) understanding); so we
 		// filter them out.	
 		currentGroup = filterOutSyncStages(currentGroup);
-		if (currentGroup->NumElements() == 0) continue;
+		if (currentGroup->NumElements() == 0) {
+			// before rulling sync stages out, we need to ensure that whatever signals they were supposed
+			// issue are by-default issued
+			generateSignalCodeForGroupTransitions(stream, nextIndentation, syncSignals); 
+			continue;
+		}
 
 		// there should be a special checking for repeat loops. Repeat loops will have the while loop that
 		// iterates over LPUs of the LPS under concern inside its body if it does not use LPS dependent 
@@ -514,11 +519,21 @@ void CompositeStage::calculateLPSUsageStatistics() {
 }
 
 void CompositeStage::analyzeSynchronizationNeeds() {	
-	
-	// evaluate synchronization requirements and dependencies within its nested stages
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->analyzeSynchronizationNeeds();
+	}
+}
+
+void CompositeStage::analyzeSynchronizationNeedsForComposites() {	
+	
+	// evaluate synchronization requirements and dependencies within its nested composite stages
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+		if (compositeStage != NULL) {
+			compositeStage->analyzeSynchronizationNeedsForComposites();
+		}
 	}
 	
 	// get the first and last flow index within the group to know the boundary of this composite stage
@@ -539,7 +554,8 @@ void CompositeStage::analyzeSynchronizationNeeds() {
 			List<SyncRequirement*> *syncReqList = varSyncs->getSyncList();
 			for (int k =  0; k < syncReqList->NumElements(); k++) {
 				SyncRequirement *syncReq = syncReqList->Nth(k);
-				FlowStage *waitingStage = syncReq->getWaitingComputation();
+				//FlowStage *waitingStage = syncReq->getWaitingComputation();
+				FlowStage *waitingStage = syncReq->getDependencyArc()->getSignalSink();
 				int sinkIndex = waitingStage->getIndex();
 				if (sinkIndex < beginIndex || sinkIndex > endIndex) {
 					synchronizationReqs->addVariableSyncReq(varSyncs->getVarName(), 
@@ -547,6 +563,9 @@ void CompositeStage::analyzeSynchronizationNeeds() {
 					// update the nesting index of the arc so that it can be discovered later
 					// by its nesting index
 					syncReq->getDependencyArc()->setNestingIndex(this->repeatIndex);
+					// then update the signal source for the arc to indicate inside that it 
+					// has been lifted up
+					syncReq->getDependencyArc()->setSignalSrc(this);
 				}
 			}
 		}
@@ -576,12 +595,16 @@ void CompositeStage::deriveSynchronizationDependencies() {
 		List<SyncRequirement*> *dependencyList = nestedDependencies->getDependencyList();
 		for (int j = 0; j < dependencyList->NumElements(); j++) {
 			SyncRequirement *sync = dependencyList->Nth(j);
-			FlowStage *syncSource = sync->getDependencyArc()->getSource();
+			FlowStage *syncSource = sync->getDependencyArc()->getSignalSrc();
+			//FlowStage *syncSource = sync->getDependencyArc()->getSource();
 			// if the source's index is within the nesting boundary then the dependency is internal
 			// otherwise, it is external and we have to pull it out.
 			int syncIndex = syncSource->getIndex();
 			if (syncIndex < beginIndex || syncIndex > endIndex) {
 				this->syncDependencies->addDependency(sync);
+				// a pulled out dependency's arc should be updated to reflect that the current
+				// composite stage is its sink
+				sync->getDependencyArc()->setSignalSink(this);
 			}
 		}
 	}
@@ -766,6 +789,14 @@ void CompositeStage::generateSignalCodeForGroupTransitions(std::ofstream &stream
 	}
 }
 
+void CompositeStage::setReactivatorFlagsForSyncReqs() {
+	FlowStage::setReactivatorFlagsForSyncReqs();
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->setReactivatorFlagsForSyncReqs(); 
+	} 
+}
+
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/
 
 RepeatCycle::RepeatCycle(int index, Space *space, RepeatCycleType type, Expr *executeCond) 
@@ -786,7 +817,10 @@ void RepeatCycle::addSyncStagesOnReturn(List<FlowStage*> *stageList) {
 }
 
 // Here we do the dependency analysis twice to take care of any new dependencies that may arise due to the
-// return from the last stage of repeat cycle to the first one. 
+// return from the last stage of repeat cycle to the first one. Note that the consequence of this double iteration
+// may seems to be addition of superfluous dependencies when we have nesting of repeat cycles. However that should
+// not happen as there is a redundancy checking mechanism in place where we add dependency arcs to flow stages. So
+// unwanted arcs will be dropped off. 
 void RepeatCycle::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 	CompositeStage::performDependencyAnalysis(hierarchy);	
 	FlowStage::performDependencyAnalysis(repeatConditionAccessMap, hierarchy);

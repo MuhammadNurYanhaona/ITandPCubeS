@@ -154,7 +154,9 @@ bool StageSyncReqs::isDependentStage(FlowStage *suspectedDependentStage) {
 		List<SyncRequirement*> *syncList = varSync->getSyncList();
 		for (int j = 0; j < syncList->NumElements(); j++) {
 			SyncRequirement *syncReq = syncList->Nth(j);
-			if (suspectedDependentStage == syncReq->getWaitingComputation()) {
+			DependencyArc *arc = syncReq->getDependencyArc();
+			if (suspectedDependentStage == syncReq->getWaitingComputation()
+					|| suspectedDependentStage == arc->getSignalSink()) {
 				return true;
 			}	
 		}	

@@ -16,6 +16,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstdlib>
 
 //-------------------------------------------------- Flow Stage ----------------------------------------------------------/
 
@@ -238,6 +239,59 @@ List<const char*> *FlowStage::getAllOutgoingDependencyNamesAtNestingLevel(int ne
 		}
 	}
 	return arcNameList;
+}
+
+void FlowStage::setReactivatorFlagsForSyncReqs() {
+	
+	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncReqirements();
+	List<SyncRequirement*> *filteredList = new List<SyncRequirement*>;
+	if (syncList != NULL && syncList->NumElements() > 0) {
+		for (int i = 0; i < syncList->NumElements(); i++) {
+			SyncRequirement *sync = syncList->Nth(i);
+			DependencyArc *arc = sync->getDependencyArc();
+			// if this is not the signal source then we can skip this arc as the signal source will
+			// take care of the reactivation flag processing
+			if (this != arc->getSignalSrc()) continue;
+			filteredList->Append(sync);	
+		}
+	}
+
+	// if the filtered list is not empty then there is a need for reactivation signaling
+	if (filteredList->NumElements() > 0) {
+		
+		DependencyArc *closestPreArc = NULL;
+		DependencyArc *furthestSuccArc = NULL;	
+		
+		for (int i = 0; i < filteredList->NumElements(); i++) {
+			SyncRequirement *sync = filteredList->Nth(i);
+			DependencyArc *arc = sync->getDependencyArc();
+			
+			FlowStage *syncStage = arc->getSignalSink();
+			int syncIndex = syncStage->getIndex();
+			if (syncIndex < this->index 
+					&& (closestPreArc == NULL 
+					|| syncIndex > closestPreArc->getSignalSink()->getIndex())) {
+				closestPreArc = arc;
+			} else if (syncIndex >= this->index 
+					&& (furthestSuccArc == NULL
+					|| syncIndex > furthestSuccArc->getSignalSink()->getIndex())) {
+				furthestSuccArc = arc;
+			}
+		}
+
+		// The reactivator should be the last stage that will read change made by this stage before
+		// this stage can execute again. That will be the closest predecessor, if exists, or the 
+		// furthest successor
+		if (closestPreArc != NULL) {
+			closestPreArc->setReactivator(true);
+		} else if (furthestSuccArc != NULL) {
+			furthestSuccArc->setReactivator(true);
+		} else {
+			std::cout << "This is strange!!! No reactivator is found for stage: ";
+			std::cout << this->getName() << std::endl;
+			std::exit(EXIT_FAILURE);
+		} 
+	}
 }
 
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
