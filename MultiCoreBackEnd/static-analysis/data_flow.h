@@ -279,6 +279,18 @@ class CompositeStage : public FlowStage {
 	static List<SyncRequirement*> *getSyncSignalsOfGroup(List<FlowStage*> *group);
 	void generateSignalCodeForGroupTransitions(std::ofstream &stream, int indentation,
 			List<SyncRequirement*> *syncRequirements);
+
+	// Part of the synchronization scheme is to ensure that a modifier of data does not go too far ahead of the
+	// reader stages so that the former has modified data several times before the latter get to finish reading.
+	// Therefore, there is a need to model and resolve write-after-read dependencies. Information about the last
+	// reader of a data -- the stage that should -- reactivate the writer for another possible update is there
+	// in the dependency arcs. Arcs that are marked as reactivator should be used by the waiting stage to notify
+	// the modifier stage that it can proceed; vice versa the modifier stage should wait for clearance of these
+	// arc's signals. Consequently we have the following two methods for group reactivations.
+	void generateCodeForWaitingForReactivation(std::ofstream &stream, int indentation, 
+			List<SyncRequirement*> *syncRequirements);
+	void generateCodeForReactivatingDataModifiers(std::ofstream &stream, int indentation, 
+			List<SyncRequirement*> *syncDependencies);
 	
 	void setReactivatorFlagsForSyncReqs();
 };

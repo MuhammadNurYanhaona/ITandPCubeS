@@ -75,7 +75,7 @@ Task "LU Factorization":
 			a<dim2>, u<dim2>, l<dim2>: stride ()
 			l_column: replicated
 		} 
-		Space C <1D> <dynamic> divides Space A partitions { 
+		Space C <1D> divides Space A partitions { 
 			u<dim2>, l<dim2>: block_size (1)
 			l_column: replicated
 		}

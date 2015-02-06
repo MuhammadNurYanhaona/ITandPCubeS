@@ -430,6 +430,10 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 			syncSignals->Nth(j)->signal();
 		}
 
+		// If there is any reactivating condition that need be checked before we let the flow of control 
+		// enter the nested stages then we wait for those condition clearance.
+		generateCodeForWaitingForReactivation(stream, nextIndentation, syncSignals);
+
 		// Sync stages -- not synchronization dependencies -- that dictate additional data movement 
 		// operations are not needed (according to our current (date: Jan-30-2015) understanding); so we
 		// filter them out.	
@@ -477,8 +481,12 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 			}
 		}
 
-		// finally generate code for signaling execution of the stages within the group
+		// generate code for signaling execution of the stages within the group
 		generateSignalCodeForGroupTransitions(stream, nextIndentation, syncSignals); 
+
+		// finally if some updater stages can be executed again because current group has finished execution
+		// then we need to enable the reactivation signals
+		generateCodeForReactivatingDataModifiers(stream, nextIndentation, syncDependencies);
 	}
 
 	// close the while loop if applicable
@@ -795,6 +803,68 @@ void CompositeStage::setReactivatorFlagsForSyncReqs() {
 		FlowStage *stage = stageList->Nth(i);
 		stage->setReactivatorFlagsForSyncReqs(); 
 	} 
+}
+
+void CompositeStage::generateCodeForWaitingForReactivation(std::ofstream &stream, int indentation, 
+		List<SyncRequirement*> *syncRequirements) {
+	
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+
+	List<DependencyArc*> *reactivatorSyncs = new List<DependencyArc*>;
+	for (int i = 0; i < syncRequirements->NumElements(); i++) {
+		SyncRequirement *sync = syncRequirements->Nth(i);
+		DependencyArc *arc = sync->getDependencyArc();
+		if (arc->isReactivator()) {
+			reactivatorSyncs->Append(arc);	
+		}
+	}
+
+	if (reactivatorSyncs->NumElements() > 0) {
+		stream << std::endl << indent.str() << "// waiting for signal clearance from readers\n";
+	}
+
+	for (int i = 0; i < reactivatorSyncs->NumElements(); i++) {
+		DependencyArc *arc = reactivatorSyncs->Nth(i);
+		Space *signalingLps = arc->getSignalSrc()->getSpace();
+		stream << indent.str() << "if (threadState->isValidPpu(Space_";
+		stream << signalingLps->getName();
+		stream << ")) {\n";
+		stream << indent.str() << '\t';
+		stream << "// waiting the signal for " << arc->getArcName() << " to be cleared\n";
+		stream << indent.str() << "}\n";
+	}			
+}
+
+void CompositeStage::generateCodeForReactivatingDataModifiers(std::ofstream &stream, int indentation,
+		List<SyncRequirement*> *syncDependencies) {
+	
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+
+	List<DependencyArc*> *reactivatorSyncs = new List<DependencyArc*>;
+	for (int i = 0; i < syncDependencies->NumElements(); i++) {
+		SyncRequirement *sync = syncDependencies->Nth(i);
+		DependencyArc *arc = sync->getDependencyArc();
+		if (arc->isReactivator()) {
+			reactivatorSyncs->Append(arc);	
+		}
+	}
+
+	if (reactivatorSyncs->NumElements() > 0) {
+		stream << std::endl << indent.str() << "// sending clearance signals to writers\n";
+	}
+
+	for (int i = 0; i < reactivatorSyncs->NumElements(); i++) {
+		DependencyArc *arc = reactivatorSyncs->Nth(i);
+		Space *sinkLps = arc->getSignalSink()->getSpace();
+		stream << indent.str() << "if (threadState->isValidPpu(Space_";
+		stream << sinkLps->getName();
+		stream << ")) {\n";
+		stream << indent.str() << '\t';
+		stream << "// sending clearance for " << arc->getArcName() << " signal\n";
+		stream << indent.str() << "}\n";
+	}			
 }
 
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/
