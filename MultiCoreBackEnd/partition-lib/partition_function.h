@@ -58,6 +58,15 @@ class StridedBlock : public SingleArgumentPartitionFunction {
 	void processArguments(List<PartitionArg*> *dividingArgs, 
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	bool doesReorderStoredData() { return true; }
+
+	// Currently the second argument is not considered in the implementation of these functions
+	// as we are not copying data for different LPSes; rather we are assigning the reference to
+	// a single allocation -- made for the Root Space -- to all other spaces. TODO we need to
+	// include copy mode into consideration for optimized compiler implementations as a lot of
+	// time copying will make more sense then reusing a single allocation.
+	const char *getTransformedIndex(const char *origIndexName, bool copyMode);
+        const char *getOriginalIndex(const char *xformIndexName, bool copyMode);
+        const char *getInclusionTestExpr(const char *origIndexName, bool copyMode);
 };
 
 class Strided : public PartitionFunctionConfig {
@@ -66,6 +75,11 @@ class Strided : public PartitionFunctionConfig {
 	Strided(yyltype *location) : PartitionFunctionConfig(location, name) {}
 	void processArguments(List<PartitionArg*> *dividingArgs, List<PartitionArg*> *paddingArgs);
 	bool doesReorderStoredData() { return true; }
+
+	// The same comment of the above is applicable for these implementations too. 
+	const char *getTransformedIndex(const char *origIndexName, bool copyMode);
+        const char *getOriginalIndex(const char *xformIndexName, bool copyMode);
+        const char *getInclusionTestExpr(const char *origIndexName, bool copyMode);
 };
 
 #endif

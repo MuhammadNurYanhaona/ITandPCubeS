@@ -374,6 +374,7 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 	// create local variables for all array dimensions so that later on name-transformer that add 
 	// prefix/suffix to accessed global variables can work properly
 	stream <<  localMdHd;
+	stream << "\t// create local copies of partition and storage dimension configs of all arrays\n";
 	std::string stmtIndent = "\t";
         List<const char*> *localArrays = filterInArraysFromAccessMap();
 	for (int i = 0; i < localArrays->NumElements(); i++) {
@@ -395,6 +396,14 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
                         stream << arrayName << "PartDims[" << j << "].storage;\n";
         	}
         }
+
+	// create a local part-dimension object for probable array dimension based range or assignment expressions
+	stream << "\n\t// create a local part-dimension object for later use\n";
+        stream << "\tPartDimension partConfig;\n";
+	
+	// create a local integer for holding intermediate values of transformed index during inclusion testing
+	stream << "\n\t// create a local transformed index variable for later use\n";
+        stream << "\tint xformIndex;\n";
 	
 	// if the execution block has an activation condition on it then we need to evaluate it before proceeding
 	// into executing anything further
@@ -426,13 +435,13 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 		stream <<  localVarDclHd;
 		stream << localVars.str();
 	}
-
+/*
         // translate statements into C++ code
 	stream <<  computeHd;
 	std::ostringstream codeStream;
 	code->generateCode(codeStream, 1, space);
 	stream << codeStream.str();
-
+*/
         // finally return a successfull run indicator
 	stream <<  returnHd;
 	stream << "\treturn SUCCESS_RUN;\n";	

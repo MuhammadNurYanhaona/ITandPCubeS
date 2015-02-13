@@ -17,6 +17,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
+#include <stack>
 
 //------------------------------------------------ Range Expressions --------------------------------------------------/
 
@@ -250,6 +251,110 @@ void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indenta
 	delete indexVar;
         delete rangeCond;
         delete stepCond;
+}
+
+void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	std::string stmtSeparator = ";\n";
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	indent << "\t\t";
+
+	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+        const char *indexVar = transformer->getTransformedName(index->getName(), false, false);
+	std::string lpuPrefix = transformer->getLpuPrefix();
+	
+	const char *arrayName = getBaseArrayForRange(space);
+	int dimensionNo = getDimensionForRange(space);
+
+	std::ostringstream partConfigVar;
+	partConfigVar << lpuPrefix << arrayName << "PartDims[" << dimensionNo - 1 << "]";
+
+	// get the Root Space reference to aid in determining the extend of reordering later
+	Space *rootSpace = space->getRoot();
+	
+	// grab array configuration information for current LPS
+	ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
+
+	std::ostringstream exprStream;
+
+	// if the array is reordered anywhere in the partition hierarchy starting from the root LPS down to 
+	// current LPS then we have to recursively do inclusion testing on higher LPSes. Note that this 
+	// implementation can be improved by considering only those points of reordering, but we do not do
+	// that in the prototype implementation.	
+	if (array->isReordered(rootSpace)) {
+		
+		// create two stacks for traversing parent pointers
+		// stacks are needed as inclusion check should be done from top to bottom in LPS hierarchy
+		std::stack<const char*> partConfigsStack;
+		std::stack<ArrayDataStructure*> parentStructsStack;
+
+		// put current array reference in stack so that it will be automatically processed with its
+		// sources in higher LPSes
+		partConfigsStack.push("");
+		parentStructsStack.push(array);
+
+		DataStructure *parent = array->getSource();
+		std::ostringstream parentArrows;
+
+		// Second condition in the while loop excludes the configuration object for root LPU as the 
+		// array is not partitioned there. TODO we need to evaluate if this exclusion can lead to 
+		// index out of bound errors in the generated code.
+		while (parent != NULL && parent->getSource() != NULL) {
+			parentArrows << "->parent";
+			ArrayDataStructure *parentArray = (ArrayDataStructure*) parent;
+			if (parentArray->isPartitionedAlongDimension(dimensionNo)) {
+				partConfigsStack.push(strdup(parentArrows.str().c_str()));
+				parentStructsStack.push(parentArray);
+			}
+			// we don't have to traverse beyond one LPS up beyond the foremost reorder point
+			if (!parentArray->isReordered(rootSpace)) break;
+		}
+	
+		// a variable for tracking the number of inclusion checks has been made so far
+		int clauseAdded = 0;
+
+		// iterate over parent structure references and do index inclusion check in each in sequence
+		ArrayDataStructure *lastArray = NULL;	 
+		while (!partConfigsStack.empty()) {
+			const char *pointerLinks = partConfigsStack.top();
+			ArrayDataStructure *parentArray = parentStructsStack.top();
+			if (clauseAdded > 0) {
+				exprStream << std::endl << indent.str();
+				exprStream << "&& (";
+				// if the dimension has been reordered by previous LPS then we need to get
+				// the transformed index before we can do inclusion check for current LPS	
+				if (lastArray->isDimensionLocallyReordered(dimensionNo)) {
+					exprStream << "xformIndex = ";
+					exprStream << lastArray->getIndexXfromExpr(dimensionNo, "xformIndex");
+					exprStream << ',' << std::endl << indent.str() << '\t';
+				}
+			} else {
+				exprStream << "(xformIndex = " << indexVar;
+				exprStream << ',' << std::endl << indent.str() << '\t';
+			}
+			exprStream << "partConfig = *" << partConfigVar.str() << pointerLinks;
+			exprStream << ',' << std::endl << indent.str() << '\t';
+			
+			// if the dimension is reordered in current LPS then we need to add the specific
+			// reorder expression applicable for the underlying partition function
+			if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
+				exprStream << parentArray->getReorderedInclusionCheckExpr(
+						dimensionNo, "xformIndex");
+			// otherwise we can invoke the standard inline inclusion function on PartDimension
+			// object
+			} else {
+				exprStream << "partConfig.isIncluded(xformIndex)";
+			}
+
+			exprStream << ")";
+			
+			clauseAdded++; 
+			lastArray = parentArray;
+			partConfigsStack.pop();
+			parentStructsStack.pop();
+		}	
+	}
 }
 
 //----------------------------------------------- Subpartition Range --------------------------------------------------/

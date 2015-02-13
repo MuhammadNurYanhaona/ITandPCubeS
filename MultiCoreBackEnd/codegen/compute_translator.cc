@@ -165,6 +165,14 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	programFile << "\n\t// set the root LPU in the thread state so that calculation can start\n";
 	programFile << "\tthreadState->setRootLpu(arrayMetadata);\n";
 
+	// create a local part-dimension object for probable array dimension based range or assignment expressions
+	programFile << "\n\t// create a local part-dimension object for later use\n";
+	programFile << "\tPartDimension partConfig;\n";
+
+	// create a local integer for holding intermediate values of transformed index during inclusion testing
+        programFile << "\n\t// create a local transformed index variable for later use\n";
+        programFile << "\tint xformIndex;\n";
+
 	// invoke recursive flow stage invocation code to implement the logic of the run method
 	CompositeStage *computation = taskDef->getComputation();
 	PartitionHierarchy *hierarchy = taskDef->getPartitionHierarchy();

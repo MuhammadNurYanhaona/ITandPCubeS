@@ -1,8 +1,12 @@
+#include "../syntax/ast.h"
+#include "../syntax/ast_expr.h"
 #include "../syntax/ast_partition.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 #include "../syntax/errors.h"
 #include "partition_function.h"
+
+#include <sstream>
 
 //-------------------------------------------- Single Argument Function -------------------------------------------/
 
@@ -101,6 +105,83 @@ void StridedBlock::processArguments(List<PartitionArg*> *dividingArgs,
 	SingleArgumentPartitionFunction::processArguments(dividingArgs, paddingArgs, "block size");
 }
 
+const char *StridedBlock::getTransformedIndex(const char *origIndexName, bool copyMode) {
+	
+	DataDimensionConfig *argument = arguments->Nth(0);
+	Node *dividingArg = argument->getDividingArg();
+	bool argNeeded = false;
+	int argValue = 0;
+	const char *argName = NULL;
+	Identifier *identifier = dynamic_cast<Identifier*>(dividingArg);
+	if (identifier != NULL) {
+		argNeeded = true;
+		argName = identifier->getName();
+	} else {
+		IntConstant *constant = dynamic_cast<IntConstant*>(dividingArg);
+		argValue = constant->getValue();
+	}
+
+	std::ostringstream expr;
+	expr << "((" << origIndexName << " / (";
+	expr << "partConfig.count " << " * ";
+	if (argNeeded) {
+		expr << "partition." << argName;
+		expr << "))";
+		expr << " * partition." << argName;
+		expr << " + " << origIndexName << " % " << "partition." << argName << ")";
+	} else {
+		expr << argValue;
+		expr << "))";
+		expr << " * " << argValue;
+		expr << " + " << origIndexName << " % " << argValue << ")";
+	}
+
+	return strdup(expr.str().c_str());	
+}
+
+const char *StridedBlock::getOriginalIndex(const char *xformIndexName, bool copyMode) {
+	
+	DataDimensionConfig *argument = arguments->Nth(0);
+	Node *dividingArg = argument->getDividingArg();
+	std::ostringstream sizeParam;
+	Identifier *identifier = dynamic_cast<Identifier*>(dividingArg);
+	if (identifier != NULL) {
+		sizeParam << "partition.";
+		sizeParam << identifier->getName();
+	} else {
+		IntConstant *constant = dynamic_cast<IntConstant*>(dividingArg);
+		sizeParam << constant->getValue();
+	}
+
+	std::ostringstream expr;
+	expr << "(" << xformIndexName << " / " << sizeParam.str() << ")";
+	expr << " * partConfig.count";
+	expr << " + partConfig.index * " << sizeParam.str();
+	expr << " + " << xformIndexName << " % " << sizeParam.str();
+	return strdup(expr.str().c_str());	
+}
+
+const char *StridedBlock::getInclusionTestExpr(const char *origIndexName, bool copyMode) {
+
+	DataDimensionConfig *argument = arguments->Nth(0);
+	Node *dividingArg = argument->getDividingArg();
+	std::ostringstream sizeParam;
+	Identifier *identifier = dynamic_cast<Identifier*>(dividingArg);
+	if (identifier != NULL) {
+		sizeParam << "partition.";
+		sizeParam << identifier->getName();
+	} else {
+		IntConstant *constant = dynamic_cast<IntConstant*>(dividingArg);
+		sizeParam << constant->getValue();
+	}
+
+	std::ostringstream expr;
+	expr << "(" << origIndexName << " % (";
+	expr << sizeParam.str() << " * partConfig.count))";
+	expr << " / " << sizeParam.str() << " == partConfig.index";
+	return strdup(expr.str().c_str());	
+}
+
 //----------------------------------------------------- Strided --------------------------------------------------/
 
 const char *Strided::name = "stride";
@@ -114,4 +195,23 @@ void Strided::processArguments(List<PartitionArg*> *dividingArgs, List<Partition
 		ReportError::PaddingArgumentsNotSupported(location, functionName);	
 	}
 	arguments->Append(new DataDimensionConfig(1, NULL));
+}
+
+const char *Strided::getTransformedIndex(const char *origIndexName, bool copyMode) {
+	std::ostringstream expr;
+	expr << "(" << origIndexName << " / " << "partConfig.count)";
+	return strdup(expr.str().c_str());
+}
+
+const char *Strided::getOriginalIndex(const char *xformIndexName, bool copyMode) {
+	std::ostringstream expr;
+	expr << "(" << "partConfig.index" <<  " + ";
+	expr << xformIndexName << " * " << "partConfig.count" << ")";
+	return strdup(expr.str().c_str());
+}
+
+const char *Strided::getInclusionTestExpr(const char *origIndexName, bool copyMode) {
+	std::ostringstream expr;
+	expr << "(" << origIndexName << " % " << "partConfig.count == partConfig.index)";
+	return strdup(expr.str().c_str());
 }

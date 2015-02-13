@@ -563,6 +563,25 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 				}
 			}
 			functionBody << ")" << statementSeparator;
+
+			// then copy the LPU-count and LPU-id along this dimension as partition count and index for the
+			// partition-dimension object been generated
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "].index = ";
+			functionBody << "lpuId" << '[' << lpuDimIndex << ']';
+			functionBody << statementSeparator;
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "].count = ";
+			functionBody << "lpuCount" << '[' << lpuDimIndex << ']';
+			functionBody << statementSeparator;
+			
+			// finally add the parent partition dimension reference as the parent pointer to the generated
+			// partition dimension object
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "].parent = &";
+			functionBody << parentVar << '[' << i << ']';
+			functionBody << statementSeparator;
+			 
 		}
 	}
 	functionHeader << ")";

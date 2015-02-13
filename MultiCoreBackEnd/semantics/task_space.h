@@ -90,8 +90,25 @@ class PartitionFunctionConfig {
 	List<int> *getOverlappingPartitionDims();
 	DataDimensionConfig *getArgsForDimension(int dimensionNo);
 	const char *getName() { return functionName; }
+
+	// function used to determine if padding arguments are applicable for the partition-function under concern
 	virtual bool doesSupportGhostRegion() { return false; }
+	// this function is used to determine if we need to transform/reverse-transform indexes that are generated
+	// by traversing the partitions created by applying this partition function
 	virtual bool doesReorderStoredData() { return false; }
+	
+	// following three functions are used to get index transformation or re-transformation expression and the
+	// specialized index inclusion check expression for functions that reorder the indexes of the dimension they
+	// partition. These expressions are used during code generation. These functions take only the name of the
+	// index to be transformed/reverse-transformed and generate the desired expressions assuming that any part-
+	// ition function parameter used to configure this LPS is available as an attribute of a partition object 
+	// and partition count and index correspond to the LPU where the test is been made is available in a part-
+	// config object. The second argument, copyMode, indicates if data copying or reference reassignment is been
+	// used for the storage of underlying data. This is needed as transformation processes for data-copy and ref-
+	// erence reassignment are different. 
+	virtual const char *getTransformedIndex(const char *origIndexName, bool copyMode) { return NULL; }
+	virtual const char *getOriginalIndex(const char *xformIndexName, bool copyMode) { return NULL; }
+	virtual const char *getInclusionTestExpr(const char *origIndexName, bool copyMode) { return NULL; }	
 };
 
 class DataStructure {
@@ -127,12 +144,12 @@ class DataStructure {
 
 class ArrayDataStructure : public DataStructure {
   protected:
-	List<int> *sourceDimensions; // indicates the dimensions of the data structure available for 
-				     // partitioning within the space under concern
+	List<int> *sourceDimensions; 		// indicates the dimensions of the data structure available for 
+				     		// partitioning within the space under concern
 	List<PartitionFunctionConfig*> *partitionSpecs;
-	List<int> *afterPartitionDimensions; // indicates the dimension remain available for partitioning
-					     // by subsequent spaces from each partition of the data structure
-					     // created by current space	
+	List<int> *afterPartitionDimensions; 	// indicates the dimension remain available for partitioning
+					     	// by subsequent spaces from each partition of the data structure
+					     	// created by current space
   public:
 	ArrayDataStructure(VariableDef *definition);
 	ArrayDataStructure(ArrayDataStructure *source);
@@ -148,6 +165,7 @@ class ArrayDataStructure : public DataStructure {
 	List<int> *getOverlappingPartitionDims();
 	PartitionFunctionConfig *getPartitionSpecForDimension(int dimensionNo);	
 	bool isPartitioned() { return partitionSpecs != NULL && partitionSpecs->NumElements() > 0; }
+	bool isPartitionedAlongDimension(int dimensionNo);
 	int getDimensionality();
 
 	// Since some partition functions results in reordering array dimensions if data is been copied down
@@ -168,6 +186,14 @@ class ArrayDataStructure : public DataStructure {
 	// This is a print function to display how different dimensions of the array are partitioned in this 
 	// LPS under concern. This function is purely for diagnostic purpose and has not been perfected.
 	void print();
+
+	// These are three functions used during code generation correspond to array dimensions that have been
+	// reordered by underlying partition functions. The transformation codes for reordered data been copied 
+	// into a new memory location for current LPS and for only LPU definition generating reordered indexes 
+	// for unordered data are different.  
+	const char *getIndexXfromExpr(int dimensionNo, const char *indexName);
+	const char *getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName);
+	const char *getReverseXformExpr(int dimensionNo, const char *xformIndex);
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions
@@ -262,6 +288,7 @@ class Space {
 	void setSubpartition(Space *subpartition) { this->subpartition = subpartition; }
 	Space *getSubpartition() { return subpartition; }
 	bool isRoot() { return parent == NULL; }
+	Space *getRoot() { return (parent == NULL) ? this : parent->getRoot(); }
 	Symbol *getLpuIdSymbol();
 };
 

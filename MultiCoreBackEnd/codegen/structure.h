@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <stdlib.h>
 
 /* class definitions for built-in object types */
 
@@ -36,8 +37,23 @@ class Epoch {
 
 class PartDimension {
   public:
-        Dimension storage;
-        Dimension partition;
+	int count;			// represents the number of partitions made for the underlying dimension
+	int index;			// represents the index or Id of the current partition this object refers to 
+        Dimension storage;		// actual storage dimension configuration 
+        Dimension partition;		// partition configuration
+	PartDimension *parent;		// parent partition dimension configuration; if exists
+
+	PartDimension() {
+		int count = 1;
+		int index = 0;
+		parent = NULL;
+	}
+	inline bool isIncluded(int index);	// This function is included only to save time in implementation of
+						// the prototype compiler. Ideally we should not have function calls
+						// for checking if an index is included within a range; rather we 
+						// should have boolean expressions directly been applied in underlying
+						// context. TODO so we should avoid using this function in our later
+						// optimized implementation.  
 	void print(std::ofstream &stream, int indentLevel);
 };
 

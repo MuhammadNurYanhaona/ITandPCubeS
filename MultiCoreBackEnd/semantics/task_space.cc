@@ -218,6 +218,11 @@ PartitionFunctionConfig *ArrayDataStructure::getPartitionSpecForDimension(int di
 	return NULL;
 }
 
+bool ArrayDataStructure::isPartitionedAlongDimension(int dimensionNo) {
+	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+	return partConfig != NULL;
+}
+
 int ArrayDataStructure::getDimensionality() {
 	if (source != NULL) {
 		return ((ArrayDataStructure*) source)->getDimensionality(); 
@@ -283,6 +288,27 @@ void ArrayDataStructure::print() {
 		}
 		std::cout << std::endl;
 	}
+}
+
+const char *ArrayDataStructure::getIndexXfromExpr(int dimensionNo, const char *indexName) {
+	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+	if (partConfig == NULL) return NULL;
+	bool copiedInLps = usageStat->isAllocated();
+	return partConfig->getTransformedIndex(indexName, copiedInLps);
+}
+
+const char *ArrayDataStructure::getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName) {
+	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+	if (partConfig == NULL) return NULL;
+	bool copiedInLps = usageStat->isAllocated();
+	return partConfig->getInclusionTestExpr(indexName, copiedInLps);
+}
+
+const char *ArrayDataStructure::getReverseXformExpr(int dimensionNo, const char *xformIndex) {
+	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+	if (partConfig == NULL) return NULL;
+	bool copiedInLps = usageStat->isAllocated();
+	return partConfig->getOriginalIndex(xformIndex, copiedInLps);
 }
 
 //----------------------------------------------------- Token ---------------------------------------------------/

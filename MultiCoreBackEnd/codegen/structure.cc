@@ -60,6 +60,16 @@ void PartDimension::print(std::ofstream &stream, int indentLevel) {
 	stream << std::endl;
 }
 
+bool PartDimension::isIncluded(int index) {
+	if (partition.range.min > partition.range.max) {
+		return index >= partition.range.max 
+				&& index <= partition.range.min;
+	} else { 
+		return index >= partition.range.min 
+				&& index <= partition.range.max;
+	}
+}
+
 //--------------------------------------------- PPU ID --------------------------------------------------/
 
 void PPU_Ids::print(std::ofstream &stream) {

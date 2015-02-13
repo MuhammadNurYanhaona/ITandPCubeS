@@ -55,6 +55,7 @@ namespace ntransform {
 		bool isThreadLocal(const char *varName);
 		bool isGlobalArray(const char *varName);
 		void setLpuPrefix(const char *prefix) { lpuPrefix = std::string(prefix); }
+		std::string getLpuPrefix() { return lpuPrefix; }
 		void disableLocalAccess() { localAccessDisabled = true; }
 		void enableLocalAccess() { localAccessDisabled = false; }
 		void reset();

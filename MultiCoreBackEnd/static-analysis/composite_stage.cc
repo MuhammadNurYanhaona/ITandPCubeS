@@ -724,12 +724,30 @@ void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, 
 }
 
 List<const char*> *CompositeStage::getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel) {
+	
 	List<const char*> *arcNameList = new List<const char*>;
+	List<const char*> *ownList = FlowStage::getAllOutgoingDependencyNamesAtNestingLevel(nestingLevel);
+	if (ownList != NULL) {
+		arcNameList->AppendAll(ownList);
+	}
+
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		List<const char*> *nestedList = stage->getAllOutgoingDependencyNamesAtNestingLevel(nestingLevel);
 		if (nestedList != NULL) {
-			arcNameList->AppendAll(nestedList);
+			for (int j = 0; j < nestedList->NumElements(); j++) {
+				const char *currentArcName = nestedList->Nth(j);
+				bool found = false;
+				for (int k = 0; k < arcNameList->NumElements(); k++) {
+					if (strcmp(arcNameList->Nth(k), currentArcName) == 0) {
+						found = true;
+						break;
+					}
+				}
+				if (!found) {
+					arcNameList->Append(currentArcName);
+				}
+			}
 		}	
 	}
 	return arcNameList;

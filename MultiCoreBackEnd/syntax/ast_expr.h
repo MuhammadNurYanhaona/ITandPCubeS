@@ -349,6 +349,13 @@ class RangeExpr : public Expr {
 	// To generate a for loop without the closing parenthesis if we need a standard implementation
 	// of translation of the range expression
 	void generateLoopForRangeExpr(std::ostringstream &stream, int indentation, Space *space);
+	// This function generates an accurate index inclusion check when the range in this expression
+	// correspond to a reordered index of some array.
+	void translateArrayRangeExprCheck(std::ostringstream &stream, int indentLevel, Space *space);
+	// This function generate an assignment expression for actual index when the range expression
+	// results in a traversal of a partition range of a reordered dimension of an array
+	void generateAssignmentExprForXformedIndex(std::ostringstream &stream, 
+			int indentLevel, Space *space);
 };
 
 class SubpartitionRangeExpr : public Expr {

@@ -147,8 +147,8 @@ DependencyArc::DependencyArc(FlowStage *source, FlowStage *destination, const ch
 
 int DependencyArc::getNestingIndex() {
 	if (nestingIndex == -1) {
-		int sourceNesting = source->getRepeatIndex();
-		int destinationNesting = destination->getRepeatIndex();
+		int sourceNesting = signalSrc->getRepeatIndex();
+		int destinationNesting = signalSink->getRepeatIndex();
 		nestingIndex = std::max(sourceNesting, destinationNesting);
 	}
 	return nestingIndex;

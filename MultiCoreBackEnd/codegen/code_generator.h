@@ -59,6 +59,15 @@ void generateFnToInitiateLPSesContent(const char *headerFile,
 		const char *initials, 
 		MappingNode *mappingRoot);
 
+/* This is a simpler version of the preceeding function. It does not allocate any memory for structures
+   in any LPS; rather it just makes all other LPS structure references to point to the references of
+   that of the root LPS. 
+*/
+void generateFnToInitiateLPSesContentSimple(const char *headerFileName, 
+		const char *programFileName,
+                const char *initials,
+                MappingNode *mappingRoot);
+
 /* function definition to close the namespace of the header file after all update is done */
 void closeNameSpace(const char *headerFile);
 
