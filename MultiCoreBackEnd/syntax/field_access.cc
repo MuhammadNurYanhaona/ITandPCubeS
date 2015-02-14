@@ -210,11 +210,11 @@ bool FieldAccess::isLocalTerminalField() {
 	return (baseField->isTerminalField() && strcmp(field->getName(), Identifier::LocalId) == 0);
 }
 
-void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 
 	if (base != NULL) {
 		// call the translate function recursively on base if it is not null
-		base->translate(stream, indentLevel, currentLineLength);
+		base->translate(stream, indentLevel, currentLineLength, space);
 		
 		// if it is an array dimension then access the appropriate index corresponding to that dimension
 		ArrayType *arrayType = dynamic_cast<ArrayType*>(base->getType());

@@ -130,7 +130,7 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 				for (int k = 0; k < applicableRestrictions->NumElements(); k++) {	
 					for (int in = 0; in < newIndent; in++) stream << '\t';
 					stream << "if (";
-					applicableRestrictions->Nth(k)->translate(stream, newIndent, 0);
+					applicableRestrictions->Nth(k)->translate(stream, newIndent, 0, space);
 					stream << ") continue;\n";
 				}
 			}
@@ -274,7 +274,7 @@ void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, 
 		for (int i = 0; i < indentLevel; i++) stream << '\t';	
 		stream << "if (";
 		if (condition != NULL) {
-			condition->translate(stream, indentLevel, 0);
+			condition->translate(stream, indentLevel, 0, space);
 		} else {
 			stream << "true";
 		}
@@ -285,7 +285,7 @@ void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, 
 	} else {
 		if (condition != NULL) {
 			stream << " else if (";
-			condition->translate(stream, indentLevel, 0);
+			condition->translate(stream, indentLevel, 0, space);
 			stream << ") {\n";
 		} else {
 			stream << " else {\n";
@@ -746,7 +746,7 @@ void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
 	for (int i = 0; i < indentLevel; i++) stream << '\t';
 	stream << "while (";
 	if (condition != NULL) {
-		condition->translate(stream, indentLevel, 0);
+		condition->translate(stream, indentLevel, 0, space);
 	} else {
 		stream << "true";
 	}

@@ -401,7 +401,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// then generate an if condition for condition checking
 		stream << nextIndent.str() << "if(!(";
 		std::ostringstream conditionStream;
-		executeCond->translate(conditionStream, nextIndentation, 0);
+		executeCond->translate(conditionStream, nextIndentation, 0, space);
 		stream << conditionStream.str();
 		stream << ")) {\n";
 		// we skip the current LPU if the condition evaluates to false	
@@ -1004,7 +1004,7 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 		// if the repeat condition is a logical expression then it is a while loop in the source code
 		if (dynamic_cast<LogicalExpr*>(repeatCond) != NULL) {
 			std::ostringstream condition;
-			repeatCond->translate(condition, indentation, 0);
+			repeatCond->translate(condition, indentation, 0, space);
 			stream << indent.str() << "while (" << condition.str() << ") {\n";
 			// declare all synchronization counter variables here that will be updated inside 
 			// repeat loop 

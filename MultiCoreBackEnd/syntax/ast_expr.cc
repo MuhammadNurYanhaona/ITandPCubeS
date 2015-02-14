@@ -29,11 +29,11 @@ void Expr::performTypeInference(Scope *executionScope) {
 
 void Expr::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
         for (int i = 0; i < indentLevel; i++) stream << '\t';
-        translate(stream, indentLevel, 0);
+        translate(stream, indentLevel, 0, space);
         stream << ";\n";
 }
 
-void Expr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+void Expr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	std::cout << "A sub-class of expression didn't implement the code generation method\n";
 	std::exit(EXIT_FAILURE);
 }
@@ -253,9 +253,9 @@ Hashtable<VariableAccess*> *ArithmaticExpr::getAccessedGlobalVariables(TaskGloba
 	return table;
 }
 
-void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	if (op != POWER) {
-		left->translate(stream, indentLevel, currentLineLength);
+		left->translate(stream, indentLevel, currentLineLength, space);
 		switch (op) {
 			case ADD: stream << " + "; break;
 			case SUBTRACT: stream << " - "; break;
@@ -266,12 +266,12 @@ void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int 
 			case RIGHT_SHIFT: stream << " >> "; break;
 			default: break;
 		}
-		right->translate(stream, indentLevel, currentLineLength);
+		right->translate(stream, indentLevel, currentLineLength, space);
 	} else {
 		stream << "pow(";
-		left->translate(stream, indentLevel, currentLineLength);
+		left->translate(stream, indentLevel, currentLineLength, space);
 		stream << ", ";
-		right->translate(stream, indentLevel, currentLineLength);
+		right->translate(stream, indentLevel, currentLineLength, space);
 	}
 }
 
@@ -412,9 +412,9 @@ Hashtable<VariableAccess*> *LogicalExpr::getAccessedGlobalVariables(TaskGlobalRe
 	return table;
 }
 
-void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	if (left != NULL) {
-		left->translate(stream, indentLevel, currentLineLength);
+		left->translate(stream, indentLevel, currentLineLength, space);
 	}
 	switch (op) {
 		case AND: stream << " && "; break;
@@ -427,7 +427,7 @@ void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int cur
 		case GTE: stream << " >= "; break;
 		case LTE: stream << " <= "; break;
 	}
-	right->translate(stream, indentLevel, currentLineLength);
+	right->translate(stream, indentLevel, currentLineLength, space);
 }
 
 List<FieldAccess*> *LogicalExpr::getTerminalFieldAccesses() {
@@ -776,10 +776,10 @@ Hashtable<VariableAccess*> *AssignmentExpr::getAccessedGlobalVariables(TaskGloba
 	return table;
 }
 
-void AssignmentExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
-	left->translate(stream, indentLevel, currentLineLength);
+void AssignmentExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
+	left->translate(stream, indentLevel, currentLineLength, space);
 	stream << " = ";
-	right->translate(stream, indentLevel, currentLineLength);
+	right->translate(stream, indentLevel, currentLineLength, space);
 }
 
 void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
@@ -809,24 +809,24 @@ void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, S
 			int dimensionCount = array->getDimensions();
 			for (int i = 0; i < dimensionCount; i++) {
 				for (int j = 0; j < indentLevel; j++) stream << '\t';
-				left->translate(stream, indentLevel, 0);
+				left->translate(stream, indentLevel, 0, space);
 				stream << '[' << i << "] = ";
-				rightPart->translate(stream, indentLevel, 0);
+				rightPart->translate(stream, indentLevel, 0, space);
 				stream << '[' << i << "];\n";
 			}
 		// If the array is unidimensional then it follows the normal assignment procedure
 		} else {
 			for (int i = 0; i < indentLevel; i++) stream << '\t';
-			left->translate(stream, indentLevel, 0);
+			left->translate(stream, indentLevel, 0, space);
 			stream << " = ";
-			rightPart->translate(stream, indentLevel, 0);
+			rightPart->translate(stream, indentLevel, 0, space);
 			stream << ";\n";
 		}
 	} else {
 		for (int i = 0; i < indentLevel; i++) stream << '\t';
-		left->translate(stream, indentLevel, 0);
+		left->translate(stream, indentLevel, 0, space);
 		stream << " = ";
-		rightPart->translate(stream, indentLevel, 0);
+		rightPart->translate(stream, indentLevel, 0, space);
 		stream << ";\n";
 	}
 }

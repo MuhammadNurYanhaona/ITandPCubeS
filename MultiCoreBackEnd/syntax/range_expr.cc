@@ -116,35 +116,64 @@ Hashtable<VariableAccess*> *RangeExpr::getAccessedGlobalVariables(TaskGlobalRefe
 	return table;
 }
 
-void RangeExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+void RangeExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 
 	// get the appropriate back-end name for the index variable
 	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
         const char *indexVar = transformer->getTransformedName(index->getName(), false, false);
-	// translate the range condition
-	std::ostringstream rangeStr;
-	range->translate(rangeStr, indentLevel, 0);
-	std::string rangeCond = rangeStr.str();
 
-	std::ostringstream indent;
-	for (int i = 0; i < indentLevel; i++) indent << '\t';
-	indent << "\t\t";
+	// Check if the range expression is correspond to a local dimension range of any global array. If it
+	// is so then we translate the range condition differently as there are chances of index range 
+	// reordering due to partition function configuration.
+	bool arrayAccessRange = false;
+	const char *baseVar = range->getBaseVarName();
+	if (baseVar != NULL) {
+		List<FieldAccess*> *fieldAccessList = range->getTerminalFieldAccesses();
+		bool localArray = false;
+		for (int i = 0; i < fieldAccessList->NumElements(); i++) {
+			FieldAccess *fieldAccess = fieldAccessList->Nth(i);
+			if (strcmp(fieldAccess->getField()->getName(), baseVar) == 0) {
+				localArray = fieldAccess->isLocal();
+				break;
+			}
+		}
+		DataStructure *structure = space->getLocalStructure(baseVar);
+		if (structure != NULL) {
+			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+			arrayAccessRange = (array != NULL) && localArray;
+		}
+	}
 
-	// by default a range expression is translated as a boolean condition
-	
-	// check if the index variable is larger than or equal to the min value of range
-	stream << '(' << indexVar << " >= " << rangeCond << ".min"; 
-	stream << '\n' << indent.str() << " && ";
-	// and less than or equal to the max value of range
-	stream << indexVar << " <= "<< rangeCond << ".max"; 
-	stream << '\n' << indent.str() << " && ";
-	// and range mean is less than range max
-	stream  << rangeCond << ".min < " << rangeCond << ".max)";
-	// otherwise, do the exact inverse calculation
-	stream << '\n' << indent.str() << " || ";	
-	stream << '(' << indexVar << " <= " << rangeCond << ".min"; 
-	stream << '\n' << indent.str() << " && ";
-	stream << indexVar << " >= " << rangeCond << ".max)";
+	// if this is an array access range then invoke the function that takes care of that case exclusively
+	if (arrayAccessRange) {
+		translateArrayRangeExprCheck(stream, indentLevel, space);
+	// otherwise, translate the range condition in a simple way
+	} else {	
+		// translate the range condition
+		std::ostringstream rangeStr;
+		range->translate(rangeStr, indentLevel, 0, space);
+		std::string rangeCond = rangeStr.str();
+
+		std::ostringstream indent;
+		for (int i = 0; i < indentLevel; i++) indent << '\t';
+		indent << "\t\t";
+
+		// by default a range expression is translated as a boolean condition
+		
+		// check if the index variable is larger than or equal to the min value of range
+		stream << '(' << indexVar << " >= " << rangeCond << ".min"; 
+		stream << '\n' << indent.str() << " && ";
+		// and less than or equal to the max value of range
+		stream << indexVar << " <= "<< rangeCond << ".max"; 
+		stream << '\n' << indent.str() << " && ";
+		// and range mean is less than range max
+		stream  << rangeCond << ".min < " << rangeCond << ".max)";
+		// otherwise, do the exact inverse calculation
+		stream << '\n' << indent.str() << " || ";	
+		stream << '(' << indexVar << " <= " << rangeCond << ".min"; 
+		stream << '\n' << indent.str() << " && ";
+		stream << indexVar << " >= " << rangeCond << ".max)";
+	}
 }
 
 const char *RangeExpr::getIndexExpr() {
@@ -152,16 +181,16 @@ const char *RangeExpr::getIndexExpr() {
         return transformer->getTransformedName(index->getName(), false, false);
 }
 
-const char *RangeExpr::getRangeExpr() {
+const char *RangeExpr::getRangeExpr(Space *space) {
 	std::ostringstream rangeStr;
-	range->translate(rangeStr, 0, 0);
+	range->translate(rangeStr, 0, 0, space);
 	return strdup(rangeStr.str().c_str());
 }
 
-const char *RangeExpr::getStepExpr() {
+const char *RangeExpr::getStepExpr(Space *space) {
 	std::ostringstream stepStr;
 	if (step == NULL) stepStr << "1";
-	else step->translate(stepStr, 0, 0);
+	else step->translate(stepStr, 0, 0, space);
 	std::string stepCond = stepStr.str();
 	return strdup(stepCond.c_str());
 }
@@ -206,8 +235,8 @@ void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indenta
 	for (int i = 0; i < indentation; i++) indent << '\t';
 
 	const char *indexVar = this->getIndexExpr();                
-	const char *rangeCond = this->getRangeExpr();
-        const char *stepCond = this->getStepExpr();
+	const char *rangeCond = this->getRangeExpr(space);
+        const char *stepCond = this->getStepExpr(space);
 
 	// find out if the used index need some index transformation before been used inside        
 	bool involveIndexXform = false;
@@ -259,8 +288,7 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 	
 	std::string stmtSeparator = ";\n";
 	std::ostringstream indent;
-	for (int i = 0; i < indentLevel; i++) indent << '\t';
-	indent << "\t\t";
+	for (int i = 0; i <= indentLevel; i++) indent << '\t';
 
 	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
         const char *indexVar = transformer->getTransformedName(index->getName(), false, false);
@@ -277,6 +305,16 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 	
 	// grab array configuration information for current LPS
 	ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
+	
+	// create two stacks for traversing parent pointers
+	// stacks are needed as inclusion check should be done from top to bottom in LPS hierarchy
+	std::stack<const char*> partConfigsStack;
+	std::stack<ArrayDataStructure*> parentStructsStack;
+
+	// put current array reference in stack so that it will be automatically processed with its
+	// sources in higher LPSes
+	partConfigsStack.push("");
+	parentStructsStack.push(array);
 
 	// if the array is reordered anywhere in the partition hierarchy starting from the root LPS down to 
 	// current LPS then we have to recursively do inclusion testing on higher LPSes. Note that this 
@@ -284,16 +322,6 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 	// that in the prototype implementation.	
 	if (array->isDimensionReordered(dimensionNo, rootSpace)) {
 		
-		// create two stacks for traversing parent pointers
-		// stacks are needed as inclusion check should be done from top to bottom in LPS hierarchy
-		std::stack<const char*> partConfigsStack;
-		std::stack<ArrayDataStructure*> parentStructsStack;
-
-		// put current array reference in stack so that it will be automatically processed with its
-		// sources in higher LPSes
-		partConfigsStack.push("");
-		parentStructsStack.push(array);
-
 		DataStructure *parent = array->getSource();
 		std::ostringstream parentArrows;
 
@@ -312,51 +340,49 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 
 			parent = parent->getSource();
 		}
+	}
 	
-		// a variable for tracking the number of inclusion checks has been made so far
-		int clauseAdded = 0;
-
-		// iterate over parent structure references and do index inclusion check in each in sequence
-		ArrayDataStructure *lastArray = NULL;	 
-		while (!partConfigsStack.empty()) {
-			const char *pointerLinks = partConfigsStack.top();
-			ArrayDataStructure *parentArray = parentStructsStack.top();
-			if (clauseAdded > 0) {
-				exprStream << std::endl << indent.str();
-				exprStream << "&& (";
-				// if the dimension has been reordered by previous LPS then we need to get
-				// the transformed index before we can do inclusion check for current LPS	
-				if (lastArray->isDimensionLocallyReordered(dimensionNo)) {
-					exprStream << "xformIndex = ";
-					exprStream << lastArray->getIndexXfromExpr(dimensionNo, "xformIndex");
-					exprStream << ',' << std::endl << indent.str() << '\t';
-				}
-			} else {
-				exprStream << "(xformIndex = " << indexVar;
+	// iterate over parent structure references and do index inclusion check in each in sequence
+	ArrayDataStructure *lastArray = NULL;	 
+	// a variable for tracking the number of inclusion checks has been made so far
+	int clauseAdded = 0;
+	while (!partConfigsStack.empty()) {
+		const char *pointerLinks = partConfigsStack.top();
+		ArrayDataStructure *parentArray = parentStructsStack.top();
+		if (clauseAdded > 0) {
+			exprStream << std::endl << indent.str();
+			exprStream << "&& (";
+			// if the dimension has been reordered by previous LPS then we need to get the 
+			// transformed index before we can do inclusion check for current LPS	
+			if (lastArray->isDimensionLocallyReordered(dimensionNo)) {
+				exprStream << "xformIndex = ";
+				exprStream << lastArray->getIndexXfromExpr(dimensionNo, "xformIndex");
 				exprStream << ',' << std::endl << indent.str() << '\t';
 			}
-			exprStream << "partConfig = *" << partConfigVar.str() << pointerLinks;
+		} else {
+			exprStream << "(xformIndex = " << indexVar;
 			exprStream << ',' << std::endl << indent.str() << '\t';
-			
-			// if the dimension is reordered in current LPS then we need to add the specific
-			// reorder expression applicable for the underlying partition function
-			if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
-				exprStream << parentArray->getReorderedInclusionCheckExpr(
-						dimensionNo, "xformIndex");
-			// otherwise we can invoke the standard inline inclusion function on PartDimension
-			// object
-			} else {
-				exprStream << "partConfig.isIncluded(xformIndex)";
-			}
+		}
+		exprStream << "partConfig = *" << partConfigVar.str() << pointerLinks;
+		exprStream << ',' << std::endl << indent.str() << '\t';
+		
+		// if the dimension is reordered in current LPS then we need to add the specific reorder 
+		// expression applicable for the underlying partition function
+		if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
+			exprStream << parentArray->getReorderedInclusionCheckExpr(
+					dimensionNo, "xformIndex");
+		// otherwise we can invoke the standard inline inclusion function on PartDimension object
+		} else {
+			exprStream << "partConfig.isIncluded(xformIndex)";
+		}
 
-			exprStream << ")";
-			
-			clauseAdded++; 
-			lastArray = parentArray;
-			partConfigsStack.pop();
-			parentStructsStack.pop();
-		}	
-	}
+		exprStream << ")";
+		
+		clauseAdded++; 
+		lastArray = parentArray;
+		partConfigsStack.pop();
+		parentStructsStack.pop();
+	}	
 }
 
 void RangeExpr::generateAssignmentExprForXformedIndex(std::ostringstream &stream, int indentLevel, Space *space) {

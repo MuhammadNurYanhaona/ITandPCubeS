@@ -72,7 +72,7 @@ class Expr : public Stmt {
 	// Helper functions for code generation
 	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 	virtual void translate(std::ostringstream &stream, 
-			int indentLevel, int currentLineLength);
+			int indentLevel, int currentLineLength, Space *space);
 	virtual List<FieldAccess*> *getTerminalFieldAccesses();
 	static void copyNewFields(List<FieldAccess*> *destination, List<FieldAccess*> *source);
 	void setType(Type *type) { this->type = type; }
@@ -88,7 +88,7 @@ class IntConstant : public Expr {
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::intType; }
 	void inferType(Scope *scope, Type *rootType);
 	int getValue() { return value; }  
-	void translate(std::ostringstream &s, int i, int c) { s << value; }
+	void translate(std::ostringstream &s, int i, int c, Space *space) { s << value; }
 };
 
 class FloatConstant : public Expr {
@@ -100,7 +100,7 @@ class FloatConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::floatType; }
 	void inferType(Scope *scope, Type *rootType);   
-	void translate(std::ostringstream &s, int i, int c) { s << value; }
+	void translate(std::ostringstream &s, int i, int c, Space *space) { s << value; }
 };
 
 class DoubleConstant : public Expr {
@@ -112,7 +112,7 @@ class DoubleConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::doubleType; }
 	void inferType(Scope *scope, Type *rootType);   
-	void translate(std::ostringstream &s, int i, int c) { s << value; }
+	void translate(std::ostringstream &s, int i, int c, Space *space) { s << value; }
 };
 
 class BoolConstant : public Expr {
@@ -124,7 +124,7 @@ class BoolConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::boolType; }
 	void inferType(Scope *scope, Type *rootType);   
-	void translate(std::ostringstream &s, int i, int c) { s << value; }
+	void translate(std::ostringstream &s, int i, int c, Space *space) { s << value; }
 };
 
 class StringConstant : public Expr {
@@ -137,7 +137,7 @@ class StringConstant : public Expr {
 	const char *getValue() { return value; }
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::stringType; }
 	void inferType(Scope *scope, Type *rootType);   
-	void translate(std::ostringstream &s, int i, int c) { s << value; }
+	void translate(std::ostringstream &s, int i, int c, Space *space) { s << value; }
 };
 
 class CharacterConstant : public Expr {
@@ -149,7 +149,7 @@ class CharacterConstant : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::charType; }
 	void inferType(Scope *scope, Type *rootType);   
-	void translate(std::ostringstream &s, int i, int c) { s << value; }
+	void translate(std::ostringstream &s, int i, int c, Space *space) { s << value; }
 };
 
 class ArithmaticExpr : public Expr {
@@ -170,7 +170,7 @@ class ArithmaticExpr : public Expr {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 
 	// for code generation
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 };
 
@@ -192,7 +192,7 @@ class LogicalExpr : public Expr {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
 	// for code generation
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	// Local expressions sometimes are added to indexed based parallel loop statement blocks to further
 	// restrict the range of indexes been traversed by the for loop. Given that there might be multiple
@@ -222,7 +222,8 @@ class ReductionExpr : public Expr {
 
 	// for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"reduction\""; }
+	void translate(std::ostringstream &stream, int indentLevel, 
+			int currentLineLength, Space *space) { stream << "\"reduction\""; }
 };
 
 class EpochValue : public Expr {
@@ -255,7 +256,8 @@ class EpochExpr : public Expr {
 	const char *getBaseVarName() { return root->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"epoch-expr\""; }
+	void translate(std::ostringstream &stream, int indentLevel, 
+			int currentLineLength, Space *space) { stream << "\"epoch-expr\""; }
 };
 
 class FieldAccess : public Expr {
@@ -293,7 +295,7 @@ class FieldAccess : public Expr {
 	void setMetadata(bool metadata) { this->metadata = metadata; }
 	bool isLocal() { return local; }
 	bool isMetadata() { return metadata; }
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	Expr *getBase() { return base; }
 	Identifier *getField() { return field; }
 	bool isEqual(FieldAccess *other);
@@ -325,13 +327,13 @@ class RangeExpr : public Expr {
 	const char *getIndexName() { return index->getName(); }
 	
 	// helper functions for backend compiler
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	// As a range expression can be used as the condition for a repeat loop that needs to be
 	// translated a for loop with other content inside, it provides following functions so that
 	// the caller can get string equivalent of its parts and generate the loop
 	const char *getIndexExpr();
-	const char *getRangeExpr();
-	const char *getStepExpr();
+	const char *getRangeExpr(Space *space);
+	const char *getStepExpr(Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	// As the range within a range expression may be the dimension of some array, there might be a
 	// need for index transformation depending on whether or not that dimension is been reordered 
@@ -387,7 +389,7 @@ class AssignmentExpr : public Expr {
 	const char *getBaseVarName() { return left->getBaseVarName(); }
 	
 	// for code generation
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	// Assignment expression overrides generate-code function along with common translate function
 	// to break compound assignment statements to multiple simple ones. Also we currently support
@@ -409,7 +411,8 @@ class SubRangeExpr : public Expr {
 	void inferType(Scope *scope, Type *rootType); 
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"subrange\""; }
+	void translate(std::ostringstream &stream, int indentLevel, 
+			int currentLineLength, Space *space) { stream << "\"subrange\""; }
 };
 
 class ArrayAccess : public Expr {
@@ -432,8 +435,9 @@ class ArrayAccess : public Expr {
 	// for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	Expr *getEndpointOfArrayAccess();
-	void generate1DIndexAccess(std::ostringstream &stream, const char *array, ArrayType *type);
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength);
+	void generate1DIndexAccess(std::ostringstream &stream, 
+			const char *array, ArrayType *type, Space *space);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 };
 
 class FunctionCall : public Expr {
@@ -447,7 +451,8 @@ class FunctionCall : public Expr {
 	void resolveType(Scope *scope, bool ignoreType);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
-	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength) { stream << "\"function-call\""; }
+	void translate(std::ostringstream &stream, int indentLevel, 
+			int currentLineLength, Space *space) { stream << "\"function-call\""; }
 };
 
 class OptionalInvocationParams : public Node {

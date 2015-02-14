@@ -172,37 +172,37 @@ List<FieldAccess*> *ArrayAccess::getTerminalFieldAccesses() {
 	return list;
 }
 
-void ArrayAccess::translate(std::ostringstream &stream, int indentLevel, int currentLineLength) {
+void ArrayAccess::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	Type *baseType = base->getType();
 	if (dynamic_cast<StaticArrayType*>(baseType) != NULL) {
-		base->translate(stream, indentLevel, currentLineLength);
+		base->translate(stream, indentLevel, currentLineLength, space);
 		stream << "["; 
-		index->translate(stream, indentLevel, currentLineLength);
+		index->translate(stream, indentLevel, currentLineLength, space);
 		stream << "]";
 	} else {
 		// Note that since user defined objects cannot have dynamic arrays, any dynamic array access must be
 		// an access to a dynamic task global variable. Therefore we can assume that the base of this array
 		// access has the name of that variable and its type is an array type.
 		Expr *endpoint = getEndpointOfArrayAccess();
-		endpoint->translate(stream, indentLevel, currentLineLength);
+		endpoint->translate(stream, indentLevel, currentLineLength, space);
 		std::ostringstream indexStream;
 		ArrayType *arrayType = (ArrayType*) endpoint->getType();
 		const char *arrayName = endpoint->getBaseVarName();
 		// we now translate a possibly multidimensional array access into a unidimensional access as arrays
 		// are stored as 1D memory blocks in the back-end
-		generate1DIndexAccess(indexStream, arrayName, arrayType);
+		generate1DIndexAccess(indexStream, arrayName, arrayType, space);
 		// then we write the index access logic in the array
 		stream << '[' << indexStream.str() << ']';
 	}
 }
 
-void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *array, ArrayType *type) {
+void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *array, ArrayType *type, Space *space) {
 	int dimension = getIndexPosition();
 	// If this is not the beginning index access in the expression then pass the computation forward
 	// first to get the earlier part been translated.
 	if (dimension > 0) {
 		ArrayAccess *previous = dynamic_cast<ArrayAccess*>(base);
-		previous->generate1DIndexAccess(stream, array, type);
+		previous->generate1DIndexAccess(stream, array, type, space);
 		stream << " + ";
 	}
 	int dimensionCount = type->getDimensions();
@@ -215,7 +215,7 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *
 	// Otherwise, there might be a need for translating the index
 	} else {
 		stream << '('; 
-		index->translate(stream, 0, 0);
+		index->translate(stream, 0, 0, space);
 		// TODO The following line is commented out temporarily. It is needed for dimensions that start from
 		// nonzero index. We disable it so that code looks easy to reason with. We need to enable this later
 		// once we are done debugging.

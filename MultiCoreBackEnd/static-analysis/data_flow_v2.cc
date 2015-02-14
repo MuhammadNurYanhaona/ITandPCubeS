@@ -411,7 +411,7 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 		stream <<  activateHd;
 		stream << "\tif(!(";
 		std::ostringstream conditionStream;
-		executeCond->translate(conditionStream, 1, 0);
+		executeCond->translate(conditionStream, 1, 0, space);
 		stream << conditionStream.str();
 		stream << ")) {\n";
 		stream << "\t\treturn FAILURE_RUN;\n";
