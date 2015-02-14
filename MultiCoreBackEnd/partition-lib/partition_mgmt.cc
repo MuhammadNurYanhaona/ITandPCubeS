@@ -22,9 +22,15 @@ int block_stride_partitionCount(Dimension d, int ppuCount, int size) {
 
 /*********************************** getRange functions *******************************************/
 
-Dimension block_size_getRange(Dimension d, int lpuCount, int lpuId, int size, 
-		int frontPadding, int backPadding) {
-        int begin = size * lpuId;
+Dimension block_size_getRange(Dimension d, 
+		int lpuCount, 
+		int lpuId, 
+		bool copyMode, 
+		int size, 
+		int frontPadding, 
+		int backPadding) {
+        
+	int begin = size * lpuId;
         Range range;
 	Range positiveRange = d.getPositiveRange();
         range.min = positiveRange.min + begin;
@@ -47,8 +53,14 @@ Dimension block_size_getRange(Dimension d, int lpuCount, int lpuId, int size,
         return dimension;
 }
 
-Dimension block_count_getRange(Dimension d, int lpuCount, int lpuId, int count, 
-		int frontPadding, int backPadding) {
+Dimension block_count_getRange(Dimension d, 
+		int lpuCount, 
+		int lpuId, 
+		bool copyMode, 
+		int count, 
+		int frontPadding, 
+		int backPadding) {
+	
 	int size = d.getLength() / count;
         int begin = size * lpuId;
         Range range;
@@ -73,7 +85,8 @@ Dimension block_count_getRange(Dimension d, int lpuCount, int lpuId, int count,
         return dimension;
 }
 
-Dimension stride_getRange(Dimension d, int lpuCount, int lpuId) {
+Dimension stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyMode) {
+
 	int perStrideEntries = d.getLength() / lpuCount;
 	int myEntries = perStrideEntries;
 	int remainder = d.getLength() % lpuCount;
@@ -88,10 +101,15 @@ Dimension stride_getRange(Dimension d, int lpuCount, int lpuId) {
 	range.max = range.min + myEntries - 1;
 	Dimension dimension;
 	dimension.range = d.adjustPositiveSubRange(range);
+
+	if (!copyMode) {
+		return dimension.getNormalizedDimension();
+	}
+
 	return dimension;
 }
               
-Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, int size) {
+Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyMode, int size) {
 	
 	int stride = size * lpuCount;
 	int strideCount = d.getLength() / stride;
@@ -122,6 +140,11 @@ Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, int size) 
 
 	Dimension dimension;
 	dimension.range = d.adjustPositiveSubRange(range);
+
+	if (!copyMode) {
+		return dimension.getNormalizedDimension();
+	}
+
 	return dimension;
 }
 

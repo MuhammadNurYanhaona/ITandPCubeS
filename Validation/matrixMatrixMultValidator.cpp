@@ -41,7 +41,7 @@ int main() {
 	// compare new C with original C
 	bool fault = false;
 	for (int i = 0; i < cSize; i++) {
-		if (c[i] != cOrig[i]) {
+		if (abs(c[i] - cOrig[i]) > 0.1) {
 			std::cout << "computed C and original C did not match at ";
 			std::cout << "index " << i << " C = " << c[i] << " but ";
 			std::cout << "original C = " << cOrig[i] << std::endl;

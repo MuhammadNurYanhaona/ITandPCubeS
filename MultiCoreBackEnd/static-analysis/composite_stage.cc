@@ -1034,6 +1034,9 @@ void RepeatCycle::generateInvocationCode(std::ofstream &stream, int indentation,
 		// exit the scope created for the repeat loop 
 		stream << indent.str() << "} // scope exit for repeat loop\n";
 	} else {
+		// declare any synchronization counter variable needed inside the repeat loop
+		declareSynchronizationCounters(stream, indentation, this->repeatIndex + 1);
+		
 		// TODO probably we need to maintain a repeat iteration counter in this case two. Then we should
 		// change this straightforward superclass's code execution strategy. We should investigate this
 		// in the future 

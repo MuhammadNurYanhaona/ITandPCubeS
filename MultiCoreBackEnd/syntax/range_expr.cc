@@ -18,6 +18,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <stack>
+#include <deque>
 
 //------------------------------------------------ Range Expressions --------------------------------------------------/
 
@@ -212,9 +213,10 @@ void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indenta
 	bool involveIndexXform = false;
         const char *baseArray = this->getBaseArrayForRange(space);
         if (baseArray != NULL) {
-        int dimension = this->getDimensionForRange(space);
-        ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(baseArray);
-        	if (array->isDimensionLocallyReordered(dimension)) {
+		int dimension = this->getDimensionForRange(space);
+		Space *rootSpace = space->getRoot();
+		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(baseArray);
+		if (array->isDimensionReordered(dimension, rootSpace)) {
         		involveIndexXform = true;
         	}
         }
@@ -242,10 +244,10 @@ void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indenta
         stream << indent.str() << "for (" << indexVarUsed.str() << " = " << rangeCond << ".min; \n";
         stream << indent.str() << "\t\tindexMultiplier * " << indexVarUsed.str() << " <= iterationBound; \n";
         stream << indent.str() << "\t\t" << indexVarUsed.str() << " += indexIncrement) {\n";
+
+	// if index transformation is used then do a reverse transformation to get to the original index
         if (involveIndexXform) {
-        	stream << indent.str() << "\t// this should be an index transformation statement in future\n";
-                stream << indent.str() << "\t" << indexVar << " = " << indexVarUsed.str();
-                stream << stmtSeparator;
+		generateAssignmentExprForXformedIndex(stream, indentation + 1, space);
         }
 	
 	delete indexVar;
@@ -253,7 +255,7 @@ void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indenta
         delete stepCond;
 }
 
-void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &stream, int indentLevel, Space *space) {
+void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int indentLevel, Space *space) {
 	
 	std::string stmtSeparator = ";\n";
 	std::ostringstream indent;
@@ -268,7 +270,7 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &stream, int ind
 	int dimensionNo = getDimensionForRange(space);
 
 	std::ostringstream partConfigVar;
-	partConfigVar << lpuPrefix << arrayName << "PartDims[" << dimensionNo - 1 << "]";
+	partConfigVar << "(&" << lpuPrefix << arrayName << "PartDims[" << dimensionNo - 1 << "])";
 
 	// get the Root Space reference to aid in determining the extend of reordering later
 	Space *rootSpace = space->getRoot();
@@ -276,13 +278,11 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &stream, int ind
 	// grab array configuration information for current LPS
 	ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
 
-	std::ostringstream exprStream;
-
 	// if the array is reordered anywhere in the partition hierarchy starting from the root LPS down to 
 	// current LPS then we have to recursively do inclusion testing on higher LPSes. Note that this 
 	// implementation can be improved by considering only those points of reordering, but we do not do
 	// that in the prototype implementation.	
-	if (array->isReordered(rootSpace)) {
+	if (array->isDimensionReordered(dimensionNo, rootSpace)) {
 		
 		// create two stacks for traversing parent pointers
 		// stacks are needed as inclusion check should be done from top to bottom in LPS hierarchy
@@ -308,7 +308,9 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &stream, int ind
 				parentStructsStack.push(parentArray);
 			}
 			// we don't have to traverse beyond one LPS up beyond the foremost reorder point
-			if (!parentArray->isReordered(rootSpace)) break;
+			if (!parentArray->isDimensionReordered(dimensionNo, rootSpace)) break;
+
+			parent = parent->getSource();
 		}
 	
 		// a variable for tracking the number of inclusion checks has been made so far
@@ -355,6 +357,92 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &stream, int ind
 			parentStructsStack.pop();
 		}	
 	}
+}
+
+void RangeExpr::generateAssignmentExprForXformedIndex(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	std::string stmtSeparator = ";\n";
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+
+	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+        const char *indexVar = transformer->getTransformedName(index->getName(), false, false);
+	std::string lpuPrefix = transformer->getLpuPrefix();
+
+	std::ostringstream xformIndexVar;
+	xformIndexVar << index->getName() << "Xformed";
+	
+	const char *arrayName = getBaseArrayForRange(space);
+	int dimensionNo = getDimensionForRange(space);
+
+	// get the prefix that is common to reach any part-dimension object that will be used during reverse
+	// transformation of transformed index
+	std::ostringstream partConfigVar;
+	partConfigVar << "(&" << lpuPrefix << arrayName << "PartDims[" << dimensionNo - 1 << "])";
+
+	// get the Root Space reference to aid in determining the extend of reordering later
+	Space *rootSpace = space->getRoot();
+	
+	// grab array configuration information for current LPS
+	ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
+
+	// Reverse transformation to the original storage index should take place in a bottom up fasion
+	// from current LPS upto last reordered ancestor LPS. So we create a queue of ancestor partConfig
+	// references and another for the pointers to get to them in generated code.
+	std::deque<const char*> partConfigsQueue;
+	std::deque<ArrayDataStructure*> parentStructsQueue;
+
+	// put current array reference in the queue so that its processing will naturally follow like all 
+	// others -- only if it involves index reordering along the concerned dimension
+	if (array->isDimensionLocallyReordered(dimensionNo)) {
+		partConfigsQueue.push_back("");
+		parentStructsQueue.push_back(array);
+	}
+
+	// iterate over parent structure references and put in queue all references that involves index
+	// reordering along the concerned dimension
+	DataStructure *parent = array->getSource();
+	std::ostringstream parentArrows;
+	while (parent != NULL) {
+		parentArrows << "->parent";
+		ArrayDataStructure *parentArray = (ArrayDataStructure*) parent;
+		if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
+			partConfigsQueue.push_back(strdup(parentArrows.str().c_str()));
+			parentStructsQueue.push_back(parentArray);
+		}
+		parent = parent->getSource();
+	}
+	
+	// create a local scope for the transformation process
+	stream << indent.str() << "{ // scope start for index retransformation\n";
+	
+	// assign the transformed index to the default local variable created for index transform and 
+	// retransform
+	stream << indent.str() << "xformIndex = " << xformIndexVar.str() << stmtSeparator;
+
+	// iterate over the queue and apply reverse transformation at each point to get final value for the
+	// index variable
+	while (!partConfigsQueue.empty()) {
+		const char *pointer = partConfigsQueue.front();
+		ArrayDataStructure *parentArray = parentStructsQueue.front();
+		
+		// get the part config reference to make it available for reverse index transformation 
+		stream << indent.str() << "partConfig = *" << partConfigVar.str();
+		stream << pointer << stmtSeparator;
+		// then assign the value of the reverse transformation to current value of xformIndex
+		stream << indent.str() << "xformIndex = ";
+		stream << parentArray->getReverseXformExpr(dimensionNo, "xformIndex");
+		stream << stmtSeparator;	
+		
+		partConfigsQueue.pop_front();
+		parentStructsQueue.pop_front();
+	}
+
+	// finally assign the value of the reverse transformed index to the intended variable
+	stream << indent.str() << indexVar << " = xformIndex" << stmtSeparator;
+
+	// end the local scope
+	stream << indent.str() << "} // scope end for index retransformation\n";
 }
 
 //----------------------------------------------- Subpartition Range --------------------------------------------------/

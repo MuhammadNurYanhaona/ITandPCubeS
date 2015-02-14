@@ -7,6 +7,7 @@
 #include "../utils/hashtable.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
+#include "../static-analysis/usage_statistic.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -513,6 +514,16 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 			// add two default parameters to the getRange function call
 			functionBody << "lpuCount" << '[' << lpuDimIndex << ']';
 			functionBody << parameterSeparator << "lpuId" << '[' << lpuDimIndex << ']';
+
+			// Determine if copy mode LPU generation (that assumes that a new address space has been
+			// allocated in the memory for this data structure within current LPS) or reference mode
+			// LPU generation (that assumes that data structure within current LPS only refers back
+			// to some earlier memory allocation done for some ancester LPS) should be used for this
+			// get part function and set the third parameter accordingly.
+			bool copyMode = array->getUsageStat()->isAllocated();
+			if (copyMode) functionBody << parameterSeparator << "true";  
+			else functionBody << parameterSeparator << "false";
+
 			// check for dividing and padding arguments and append more parameters to the function
 			// call accordingly
 			DataDimensionConfig *argConfig = partConfig->getArgsForDimension(i + 1);

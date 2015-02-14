@@ -435,13 +435,13 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 		stream <<  localVarDclHd;
 		stream << localVars.str();
 	}
-/*
+
         // translate statements into C++ code
 	stream <<  computeHd;
 	std::ostringstream codeStream;
 	code->generateCode(codeStream, 1, space);
 	stream << codeStream.str();
-*/
+
         // finally return a successfull run indicator
 	stream <<  returnHd;
 	stream << "\treturn SUCCESS_RUN;\n";	

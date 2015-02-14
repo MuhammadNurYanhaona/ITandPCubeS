@@ -29,19 +29,27 @@ int block_stride_partitionCount(Dimension d, int ppuCount, int size);
 
    The signature for these functions are as follows
 
-   Dimension $(FUNCTION)_getRange(Dimension d, int lpuCount, int lpuId, ...)
+   Dimension $(FUNCTION)_getRange(Dimension d, int lpuCount, 
+		int lpuId, bool copyMode, ...)
+
+   The forth parameter is there to distinguish between LPU part range generation for
+   data structure been allocated a new in the underlying LPS or referencing back to
+   the allocation done for the data structure been allocated in some ancestor LPS.
+   If the dimension is reordered by the partition function then the LPU description
+   should be different for these two different situations.		
 
    Note that if a partition function supports overlapping boundary/ghost regions among
    adjacent LPUs then two padding parameters (for front and back ends) should be
    added in the range function to adjust the returned dimension range appropriately. 		
 */
 
-Dimension block_size_getRange(Dimension d, int lpuCount, int lpuId, 
+Dimension block_size_getRange(Dimension d, int lpuCount, int lpuId, bool copyMode,
 		int size, int frontPadding, int backPadding); 
-Dimension block_count_getRange(Dimension d, int lpuCount, int lpuId, int count, 
-		int frontPadding, int backPadding); 
-Dimension stride_getRange(Dimension d, int lpuCount, int lpuId); 
-Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, int size); 
+Dimension block_count_getRange(Dimension d, int lpuCount, int lpuId, bool copyMode,
+		int count, int frontPadding, int backPadding); 
+Dimension stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyMode); 
+Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyMode, 
+		int size); 
 
 /*
    An alternative to the above approach of data re-ordering is to provide index 

@@ -70,17 +70,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         generatePPSCountConstants(headerFile, pcubesConfig);
         generateThreadCountConstants(headerFile, mappingConfig, pcubesConfig);
         
-	// generate library routines for LPUs management        
-        List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
-        Hashtable<List<PartitionParameterConfig*>*> *partitionFnParamConfigs
-                        = generateLPUCountFunctions(headerFile, 
-					programFile, initials, mappingConfig, partitionArgs);
-        Hashtable<List<int>*> *lpuPartFnParamsConfigs
-                        = generateAllGetPartForLPURoutines(headerFile, programFile, 
-					initials, mappingConfig, partitionArgs);
-        
 	// generate task specific data structures and their functions 
-        generateLpuDataStructures(headerFile, mappingConfig);
 	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
         List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
 			mappingConfig, taskDef->getEnvironmentLinks());
@@ -89,7 +79,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	List<TaskGlobalScalar*> *globalScalars 
 			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
 	generateClassesForGlobalScalars(headerFile, globalScalars);
-
+	
 	// generate functions to initialize LPS content references
 	generateFnToInitiateRootLPSContent(headerFile, programFile, initials,
                 	mappingConfig, envLinkList);
@@ -106,6 +96,17 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generateFnToInitiateLPSesContentSimple(headerFile, 
 			programFile, initials, mappingConfig);
         
+        
+	// generate library routines for LPUs management        
+        List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
+        Hashtable<List<PartitionParameterConfig*>*> *partitionFnParamConfigs
+                        = generateLPUCountFunctions(headerFile, 
+					programFile, initials, mappingConfig, partitionArgs);
+        Hashtable<List<int>*> *lpuPartFnParamsConfigs
+                        = generateAllGetPartForLPURoutines(headerFile, programFile, 
+					initials, mappingConfig, partitionArgs);
+        generateLpuDataStructures(headerFile, mappingConfig);
+
 	// generate thread management functions and classes
         generateFnForThreadIdsAllocation(headerFile, 
 			programFile, initials, mappingConfig, pcubesConfig);
@@ -494,6 +495,7 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << indent << "threadArgs[i]->metadata = metadata" << stmtSeparator;
 	stream << indent << indent << "threadArgs[i]->taskGlobals = &taskGlobals" << stmtSeparator;
 	stream << indent << indent << "threadArgs[i]->threadLocals = threadLocalsList[i]" << stmtSeparator;
+	stream << indent << indent << "threadArgs[i]->partition = partition" << stmtSeparator;
 	stream << indent << indent << "threadArgs[i]->threadState = threadStateList[i]" << stmtSeparator;
 	stream << indent << "}\n";
 

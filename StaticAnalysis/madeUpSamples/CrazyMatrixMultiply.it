@@ -1,0 +1,29 @@
+Task "Matrix Multiply":
+	Define:
+		a, b, c: 2D Array of Real double-precision
+	Environment:
+		a, b: link
+		c: create
+	Initialize:
+		c.dimension1 = a.dimension1
+		c.dimension2 = b.dimension2
+	Compute:
+		"Block multiply matrices" (Space B) { 
+			do { c[i][j] = c[i][j] + a[i][k] * b[k][j]
+			} for i, j in c; k in a
+		}
+		Repeat: from "Block multiply matrices" foreach Space A sub-partition
+	Partition (k, l):
+		Space A <2D> {
+			c: strided_block(k, l)
+			a: strided_block(k), replicated
+			b: replicated, strided_block(l)
+			Sub-partition <1D> <unordered> {
+				a<dim2>, b<dim1>: strided()
+			}
+		}
+		Space B <2D> divides Space A sub-partitions {
+			c: strided(), strided()
+			a: strided(), replicated
+			b: replicated, strided()
+		}
