@@ -478,6 +478,15 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 			functionBody << statementIndent;
 			functionBody << currentVar << '[' << i << "] = " << parentVar << '[' << i << ']';
 			functionBody << statementSeparator;
+
+			// for a replicated dimension the partition count and partition index need to be
+			// set to their default values that are 1 and 0 respectively
+			functionBody << statementIndent;
+			functionBody << currentVar << '[' << i << "].count = 1";
+			functionBody << statementSeparator << statementIndent;
+			functionBody << currentVar << '[' << i << "].index = 0";
+			functionBody << statementSeparator;
+
 		// Otherwise, we need to allocate a new metadata variable for this dimension; invoke the
 		// mentioned partition function; and set up other references properly.
 		} else {

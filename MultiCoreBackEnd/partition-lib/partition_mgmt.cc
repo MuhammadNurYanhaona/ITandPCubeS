@@ -2,6 +2,8 @@
 #include "../codegen/structure.h"
 #include "../utils/list.h"
 
+#include <iostream>
+
 /******************************** partitionCount functions ****************************************/
 
 int block_size_partitionCount(Dimension d, int ppuCount, int size) {
@@ -115,7 +117,7 @@ Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyM
 	int strideCount = d.getLength() / stride;
 	int partialStrideElements = d.getLength() % stride;
 	int blockCount = partialStrideElements / size;
-	int extraEntriesBefore;
+	int extraEntriesBefore = 0;
 	int myEntries = strideCount * size;
 	
 	// if all the extra entries belongs to strides earlier than current one then they will

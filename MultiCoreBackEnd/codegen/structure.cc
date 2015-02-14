@@ -53,6 +53,8 @@ void Dimension::print(std::ofstream &stream) {
 void PartDimension::print(std::ofstream &stream, int indentLevel) {
 	
 	for (int i = 0; i < indentLevel; i++) stream << "\t";
+	stream << "count: " << count << " ";
+	stream << "index: " << index << " ";
 	stream << "storage: ";
 	storage.print(stream);
 	stream << " partition: ";

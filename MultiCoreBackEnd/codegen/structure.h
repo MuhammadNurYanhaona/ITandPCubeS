@@ -44,8 +44,8 @@ class PartDimension {
 	PartDimension *parent;		// parent partition dimension configuration; if exists
 
 	PartDimension() {
-		int count = 1;
-		int index = 0;
+		count = 1;
+		index = 0;
 		parent = NULL;
 	}
 	inline bool isIncluded(int index);	// This function is included only to save time in implementation of

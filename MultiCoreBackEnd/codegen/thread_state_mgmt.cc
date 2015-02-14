@@ -52,6 +52,8 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 		std::ostringstream varName;
 		varName << "lpu->" << arrayName << "PartDims";
 		for (int j = 0; j < dimensionCount; j++) {
+			functionBody << singleIndent << varName.str() << "[" << j << "] = ";
+			functionBody << "PartDimension()" << statementSeparator;
 			functionBody << singleIndent << varName.str() << "[" << j << "].partition = ";
 			functionBody << "arrayMetadata->" << arrayName << "Dims[" << j << "]";
 			functionBody << statementSeparator;			

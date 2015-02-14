@@ -154,9 +154,9 @@ const char *StridedBlock::getOriginalIndex(const char *xformIndexName, bool copy
 	}
 
 	std::ostringstream expr;
-	expr << "(" << xformIndexName << " / " << sizeParam.str() << ")";
+	expr << "((" << xformIndexName << " / " << sizeParam.str() << ")";
 	expr << " * partConfig.count";
-	expr << " + partConfig.index * " << sizeParam.str();
+	expr << " + partConfig.index) * " << sizeParam.str();
 	expr << " + " << xformIndexName << " % " << sizeParam.str();
 	return strdup(expr.str().c_str());	
 }
