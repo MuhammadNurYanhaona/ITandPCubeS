@@ -105,9 +105,9 @@ void StridedBlock::processArguments(List<PartitionArg*> *dividingArgs,
 	SingleArgumentPartitionFunction::processArguments(dividingArgs, paddingArgs, "block size");
 }
 
-const char *StridedBlock::getTransformedIndex(const char *origIndexName, bool copyMode) {
+const char *StridedBlock::getTransformedIndex(int dimensionNo, const char *origIndexName, bool copyMode) {
 	
-	DataDimensionConfig *argument = arguments->Nth(0);
+	DataDimensionConfig *argument = getArgsForDimension(dimensionNo);
 	Node *dividingArg = argument->getDividingArg();
 	bool argNeeded = false;
 	int argValue = 0;
@@ -139,9 +139,9 @@ const char *StridedBlock::getTransformedIndex(const char *origIndexName, bool co
 	return strdup(expr.str().c_str());	
 }
 
-const char *StridedBlock::getOriginalIndex(const char *xformIndexName, bool copyMode) {
+const char *StridedBlock::getOriginalIndex(int dimensionNo, const char *xformIndexName, bool copyMode) {
 	
-	DataDimensionConfig *argument = arguments->Nth(0);
+	DataDimensionConfig *argument = getArgsForDimension(dimensionNo);
 	Node *dividingArg = argument->getDividingArg();
 	std::ostringstream sizeParam;
 	Identifier *identifier = dynamic_cast<Identifier*>(dividingArg);
@@ -161,9 +161,9 @@ const char *StridedBlock::getOriginalIndex(const char *xformIndexName, bool copy
 	return strdup(expr.str().c_str());	
 }
 
-const char *StridedBlock::getInclusionTestExpr(const char *origIndexName, bool copyMode) {
+const char *StridedBlock::getInclusionTestExpr(int dimensionNo, const char *origIndexName, bool copyMode) {
 
-	DataDimensionConfig *argument = arguments->Nth(0);
+	DataDimensionConfig *argument = getArgsForDimension(dimensionNo);
 	Node *dividingArg = argument->getDividingArg();
 	std::ostringstream sizeParam;
 	Identifier *identifier = dynamic_cast<Identifier*>(dividingArg);
@@ -197,20 +197,20 @@ void Strided::processArguments(List<PartitionArg*> *dividingArgs, List<Partition
 	arguments->Append(new DataDimensionConfig(1, NULL));
 }
 
-const char *Strided::getTransformedIndex(const char *origIndexName, bool copyMode) {
+const char *Strided::getTransformedIndex(int dimensionNo, const char *origIndexName, bool copyMode) {
 	std::ostringstream expr;
 	expr << "(" << origIndexName << " / " << "partConfig.count)";
 	return strdup(expr.str().c_str());
 }
 
-const char *Strided::getOriginalIndex(const char *xformIndexName, bool copyMode) {
+const char *Strided::getOriginalIndex(int dimensionNo, const char *xformIndexName, bool copyMode) {
 	std::ostringstream expr;
 	expr << "(" << "partConfig.index" <<  " + ";
 	expr << xformIndexName << " * " << "partConfig.count" << ")";
 	return strdup(expr.str().c_str());
 }
 
-const char *Strided::getInclusionTestExpr(const char *origIndexName, bool copyMode) {
+const char *Strided::getInclusionTestExpr(int dimensionNo, const char *origIndexName, bool copyMode) {
 	std::ostringstream expr;
 	expr << "(" << origIndexName << " % " << "partConfig.count == partConfig.index)";
 	return strdup(expr.str().c_str());

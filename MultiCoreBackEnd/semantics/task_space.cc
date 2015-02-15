@@ -294,21 +294,21 @@ const char *ArrayDataStructure::getIndexXfromExpr(int dimensionNo, const char *i
 	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
 	if (partConfig == NULL) return NULL;
 	bool copiedInLps = usageStat->isAllocated();
-	return partConfig->getTransformedIndex(indexName, copiedInLps);
+	return partConfig->getTransformedIndex(dimensionNo, indexName, copiedInLps);
 }
 
 const char *ArrayDataStructure::getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName) {
 	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
 	if (partConfig == NULL) return NULL;
 	bool copiedInLps = usageStat->isAllocated();
-	return partConfig->getInclusionTestExpr(indexName, copiedInLps);
+	return partConfig->getInclusionTestExpr(dimensionNo, indexName, copiedInLps);
 }
 
 const char *ArrayDataStructure::getReverseXformExpr(int dimensionNo, const char *xformIndex) {
 	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
 	if (partConfig == NULL) return NULL;
 	bool copiedInLps = usageStat->isAllocated();
-	return partConfig->getOriginalIndex(xformIndex, copiedInLps);
+	return partConfig->getOriginalIndex(dimensionNo, xformIndex, copiedInLps);
 }
 
 //----------------------------------------------------- Token ---------------------------------------------------/

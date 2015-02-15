@@ -103,12 +103,15 @@ class PartitionFunctionConfig {
 	// index to be transformed/reverse-transformed and generate the desired expressions assuming that any part-
 	// ition function parameter used to configure this LPS is available as an attribute of a partition object 
 	// and partition count and index correspond to the LPU where the test is been made is available in a part-
-	// config object. The second argument, copyMode, indicates if data copying or reference reassignment is been
+	// config object. The third argument, copyMode, indicates if data copying or reference reassignment is been
 	// used for the storage of underlying data. This is needed as transformation processes for data-copy and ref-
 	// erence reassignment are different. 
-	virtual const char *getTransformedIndex(const char *origIndexName, bool copyMode) { return NULL; }
-	virtual const char *getOriginalIndex(const char *xformIndexName, bool copyMode) { return NULL; }
-	virtual const char *getInclusionTestExpr(const char *origIndexName, bool copyMode) { return NULL; }	
+	virtual const char *getTransformedIndex(int dimensionNo, 
+			const char *origIndexName, bool copyMode) { return NULL; }
+	virtual const char *getOriginalIndex(int dimensionNo, 
+			const char *xformIndexName, bool copyMode) { return NULL; }
+	virtual const char *getInclusionTestExpr(int dimensionNo, 
+			const char *origIndexName, bool copyMode) { return NULL; }	
 };
 
 class DataStructure {

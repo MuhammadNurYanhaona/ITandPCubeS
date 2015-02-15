@@ -15,7 +15,7 @@ Task "Matrix Multiply":
 		Repeat: from "Block multiply matrices" foreach Space A sub-partition
 	Partition (k, l):
 		Space A <2D> {
-			c: block_stride(k), block_stride(l)
+			c: block_stride(k, l)
 			a: block_stride(k), replicated
 			b: replicated, block_stride(l)
 			Sub-partition <1D> <unordered> {
