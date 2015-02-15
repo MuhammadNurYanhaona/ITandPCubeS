@@ -306,11 +306,11 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 	// grab array configuration information for current LPS
 	ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
 	
-	// create two stacks for traversing parent pointers
-	// stacks are needed as inclusion check should be done from top to bottom in LPS hierarchy
+	// create two stacks for traversing parent pointers; stacks are needed as inclusion check should be 
+	// done from top to bottom in LPS hierarchy
 	std::stack<const char*> partConfigsStack;
 	std::stack<ArrayDataStructure*> parentStructsStack;
-
+	
 	// put current array reference in stack so that it will be automatically processed with its
 	// sources in higher LPSes
 	partConfigsStack.push("");
@@ -335,8 +335,13 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 				partConfigsStack.push(strdup(parentArrows.str().c_str()));
 				parentStructsStack.push(parentArray);
 			}
-			// we don't have to traverse beyond one LPS up beyond the foremost reorder point
-			if (!parentArray->isDimensionReordered(dimensionNo, rootSpace)) break;
+			
+			// we do not have to traverse past one partitioning LPS up to the foremost reorder 
+			// point
+			if (parentArray->isPartitionedAlongDimension(dimensionNo) 
+					&& !parentArray->isDimensionReordered(dimensionNo, rootSpace)) {
+				break;
+			}
 
 			parent = parent->getSource();
 		}
@@ -350,13 +355,25 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 		const char *pointerLinks = partConfigsStack.top();
 		ArrayDataStructure *parentArray = parentStructsStack.top();
 		if (clauseAdded > 0) {
-			exprStream << std::endl << indent.str();
+			exprStream << std::endl << indent.str() << '\t';
 			exprStream << "&& (";
-			// if the dimension has been reordered by previous LPS then we need to get the 
-			// transformed index before we can do inclusion check for current LPS	
+			// If the dimension has been reordered by previous LPS then we need to get the 
+			// transformed index before we can do inclusion check for current LPS.	
 			if (lastArray->isDimensionLocallyReordered(dimensionNo)) {
 				exprStream << "xformIndex = ";
 				exprStream << lastArray->getIndexXfromExpr(dimensionNo, "xformIndex");
+				exprStream << ',' << std::endl << indent.str() << '\t';
+
+			// Otherwise we have to check array has been reordered in current LPS; if it has
+			// then we have to adjust the partition beginning to zero before doing inclusion
+			// check. TODO this is a limitation of current prototype implementation that
+			// LPU definition for reordering partition functions always start at zero. in
+			// future when we will optimize the compiler then we need to find a way to avoid
+			// adjusting indexes from order preserving partition functions during inclusion
+			// check by redesigning the LPU configuration of reordering partition functions
+			// appropriately.
+			} else if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
+				exprStream << "xformIndex = partConfig.normalizeIndex(xformIndex)";
 				exprStream << ',' << std::endl << indent.str() << '\t';
 			}
 		} else {
@@ -412,31 +429,35 @@ void RangeExpr::generateAssignmentExprForXformedIndex(std::ostringstream &stream
 	// grab array configuration information for current LPS
 	ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
 
+	// skip LPSes untill we get to the first LPS where the dimension has been reordered
+	std::ostringstream parentArrows;
+	while (!array->isDimensionLocallyReordered(dimensionNo)) {
+		array = (ArrayDataStructure*) array->getSource();
+		// we need to keep track how far we need to traverse the parent pointers to get to the first
+		// index reorder point
+		parentArrows << "->parent";
+	}
+
 	// Reverse transformation to the original storage index should take place in a bottom up fasion
 	// from current LPS upto last reordered ancestor LPS. So we create a queue of ancestor partConfig
 	// references and another for the pointers to get to them in generated code.
 	std::deque<const char*> partConfigsQueue;
 	std::deque<ArrayDataStructure*> parentStructsQueue;
 
-	// put current array reference in the queue so that its processing will naturally follow like all 
-	// others -- only if it involves index reordering along the concerned dimension
-	if (array->isDimensionLocallyReordered(dimensionNo)) {
-		partConfigsQueue.push_back("");
-		parentStructsQueue.push_back(array);
-	}
-
 	// iterate over parent structure references and put in queue all references that involves index
-	// reordering along the concerned dimension
-	DataStructure *parent = array->getSource();
-	std::ostringstream parentArrows;
-	while (parent != NULL) {
-		parentArrows << "->parent";
-		ArrayDataStructure *parentArray = (ArrayDataStructure*) parent;
-		if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
+	// reordering along the concerned dimension; note that we do not have to traverse part the foremost
+	// LPS where the index has been reordered.
+	while (array != NULL) {
+		if (array->isPartitionedAlongDimension(dimensionNo)) {
 			partConfigsQueue.push_back(strdup(parentArrows.str().c_str()));
-			parentStructsQueue.push_back(parentArray);
+			parentStructsQueue.push_back(array);
 		}
-		parent = parent->getSource();
+		// we do not have to traverse past one partitioning LPS up to the foremost reorder point
+		if (array->isPartitionedAlongDimension(dimensionNo) 
+			&& !array->isDimensionReordered(dimensionNo, rootSpace)) break;
+
+		parentArrows << "->parent";
+		array = (ArrayDataStructure*) array->getSource();
 	}
 	
 	// create a local scope for the transformation process
@@ -455,10 +476,22 @@ void RangeExpr::generateAssignmentExprForXformedIndex(std::ostringstream &stream
 		// get the part config reference to make it available for reverse index transformation 
 		stream << indent.str() << "partConfig = *" << partConfigVar.str();
 		stream << pointer << stmtSeparator;
-		// then assign the value of the reverse transformation to current value of xformIndex
-		stream << indent.str() << "xformIndex = ";
-		stream << parentArray->getReverseXformExpr(dimensionNo, "xformIndex");
-		stream << stmtSeparator;	
+		// if the dimension has been reordered in this LPS then assign the value of the reverse 
+		// transformation to current value of xformIndex
+		if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
+			stream << indent.str() << "xformIndex = ";
+			stream << parentArray->getReverseXformExpr(dimensionNo, "xformIndex");
+			stream << stmtSeparator;
+
+		// Otherwise do an index adjustment as mixing of reordering and order preserving partition
+		// functions may result in lost of the partition beginnings at the points where reordering
+		// takes place. TODO in the future we have to develop a different mechanism for reordering
+		// partition functions' LPU configuration that will save us from index adjustment on order
+		// preserving partition functions.
+		} else {
+			stream << indent.str() << "xformIndex = partConfig.adjustIndex(xformIndex)";
+			stream << stmtSeparator;
+		}	
 		
 		partConfigsQueue.pop_front();
 		parentStructsQueue.pop_front();

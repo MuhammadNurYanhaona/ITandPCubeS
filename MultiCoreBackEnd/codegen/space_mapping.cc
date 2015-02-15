@@ -594,15 +594,14 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 			functionBody << currentVar << '[' << i << "].count = ";
 			functionBody << "lpuCount" << '[' << lpuDimIndex << ']';
 			functionBody << statementSeparator;
-			
-			// finally add the parent partition dimension reference as the parent pointer to the generated
-			// partition dimension object
-			functionBody << statementIndent;
-			functionBody << currentVar << '[' << i << "].parent = &";
-			functionBody << parentVar << '[' << i << ']';
-			functionBody << statementSeparator;
-			 
+
 		}
+		// finally add the parent partition dimension reference as the parent pointer to the generated
+		// partition dimension object
+		functionBody << statementIndent;
+		functionBody << currentVar << '[' << i << "].parent = &";
+		functionBody << parentVar << '[' << i << ']';
+		functionBody << statementSeparator;
 	}
 	functionHeader << ")";
 	functionBody << "}\n";

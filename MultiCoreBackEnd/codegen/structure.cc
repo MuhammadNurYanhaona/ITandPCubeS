@@ -72,6 +72,12 @@ bool PartDimension::isIncluded(int index) {
 	}
 }
 
+int PartDimension::adjustIndex(int index) {
+	if (partition.range.min > partition.range.max)
+		return partition.range.min - index;
+	else return index + partition.range.min;
+}
+
 //--------------------------------------------- PPU ID --------------------------------------------------/
 
 void PPU_Ids::print(std::ofstream &stream) {

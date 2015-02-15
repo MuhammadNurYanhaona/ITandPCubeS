@@ -48,12 +48,28 @@ class PartDimension {
 		index = 0;
 		parent = NULL;
 	}
-	inline bool isIncluded(int index);	// This function is included only to save time in implementation of
-						// the prototype compiler. Ideally we should not have function calls
-						// for checking if an index is included within a range; rather we 
-						// should have boolean expressions directly been applied in underlying
-						// context. TODO so we should avoid using this function in our later
-						// optimized implementation.  
+	bool isIncluded(int index);	// This function is included only to save time in implementation of the 
+					// prototype compiler. Ideally we should not have function calls for checking 
+					// if an index is included within a range; rather we should have boolean 
+					// expressions directly been applied in underlying context. TODO so we should 
+					// avoid using this function in our later optimized implementation.
+
+	int adjustIndex(int index);  	// This is again a time saving implementation of index adjustment when the
+					// index under concern is generated from a representative range that starts 
+					// from 0 but the original range starts at some non-zero value. We have 
+					// such cases when some dimension reordering partition function in some LPS
+					// is combined with order preserving partition function in its ancester 
+					// LPSes. We can avoid the use of this function in the future by redesigning 
+					// the reordering partition functions to take into account non-zero range 
+					// beginnings. 
+	
+	inline int normalizeIndex(int index) {
+		return index - partition.range.min;
+	}				// Similar to the above, this function is a time saving implementation for
+					// shifting index to be relative to the zero based, normalized, beginning 
+					// if order preserving partition functions are combined with reordering part-
+					// ition functions.
+					
 	void print(std::ofstream &stream, int indentLevel);
 };
 
