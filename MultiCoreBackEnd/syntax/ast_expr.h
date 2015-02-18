@@ -182,7 +182,10 @@ class LogicalExpr : public Expr {
   public:
 	LogicalExpr(Expr *left, LogicalOperator op, Expr *right, yyltype loc);
 	const char *GetPrintNameForNode() { return "LogicalExpr"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+	Expr *getLeft() { return left; }
+	LogicalOperator getOp() { return op; }	
+	Expr *getRight() { return right; }    	
 	
 	// for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
@@ -202,6 +205,36 @@ class LogicalExpr : public Expr {
 	// erators and put different parts in different location. So the following method has been added to
 	// break a collective of AND statements into a list of such statements
 	List<LogicalExpr*> *getANDBreakDown(); 
+	// This function generates, as its name suggests, a starting or ending condition for an index from 
+	// logical expressions that are used as restricting conditions in parallel loops based on that index. 
+	// An example of such restriction can be "do { ... } for k in matrix AND k > expr." Here we will like
+	// to begin the translated C++ loops to start from "k = expr + 1." On the other hand, if the range
+	// to be traversed by the index is a decreasing range than the same condition should be used to exit
+	// from the loop instead of as a starting condition. If none of the expressions in the list can be used 
+	// to restrict generated index loop this way due to the nature of those expressions, then it does 
+	// nothing and returns the original list. If it is successfull then it gets rid of the expressions 
+	// that are used in the generated expression from the original list and return the filtered list to
+	// be used by the caller.
+	// The last three parameters are for determining if the index under concern traverses a reordered
+	// array dimension, and if it does then transform the index start or end restriction that may be applied 
+	// to the added restrictions.    
+	static List<LogicalExpr*> *getIndexRestrictExpr(List<LogicalExpr*> *exprList, 
+			std::ostringstream &stream, 
+			const char *indexVar, const char *rangeExpr, 
+			int indentLevel, Space *space,
+			bool xformedArrayRange, const char *arrayName, int dimensionNo);
+	// This is a supporting function for the function above to determine whether to consider of skip an
+	// expression. Instead of a boolean value, it returns an integer as we need to know on which side of
+	// the expression the index variable lies. So it returns -1 if the expression is a loop restrict
+	// condition and the loop index is on the right of the expression, 1 if the loop index is on the left,
+	// and 0 if the expression is not a loop restrict condition.
+	int isLoopRestrictExpr(const char *loopIndex);
+	// This function transforms a variable holding the value of an index restricting expression based on
+	// the partitioning of the array dimension that the index is traversing -- when the loop corresponds to
+	// a reordered array dimension traversal, of course.  
+	static void transformIndexRestriction(std::ostringstream &stream, 
+			const char *varName, const char *arrayName, int dimensionNo, 
+			int indentLevel, Space *space);
 };
 
 class ReductionExpr : public Expr {

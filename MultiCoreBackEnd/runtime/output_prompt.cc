@@ -26,6 +26,6 @@ bool outprompt::getYesNoAnswer(const char *prompt) {
 	std::string response;
 	readNonEmptyLine(response);
 	string_utils::trim(response);
-	if ('Y' == response[0]) return true;
+	if ('Y' == response[0] || 'y' == response[0]) return true;
 	return false;
 }
