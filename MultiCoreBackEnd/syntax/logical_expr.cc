@@ -197,8 +197,7 @@ List<LogicalExpr*> *LogicalExpr::getANDBreakDown() {
 	return breakDownList;
 }
 
-List<LogicalExpr*> *LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprList,
-                        std::ostringstream &stream,
+void LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprList, std::ostringstream &stream,
                         const char *indexVar, const char *rangeExpr,
 			int indentLevel, Space *space,
                         bool xformedArrayRange, const char *arrayName, int dimensionNo) {
@@ -216,42 +215,33 @@ List<LogicalExpr*> *LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprLi
 	int gteMarker = 0;
 	int lteMarker = 0;
 
-	List<LogicalExpr*> *filteredList = new List<LogicalExpr*>;
 	for (int i = 0; i < exprList->NumElements(); i++) {
 		LogicalExpr *currentExpr = exprList->Nth(i);
 		int eval = currentExpr->isLoopRestrictExpr(indexVar);
-		// if the current expression is not a valid candidate at all then add it to the filtered
-		// list
-		if (eval == 0) {
-			filteredList->Append(currentExpr);
-		// otherwise, filter out the expression only if it is the first expression of our desired
-		// kind
+		if (eval == 0) continue;
+	
+		// Note that the logic below ensures that the first candidate expressions for the loop start
+		// and end conditions are retained. We may not need this.		
+		LogicalOperator op = currentExpr->getOp();
+		if (op == GT || op == GTE) {
+			if (eval == -1 && !lteFound) {
+				lteFound = true;
+				lteMarker = -1;
+				lteExpr = currentExpr;
+			} else if (eval == 1 && !gteFound) {
+				gteFound = true;
+				gteMarker = 1;
+				gteExpr = currentExpr;
+			}
 		} else {
-			LogicalOperator op = currentExpr->getOp();
-			if (op == GT || op == GTE) {
-				if (eval == -1 && !lteFound) {
-					lteFound = true;
-					lteMarker = -1;
-					lteExpr = currentExpr;
-				} else if (eval == 1 && !gteFound) {
-					gteFound = true;
-					gteMarker = 1;
-					gteExpr = currentExpr;
-				} else {
-					filteredList->Append(currentExpr);
-				}
-			} else {
-				if (eval == -1 && !gteFound) {
-					gteFound = true;
-					gteMarker = -1;
-					gteExpr = currentExpr;
-				} else if (eval == 1 && !lteFound) {
-					lteFound = true;
-					lteMarker = 1;
-					lteExpr = currentExpr;
-				} else {
-					filteredList->Append(currentExpr);
-				}
+			if (eval == -1 && !gteFound) {
+				gteFound = true;
+				gteMarker = -1;
+				gteExpr = currentExpr;
+			} else if (eval == 1 && !lteFound) {
+				lteFound = true;
+				lteMarker = 1;
+				lteExpr = currentExpr;
 			}
 		}
 	}
@@ -271,12 +261,8 @@ List<LogicalExpr*> *LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprLi
 
 		// initially assign the index start and end bounds that are applied by default to some
 		// local variables
-		stream << indent.str() << "int localIndexStart = indexStart" << stmtSeparator; 	
-		stream << indent.str() << "int localIndexBound = indexbound" << stmtSeparator;
-
-		// create two flags to track if index start or end condition has been modified
-		bool startChanged = false;
-		bool boundChanged = false; 	
+		stream << indent.str() << "int localIterationStart = iterationStart" << stmtSeparator; 	
+		stream << indent.str() << "int localIterationBound = iterationBound" << stmtSeparator;
 
 		// generate an if else block that will check if the index is increasing or decreasing
 		// and based on that apply appropriate restrictions
@@ -287,26 +273,37 @@ List<LogicalExpr*> *LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprLi
 		if (lteFound) {
 			Expr *lteCond = (lteMarker == 1) ? lteExpr->getRight() : lteExpr->getLeft();
 			stream << indent.str() << "\t";
-			stream << "localIndexStart = ";
+			stream << "localIterationStart = ";
 			lteCond->translate(stream, indentLevel + 1, 0, space);
 			if ((lteMarker == 1 && lteExpr->getOp() == LT) 
 					|| (lteMarker == -1 && lteExpr->getOp() == GT)) {
 				stream << " - 1";
 			}
 			stream << stmtSeparator;
-			startChanged = true;
+			// if the index is traversing an array dimension range and the dimension of the 
+			// array has been reordered then apply equivalent transformation on the iteration 
+			// start condition
+			if (xformedArrayRange) {
+				transformIndexRestriction(stream, "localIterationStart", 
+						arrayName, dimensionNo, indentLevel + 1, space, true);
+			}
 		}
 		if (gteFound) {
 			Expr *gteCond = (gteMarker == 1) ? gteExpr->getRight() : gteExpr->getLeft();
 			stream << indent.str() << "\t";
-			stream << "localIndexBound = ";
+			stream << "localIterationBound = ";
 			gteCond->translate(stream, indentLevel + 1, 0, space);
 			if ((gteMarker == 1 && gteExpr->getOp() == GT) 
 					|| (gteMarker == -1 && gteExpr->getOp() == LT)) {
 				stream << " + 1";
 			}
 			stream << stmtSeparator;
-			boundChanged = true;	
+			// similar to the above case of iteration start condition, appy a transformation
+			// on the iteration end condition, if applicable. 
+			if (xformedArrayRange) {
+				transformIndexRestriction(stream, "localIterationBound", 
+						arrayName, dimensionNo, indentLevel + 1, space, false);
+			}
 		}
 
 		// on the other hand, when the range is increasing, which is the normal case, greater than
@@ -315,42 +312,35 @@ List<LogicalExpr*> *LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprLi
 		if (lteFound) {
 			Expr *lteCond = (lteMarker == 1) ? lteExpr->getRight() : lteExpr->getLeft();
 			stream << indent.str() << "\t";
-			stream << "localIndexBound = ";
+			stream << "localIterationBound = ";
 			lteCond->translate(stream, indentLevel + 1, 0, space);
 			if ((lteMarker == 1 && lteExpr->getOp() == LT) 
 					|| (lteMarker == -1 && lteExpr->getOp() == GT)) {
 				stream << " - 1";
 			}
 			stream << stmtSeparator;
-			boundChanged = true;	
+			if (xformedArrayRange) {
+				transformIndexRestriction(stream, "localIterationBound", 
+						arrayName, dimensionNo, indentLevel + 1, space, false);
+			}
 		}
 		if (gteFound) {
 			Expr *gteCond = (gteMarker == 1) ? gteExpr->getRight() : gteExpr->getLeft();
 			stream << indent.str() << "\t";
-			stream << "localIndexStart = ";
+			stream << "localIterationStart = ";
 			gteCond->translate(stream, indentLevel + 1, 0, space);
 			if ((gteMarker == 1 && gteExpr->getOp() == GT) 
 					|| (gteMarker == -1 && gteExpr->getOp() == LT)) {
 				stream << " + 1";
 			}
 			stream << stmtSeparator;
-			startChanged = true;	
+			if (xformedArrayRange) {
+				transformIndexRestriction(stream, "localIterationStart", 
+						arrayName, dimensionNo, indentLevel + 1, space, true);
+			}
 		}
 		stream << indent.str() << "}\n";
 		
-		// if the range been traversed by the index corresponds to a reordered dimension of an array
-		// then we have to transform the updated index start and end condition to make them meaning-
-		// full.  	
-		if (xformedArrayRange) {
-			if (startChanged) {
-				transformIndexRestriction(stream, "localIndexStart", 
-						arrayName, dimensionNo, indentLevel + 1, space);
-			}
-			if (boundChanged) {
-				transformIndexRestriction(stream, "localIndexBound", 
-						arrayName, dimensionNo, indentLevel + 1, space);
-			}
-		}
 
 		// Finally, before applying the updated conditions we need to validate that new conditions will
 		// not expand the range been traversed as oppose to restrict it further. This can happen often
@@ -358,21 +348,19 @@ List<LogicalExpr*> *LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprLi
 		stream << indent.str();
 		stream << "if (" << rangeExpr << ".min > " << rangeExpr << ".max) {\n";
 		stream << indent.str() << '\t';
-		stream << "indexStart = std::min(indexStart, localIndexStart)" << stmtSeparator;
+		stream << "iterationStart = std::min(iterationStart, localIterationStart)" << stmtSeparator;
 		stream << indent.str() << '\t';
-		stream << "indexBound = std::max(indexBound, localIndexBound)" << stmtSeparator;
+		stream << "iterationBound = std::max(iterationBound, localIterationBound)" << stmtSeparator;
 		stream << indent.str() << "} else {\n";
 		stream << indent.str() << '\t';
-		stream << "indexStart = std::max(indexStart, localIndexStart)" << stmtSeparator;
+		stream << "iterationStart = std::max(iterationStart, localIterationStart)" << stmtSeparator;
 		stream << indent.str() << '\t';
-		stream << "indexBound = std::min(indexBound, localIndexBound)" << stmtSeparator;
+		stream << "iterationBound = std::min(iterationBound, localIterationBound)" << stmtSeparator;
 		stream << indent.str() << "}\n";
 		
 		// close the local scope 
 		stream << indent.str() << "}// scope exit for applying index loop restrictions\n"; 	
 	} 
-
-	return filteredList;
 }
 
 int LogicalExpr::isLoopRestrictExpr(const char *loopIndex) {
@@ -410,11 +398,13 @@ int LogicalExpr::isLoopRestrictExpr(const char *loopIndex) {
 
 void LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
                         const char *varName, const char *arrayName, int dimensionNo,
-                        int indentLevel, Space *space) {
+                        int indentLevel, Space *space, 
+			bool normalizedToMinOfRange) {
 
 	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
         std::ostringstream indent;
-        for (int i = 0; i <= indentLevel; i++) indent << '\t';
+        for (int i = 0; i < indentLevel; i++) indent << '\t';
 
 	// get the reference name for the partition dimension configuration object for the concerned
 	// array's concerned dimension
@@ -442,13 +432,17 @@ void LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
 		parentArrows << "->parent";
 	}
 
-	// reverse track references up to the foremost reorder point and store all points where the
+	// reverse track references up to one LPS up to foremost reorder point and store all points where the
 	// array has been partitioned along concerned dimension
-	while (array != NULL && !array->isDimensionReordered(dimensionNo, rootSpace)) {
+	while (array != NULL) {
                 if (array->isPartitionedAlongDimension(dimensionNo)) {
                         partConfigsStack.push(strdup(parentArrows.str().c_str()));
                         parentStructsStack.push(array);
                 }
+
+                if (array->isPartitionedAlongDimension(dimensionNo)
+                        && !array->isDimensionReordered(dimensionNo, rootSpace)) break;
+
                 parentArrows << "->parent";
                 array = (ArrayDataStructure*) array->getSource();
         }
@@ -482,8 +476,11 @@ void LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
 				stream << stmtSeparator;
 				stream << indent.str();
 				stream << varName << " = ";
-				stream << "partConfig.normalizeIndex(" << varName << ")";
-				stream << stmtSeparator;
+				stream << "partConfig.safeNormalizeIndex(" << varName;
+				stream << paramSeparator;
+				if (normalizedToMinOfRange) stream << "true";
+				else stream << "false";
+				stream << ")" << stmtSeparator;
 			}
 
 			// get the reference of the partition dimension configuration object for current LPS
@@ -494,7 +491,7 @@ void LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
 			// then transform the index	
 			stream << indent.str();
 			stream << varName << " = ";
-                        stream << parentArray->getIndexXfromExpr(dimensionNo, varName);
+                        stream << parentArray->getImpreciseLowerXformedIndex(dimensionNo, varName);
 			stream << stmtSeparator;
 		}
 		

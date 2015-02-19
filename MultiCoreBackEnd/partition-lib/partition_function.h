@@ -67,6 +67,7 @@ class StridedBlock : public SingleArgumentPartitionFunction {
 	const char *getTransformedIndex(int dimensionNo, const char *origIndexName, bool copyMode);
         const char *getOriginalIndex(int dimensionNo, const char *xformIndexName, bool copyMode);
         const char *getInclusionTestExpr(int dimensionNo, const char *origIndexName, bool copyMode);
+	const char *getImpreciseLowerXformedIndex(int dimension, const char *index, bool copyMode); 
 };
 
 class Strided : public PartitionFunctionConfig {
@@ -80,6 +81,7 @@ class Strided : public PartitionFunctionConfig {
 	const char *getTransformedIndex(int dimensionNo, const char *origIndexName, bool copyMode);
         const char *getOriginalIndex(int dimensionNo, const char *xformIndexName, bool copyMode);
         const char *getInclusionTestExpr(int dimensionNo, const char *origIndexName, bool copyMode);
+	const char *getImpreciseLowerXformedIndex(int dimension, const char *index, bool copyMode); 
 };
 
 #endif

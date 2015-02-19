@@ -97,6 +97,14 @@ void LpuCounter::resetCounter() {
 	currentLinearLpuId = INVALID_ID;
 }
 
+void LpuCounter::logLpuRange(std::ofstream &log, int indent) {
+	for (int i = 0; i < indent; i++) log << '\t';
+	log << "LPU ID Range: ";
+	log << currentRange->startId;
+	log << " -- " << currentRange->endId;
+	log << std::endl;	
+}
+
 void LpuCounter::logLpuCount(std::ofstream &log, int indent) {
 	for (int i = 0; i < indent; i++) log << '\t';
 	log << "LPU Count: ";
@@ -213,30 +221,35 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 			LpsState *parentState = lpsStates[parentLpsId];
 			if (parentState->isIterationBound()) {
 				return NULL;
-			// otherwise check if parent LPS'es LPU can be updated
-			} else {			
-				LpuCounter *parentCounter = parentState->getCounter();
-				int parentLpuId = parentCounter->getCurrentLpuId();
+			// otherwise check if parent LPS'es LPU can be updated to resume iteration of LPUs in
+			// current LPS
+			} else {
+				while (nextLpuId == INVALID_ID) {			
+					LpuCounter *parentCounter = parentState->getCounter();
+					int parentLpuId = parentCounter->getCurrentLpuId();
 
-				// recursively call the same routine in the parent LPS to update the parent LPU
-				// if possible
-				LPU *parentLpu = getNextLpu(parentLpsId, containerLpsId, parentLpuId);
+					// recursively call the same routine in the parent LPS to update the 
+					// parent LPU if possible
+					LPU *parentLpu = getNextLpu(parentLpsId, containerLpsId, parentLpuId);
 				
-				// If parent LPU is NULL then it means all parent LPUs have been executed too. So
-				// there is nothing more to do in current LPS either 
-				if (parentLpu == NULL) return NULL;
+					// If parent LPU is NULL then it means all parent LPUs have been executed 
+					// too. So there is nothing more to do in current LPS either 
+					if (parentLpu == NULL) return NULL;
 				
-				// Otherwise, counters for current LPS should be reset, the range of LPUs that 
-				// current thread needs to execute should also be renewed
-				int *newLpuCounts = computeLpuCounts(lpsId);
-				counter->setLpuCounts(newLpuCounts);
-				counter->setCurrentRange(threadIds->ppuIds[lpsId]);
+					// Otherwise, counters for current LPS should be reset, the range of LPUs 
+					// that current thread needs to execute should also be renewed
+					int *newLpuCounts = computeLpuCounts(lpsId);
+					counter->setLpuCounts(newLpuCounts);
+					counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 		
-				// log counter update
-				counter->logLpuCount(threadLog, lpsId);
+					// log counter update
+					counter->logLpuCount(threadLog, lpsId);
+					
+					// retrieve next LPU Id from the updated counter
+					nextLpuId = counter->getNextLpuId(INVALID_ID);
+				}
 
 				// finally, compute next LPU to execute, save state, and return the LPU
-				nextLpuId = counter->getNextLpuId(INVALID_ID);
 				int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
 				int *lpuCounts = counter->getLpuCounts();
 				LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
@@ -276,24 +289,51 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				
 	// log counter update
 	counter->logLpuCount(threadLog, lpsId);
-				
-	// finally, compute next LPU to execute, save state, and return the LPU
+	
+	// compute the next LPU for the current LPS using a recursive procedure
 	int nextLpuId = counter->getNextLpuId(INVALID_ID);
-	if (nextLpuId != INVALID_ID) {
-		int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
-		int *lpuCounts = counter->getLpuCounts();
-		LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
+	while (nextLpuId == INVALID_ID) {
+	
+		// if it is not possible to go recursively up to find the first valid LPU for current
+		// LPS then return NULL	
+		if (containerLpsId == parentLpsId || parentLpsId == INVALID_ID) return NULL;			
 		
-		// log LPU execution
-		for (int i = 0; i < lpsId; i++) threadLog << '\t';
-		threadLog << "Start LPU: " << nextLpuId << std::endl;
-		counter->logCompositeLpuId(threadLog, lpsId);
-		lpu->print(threadLog, lpsId + 1);
+		LpuCounter *parentCounter = parentState->getCounter();
+		int parentLpuId = parentCounter->getCurrentLpuId();
+
+		// recursively call the same routine in the parent LPS to update the 
+		// parent LPU if possible
+		LPU *parentLpu = getNextLpu(parentLpsId, containerLpsId, parentLpuId);
+	
+		// If parent LPU is NULL then it means all parent LPUs have been executed 
+		// too. So there is nothing more to do in current LPS either 
+		if (parentLpu == NULL) return NULL;
+	
+		// Otherwise, counters for current LPS should be reset, the range of LPUs 
+		// that current thread needs to execute should also be renewed
+		int *newLpuCounts = computeLpuCounts(lpsId);
+		counter->setLpuCounts(newLpuCounts);
+		counter->setCurrentRange(threadIds->ppuIds[lpsId]);
+
+		// log counter update
+		counter->logLpuCount(threadLog, lpsId);
 		
-		// set the LPU Id so that recursion can advance to the next LPU in next call 
-		lpu->setId(nextLpuId);	
-		return lpu;
-	} else return NULL;	
+		// retrieve next LPU Id from the updated counter
+		nextLpuId = counter->getNextLpuId(INVALID_ID);
+	}	
+	int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
+	int *lpuCounts = counter->getLpuCounts();
+	LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
+	
+	// log LPU execution
+	for (int i = 0; i < lpsId; i++) threadLog << '\t';
+	threadLog << "Start LPU: " << nextLpuId << std::endl;
+	counter->logCompositeLpuId(threadLog, lpsId);
+	lpu->print(threadLog, lpsId + 1);
+	
+	// set the LPU Id so that recursion can advance to the next LPU in next call 
+	lpu->setId(nextLpuId);	
+	return lpu;
 }
 
 void ThreadState::removeIterationBound(int lpsId) {

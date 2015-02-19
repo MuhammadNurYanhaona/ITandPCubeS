@@ -182,6 +182,27 @@ const char *StridedBlock::getInclusionTestExpr(int dimensionNo, const char *orig
 	return strdup(expr.str().c_str());	
 }
 
+const char *StridedBlock::getImpreciseLowerXformedIndex(int dimensionNo, const char *index, bool copyMode) {
+	
+	DataDimensionConfig *argument = getArgsForDimension(dimensionNo);
+	Node *dividingArg = argument->getDividingArg();
+	std::ostringstream sizeParam;
+	Identifier *identifier = dynamic_cast<Identifier*>(dividingArg);
+	if (identifier != NULL) {
+		sizeParam << "partition.";
+		sizeParam << identifier->getName();
+	} else {
+		IntConstant *constant = dynamic_cast<IntConstant*>(dividingArg);
+		sizeParam << constant->getValue();
+	}
+
+	std::ostringstream expr;
+	expr << "(" << index << " / (";
+	expr << "partConfig.count " << " * " << sizeParam.str();
+	expr << ")) * " << sizeParam.str();
+	return strdup(expr.str().c_str());	
+}
+
 //----------------------------------------------------- Strided --------------------------------------------------/
 
 const char *Strided::name = "stride";
@@ -213,5 +234,13 @@ const char *Strided::getOriginalIndex(int dimensionNo, const char *xformIndexNam
 const char *Strided::getInclusionTestExpr(int dimensionNo, const char *origIndexName, bool copyMode) {
 	std::ostringstream expr;
 	expr << "(" << origIndexName << " % " << "partConfig.count == partConfig.index)";
+	return strdup(expr.str().c_str());
+}
+
+
+const char *Strided::getImpreciseLowerXformedIndex(int dimensionNo, 
+		const char *origIndexName, bool copyMode) {
+	std::ostringstream expr;
+	expr << "(" << origIndexName << " / " << "partConfig.count)";
 	return strdup(expr.str().c_str());
 }

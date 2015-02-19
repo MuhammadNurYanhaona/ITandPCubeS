@@ -111,7 +111,16 @@ class PartitionFunctionConfig {
 	virtual const char *getOriginalIndex(int dimensionNo, 
 			const char *xformIndexName, bool copyMode) { return NULL; }
 	virtual const char *getInclusionTestExpr(int dimensionNo, 
-			const char *origIndexName, bool copyMode) { return NULL; }	
+			const char *origIndexName, bool copyMode) { return NULL; }
+	
+	// this function is used to transform any integer unrelated to an array index of a dimension based on the 
+	// partition function used in that dimension for that array. Here imprecise lower bound is calculated as we
+	// do not know if the compared integer falls within the LPU boundary, nonetheless we can optimize code using
+	// an imprecise lower bound. For example, if the partition function is block-stride then we can use the 
+	// imprecise transformation to skips some of the strides of the current LPU during loop iterations. This 
+	// function, like its three predecessors, is only applicable for data reordering partitioning functions. 	
+	virtual const char *getImpreciseLowerXformedIndex(int dimensionNo, 
+			const char *origIndexName, bool copyMode) { return NULL; }
 };
 
 class DataStructure {
@@ -190,13 +199,14 @@ class ArrayDataStructure : public DataStructure {
 	// LPS under concern. This function is purely for diagnostic purpose and has not been perfected.
 	void print();
 
-	// These are three functions used during code generation correspond to array dimensions that have been
+	// These are four functions used during code generation correspond to array dimensions that have been
 	// reordered by underlying partition functions. The transformation codes for reordered data been copied 
 	// into a new memory location for current LPS and for only LPU definition generating reordered indexes 
 	// for unordered data are different.  
 	const char *getIndexXfromExpr(int dimensionNo, const char *indexName);
 	const char *getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName);
 	const char *getReverseXformExpr(int dimensionNo, const char *xformIndex);
+	const char *getImpreciseLowerXformedIndex(int dimensionNo, const char *indexName);
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions

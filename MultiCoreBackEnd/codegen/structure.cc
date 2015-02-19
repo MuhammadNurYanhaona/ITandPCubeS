@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
+#include <algorithm>
 
 //------------------------------------------- Dimension -------------------------------------------------/
 
@@ -76,6 +77,13 @@ int PartDimension::adjustIndex(int index) {
 	if (partition.range.min > partition.range.max)
 		return partition.range.min - index;
 	else return index + partition.range.min;
+}
+
+int PartDimension::safeNormalizeIndex(int index, bool matchToMin) {
+	int normalIndex = index - partition.range.min;
+	int length = partition.getLength();	
+	if (normalIndex >= 0 && normalIndex < length) return normalIndex;
+	return (matchToMin) ? 0 : length - 1;	
 }
 
 //--------------------------------------------- PPU ID --------------------------------------------------/

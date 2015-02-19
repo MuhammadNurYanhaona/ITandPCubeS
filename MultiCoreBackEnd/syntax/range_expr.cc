@@ -228,7 +228,8 @@ int RangeExpr::getDimensionForRange(Space *executionSpace) {
 	return dimensionId->getDimensionNo();	
 }
 
-void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indentation, Space *space) {
+void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, 
+		int indentation, Space *space, const char *loopBoundsRestrictCond) {
 	
 	std::string stmtSeparator = ";\n";
 	std::ostringstream indent;
@@ -250,8 +251,10 @@ void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indenta
         	}
         }
 
-        // create two new variables for setting appropriate loop  condition checking and index 
+        // create three new variables for setting appropriate loop  condition checking and index 
         // increment, and one variable to multiply index properly during looping
+        stream << indent.str() << "int iterationStart = " << rangeCond << ".min";
+        stream << stmtSeparator;
         stream << indent.str() << "int iterationBound = " << rangeCond << ".max";
         stream << stmtSeparator;
         stream << indent.str() << "int indexIncrement = " << stepCond << stmtSeparator;
@@ -269,8 +272,11 @@ void RangeExpr::generateLoopForRangeExpr(std::ostringstream &stream, int indenta
                 stream << indent.str() << "int " << indexVarUsed.str() << stmtSeparator;
         } else indexVarUsed << indexVar;
 
+	// if there is a loop restriction condition passed by the caller then apply it before creating the for loop
+	if (loopBoundsRestrictCond != NULL) stream << loopBoundsRestrictCond;
+
         // write the for loop corresponding to the repeat instruction
-        stream << indent.str() << "for (" << indexVarUsed.str() << " = " << rangeCond << ".min; \n";
+        stream << indent.str() << "for (" << indexVarUsed.str() << " = " << "iterationStart; \n";
         stream << indent.str() << "\t\tindexMultiplier * " << indexVarUsed.str() << " <= iterationBound; \n";
         stream << indent.str() << "\t\t" << indexVarUsed.str() << " += indexIncrement) {\n";
 

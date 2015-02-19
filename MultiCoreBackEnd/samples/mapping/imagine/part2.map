@@ -1,0 +1,5 @@
+"Double Partition Test" {
+	// syntax LPS ':' PPS
+	Space A: 2	// A core
+	Space B: 1	// A hyperthread
+}

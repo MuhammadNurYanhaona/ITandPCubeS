@@ -51,6 +51,7 @@ class LpuCounter {
 	int getCurrentLpuId() { return currentLinearLpuId; }
 	virtual int getNextLpuId(int previousLpuId);
 	virtual void resetCounter();
+	virtual void logLpuRange(std::ofstream &log, int indent);
 	virtual void logLpuCount(std::ofstream &log, int indent);
 	virtual void logCompositeLpuId(std::ofstream &log, int indent);
 };
@@ -67,6 +68,7 @@ class MockLpuCounter : public LpuCounter {
 	int *setCurrentCompositeLpuId(int linearId);
 	int getNextLpuId(int previousLpuId);
 	void resetCounter() { currentLinearLpuId = INVALID_ID; }
+	void logLpuRange(std::ofstream &log, int indent) {}
 	void logLpuCount(std::ofstream &log, int indent);
 	void logCompositeLpuId(std::ofstream &log, int indent);
 };

@@ -3,23 +3,28 @@
 #include "../utils/list.h"
 
 #include <iostream>
+#include <algorithm>
 
 /******************************** partitionCount functions ****************************************/
 
 int block_size_partitionCount(Dimension d, int ppuCount, int size) {
-        return d.getLength() / size;
+        return std::max(1, d.getLength() / size);
 }
 
 int block_count_partitionCount(Dimension d, int ppuCount, int count) {
-        return count;
+	int length = d.getLength();
+        return std::max(1, std::min(count, length));
 }
 
 int stride_partitionCount(Dimension d, int ppuCount) {
-        return ppuCount;
+	int length = d.getLength();
+        return std::max(1, std::min(ppuCount, length));
 }
 
 int block_stride_partitionCount(Dimension d, int ppuCount, int size) {
-        return ppuCount;
+	int length = d.getLength();
+	int strides = length / size;
+        return std::max(1, std::min(strides, ppuCount));
 }
 
 /*********************************** getRange functions *******************************************/
@@ -64,12 +69,17 @@ Dimension block_count_getRange(Dimension d,
 		int backPadding) {
 	
 	int size = d.getLength() / count;
+	//int extraEntries = d.getLength() % count;
         int begin = size * lpuId;
         Range range;
 	Range positiveRange = d.getPositiveRange();
         range.min = positiveRange.min + begin;
+	//if (lpuId > 0) range.min += extraEntries;
         range.max = positiveRange.min + begin + size - 1;
+        //range.max = range.min + size - 1;
+	//if (lpuId == 0) range.max += extraEntries;
         if (lpuId == lpuCount - 1) range.max = positiveRange.max;
+
 	if (lpuId > 0 && frontPadding > 0) {
 		range.min = range.min - frontPadding;
 		if (range.min < positiveRange.min) {
@@ -117,13 +127,9 @@ Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyM
 	int strideCount = d.getLength() / stride;
 	int partialStrideElements = d.getLength() % stride;
 	int blockCount = partialStrideElements / size;
-	int extraEntriesBefore = 0;
+	int extraEntriesBefore = partialStrideElements;
 	int myEntries = strideCount * size;
-	
-	// if all the extra entries belongs to strides earlier than current one then they will
-	// occupy reordered indexes that preceed this one's starting index
-	if (blockCount > 0) extraEntriesBefore = partialStrideElements;
-	
+
 	// if extra entries fill up a complete new block in the stride of the current LPU then
 	// its number of entries should increase by the size parameter and extra preceeding
 	// entries should equal to size * preceeding stride count

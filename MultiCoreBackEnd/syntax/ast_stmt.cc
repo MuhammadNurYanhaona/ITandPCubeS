@@ -61,6 +61,7 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 	List<LogicalExpr*> *allRestrictions = indexRestrictions;
 	List<LogicalExpr*> *remainingRestrictions = new List<LogicalExpr*>;
 
+	Space *rootSpace = space->getRoot();
 
 	// create an array for indexes that are single entry in the execution space so that we do not have to
 	// create loops for them
@@ -93,6 +94,22 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 			stream << ntransform::NameTransformer::transformer->getTransformedName(arrayName, true, true);
 			stream << '[' << dimensionNo << "].range.min;\n"; 
 		}
+		
+		// check any additional restrictions been provided that can be used as restricting conditions to 
+		// further limit iteration range from original partition dimension's minimum to maximum value
+		List<LogicalExpr*> *applicableRestrictions = NULL;
+		if (allRestrictions != NULL && allRestrictions->NumElements() > 0) {
+			remainingRestrictions = new List<LogicalExpr*>;
+			Hashtable<const char*> *invisibleIndexes = new Hashtable<const char*>;
+			for (int j = i + 1; j < associateList->NumElements(); j++) {
+				IndexArrayAssociation *otherAssoc = associateList->Nth(j);
+				const char *otherIndex = otherAssoc->getIndex();
+				invisibleIndexes->Enter(otherIndex, otherIndex, true);
+			}
+			applicableRestrictions = getApplicableExprs(invisibleIndexes, allRestrictions, 
+					remainingRestrictions);
+			allRestrictions = remainingRestrictions;
+		}  	
 
 		if (!forbidden) {
 			// declare the uninitialized index variable
@@ -100,9 +117,39 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 			// convert the index access to a range loop iteration and generate code for that
 			DataStructure *structure = space->getLocalStructure(association->getArray());
 			RangeExpr *rangeExpr = association->convertToRangeExpr(structure->getType());
-			rangeExpr->generateLoopForRangeExpr(stream, newIndent, space);
+
+			// if there are index restricting conditions applicable to this loop index then try to extract
+			// those conditions that can be used as limit the boundaries of the loop iteration
+			const char *rangeCond = rangeExpr->getRangeExpr(space);
+			std::ostringstream restrictStream;
+			if (applicableRestrictions != NULL) {
+					LogicalExpr::getIndexRestrictExpr(applicableRestrictions, 
+						restrictStream, index, rangeCond, newIndent, space,
+						array->isDimensionReordered(dimensionNo + 1, rootSpace),
+						arrayName, dimensionNo + 1);
+			}
+
+			rangeExpr->generateLoopForRangeExpr(stream, newIndent, space, restrictStream.str().c_str());
 			indentIncrease++;
 			newIndent++;	
+		}
+		
+		// Apply any restrictions applicable for escaping some loop iterations. Note that this process reuse
+		// some of the expressions that may be already used to limit the index start and end boundaries. None-
+		// theless we apply them here again as our boundary setting restrictions may be imprecise. 
+		// TODO note that this implementation is assuming that iteration restrictions are only applicable for 
+		// non-single entry loops. This assumption should not be made. Including restrictions checking for 
+		// single-entry for loop would require some code refactoring that we are avoiding at this point to save 
+		// time, but this is not hard. More generic and appropriate mechanism is to put the body of the loop 
+		// inside a composite if statement covering all additional restriction. If we do that than the 
+		// restrictions should work for both mode of loop traversal.
+		if (!forbidden && applicableRestrictions != NULL && applicableRestrictions->NumElements() > 0) {
+			for (int k = 0; k < applicableRestrictions->NumElements(); k++) {	
+				for (int in = 0; in < newIndent; in++) stream << '\t';
+				stream << "if (!(";
+				applicableRestrictions->Nth(k)->translate(stream, newIndent, 0, space);
+				stream << ")) continue;\n";
+			}
 		}
 
 		// generate auxiliary code for multi to unidimensional array indexing transformations
@@ -114,28 +161,6 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 			otherAssoc->generateTransform(stream, newIndent, space);
 		}
 
-		// check any additional restrictions been provided and apply it to the loop as a iteration 
-		// escaping conditional statement
-		if (allRestrictions != NULL && allRestrictions->NumElements() > 0) {
-			remainingRestrictions = new List<LogicalExpr*>;
-			Hashtable<const char*> *invisibleIndexes = new Hashtable<const char*>;
-			for (int j = i + 1; j < associateList->NumElements(); j++) {
-				IndexArrayAssociation *otherAssoc = associateList->Nth(j);
-				const char *otherIndex = otherAssoc->getIndex();
-				invisibleIndexes->Enter(otherIndex, otherIndex, true);
-			}
-			List<LogicalExpr*> *applicableRestrictions = getApplicableExprs(invisibleIndexes, 
-					allRestrictions, remainingRestrictions);
-			if (applicableRestrictions != NULL && applicableRestrictions->NumElements() > 0) {
-				for (int k = 0; k < applicableRestrictions->NumElements(); k++) {	
-					for (int in = 0; in < newIndent; in++) stream << '\t';
-					stream << "if (";
-					applicableRestrictions->Nth(k)->translate(stream, newIndent, 0, space);
-					stream << ") continue;\n";
-				}
-			}
-			allRestrictions = remainingRestrictions;
-		}  	
 	}
 
 	// translate the body of the for loop

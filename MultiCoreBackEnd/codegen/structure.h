@@ -69,6 +69,13 @@ class PartDimension {
 					// shifting index to be relative to the zero based, normalized, beginning 
 					// if order preserving partition functions are combined with reordering part-
 					// ition functions.
+
+	int safeNormalizeIndex(int index, bool matchToMin); // This function can be used when we are not sure if 
+					// the compared index is inside an LPU partition range. When such uncertain
+					// transformation is made, we need to ensure that invalid use of the normalized
+					// index has not been made. To safeguard against invalid index transformation
+					// we should use this function during normalization and specified what value
+					// to choose among the min and max as the normalized safety value.  
 					
 	void print(std::ofstream &stream, int indentLevel);
 };

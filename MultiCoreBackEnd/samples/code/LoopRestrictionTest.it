@@ -1,0 +1,22 @@
+Task "Loop Restriction Test":
+	Define:
+		matrix: 2D Array of Real single-precision
+		min_row, min_col: Integer
+	Environment:
+		matrix: create
+	Initialize (length, min_row, min_col):
+		matrix.dimension1.range.min = 0
+		matrix.dimension1.range.max = length - 1
+		matrix.dimension2 = matrix.dimension1
+	Compute:
+		"Update Selective Entries" (Space B) {
+			do { matrix[i][j] = 1
+			} for i, j in matrix and i < min_row and min_col > j
+		}
+	Partition (k, l, m, n):
+		Space A <2D> {
+			matrix: block_stride(k, l)
+		}
+		Space B <2D> divides Space A partitions {
+			matrix: block_stride(m, n)
+		}
