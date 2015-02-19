@@ -432,8 +432,8 @@ void LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
 		parentArrows << "->parent";
 	}
 
-	// reverse track references up to one LPS up to foremost reorder point and store all points where the
-	// array has been partitioned along concerned dimension
+	// reverse track references up to one LPS up to foremost reorder point and store all points where
+	// the array has been partitioned along concerned dimension
 	while (array != NULL) {
                 if (array->isPartitionedAlongDimension(dimensionNo)) {
                         partConfigsStack.push(strdup(parentArrows.str().c_str()));
@@ -459,23 +459,17 @@ void LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
 		if (parentArray->isDimensionLocallyReordered(dimensionNo)) {
 
 			// first normalize the index first if the reoredering LPS is preceeded by an order 
-			// preserving LPS
-			// TODO note that normalization may cause the currect, intended value of the 
-			// transformed variable and give a wrong answer when the original, non-transformed 
-			// variable is outside of the LPU boundary where this code is been invoked. They 
-			// way we are using this feature, however, ensures that such corruption will not 
-			// have effect on the computation. This is because in such cases the result of the 
-			// transformation will be outside the transformed range boundary that the transformed 
-			// variable is supposed to further restrict; thereby will be ignored. Nevertheless, 
-			// validate my statement by sufficient testing if you see some error due to this 
-			// transformation in the future. Also be cautious and make sure that transformed 
-			// variable is within the range of current LPU if you use this function elsewhere.
 			if (lastArray != NULL && !lastArray->isDimensionLocallyReordered(dimensionNo)) {
 				stream << indent.str();
 				stream << "partConfig = *" << partConfigVar.str() << lastPointerLinks;
 				stream << stmtSeparator;
 				stream << indent.str();
 				stream << varName << " = ";
+				// note that safe-normalization is used as we do not know if the transformed
+				// variable's value falls inside the LPU boundary for the underlying array
+				// dimension and we need to set the value to partitioned dimension's min or
+				// max value to probable incorrect computation as a result of non-sensical 
+				// transformation 	
 				stream << "partConfig.safeNormalizeIndex(" << varName;
 				stream << paramSeparator;
 				if (normalizedToMinOfRange) stream << "true";
@@ -491,7 +485,8 @@ void LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
 			// then transform the index	
 			stream << indent.str();
 			stream << varName << " = ";
-                        stream << parentArray->getImpreciseLowerXformedIndex(dimensionNo, varName);
+                        stream << parentArray->getImpreciseBoundOnXformedIndex(dimensionNo, 
+					varName, normalizedToMinOfRange);
 			stream << stmtSeparator;
 		}
 		

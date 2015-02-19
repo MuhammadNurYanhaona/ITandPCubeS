@@ -114,13 +114,13 @@ class PartitionFunctionConfig {
 			const char *origIndexName, bool copyMode) { return NULL; }
 	
 	// this function is used to transform any integer unrelated to an array index of a dimension based on the 
-	// partition function used in that dimension for that array. Here imprecise lower bound is calculated as we
-	// do not know if the compared integer falls within the LPU boundary, nonetheless we can optimize code using
-	// an imprecise lower bound. For example, if the partition function is block-stride then we can use the 
+	// partition function used in that dimension for that array. Here imprecise upper/lower bound is calculated 
+	// as we do not know if the compared integer falls within the LPU boundary, nonetheless we can optimize code 
+	// using an imprecise bound. For example, if the partition function is block-stride then we can use the 
 	// imprecise transformation to skips some of the strides of the current LPU during loop iterations. This 
 	// function, like its three predecessors, is only applicable for data reordering partitioning functions. 	
-	virtual const char *getImpreciseLowerXformedIndex(int dimensionNo, 
-			const char *origIndexName, bool copyMode) { return NULL; }
+	virtual const char *getImpreciseBoundOnXformedIndex(int dimensionNo, 
+			const char *origIndexName, bool lowerBound, bool copyMode) { return NULL; }
 };
 
 class DataStructure {
@@ -206,7 +206,7 @@ class ArrayDataStructure : public DataStructure {
 	const char *getIndexXfromExpr(int dimensionNo, const char *indexName);
 	const char *getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName);
 	const char *getReverseXformExpr(int dimensionNo, const char *xformIndex);
-	const char *getImpreciseLowerXformedIndex(int dimensionNo, const char *indexName);
+	const char *getImpreciseBoundOnXformedIndex(int dimensionNo, const char *indexName, bool lowerBound);
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions

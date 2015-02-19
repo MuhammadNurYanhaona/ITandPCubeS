@@ -100,6 +100,7 @@ depend:
 
 clean:
 	rm -f $(JUNK) y.output $(PRODUCTS) $(BUILD_LOGS)
+	rm -rf ./build/*.h ./build/*.cc
 
 # make build will compile and generate executable for any IT program compiled by the IT compiler 
 build: $(BUILD_OBJS)
