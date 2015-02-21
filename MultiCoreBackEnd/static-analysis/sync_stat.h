@@ -43,14 +43,31 @@ class SyncRequirement {
 	void deactivate() { arc->deactivate(); }
 	void signal() { arc->signal(); }	
 	virtual void print(int indent);
-	void writeDescriptiveComment(std::ofstream &stream, bool forDependent);		
+	void writeDescriptiveComment(std::ofstream &stream, bool forDependent);
+	const char *getSyncName();
+
+	// This is a function to aid code generation for synchronization. It decides in which LPS should
+	// the sync primitives belong to and returns that LPS to the caller.
+	virtual Space *getSyncOwner();
+
+	// This is again a helper function for code generation that decides the logical coverage of a sync
+	// operation starting from the sync-owner. This is not necessarily equals to the dependentLps 
+	// property and vary with the specific type of synchronization. 
+	virtual Space *getSyncSpan() { return dependentLps; }
+
+	// This corresponds to a makeshift mechanism to protect from multiple updates taking place before
+	// all readers have finished reading the last update. Current implementation of synchronization
+	// primitives (up until Feb 20, 2015) do not have support for signaling back to updater that the
+	// underlying data can be modified again. Thus, we need another variable for each sync requirement
+	// to serve reader-to-updater signaling back.
+	const char *getReverseSyncName();	
 };
 
 // As the name suggests, this represents a sync requirements among all LPUs within an LPS due to a
 // replicated variable update within one of them
 class ReplicationSync : public SyncRequirement {
   public:	
-	ReplicationSync() : SyncRequirement("Replication") {}
+	ReplicationSync() : SyncRequirement("RSync") {}
 	void print(int indent);		
 };
 
@@ -69,14 +86,15 @@ class GhostRegionSync : public SyncRequirement {
 // to be synchronized in an ancestor LPS.
 class UpPropagationSync : public SyncRequirement {
   public:	
-	UpPropagationSync() : SyncRequirement("Gather/Reduction") {}
+	UpPropagationSync() : SyncRequirement("USync") {}
 	void print(int indent);		
+	Space *getSyncSpan();
 };
 
 // This does the exact opposite of the previous computation
 class DownPropagationSync : public SyncRequirement {
   public:	
-	DownPropagationSync() : SyncRequirement("Broadcast/Scatter") {}
+	DownPropagationSync() : SyncRequirement("DSync") {}
 	void print(int indent);		
 };
 
@@ -86,7 +104,7 @@ class DownPropagationSync : public SyncRequirement {
 // calculation and we may have to extend this class further in the future.
 class CrossPropagationSync : public SyncRequirement {
   public:
-	CrossPropagationSync() : SyncRequirement("Redistribution") {}
+	CrossPropagationSync() : SyncRequirement("CSync") {}
 	void print(int indent);		
 };
 

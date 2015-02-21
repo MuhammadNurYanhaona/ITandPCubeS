@@ -1,6 +1,9 @@
 // This task does an LU decomposition of an co-efficient matrix a and produces l, u, and p matrixes.
 // This is not an in-place update algorithm. That is l and u are kept separate from a. It does a
 // partial row pivoting and uses strided column partitioning.
+// Note that this is a simplified version of LU Factorization that we created to check if the compiler
+// prototype is working correctly. A more flexible and feature rich LU Factorization is available in 
+// current directory.  
 Task "LU Factorization":
 	Define:
 		// a is the input coefficient matrix; u and l are the upper and lower triangular matrixes 
@@ -14,7 +17,6 @@ Task "LU Factorization":
 		// l_column is a shared data structure used to communicate the transformed column of l in 
 		// any iteration to all partition for their update of U
 		l_column: 1D Array of Real single-precision
-		t: Epoch
 	Environment:
 		a: link
 		u, l, p: create
@@ -31,8 +33,12 @@ Task "LU Factorization":
 		// determine the pivot index as the row index with maximum value in current k-th column
 		"Select Pivot" (Space B)
 		Activate if k in u.local.dimension2.range {
-			do {
-				pivot = reduce ("maxEntry", u[i][k]) 
+			max = u[k][k]
+			pivot = k
+			do {	if (u[i][k] > max) {
+					max = u[i][k]
+					pivot = i		
+				}
 			} for i in u and i >= k
 		}
 		// store the index of the original pivot row in the pivot array 
@@ -42,11 +48,13 @@ Task "LU Factorization":
 		// interchanges current k-th and pivot rows in both upper and lower matrices
 		"Interchange Rows" (Space B) {
 			if (k != pivot) {
-				do { 	u[k][j] at (t) = u[pivot][j] at (t-1)
-			     		u[pivot][j] at (t) = u[k][j] at (t-1)
+				do { 	pivot_entry = u[k][j]
+					u[k][j] = u[pivot][j]
+			     		u[pivot][j] = pivot_entry
 				} for j in u and j >= k
-				do { 	l[k][j] at (t) = l[pivot][j] at (t-1)
-			     		l[pivot][j] at (t) = l[k][j] at (t-1) 
+				do { 	pivot_entry = l[k][j]
+					l[k][j] = l[pivot][j]
+			     		l[pivot][j] = pivot_entry
 				} for j in l and j < k
 			}
 		}
@@ -55,8 +63,8 @@ Task "LU Factorization":
 		"Update Lower" (Space B)
 		Activate if k in l.local.dimension2.range {
 			do {	l[i][k] = u[i][k] / u[k][k]
+				l_column[i] = l[i][k]
 			} for i in l and i > k
-			l_column = l[...][k]
 		}
 		// update remaining entries of the upper triangular matrix using the pivot row and column
 		"Update Upper" (Space B) {

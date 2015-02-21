@@ -14,6 +14,7 @@
 #include "name_transformer.h"
 #include "compute_translator.h"
 #include "pthread_mgmt.h"
+#include "sync_mgmt.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -112,6 +113,15 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 			programFile, initials, mappingConfig, pcubesConfig);
         generateThreadStateImpl(headerFile, programFile, mappingConfig,
                         partitionFnParamConfigs, lpuPartFnParamsConfigs);
+
+	// generate synchronization primitives and their initialization functions
+	SyncManager *syncManager = new SyncManager(taskDef, 
+			headerFile, programFile, initials);
+	syncManager->processSyncList();
+	syncManager->generateSyncPrimitives();
+	syncManager->generateSyncInitializerFn();
+	syncManager->generateSyncStructureForThreads();
+	syncManager->generateFnForThreadsSyncStructureInit();
 
 	// initialize the variable transformation map that would be used to translate
 	// the code inside initialize and compute blocks

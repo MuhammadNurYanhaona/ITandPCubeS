@@ -107,6 +107,30 @@ void generateThreadCountConstants(const char *outputFile,
 			}
 		}
 	}
+
+	// compute the total number of threads participating on each PPS starting from the root PPS
+        nodeQueue.push_back(mappingRoot);
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		
+		int threadCount = 1;
+		PPS_Definition *pps = node->mappingConfig->PPS;
+		Space *lps = node->mappingConfig->LPS;
+		if (pps->id < highestUnpartitionedPpsId) {
+			for (int i = 0; i < pcubesConfig->NumElements(); i++) {
+				PPS_Definition *nextPps = pcubesConfig->Nth(i);
+				if (nextPps->id >= highestUnpartitionedPpsId) continue;
+				threadCount *= nextPps->units;
+				if (pps == nextPps) break;
+			}
+		}
+		programFile << "const int Space_" << lps->getName() << "_Threads = ";
+		programFile << threadCount << ";" << std::endl;
+	}	
 	
 	// compute the total number of threads that will participate in computing for the task
 	int totalThreads = 1;

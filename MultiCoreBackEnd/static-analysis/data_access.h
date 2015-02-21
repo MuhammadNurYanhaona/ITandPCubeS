@@ -158,6 +158,8 @@ class DependencyArc {
 	const char *getArcName();
 	void print(int indent, bool displaySource, bool displayDestination);
 	void deriveSyncAndCommunicationRoots(PartitionHierarchy *hierarchy);
+	Space *getCommRoot() { return communicationRoot; }
+	Space *getSyncRoot() { return syncRoot; }
 };
 
 /*	DataDependencies Class is for storing all the incoming and outgoing dependency arcs of a single computation stage.

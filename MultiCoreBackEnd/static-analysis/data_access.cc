@@ -186,6 +186,10 @@ void DependencyArc::deriveSyncAndCommunicationRoots(PartitionHierarchy *hierarch
 				syncRoot = syncRootCandidate;	
 			}
 		} while ((syncRootCandidate = syncRootCandidate->getParent()) != NULL);
+
+		if (syncRoot != NULL) {
+			syncRoot = syncRoot->getParent();
+		}
 	}
 }
 
@@ -193,7 +197,7 @@ const char *DependencyArc::getArcName() {
 	if (arcName == NULL) {
 		std::ostringstream nameStr;
 		nameStr << varName << "Stage";
-		nameStr << source->getIndex() << "Sig";
+		nameStr << source->getIndex() << "No";
 		nameStr << arcId;
 		arcName = strdup(nameStr.str().c_str());
 	}

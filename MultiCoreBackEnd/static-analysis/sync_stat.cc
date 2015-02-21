@@ -43,6 +43,23 @@ void SyncRequirement::writeDescriptiveComment(std::ofstream &stream, bool forDep
 	}
 }
 
+Space *SyncRequirement::getSyncOwner() {
+	if (arc->getSyncRoot() == NULL) return arc->getCommRoot();
+	return arc->getSyncRoot();
+}
+
+const char *SyncRequirement::getSyncName() {
+	std::ostringstream stream;
+	stream << arc->getArcName() << syncTypeName;
+	return strdup(stream.str().c_str());
+}
+
+const char *SyncRequirement::getReverseSyncName() {
+	std::ostringstream stream;
+	stream << arc->getArcName() << "ReverseSync";
+	return strdup(stream.str().c_str());
+}
+
 //----------------------------------------------- Replication Sync ----------------------------------------------/
 
 void ReplicationSync::print(int indent) {
@@ -53,7 +70,7 @@ void ReplicationSync::print(int indent) {
 
 //---------------------------------------------- Ghost Region Sync ----------------------------------------------/
 
-GhostRegionSync::GhostRegionSync() : SyncRequirement("Ghost-Region") {
+GhostRegionSync::GhostRegionSync() : SyncRequirement("GSync") {
 	overlappingDirections = NULL;
 }
 
@@ -79,6 +96,10 @@ void UpPropagationSync::print(int indent) {
 	for (int i = 0; i < indent; i++) std::cout << '\t';
 	std::cout << "Type: " << "up propagation sync" << std::endl;
 	SyncRequirement::print(indent);
+}
+
+Space *UpPropagationSync::getSyncSpan() {
+	return arc->getSource()->getSpace();	
 }
 
 //-------------------------------------------- Down Propagation Sync --------------------------------------------/

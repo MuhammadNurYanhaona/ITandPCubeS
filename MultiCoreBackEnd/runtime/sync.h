@@ -31,7 +31,7 @@ public:
 class RS {
 	// How many threads need call wait before releasing all threads
 	int _size, _count,_iteration;
-// _iteration is the last iteration for which a signal has been received.
+	// _iteration is the last iteration for which a signal has been received.
 	int _gappers;
 	sem_t mutex;  	// the mutex
 	sem_t throttle;	// Waiters signal the releaser so that there is no over-pumping
