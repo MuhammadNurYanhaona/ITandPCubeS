@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <pthread.h>
 
 #include "lpu_management.h"
 #include "structure.h"
@@ -359,4 +360,9 @@ void ThreadState::initiateLogFile(const char *fileNamePrefix) {
 void ThreadState::logExecution(const char *stageName, int spaceId) {
 	for (int i = 0; i <= spaceId; i++) threadLog << '\t';
 	threadLog << "Executed: " << stageName << std::endl;
+}
+
+void ThreadState::logThreadAffinity() {
+	threadLog << "Thread Id: " << pthread_self() << std::endl;
+	threadLog << "Thread CPU Id: " << sched_getcpu() << std::endl; 	
 }

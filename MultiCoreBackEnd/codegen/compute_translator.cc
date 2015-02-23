@@ -162,7 +162,12 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	headerFile << "void run(" << defaultArgs.str() << ");\n\n";
 	programFile << "void " << initials << "::run(" << defaultArgs.str() << ") {\n";
 
-	// first set the root LPU for the thread so the computation can start
+	// first log affinity information of this thread so that later we can varify that it executed on the PPU
+	// we intended
+	programFile << "\n\t// log thread's affinity information\n";
+	programFile << "\tthreadState->logThreadAffinity();\n";
+
+	// set the root LPU for the thread so the computation can start
 	programFile << "\n\t// set the root LPU in the thread state so that calculation can start\n";
 	programFile << "\tthreadState->setRootLpu(arrayMetadata);\n";
 

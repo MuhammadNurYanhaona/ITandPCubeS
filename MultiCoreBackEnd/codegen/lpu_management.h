@@ -164,6 +164,7 @@ class ThreadState {
 	// a log file for diagnostics
 	std::ofstream threadLog;
 	void logExecution(const char *stageName, int spaceId);
+	void logThreadAffinity();
 };
 
 

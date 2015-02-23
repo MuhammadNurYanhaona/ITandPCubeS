@@ -505,7 +505,7 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	// declare an array of thread IDs and another array of thread arguments
 	stream << indent << "pthread_t threads[Total_Threads]" << stmtSeparator;
 	stream << indent << "PThreadArg *threadArgs[Total_Threads]" << stmtSeparator;
-
+	
 	// initialize the argument list first
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	stream << indent << indent << "threadArgs[i] = new PThreadArg" << stmtSeparator;
@@ -516,12 +516,25 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << indent << "threadArgs[i]->partition = partition" << stmtSeparator;
 	stream << indent << indent << "threadArgs[i]->threadState = threadStateList[i]" << stmtSeparator;
 	stream << indent << "}\n";
+	
+	// declare attributes that will be needed to set the thread affinity masks properly
+	stream << indent << "pthread_attr_t attr" << stmtSeparator;
+	stream << indent << "cpu_set_t cpus" << stmtSeparator;
+	stream << indent << "pthread_attr_init(&attr)" << stmtSeparator;
 
 	// then create the threads one by one
 	stream << indent << "int state" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
-	stream << indent << indent << "state = pthread_create(&threads[i], NULL, runPThreads, (void *) threadArgs[i])";
+	// determine the cpu-id for the thread
+	stream << indent << indent << "int cpuId = i / Threads_Par_Core" << stmtSeparator;
+	// then set the affinity attribute based on the CPU Id
+	stream << indent << indent << "CPU_ZERO(&cpus)" << stmtSeparator;
+	stream << indent << indent << "CPU_SET(cpuId, &cpus)" << stmtSeparator;
+	stream << indent << indent << "pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus)" << stmtSeparator;
+	// then create the thread
+	stream << indent << indent << "state = pthread_create(&threads[i], &attr, runPThreads, (void *) threadArgs[i])";
 	stream << stmtSeparator;
+	// if thread creation fails then exit after writing an error message on the screen
 	stream << indent << indent << "if (state) {\n";
 	stream << indent << indent << indent << "std::cout << \"Could not start some PThread\" << std::endl";
 	stream << stmtSeparator;
