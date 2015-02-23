@@ -216,8 +216,20 @@ void TaskGenerator::generateTaskMain() {
 	// generate thread-state objects for the intended number of threads and initialize their root LPUs
 	initiateThreadStates(stream);
 
+	// start execution time monitoring timer
+	stream << std::endl << indent << "// starting execution timer clock\n";
+	stream << indent << "clock_t begin = clock()" << stmtSeparator;
+
 	// start threads 
-	startThreads(stream);	
+	startThreads(stream);
+
+	// calculate running time
+	stream << indent << "// calculating task running time\n";
+	stream << indent << "clock_t end = clock()" << stmtSeparator;
+	stream << indent << "double runningTime = (end - begin) / CLOCKS_PER_SEC" << stmtSeparator;
+	stream << indent << "logFile << \"Execution Time: \" << runningTime << \" Seconds\" << std::endl";
+	stream << stmtSeparator;
+	stream << std::endl;
 
 	// write all environment variables into files
 	writeResults(stream);
