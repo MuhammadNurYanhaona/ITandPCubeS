@@ -121,7 +121,8 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFileName,
 }
 
 void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
-                const char *programFileName, const char *initials, MappingNode *mappingRoot) {
+                const char *programFileName, const char *initials, 
+		MappingNode *mappingRoot, bool involvesSynchronization) {
 
 	std::cout << "Generating the thread::run function for the task\n";
 	
@@ -164,6 +165,14 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	// first set the root LPU for the thread so the computation can start
 	programFile << "\n\t// set the root LPU in the thread state so that calculation can start\n";
 	programFile << "\tthreadState->setRootLpu(arrayMetadata);\n";
+
+	// if the task involves synchronization then initialize the data structure that will hold sync primitives
+	// correspond to synchronizations that this thread will participate into. 
+	if (involvesSynchronization) {
+		programFile << "\n\t// initialize thread's sync primitives holder data structure\n";
+		programFile << "\tThreadSyncPrimitive *threadSync = ";
+		programFile << "getSyncPrimitives(threadState->getThreadIds());\n";
+	}
 
 	// create a local part-dimension object for probable array dimension based range or assignment expressions
 	programFile << "\n\t// create a local part-dimension object for later use\n";

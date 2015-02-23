@@ -131,6 +131,7 @@ class FlowStage {
 	// needing such collective support, then only a single PPU should enter and execute it. The method below 
 	// need to be overridden by subclasses to reflect intended behavior. 
 	virtual bool isGroupEntry() { return false; }
+	
 	// This method is required to determine what variables need to be copied in local socpe from the LPU for
 	// the flow stage to simplify code generation.
 	List<const char*> *filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap = NULL);
@@ -246,7 +247,7 @@ class CompositeStage : public FlowStage {
 	void printSyncRequirements();
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 
-	// helper functions for code generation
+	// helper functions for code generation-----------------------------------------------------------------
 	// A composite stage organize the stages within into groups based on their LPSes so that iterations over 
 	// LPUs happens in group basis instead of individual computation basis. This reduces the number of times
 	// we need to invoke the LPU generation library at runtime.
@@ -290,9 +291,20 @@ class CompositeStage : public FlowStage {
 	void generateCodeForWaitingForReactivation(std::ofstream &stream, int indentation, 
 			List<SyncRequirement*> *syncRequirements);
 	void generateCodeForReactivatingDataModifiers(std::ofstream &stream, int indentation, 
-			List<SyncRequirement*> *syncDependencies);
-	
+			List<SyncRequirement*> *syncDependencies);	
 	void setReactivatorFlagsForSyncReqs();
+
+	// These two are synchronization simplification functions for our initial barrier based implementation of
+	// sync primitives. When we use barrier then our detail method for 
+	// signalUpdate-waitForUpdate-signalRead-waitForRead sync cycles that offers the utmost flexibility for
+	// computation and communication overlap boils down to lock-step bulk synchronous mode of execution. In that
+	// case we do not need all four signals rather updaters should just waitForRead signals from readers to know
+	// that last change is no longer needed then execute its code and signalUpdate.
+	void genSimplifiedWaitingForReactivationCode(std::ofstream &stream, int indentation, 
+			List<SyncRequirement*> *syncRequirements);
+	void genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &stream, int indentation,
+			List<SyncRequirement*> *syncRequirements);
+	
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.

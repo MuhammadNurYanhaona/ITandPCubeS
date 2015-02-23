@@ -115,8 +115,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
                         partitionFnParamConfigs, lpuPartFnParamsConfigs);
 
 	// generate synchronization primitives and their initialization functions
-	SyncManager *syncManager = new SyncManager(taskDef, 
-			headerFile, programFile, initials);
+	syncManager = new SyncManager(taskDef, headerFile, programFile, initials);
 	syncManager->processSyncList();
 	syncManager->generateSyncPrimitives();
 	syncManager->generateSyncInitializerFn();
@@ -136,7 +135,8 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
 	// generate run function for threads
 	generateThreadRunFunction(taskDef, headerFile, 
-			programFile, initials, mappingConfig);
+			programFile, initials, mappingConfig, 
+			syncManager->involvesSynchronization());
 
 	// generate data structure and functions for Pthreads
 	generateArgStructForPthreadRunFn(taskDef->getName(), headerFile);
@@ -188,6 +188,14 @@ void TaskGenerator::generateTaskMain() {
 
 	// read in partition parameters
 	readPartitionParameters(stream);
+
+	// if the task involves synchronization then initialize the global sync variables that would be used
+	// by different threads
+	if (syncManager->involvesSynchronization()) {
+		stream << std::endl << indent << "// initializing sync primitives\n";
+		stream << indent << "std::cout << \"Initializing sync primitives\\n\"" << stmtSeparator;
+		stream << indent << "initializeSyncPrimitives()" << stmtSeparator;
+	}
 
 	// read any initialization parameter that are not already covered as environment links and invoke the
 	// initialize function

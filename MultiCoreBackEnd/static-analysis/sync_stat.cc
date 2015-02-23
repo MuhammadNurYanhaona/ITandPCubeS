@@ -30,7 +30,7 @@ void SyncRequirement::print(int indent) {
 void SyncRequirement::writeDescriptiveComment(std::ofstream &stream, bool forDependent) {
 	stream << "// ";
 	if (forDependent) {
-		stream << syncTypeName << " sync dependency on Space " << dependentLps->getName(); 
+		stream << syncTypeName << " dependency on Space " << dependentLps->getName(); 
 		stream <<" due to update on \"";
 		stream << variableName << "\"";
 		stream << '\n'; 
@@ -58,6 +58,45 @@ const char *SyncRequirement::getReverseSyncName() {
 	std::ostringstream stream;
 	stream << arc->getArcName() << "ReverseSync";
 	return strdup(stream.str().c_str());
+}
+
+int SyncRequirement::compareTo(SyncRequirement *other) {
+	DependencyArc *otherArc = other->getDependencyArc();
+	int srcIndex = arc->getSource()->getIndex();
+	int otherSrcIndex = otherArc->getSource()->getIndex();
+	if (srcIndex < otherSrcIndex) return -1;
+	else if (srcIndex > otherSrcIndex) return 1;
+	int destIndex = arc->getDestination()->getIndex();
+	int otherDestIndex = otherArc->getDestination()->getIndex();
+	if (destIndex < otherDestIndex) return -1;
+	else if (destIndex > otherDestIndex) return 1;
+	int arcId = arc->getArcId();
+	int otherArcId = otherArc->getArcId();
+	if (arcId < otherArcId) return -1;
+	else if (arcId > otherArcId) return 1;
+	return 0;
+}
+
+List<SyncRequirement*> *SyncRequirement::sortList(List<SyncRequirement*> *reqList) {
+	
+	if (reqList == NULL || reqList->NumElements() <= 1) return reqList;
+	
+	List<SyncRequirement*> *sortedList = new List<SyncRequirement*>;
+	sortedList->Append(reqList->Nth(0));
+	for (int i = 1; i < reqList->NumElements(); i++) {
+		SyncRequirement *sync = reqList->Nth(i);
+		bool found = false;
+		for (int j = 0; j < sortedList->NumElements(); j++) {
+			SyncRequirement *sortSync = sortedList->Nth(j);
+			if (sync->compareTo(sortSync) <= 0) {
+				found = true;
+				sortedList->InsertAt(sync, j);
+				break;
+			}
+		}
+		if (!found) sortedList->Append(sync);
+	}
+	return sortedList;
 }
 
 //----------------------------------------------- Replication Sync ----------------------------------------------/

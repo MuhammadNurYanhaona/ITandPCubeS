@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "sync_mgmt.h"
 #include "../syntax/ast_task.h"
 #include "../syntax/ast_type.h"
 #include "../utils/list.h"
@@ -28,6 +29,7 @@ class TaskGenerator {
 	const char *programFile;
 	const char *initials;
 	MappingNode *mappingRoot;
+	SyncManager *syncManager;
   public:
 	TaskGenerator(TaskDef *taskDef, 
 		const char *outputDirectory, 

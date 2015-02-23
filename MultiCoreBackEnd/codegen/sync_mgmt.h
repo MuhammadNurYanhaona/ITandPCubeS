@@ -26,6 +26,9 @@ class SyncManager {
 	// synchronization primitives
 	void processSyncList();
 
+	// tells if the task under concern requires synchronization or not
+	bool involvesSynchronization();
+
 	// this function generates and writes the array of sync primitives in the header file 
 	// for the task
 	void generateSyncPrimitives();

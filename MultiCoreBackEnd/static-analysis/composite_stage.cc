@@ -418,10 +418,15 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		
 		List<FlowStage*> *currentGroup = stageGroups->Nth(i);
 
+		// commented out this code as the barrier based priliminary implementation does not need this
+		/*-------------------------------------------------------------------------------------------------
 		// first generate code for waiting on all synchronization dependencies before diving into 
 		// multiplexed LPU iterations.
 		List<SyncRequirement*> *syncDependencies = getSyncDependeciesOfGroup(currentGroup);
+		// sort the sync dependencies to ensure that their is a consistent order of the waiting primitives
+		syncDependencies = SyncRequirement::sortList(syncDependencies);
 		generateSyncCodeForGroupTransitions(stream, nextIndentation, syncDependencies);
+		//-----------------------------------------------------------------------------------------------*/
 		
 		// retrieve all synchronization signals that need to be activated if the stages in the group execute
 		List<SyncRequirement*> *syncSignals = getSyncSignalsOfGroup(currentGroup);
@@ -429,10 +434,16 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		for (int j = 0; j < syncSignals->NumElements(); j++) {
 			syncSignals->Nth(j)->signal();
 		}
+		// sort the sync signals to ensure waiting for signal clearance (equivalent to get signals from the
+		// readers that all of them have finished reading the last update) happens in proper order
+		syncSignals = SyncRequirement::sortList(syncSignals);
 
+		// simplified implementation	
+		//-------------------------------------------------------------------------------------------------
 		// If there is any reactivating condition that need be checked before we let the flow of control 
 		// enter the nested stages then we wait for those condition clearance.
-		generateCodeForWaitingForReactivation(stream, nextIndentation, syncSignals);
+		genSimplifiedWaitingForReactivationCode(stream, nextIndentation, syncSignals);
+		//-------------------------------------------------------------------------------------------------
 
 		// Sync stages -- not synchronization dependencies -- that dictate additional data movement 
 		// operations are not needed (according to our current (date: Jan-30-2015) understanding); so we
@@ -481,12 +492,19 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 			}
 		}
 
-		// generate code for signaling execution of the stages within the group
-		generateSignalCodeForGroupTransitions(stream, nextIndentation, syncSignals); 
+		// simplified implementation	
+		//-------------------------------------------------------------------------------------------------
+		// generate code for signaling updates and waiting on those updates for any shared variable change
+		// made by stages within current group  
+		genSimplifiedSignalsForGroupTransitionsCode(stream, nextIndentation, syncSignals);
+		//-------------------------------------------------------------------------------------------------
 
+		// commented out this code as the barrier based priliminary implementation does not need this
+		/*-------------------------------------------------------------------------------------------------
 		// finally if some updater stages can be executed again because current group has finished execution
 		// then we need to enable the reactivation signals
 		generateCodeForReactivatingDataModifiers(stream, nextIndentation, syncDependencies);
+		//-----------------------------------------------------------------------------------------------*/
 	}
 
 	// close the while loop if applicable
@@ -883,6 +901,83 @@ void CompositeStage::generateCodeForReactivatingDataModifiers(std::ofstream &str
 		stream << "// sending clearance for " << arc->getArcName() << " signal\n";
 		stream << indent.str() << "}\n";
 	}			
+}
+
+void CompositeStage::genSimplifiedWaitingForReactivationCode(std::ofstream &stream, int indentation,
+		List<SyncRequirement*> *syncRequirements) {
+
+	std::string stmtSeparator = ";\n";	
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+
+	if (syncRequirements->NumElements() > 0) {
+		stream << std::endl << indent.str();
+		stream << "// barriers to ensure all readers have finished reading last update\n";
+	}
+
+	for (int i = 0; i < syncRequirements->NumElements(); i++) {
+		SyncRequirement *sync = syncRequirements->Nth(i);
+		Space *syncSpanLps = sync->getSyncSpan();
+		stream << indent.str() << "if (threadState->isValidPpu(Space_";
+		stream << syncSpanLps->getName();
+		stream << ")) {\n";	
+		stream << indent.str() << '\t';
+		stream << "threadSync->" << sync->getReverseSyncName() << "->wait()";
+		stream << stmtSeparator;
+		stream << indent.str() << "}\n";
+	}
+}
+
+void CompositeStage::genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &stream, int indentation,
+		List<SyncRequirement*> *syncRequirements) {
+
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+
+	if (syncRequirements->NumElements() > 0) {
+		stream << std::endl << indent.str() << "// resolving synchronization dependencies\n";
+	}
+
+	// iterate over all the synchronization signals and then issue signals and waits in a lock-step fasion
+	for (int i = 0; i < syncRequirements->NumElements(); i++) {
+		
+		SyncRequirement *currentSync = syncRequirements->Nth(i);
+		const char *counterVarName = currentSync->getDependencyArc()->getArcName();
+		
+		// check if the concerned update did take place
+		stream << indent.str() << "if (" << counterVarName << " > 0 && ";
+		// also check if the current PPU is a valid candidate for signaling update
+		FlowStage *sourceStage = currentSync->getDependencyArc()->getSource();
+		Space *signalingLps = sourceStage->getSpace();
+		stream << "threadState->isValidPpu(Space_" << signalingLps->getName();
+		stream << ")) {\n";
+		// then signal synchronization
+		stream << indent.str() << '\t';
+		stream << "threadSync->" << currentSync->getSyncName() << "->signal(";
+		if (sourceStage->getRepeatIndex() > 0) stream << "repeatIteration";
+		else stream << "0";
+		stream << ")" << stmtSeparator;
+		// then reset the counter	 
+		stream << indent.str() << '\t';
+		stream << counterVarName << " = 0" << stmtSeparator;
+
+		// the waiting is in an else block coupled with the signaling if block as the current implementation
+		// of synchronization primitives does not support the PPU (or PPUs) in the signaling block to also be
+		// among the list of waiting PPUs.  
+		stream << indent.str() << "} else if (";
+		Space *syncSpanLps = currentSync->getSyncSpan();
+		FlowStage *waitingStage = currentSync->getWaitingComputation();
+		stream << "threadState->isValidPpu(Space_" << syncSpanLps->getName();
+		stream << ")) {\n";
+		stream << indent.str() << '\t';
+		stream << "threadSync->" << currentSync->getSyncName() << "->wait(";
+		if (waitingStage->getRepeatIndex() > 0) stream << "repeatIteration";
+		else stream << "0";
+		stream << ")" << stmtSeparator;
+		stream << indent.str() << "}\n";
+	}
 }
 
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/

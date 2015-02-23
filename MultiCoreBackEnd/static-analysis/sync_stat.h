@@ -60,7 +60,14 @@ class SyncRequirement {
 	// primitives (up until Feb 20, 2015) do not have support for signaling back to updater that the
 	// underlying data can be modified again. Thus, we need another variable for each sync requirement
 	// to serve reader-to-updater signaling back.
-	const char *getReverseSyncName();	
+	const char *getReverseSyncName();
+
+	// This is a function used to sort sync requirements. It returns 0 if the other sync requirement
+	// is equivalent to current instace, -1 if the current instance less than the other, and finally 
+	// 1 if it is greater then the other. 
+	int compareTo(SyncRequirement *other);
+
+	static List<SyncRequirement*> *sortList(List<SyncRequirement*> *reqList);	
 };
 
 // As the name suggests, this represents a sync requirements among all LPUs within an LPS due to a

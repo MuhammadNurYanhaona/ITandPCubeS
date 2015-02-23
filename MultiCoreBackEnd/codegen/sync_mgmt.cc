@@ -53,6 +53,10 @@ void SyncManager::processSyncList() {
 	}
 }
 
+bool SyncManager::involvesSynchronization() {
+	return taskSyncList != NULL && taskSyncList->NumElements() > 0;
+}
+
 void SyncManager::generateSyncPrimitives() {
 
 	if (taskSyncList->NumElements() > 0) {
