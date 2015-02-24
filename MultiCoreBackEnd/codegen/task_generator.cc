@@ -542,7 +542,7 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << "int state" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	// determine the cpu-id for the thread
-	stream << indent << indent << "int cpuId = i / Threads_Par_Core" << stmtSeparator;
+	stream << indent << indent << "int cpuId = i * Core_Jump / Threads_Par_Core" << stmtSeparator;
 	// then set the affinity attribute based on the CPU Id
 	stream << indent << indent << "CPU_ZERO(&cpus)" << stmtSeparator;
 	stream << indent << indent << "CPU_SET(cpuId, &cpus)" << stmtSeparator;

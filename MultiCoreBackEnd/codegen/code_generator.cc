@@ -158,6 +158,35 @@ void generateThreadCountConstants(const char *outputFile,
 		threadsParCore *= pps->units;
 	}	
 	programFile << "const int Threads_Par_Core = " << threadsParCore << ';' << std::endl;
+
+	// If the lowest LPS is mapped to a PPS above the core space then threads should be more apart than
+	// 1 core space processor. In that case we need to determine how far we should jump as we assign 
+	// threads to processors. To aid in that calculation we need to calculate another constant. We call 
+	// core jump.
+        int lastMappedPpsId = mappingRoot->mappingConfig->PPS->id;
+	nodeQueue.push_back(mappingRoot);
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		PPS_Definition *pps = node->mappingConfig->PPS;
+		if (pps->id < lastMappedPpsId) {
+			lastMappedPpsId = pps->id;
+		}
+	}
+	int coreJump = 1;
+	if (lastMappedPpsId > coreSpaceId) {
+		for (int i = 0; i < pcubesConfig->NumElements(); i++) {
+			PPS_Definition *pps = pcubesConfig->Nth(i);
+			if (pps->id >= lastMappedPpsId) continue;
+			coreJump *= pps->units;
+			if (pps->id == coreSpaceId) break;
+		}
+	}
+	programFile << "const int Core_Jump = " << coreJump << ';' << std::endl;
+
 	programFile.close();
 }
 
