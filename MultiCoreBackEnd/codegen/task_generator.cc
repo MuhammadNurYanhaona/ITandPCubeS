@@ -228,17 +228,21 @@ void TaskGenerator::generateTaskMain() {
 	stream << indent << "clock_t end = clock()" << stmtSeparator;
 	stream << indent << "double runningTime = (end - begin) / CLOCKS_PER_SEC" << stmtSeparator;
 	stream << indent << "logFile << \"Execution Time: \" << runningTime << \" Seconds\" << std::endl";
-	stream << stmtSeparator;
-	stream << std::endl;
+	stream << stmtSeparator << std::endl;
 
 	// write all environment variables into files
 	writeResults(stream);
 	
-	// close the log file and exit the function
+	// close the log file
 	stream << std::endl << indent << "logFile.close()" << stmtSeparator;
+	// display the running time on console
+	stream << indent << "std::cout << \"Parallel Execution Time: \" << runningTime <<";
+	stream << " \" Seconds\" << std::endl" << stmtSeparator;
+	// then exit the function
 	stream << indent << "return 0" << stmtSeparator;
 	stream << "}\n";
 	stream.close();
+	
 }
 
 List<const char*> *TaskGenerator::initiateEnvLinks(std::ofstream &stream) {
