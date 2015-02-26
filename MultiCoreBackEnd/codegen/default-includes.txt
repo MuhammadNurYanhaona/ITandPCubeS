@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <time.h>
+#include <sys/time.h>
 
 // for math functions
 #include <math.h>

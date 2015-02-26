@@ -29,10 +29,12 @@
 
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
                 const char *outputDirectory,
-                const char *mappingFile) {
+                const char *mappingFile,
+		const char *processorFile) {
 
 	this->taskDef = taskDef;
 	this->mappingFile = mappingFile;
+	this->processorFile = processorFile;
 
 	std::ostringstream headerFileStr;
 	headerFileStr << outputDirectory;
@@ -65,6 +67,9 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         MappingNode *mappingConfig = parseMappingConfiguration(taskDef->getName(),
                         mappingFile, lpsHierarchy, pcubesConfig);
 	this->mappingRoot = mappingConfig;
+
+	// generate a constant array for processor ordering in the hardware
+	generateProcessorOrderArray(headerFile, processorFile);
         
 	// generate constansts needed for various reasons
         generateLPSConstants(headerFile, mappingConfig);
@@ -218,15 +223,19 @@ void TaskGenerator::generateTaskMain() {
 
 	// start execution time monitoring timer
 	stream << std::endl << indent << "// starting execution timer clock\n";
-	stream << indent << "clock_t begin = clock()" << stmtSeparator;
+	stream << indent << "struct timeval start" << stmtSeparator;
+	stream << indent << "gettimeofday(&start, NULL)" << stmtSeparator;
 
 	// start threads 
 	startThreads(stream);
 
 	// calculate running time
 	stream << indent << "// calculating task running time\n";
-	stream << indent << "clock_t end = clock()" << stmtSeparator;
-	stream << indent << "double runningTime = (end - begin) / CLOCKS_PER_SEC" << stmtSeparator;
+	stream << indent << "struct timeval end" << stmtSeparator;
+	stream << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
+	stream << indent << "double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
+	stream << std::endl << indent << indent << indent;
+	stream << "- (start.tv_sec + start.tv_usec / 1000000.0))" << stmtSeparator;
 	stream << indent << "logFile << \"Execution Time: \" << runningTime << \" Seconds\" << std::endl";
 	stream << stmtSeparator << std::endl;
 
@@ -543,9 +552,10 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	// determine the cpu-id for the thread
 	stream << indent << indent << "int cpuId = i * Core_Jump / Threads_Par_Core" << stmtSeparator;
+	stream << indent << indent << "int physicalId = Processor_Order[cpuId]" << stmtSeparator;
 	// then set the affinity attribute based on the CPU Id
 	stream << indent << indent << "CPU_ZERO(&cpus)" << stmtSeparator;
-	stream << indent << indent << "CPU_SET(cpuId, &cpus)" << stmtSeparator;
+	stream << indent << indent << "CPU_SET(physicalId, &cpus)" << stmtSeparator;
 	stream << indent << indent << "pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus)" << stmtSeparator;
 	// then create the thread
 	stream << indent << indent << "state = pthread_create(&threads[i], &attr, runPThreads, (void *) threadArgs[i])";

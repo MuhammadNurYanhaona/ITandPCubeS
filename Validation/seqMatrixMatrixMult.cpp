@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <deque>
+#include <sys/time.h>
 #include <time.h>
 #include "utils.h"
 #include "structures.h"
@@ -26,8 +27,9 @@ int main() {
 	double *c = new double[cSize];
 	for (int i = 0; i < cSize; i++) c[i] = 0;
 
-	// start timer
-	clock_t begin = clock();
+	// starting execution timer clock
+	struct timeval start;
+	gettimeofday(&start, NULL);
 
 	// execute matrix-matrix multiplication sequentially
 	for (int i = 0; i < aDims[0].length; i++) {
@@ -42,8 +44,10 @@ int main() {
 	}
 
 	//-------------------------------- calculate running time
-	clock_t end = clock();
-	double runningTime = (end - begin) / CLOCKS_PER_SEC;
+	struct timeval end;
+	gettimeofday(&end, NULL);
+	double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)
+			- (start.tv_sec + start.tv_usec / 1000000.0));
 	std::cout << "Sequential Execution Time: " << runningTime << " Seconds" << std::endl;
 
 	return 0;

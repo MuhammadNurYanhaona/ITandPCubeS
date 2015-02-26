@@ -8,21 +8,21 @@
 /******************************** partitionCount functions ****************************************/
 
 int block_size_partitionCount(Dimension d, int ppuCount, int size) {
-        return std::max(1, d.getLength() / size);
+        return std::max(1, d.length / size);
 }
 
 int block_count_partitionCount(Dimension d, int ppuCount, int count) {
-	int length = d.getLength();
+	int length = d.length;
         return std::max(1, std::min(count, length));
 }
 
 int stride_partitionCount(Dimension d, int ppuCount) {
-	int length = d.getLength();
+	int length = d.length;
         return std::max(1, std::min(ppuCount, length));
 }
 
 int block_stride_partitionCount(Dimension d, int ppuCount, int size) {
-	int length = d.getLength();
+	int length = d.length;
 	int strides = length / size;
         return std::max(1, std::min(strides, ppuCount));
 }
@@ -57,6 +57,7 @@ Dimension block_size_getRange(Dimension d,
 	}
 	Dimension dimension;
 	dimension.range = d.adjustPositiveSubRange(range);
+	dimension.setLength();
         return dimension;
 }
 
@@ -68,16 +69,12 @@ Dimension block_count_getRange(Dimension d,
 		int frontPadding, 
 		int backPadding) {
 	
-	int size = d.getLength() / count;
-	//int extraEntries = d.getLength() % count;
+	int size = d.length / count;
         int begin = size * lpuId;
         Range range;
 	Range positiveRange = d.getPositiveRange();
         range.min = positiveRange.min + begin;
-	//if (lpuId > 0) range.min += extraEntries;
         range.max = positiveRange.min + begin + size - 1;
-        //range.max = range.min + size - 1;
-	//if (lpuId == 0) range.max += extraEntries;
         if (lpuId == lpuCount - 1) range.max = positiveRange.max;
 
 	if (lpuId > 0 && frontPadding > 0) {
@@ -94,6 +91,7 @@ Dimension block_count_getRange(Dimension d,
 	}
 	Dimension dimension;
 	dimension.range = d.adjustPositiveSubRange(range);
+	dimension.setLength();
         return dimension;
 }
 
@@ -113,6 +111,7 @@ Dimension stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyMode) {
 	range.max = range.min + myEntries - 1;
 	Dimension dimension;
 	dimension.range = d.adjustPositiveSubRange(range);
+	dimension.setLength();
 
 	if (!copyMode) {
 		return dimension.getNormalizedDimension();
@@ -148,6 +147,7 @@ Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyM
 
 	Dimension dimension;
 	dimension.range = d.adjustPositiveSubRange(range);
+	dimension.setLength();
 
 	if (!copyMode) {
 		return dimension.getNormalizedDimension();

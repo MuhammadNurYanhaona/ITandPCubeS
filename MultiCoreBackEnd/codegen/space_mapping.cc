@@ -267,6 +267,102 @@ void generatePPSCountConstants(const char *outputFile, List<PPS_Definition*> *pc
 	}
 }
 
+void generateProcessorOrderArray(const char *outputFile, const char *processorFile) {
+	
+	std::string line;
+	std::ifstream inputFile(processorFile);
+	std::string separator1 = ":";
+	std::string separator2 = " ";
+	List<std::string> *tokenList;
+	List<std::string> *fieldList;
+	if (!inputFile.is_open()) {
+		std::cout << "could not open processor specification file" << std::endl;
+		std::exit(EXIT_FAILURE);
+	}	
+	
+	std::cout << "Parsing the prcoessor description" << std::endl;
+	
+	List<int> *processorIdList = new List<int>;
+	List<int> *physicalIdList = new List<int>;
+
+	// we are not sure if the core id information of a processor is important for ordering processor
+	// nonetheless we are keeping this information in hand for possible later use 
+	List<int> *coreIdList = new List<int>;
+
+	// parse each line in the processor description file and get the different id of processors
+	while (std::getline(inputFile, line)) {
+		
+		string_utils::trim(line);
+		tokenList = string_utils::tokenizeString(line, separator1);
+		string_utils::shrinkWhitespaces(line);
+		
+		std::string procNoStr = tokenList->Nth(1);
+		fieldList = string_utils::tokenizeString(procNoStr, separator2);
+		processorIdList->Append(atoi(fieldList->Nth(0).c_str()));
+		
+		std::string physicalIdStr = tokenList->Nth(2);
+		fieldList = string_utils::tokenizeString(physicalIdStr, separator2);
+		physicalIdList->Append(atoi(fieldList->Nth(0).c_str()));
+
+		std::string coreIdStr = tokenList->Nth(3);
+		fieldList = string_utils::tokenizeString(coreIdStr, separator2);
+		coreIdList->Append(atoi(fieldList->Nth(0).c_str()));
+	}
+	inputFile.close();
+
+	// sort the processor Id list based on their physical id
+	List<int> *sortedProcessorIdList = new List<int>;
+	List<int> *reorderedPhyIdList = new List<int>;
+	sortedProcessorIdList->Append(processorIdList->Nth(0));
+	reorderedPhyIdList->Append(physicalIdList->Nth(0));
+
+	for (int i = 1; i < processorIdList->NumElements(); i++) {
+		int processorId = processorIdList->Nth(i);
+		int physicalId = physicalIdList->Nth(i);	
+		bool inserted = false;
+		for (int j = 0; j < sortedProcessorIdList->NumElements(); j++) {
+			if (reorderedPhyIdList->Nth(j) <= physicalId) continue;
+			reorderedPhyIdList->InsertAt(physicalId, j);
+			sortedProcessorIdList->InsertAt(processorId, j);
+			inserted = true;
+			break;
+		}
+		if (!inserted) {
+			reorderedPhyIdList->Append(physicalId);
+			sortedProcessorIdList->Append(processorId);
+		}
+	}
+
+	// write the reordered list as a constant array in the output fille
+	std::ofstream headerFile;
+	headerFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+  	if (!headerFile.is_open()) {
+		std::cout << "Unable to open output header file to write processor order array";
+		std::exit(EXIT_FAILURE);
+	}
+	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
+	headerFile << "processor ordering in the hardware\n";
+	headerFile << "------------------------------------------------------------------------------------*/\n";
+	headerFile << std::endl;
+	headerFile << "const int Processor_Order[" << sortedProcessorIdList->NumElements() << "]";
+	headerFile << " = {";
+	int count = 0;
+	int remaining = sortedProcessorIdList->NumElements();
+	for (int i = 0; i < sortedProcessorIdList->NumElements(); i++) {
+		if (i > 0) headerFile << ", ";
+		headerFile << sortedProcessorIdList->Nth(i);
+		count++;
+		remaining--;
+		if (count == 10 && remaining > 5) {
+			headerFile << std::endl << "\t\t";
+			count = 0;
+		}
+	}
+	headerFile << "};\n";
+	headerFile << std::endl;
+	headerFile.close();	
+}
+
 List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerFile, 
                 std::ofstream &programFile, 
                 const char *initials,

@@ -134,11 +134,13 @@ void generateThreadCountConstants(const char *outputFile,
 	
 	// compute the total number of threads that will participate in computing for the task
 	int totalThreads = 1;
-	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
-		PPS_Definition *pps = pcubesConfig->Nth(i);
-		if (pps->id >= highestUnpartitionedPpsId) continue;
-		totalThreads *= pps->units;
-		if (pps->id == lowestPpsId) break;
+	if (highestUnpartitionedPpsId > lowestPpsId) {
+		for (int i = 0; i < pcubesConfig->NumElements(); i++) {
+			PPS_Definition *pps = pcubesConfig->Nth(i);
+			if (pps->id >= highestUnpartitionedPpsId) continue;
+			totalThreads *= pps->units;
+			if (pps->id == lowestPpsId) break;
+		}
 	}
 	programFile << "const int Total_Threads = " << totalThreads << ';' << std::endl;
 	

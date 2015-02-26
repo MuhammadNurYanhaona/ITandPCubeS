@@ -38,6 +38,7 @@ void inprompt::readArrayDimensionInfo(const char *arrayName, int dimensionCount,
         	std::string max = rangeBoundaries->Nth(1);
         	string_utils::trim(max);
         	dimensions[i].range.max = atoi(max.c_str());
+		dimensions[i].setLength();
         }
 }
 
@@ -59,6 +60,7 @@ void inprompt::readArrayDimensionInfoFromFile(std::ifstream &file, int dimension
                 dimensions[i].range.min = 0;
                 string_utils::trim(token);
                 dimensions[i].range.max = atoi(token.c_str()) - 1;
+		dimensions[i].setLength();
         }
 }
 

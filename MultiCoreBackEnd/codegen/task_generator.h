@@ -24,6 +24,7 @@ class MappingNode;
 class TaskGenerator {
   private:
 	TaskDef *taskDef;
+	const char *processorFile;
 	const char *mappingFile;
 	const char *headerFile;
 	const char *programFile;
@@ -33,7 +34,8 @@ class TaskGenerator {
   public:
 	TaskGenerator(TaskDef *taskDef, 
 		const char *outputDirectory, 
-		const char *mappingFile);
+		const char *mappingFile,
+		const char *processorFile);
 	const char *getHeaderFile() { return headerFile; }
 	const char *getProgramFile() { return programFile; }
 	TaskDef *getTaskDef() { return taskDef; }

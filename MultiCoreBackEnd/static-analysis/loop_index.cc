@@ -72,7 +72,7 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
 		if (!firstEntry) {
 			xform << '\n' << indent.str() << "\t\t";
 		}
-		xform << " * " << array << "StoreDims[" << i << "].getLength()";
+		xform << " * " << array << "StoreDims[" << i << "].length";
 		firstEntry = false;
 	}
 	stream << indent.str();

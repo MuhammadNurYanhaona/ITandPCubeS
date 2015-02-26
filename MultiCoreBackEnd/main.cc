@@ -25,19 +25,22 @@ int main(int argc, const char *argv[]) {
 
 	//***************************************************** Command Line Arguments Reader
 	// read the input arguments and keep track of the appropriate files
-	const char *sourceFile, *pcubesFile, *mappingFile;
-	if (argc < 4) {
-		std::cout << "You need to pass three files as input arguments" << std::endl;
+	const char *sourceFile, *pcubesFile, *processorFile, *mappingFile;
+	if (argc < 5) {
+		std::cout << "You need to pass four files as input arguments" << std::endl;
 		std::cout << "\t" << "1. The input IT program file" << std::endl;
 		std::cout << "\t" << "2. The PCubeS model of the machine" << std::endl;
-		std::cout << "\t" << "3. The mapping configuration file" << std::endl;
+		std::cout << "\t" << "3. A processor description file for the machine\n";
+		std::cout << "\t" << "4. The mapping configuration file" << std::endl;
 		return -1;
 	} else {
 		sourceFile = argv[1];
 		std::cout << "Source program: " << sourceFile << std::endl;
 		pcubesFile = argv[2];
 		std::cout << "PCubeS model: " << pcubesFile << std::endl;
-		mappingFile = argv[3];
+		processorFile = argv[3];
+		std::cout << "Processor configuration: " << processorFile << std::endl;	
+		mappingFile = argv[4];
 		std::cout << "Mapping Configuration: " << mappingFile << std::endl;	
 	}
 	// redirect standard input to the source file for the front end compiler to work
@@ -85,7 +88,8 @@ int main(int argc, const char *argv[]) {
 		// do static analysis of the task to determine what data structure has been 
 		// accessed in what LPS before code generation starts
 		taskDef->getComputation()->calculateLPSUsageStatistics();
-		TaskGenerator *generator = new TaskGenerator(taskDef, outputDir, mappingFile);
+		TaskGenerator *generator = new TaskGenerator(taskDef, 
+				outputDir, mappingFile, processorFile);
 		generator->generate(pcubesConfig);
 		if (i == 0) firstTaskGenerator = generator;
 	}

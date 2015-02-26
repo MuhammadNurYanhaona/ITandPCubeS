@@ -203,8 +203,8 @@ void LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprList, std::ostrin
                         bool xformedArrayRange, const char *arrayName, int dimensionNo) {
 	
 	// we create two local references for possible restriction on beginning and ending conditions
-	LogicalExpr *gteExpr;
-	LogicalExpr *lteExpr;
+	LogicalExpr *gteExpr = NULL;
+	LogicalExpr *lteExpr = NULL;
 
 	// two flags to determine if we need to investigate further for restricting conditions
 	bool gteFound = false;

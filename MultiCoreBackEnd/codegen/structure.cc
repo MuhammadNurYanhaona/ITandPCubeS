@@ -15,6 +15,10 @@ void Dimension::setLength(int length) {
 	range.max = length - 1;	
 }
 
+void Dimension::setLength() {
+	this->length = getLength();
+}
+
 bool Dimension::isIncreasing() {
 	return (range.min <= range.max);
 }
@@ -42,6 +46,7 @@ Dimension Dimension::getNormalizedDimension() {
 	normalRange.max = length - 1;
 	Dimension normalDimension;
 	normalDimension.range = normalRange;
+	normalDimension.length = length;
 	return normalDimension;	
 }
 

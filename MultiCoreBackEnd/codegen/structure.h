@@ -14,12 +14,16 @@ class Range {
 	int max;
 };
 
-class Dimension {
+class Dimension {	
   public:
 	Range range;
+	int length; // for quick access to length information
+	
 	int getLength();
 	void setLength(int length);
 	bool isIncreasing();
+	void setLength();
+
 	Range getPositiveRange();
 	Range adjustPositiveSubRange(Range positiveSubRange);
 	Dimension getNormalizedDimension();

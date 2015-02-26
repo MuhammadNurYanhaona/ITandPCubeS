@@ -370,10 +370,10 @@ void ThreadState::initiateLogFile(const char *fileNamePrefix) {
 }
 
 void ThreadState::logExecution(const char *stageName, int spaceId) {
-	/*------------------------------------------- Turned Off
+	///*------------------------------------------- Turned Off
 	for (int i = 0; i <= spaceId; i++) threadLog << '\t';
 	threadLog << "Executed: " << stageName << std::endl;
-	------------------------------------------------------*/
+	//------------------------------------------------------*/
 }
 
 void ThreadState::logThreadAffinity() {

@@ -64,6 +64,16 @@ void generateLPSConstants(const char *outputFile, MappingNode *mappingRoot);
 /* function definition to generate the thread counts for all PPSes */
 void generatePPSCountConstants(const char *outputFile, List<PPS_Definition*> *pcubesConfig); 
 
+/* 
+   We need to know what processor Id of the target hardware correspond to what actual physical
+   unit in the hardware. Otherwise, there may be a mismatch in the expected behavior of the
+   code from its actual performance as processor numbering does not necessarily happen in an
+   increasing order. This functions parse the processor description file, created by inpecting
+   the /proc/cpuinfo file, and generate an array that sort processor Ids so that we can get
+   the physical unit intended for a virtual processor id.
+*/
+void generateProcessorOrderArray(const char *outputFile, const char *processorFile);
+
 /* function definition to generate get-partition-count() routine for any given space */
 List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerFile, 
 		std::ofstream &programFile, 

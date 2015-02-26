@@ -2,7 +2,11 @@ Note that to generate executables from IT source codes you have to take the foll
 
 1. First, write a valid IT task or program, of course.
 2. Second, get or write a PCubeS description of the machine where you want to run your code.
-3. Third, write a mapping description file depicting how LPSes (logical processing spaces) 
+3. Third, generates a processor description file for you target machine by parsing the content
+   of /proc/cpuinfo using the following command
+	cat $CPU-Info-File | grep -e processor -e "physical id" -e "core id" | paste - - -	
+   and save the output on a file, say "processor_desc"
+4. Fourth, write a mapping description file depicting how LPSes (logical processing spaces) 
    of IT source are mapped to PPSes (physical processing spaces) of the target machine.
 
 Examples of all these are available in MultiCoreBackEnd/samples directory.
@@ -17,7 +21,7 @@ following steps.
 2. After that, you will have the compiler 'icc' on the backend directory. Then compile your
    own source code by using that compiler as follows
    
-   ./icc $source_code $pcubes_file $mapping_file
+   ./icc $source_code $pcubes_file $processor_desc $mapping_file
 
    You will have target code generated in the build directory of your back-end compiler. If 
    the compilation fails then probably you do not have a build directory; thereby create it
