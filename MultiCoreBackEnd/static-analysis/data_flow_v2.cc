@@ -480,10 +480,12 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 		stream << nextIndent.str() << syncList->Nth(i)->getDependencyArc()->getArcName();
 		stream << " += stage" << index << "Executed;\n";
 	}
-	
+
+	/*----------------------------------------------- Turned off	
 	// write a log entry for the stage executed
 	stream << nextIndent.str() << "threadState->logExecution(\"";
-	stream << name << "\", Space_" << space->getName() << ");\n"; 	
+	stream << name << "\", Space_" << space->getName() << ");\n";
+	----------------------------------------------------------*/ 	
 	
 	// close the if condition if applicable
 	if (!isGroupEntry()) {
