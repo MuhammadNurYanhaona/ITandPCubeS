@@ -48,8 +48,7 @@ Task "LU Factorization":
 			} for j in l and j > k
 		}
 		"Update Upper" (Space B) {
-			do { 
-				u[i][j] = u[i][j] - l_row[j] * u[i][k] 
+			do {	u[i][j] = u[i][j] - l_row[j] * u[i][k] 
 			} for i, j in u and i >= k and j > k
 		}
 		Repeat: from "Select Pivot" for k in a.dimension1.range

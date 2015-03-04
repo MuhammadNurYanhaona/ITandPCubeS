@@ -312,11 +312,12 @@ const char *ArrayDataStructure::getReverseXformExpr(int dimensionNo, const char 
 }
 
 const char *ArrayDataStructure::getImpreciseBoundOnXformedIndex(int dimensionNo, 
-		const char *indexName, bool lowerBound) {
+		const char *indexName, bool lowerBound, int indent) {
 	PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
 	if (partConfig == NULL) return NULL;
 	bool copiedInLps = usageStat->isAllocated();
-	return partConfig->getImpreciseBoundOnXformedIndex(dimensionNo, indexName, lowerBound, copiedInLps);
+	return partConfig->getImpreciseBoundOnXformedIndex(dimensionNo, 
+			indexName, lowerBound, copiedInLps, indent);
 }
 
 //----------------------------------------------------- Token ---------------------------------------------------/

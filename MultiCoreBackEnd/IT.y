@@ -346,7 +346,7 @@ parallel_loop	: Do '{' stmt_block '}' For index_ranges	{ $$ = new PLoopStmt($6, 
 		| Do '{' stmt_block '}' While expr		{ $$ = new WhileStmt($6, new StmtBlock($3), @1); };
 index_ranges	: index_range					{ ($$ = new List<IndexRangeCondition*>)->Append($1); }	
 		| index_ranges ';' index_range			{ ($$ = $1)->Append($3); };
-index_range	: names In Variable_Name restrictions		{ $$ = new IndexRangeCondition($1, new Identifier(@3, $3), 0, $4, Join(@1, @4)); }
+index_range	: names In Variable_Name restrictions		{ $$ = new IndexRangeCondition($1, new Identifier(@3, $3), -1, $4, Join(@1, @4)); }
 		| names In Variable_Name '.' 
 		  Dimension_No restrictions		        { $$ = new IndexRangeCondition($1, new Identifier(@3, $3), $5, $6, Join(@1, @6)); };
 restrictions	:						{ $$ = NULL; }	 

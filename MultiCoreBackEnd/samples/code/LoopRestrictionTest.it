@@ -13,7 +13,7 @@ Task "Loop Restriction Test":
 			do { matrix[i][j] = 1
 			} for i, j in matrix and i < max_row and min_col <= j
 		}
-	Partition (k, l, m, n):
+	Partition(k, l, m, n):
 		Space A <2D> {
 			matrix: block_stride(k, l)
 		}

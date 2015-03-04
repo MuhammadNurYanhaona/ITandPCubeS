@@ -443,9 +443,9 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const cha
 		}
 	}
 
+	// Invoke the task initializer function if it is invocable or write a comment directing code modifications
 	stream << std::endl << indent << "// invoking the initializer function\n";
 	stream << indent << "std::cout << \"invoking task initializer function\\n\"" << stmtSeparator;
-	// Invoke the initializer function if it is invocable or write a comment directing code modifications
 	if (!initFunctionInvocable) {	
 		stream << indent << "//TODO invoke the initializeTask function after making required changes\n";
 		stream << indent << "//";			
@@ -458,6 +458,21 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const cha
 		}
 	}
 	stream << ")" << stmtSeparator;
+
+	// Update the length property of all dimensions of all arrays lest any has contents been modified within 
+	// the initialize function 
+	PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
+        Space *rootLps = lpsHierarchy->getRootSpace();
+	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
+        for (int i = 0; i < localArrays->NumElements(); i++) {
+                ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(localArrays->Nth(i));
+                int dimensions = array->getDimensionality();
+                for (int d = 0; d < dimensions; d++) {
+			stream << indent;
+                	stream << "metadata->" << array->getName() << "Dims[" << d << "].setLength()";
+                	stream << stmtSeparator;
+		}
+        }
 }
 
 void TaskGenerator::initiateThreadStates(std::ofstream &stream) {

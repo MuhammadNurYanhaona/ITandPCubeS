@@ -1,0 +1,7 @@
+"Reorder Inclusion Check" {
+	// syntax LPS ':' PPS
+	Space A: 3	// CPU
+	Space B: 2	// Core
+	Space C: 1	// Hyperthread
+}
+

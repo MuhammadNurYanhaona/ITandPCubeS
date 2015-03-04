@@ -38,7 +38,7 @@ YACC = bison
 # We want debugging and most warnings, but lex/yacc generate some
 # static symbols we don't use, so turn off unused warnings to avoid clutter
 # STL has some signed/unsigned comparisons we want to suppress
-CFLAGS = -g -pg -Wall -Wno-unused -Wno-sign-compare -O2
+CFLAGS = -g -Wall -Wno-unused -Wno-sign-compare -O2
 
 # We need flag to enable the POSIX thread library during compiling generated code
 RFLAG = -pthread
@@ -104,6 +104,6 @@ clean:
 
 # make build will compile and generate executable for any IT program compiled by the IT compiler 
 build: $(BUILD_OBJS)
-	$(LD) -pg -o ./bin/it-program.o $(BUILD_OBJS) $(LIBS) $(BUILD_LIBS)
+	$(LD) -o ./bin/it-program.o $(BUILD_OBJS) $(LIBS) $(BUILD_LIBS)
 	
 

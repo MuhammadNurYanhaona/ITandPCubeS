@@ -223,7 +223,7 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *
 		stream << ')';
 		std::ostringstream xform;
                 for (int i = dimensionCount - 1; i > dimension; i--) {
-                        stream << " * " << array << "StoreDims[" << i << "].getLength()";
+                        stream << " * " << array << "StoreDims[" << i << "].length";
                 }
 	}
 }

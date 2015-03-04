@@ -123,7 +123,7 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 			const char *rangeCond = rangeExpr->getRangeExpr(space);
 			std::ostringstream restrictStream;
 			if (applicableRestrictions != NULL) {
-					LogicalExpr::getIndexRestrictExpr(applicableRestrictions, 
+				applicableRestrictions = LogicalExpr::getIndexRestrictExpr(applicableRestrictions, 
 						restrictStream, index, rangeCond, newIndent, space,
 						array->isDimensionReordered(dimensionNo + 1, rootSpace),
 						arrayName, dimensionNo + 1);
@@ -379,7 +379,7 @@ IndexRangeCondition::IndexRangeCondition(List<Identifier*> *i, Identifier *c,
 	if (restrictions != NULL) {
 		restrictions->SetParent(this);
 	}
-	this->dimensionNo = dim;
+	this->dimensionNo = dim - 1;
 }
 
 void IndexRangeCondition::PrintChildren(int indentLevel) {
@@ -457,7 +457,7 @@ void IndexRangeCondition::putIndexesInIndexScope() {
 		const char *arrayName = collection->getName();
 		indexScope->initiateAssociationList(indexName);
 		indexScope->setPreferredArrayForIndex(indexName, arrayName);
-		if (dimensionNo > 0) {
+		if (dimensionNo >= 0) {
 			List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(indexName);
 			list->Append(new IndexArrayAssociation(indexName, arrayName, dimensionNo));
 		}

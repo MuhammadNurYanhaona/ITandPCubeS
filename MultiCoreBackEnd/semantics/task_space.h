@@ -120,7 +120,8 @@ class PartitionFunctionConfig {
 	// imprecise transformation to skips some of the strides of the current LPU during loop iterations. This 
 	// function, like its three predecessors, is only applicable for data reordering partitioning functions. 	
 	virtual const char *getImpreciseBoundOnXformedIndex(int dimensionNo, 
-			const char *origIndexName, bool lowerBound, bool copyMode) { return NULL; }
+			const char *origIndexName, 
+			bool lowerBound, bool copyMode, int indent) { return NULL; }
 };
 
 class DataStructure {
@@ -206,7 +207,8 @@ class ArrayDataStructure : public DataStructure {
 	const char *getIndexXfromExpr(int dimensionNo, const char *indexName);
 	const char *getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName);
 	const char *getReverseXformExpr(int dimensionNo, const char *xformIndex);
-	const char *getImpreciseBoundOnXformedIndex(int dimensionNo, const char *indexName, bool lowerBound);
+	const char *getImpreciseBoundOnXformedIndex(int dimensionNo, 
+			const char *indexName, bool lowerBound, int indent);
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions

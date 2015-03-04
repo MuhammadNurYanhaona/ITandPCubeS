@@ -197,6 +197,7 @@ class LogicalExpr : public Expr {
 	// for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	
 	// Local expressions sometimes are added to indexed based parallel loop statement blocks to further
 	// restrict the range of indexes been traversed by the for loop. Given that there might be multiple
 	// nested for loops in the target code correspond to a single loop in IT source, we need to know
@@ -205,6 +206,7 @@ class LogicalExpr : public Expr {
 	// erators and put different parts in different location. So the following method has been added to
 	// break a collective of AND statements into a list of such statements
 	List<LogicalExpr*> *getANDBreakDown(); 
+
 	// This function generates, as its name suggests, a starting or ending condition for an index from 
 	// logical expressions that are used as restricting conditions in parallel loops based on that index. 
 	// An example of such restriction can be "do { ... } for k in matrix AND k > expr." Here we will like
@@ -214,28 +216,41 @@ class LogicalExpr : public Expr {
 	// to restrict generated index loop this way due to the nature of those expressions, then it does 
 	// nothing.
 	// The last three parameters are for determining if the index under concern traverses a reordered
-	// array dimension, and if it does then transform the index start or end restriction that may be applied 
-	// to the added restrictions.    
-	static void getIndexRestrictExpr(List<LogicalExpr*> *exprList, std::ostringstream &stream, 
+	// array dimension, and if it does then transform the index start or end restriction that may be 
+	// applied to the added restrictions.
+	// The function returns a filtered list of index restriction expressions if some of the expressions in
+	// the original list can be successfully and precisely applied on the loop. Otherwise, it returns the
+	// original list      
+	static List<LogicalExpr*> *getIndexRestrictExpr(List<LogicalExpr*> *exprList, 
+			std::ostringstream &stream, 
 			const char *indexVar, const char *rangeExpr, 
 			int indentLevel, Space *space,
 			bool xformedArrayRange, const char *arrayName, int dimensionNo);
+	
 	// This is a supporting function for the function above to determine whether to consider of skip an
 	// expression. Instead of a boolean value, it returns an integer as we need to know on which side of
 	// the expression the index variable lies. So it returns -1 if the expression is a loop restrict
 	// condition and the loop index is on the right of the expression, 1 if the loop index is on the left,
 	// and 0 if the expression is not a loop restrict condition.
 	int isLoopRestrictExpr(const char *loopIndex);
+	
 	// This function transforms a variable holding the value of an index restricting expression based on
 	// the partitioning of the array dimension that the index is traversing -- when the loop corresponds to
-	// a reordered array dimension traversal, of course. Notice the last parameter of this function. This
-	// is used to determine what to set the value of the variable to if it falls outside the range of the
-	// dimension that falls within the LPU where the generated code will execute. This is needed as this 
-	// function is used in context where we do not know if the variable is within the boundary of the LPU.  
-	static void transformIndexRestriction(std::ostringstream &stream, 
+	// a reordered array dimension traversal, of course. Notice the second last parameter of this function. 
+	// This is used to determine what to set the value of the variable to if it falls outside the range of 
+	// the dimension that falls within the LPU where the generated code will execute. This is needed as this 
+	// function is used in context where we do not know if the variable is within the boundary of the LPU.
+	// The last parameter is used to determine if a lower bound or an upper bound should be attempted by 
+	// the transformation process when the index is not in within the boundary of the LPU and we are sured
+	// about its position relative to the LPU boundary. TODO probably we can exclude the second last parameter
+	// if we do some refactoring in the implementation. Varify the correctness of the new implementation if
+	// you attempt that.
+	// The function returns a boolean value indicating if it made a precise transformation of the given 
+	// restriction or not.   
+	static bool transformIndexRestriction(std::ostringstream &stream, 
 			const char *varName, const char *arrayName, int dimensionNo, 
 			int indentLevel, Space *space, 
-			bool normalizedToMinOfRange);
+			bool normalizedToMinOfRange, bool lowerBound);
 };
 
 class ReductionExpr : public Expr {
