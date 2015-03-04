@@ -7,31 +7,35 @@
 #include <stdlib.h>
 #include <string.h>
 #include <deque>
+#include <sys/time.h>
+#include <time.h>
 #include "utils.h"
 #include "structures.h"
 #include "fileUtility.h"
 
-int mainLUV() {
+int mainLUFC() {
 
-	// read all arrays from file
 	Dimension aDims[2];
-	float *a = readArrayFromFile <float> ("a", 2, aDims);
+	double *a = readArrayFromFile <double> ("a", 2, aDims);
 	Dimension uDims[2];
-	float *u = readArrayFromFile <float> ("u", 2, uDims);
 	Dimension lDims[2];
-	float *l = readArrayFromFile <float> ("l", 2, lDims);
 	Dimension pDims[1];
-	int *p = readArrayFromFile <int> ("p", 1, pDims);
+	pDims[0] = uDims[0] = lDims[0] = aDims[0];
+	uDims[1] = lDims[1] = aDims[1];
 
 	// declare new arrays for computation and initialize them
 	int uSize = uDims[0].length * uDims[1].length;
-	float *nU = new float[uSize];
+	double *nU = new double[uSize];
 	for (int i = 0; i < uSize; i++) nU[i] = 0;
 	int lSize = lDims[0].length * lDims[1].length;
-	float *nL = new float[lSize];
+	double *nL = new double[lSize];
 	for (int i = 0; i < lSize; i++) nL[i] = 0;
 	int *nP = new int[pDims[0].length];
 	for (int i = 0; i < pDims[0].length; i++) nP[i] = 0;
+
+	// starting execution timer clock
+	struct timeval start;
+	gettimeofday(&start, NULL);
 
 	//-------------------------------- execute LU factorization sequentially on new arrays
 	// prepare step
@@ -45,7 +49,7 @@ int mainLUV() {
 
 		// select pivot step
 		int cols = uDims[1].length;
-		float max = nU[k * cols + k];
+		double max = nU[k * cols + k];
 		int pivot = k;
 		for (int i = k; i < uDims[0].length; i++) {
 			if (nU[i * cols + k] > max) {
@@ -60,12 +64,12 @@ int mainLUV() {
 		// interchange rows step
 		if (k != pivot) {
 			for (int j = k; j < uDims[1].length; j++) {
-				float pivotEntry = nU[k * cols + j];
+				double pivotEntry = nU[k * cols + j];
 				nU[k * cols + j] = nU[pivot * cols + j];
 				nU[pivot * cols + j] = pivotEntry;
 			}
 			for (int j = 0; j < k; j++) {
-				float pivotEntry = nL[k * cols + j];
+				double pivotEntry = nL[k * cols + j];
 				nL[k * cols + j] = nL[pivot * cols + j];
 				nL[pivot * cols + j] = pivotEntry;
 			}
@@ -84,34 +88,14 @@ int mainLUV() {
 		}
 	}
 
-	//------------------------------------------------- finally, check if all arrays match
-	bool valid = true;
-	for (int i = 0; i < pDims[0].length; i++) {
-		if (nP[i] != p[i]) {
-			std::cout << "Computed P did not match at index [" << i << "]\n";
-			valid = false;
-		}
-	}
-	for (int i = 0; i < uSize; i++) {
-		if (abs(u[i] - nU[i]) > 0.1) {
-			int row = i / uDims[1].length;
-			int cols = i - row * uDims[1].length;
-			std::cout << "Computed U did not match at index [" << row << "][" << cols << "]\n";
-			valid = false;
-		}
-	}
-	for (int i = 0; i < lSize; i++) {
-		if (abs(l[i] - nL[i]) > 0.1) {
-			int row = i / lDims[1].length;
-			int cols = i - row * lDims[1].length;
-			std::cout << "Computed L did not match at index [" << row << "][" << cols << "]\n";
-			valid = false;
-		}
-	}
-	if (valid) std::cout << "validation successful\n";
-
-	return 0;
+	//-------------------------------- calculate running time
+	struct timeval end;
+	gettimeofday(&end, NULL);
+	double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)
+			- (start.tv_sec + start.tv_usec / 1000000.0));
+	std::cout << "Sequential Execution Time: " << runningTime << " Seconds" << std::endl;
 }
+
 
 
 

@@ -8,7 +8,7 @@ Task "LU Factorization":
 	Define:
 		// a is the input coefficient matrix; u and l are the upper and lower triangular matrixes 
 		// that will be generated as the result of LU decomposition
-		a, u, l: 2D Array of Real single-precision
+		a, u, l: 2D Array of Real double-precision
 		// P is a one dimentional array representing the permutation matrix for LU decomposition
 		// with partial pivoting
 		p: 1D Array of Integer
@@ -16,7 +16,7 @@ Task "LU Factorization":
 		pivot, k: Integer
 		// l_column is a shared data structure used to communicate the transformed column of l in 
 		// any iteration to all partition for their update of U
-		l_column: 1D Array of Real single-precision
+		l_column: 1D Array of Real double-precision
 	Environment:
 		a: link
 		u, l, p: create
@@ -33,10 +33,10 @@ Task "LU Factorization":
 		// determine the pivot index as the row index with maximum value in current k-th column
 		"Select Pivot" (Space B)
 		Activate if k in u.local.dimension2.range {
-			max = u[k][k]
+			maxEntry = u[k][k]
 			pivot = k
-			do {	if (u[i][k] > max) {
-					max = u[i][k]
+			do {	if (u[i][k] > maxEntry) {
+					maxEntry = u[i][k]
 					pivot = i		
 				}
 			} for i in u and i >= k

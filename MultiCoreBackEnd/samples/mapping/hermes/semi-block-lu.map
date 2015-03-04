@@ -1,0 +1,9 @@
+// mapping for LU Factorization task
+"LU Factorization" {
+	// syntax LPS ':' PPS
+	Space A: 5	// Socket
+	Space B: 2	// a core pair
+	Space C: 1	// a core
+	Space D: 1	// a core
+}
+

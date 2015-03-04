@@ -93,7 +93,7 @@ void LogicalExpr::resolveType(Scope *scope, bool ignoreFailure) {
 			}
 		}		
 	} else {
-		if (!rightType->isAssignableFrom(Type::boolType)) {
+		if (rightType != NULL && !rightType->isAssignableFrom(Type::boolType)) {
 			ReportError::IncompatibleTypes(right->GetLocation(), 
 					rightType, Type::boolType, ignoreFailure);
 		}
@@ -348,14 +348,14 @@ void LogicalExpr::getIndexRestrictExpr(List<LogicalExpr*> *exprList, std::ostrin
 		stream << indent.str();
 		stream << "if (" << rangeExpr << ".min > " << rangeExpr << ".max) {\n";
 		stream << indent.str() << '\t';
-		stream << "iterationStart = std::min(iterationStart, localIterationStart)" << stmtSeparator;
+		stream << "iterationStart = min(iterationStart, localIterationStart)" << stmtSeparator;
 		stream << indent.str() << '\t';
-		stream << "iterationBound = std::max(iterationBound, localIterationBound)" << stmtSeparator;
+		stream << "iterationBound = max(iterationBound, localIterationBound)" << stmtSeparator;
 		stream << indent.str() << "} else {\n";
 		stream << indent.str() << '\t';
-		stream << "iterationStart = std::max(iterationStart, localIterationStart)" << stmtSeparator;
+		stream << "iterationStart = max(iterationStart, localIterationStart)" << stmtSeparator;
 		stream << indent.str() << '\t';
-		stream << "iterationBound = std::min(iterationBound, localIterationBound)" << stmtSeparator;
+		stream << "iterationBound = min(iterationBound, localIterationBound)" << stmtSeparator;
 		stream << indent.str() << "}\n";
 		
 		// close the local scope 
