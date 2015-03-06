@@ -834,7 +834,11 @@ void CompositeStage::generateSignalCodeForGroupTransitions(std::ofstream &stream
 }
 
 void CompositeStage::setReactivatorFlagsForSyncReqs() {
+	
+	// set reactivator flags for all sync primitives operating on this composite stage level
 	FlowStage::setReactivatorFlagsForSyncReqs();
+
+	// then set reactivator flags for nested computations 
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->setReactivatorFlagsForSyncReqs(); 

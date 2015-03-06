@@ -177,6 +177,7 @@ class SyncStage : public FlowStage {
 		bool filterOutNonReads, bool filterOutNonWritten);
 	bool isLoaderSync() { return (mode == Load || mode == Load_And_Configure); }
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
+	
 	// For now usage statistics is not been gathered for sync stages 
 	void calculateLPSUsageStatistics() {}
 };

@@ -258,39 +258,60 @@ void FlowStage::setReactivatorFlagsForSyncReqs() {
 
 	// if the filtered list is not empty then there is a need for reactivation signaling
 	if (filteredList->NumElements() > 0) {
-		
-		DependencyArc *closestPreArc = NULL;
-		DependencyArc *furthestSuccArc = NULL;	
-		
+
+		// reactivation signals should be received from PPUs of all LPSes that have computations dependent
+    		// on changes made by the current stage under concern. So we need to partition the list into 
+		// smaller lists for individual LPSes
+		Hashtable<List<SyncRequirement*>*> *syncMap = new Hashtable<List<SyncRequirement*>*>;
 		for (int i = 0; i < filteredList->NumElements(); i++) {
 			SyncRequirement *sync = filteredList->Nth(i);
-			DependencyArc *arc = sync->getDependencyArc();
-			
-			FlowStage *syncStage = arc->getSignalSink();
-			int syncIndex = syncStage->getIndex();
-			if (syncIndex < this->index 
-					&& (closestPreArc == NULL 
-					|| syncIndex > closestPreArc->getSignalSink()->getIndex())) {
-				closestPreArc = arc;
-			} else if (syncIndex >= this->index 
-					&& (furthestSuccArc == NULL
-					|| syncIndex > furthestSuccArc->getSignalSink()->getIndex())) {
-				furthestSuccArc = arc;
+			Space *dependentLps = sync->getDependentLps();
+			List<SyncRequirement*> *lpsSyncList = syncMap->Lookup(dependentLps->getName());
+			if (lpsSyncList == NULL) {
+				lpsSyncList = new List<SyncRequirement*>;
 			}
-		}
+			lpsSyncList->Append(sync);
+			syncMap->Enter(dependentLps->getName(), lpsSyncList, true);	
+		}  
+		
+		// iterate over the sync list correspond to each LPS and select a reactivating sync for that LPS 
+		Iterator<List<SyncRequirement*>*> iterator = syncMap->GetIterator();
+		List<SyncRequirement*> *lpsSyncList;
+		while ((lpsSyncList = iterator.GetNextValue()) != NULL) {		
 
-		// The reactivator should be the last stage that will read change made by this stage before
-		// this stage can execute again. That will be the closest predecessor, if exists, or the 
-		// furthest successor
-		if (closestPreArc != NULL) {
-			closestPreArc->setReactivator(true);
-		} else if (furthestSuccArc != NULL) {
-			furthestSuccArc->setReactivator(true);
-		} else {
-			std::cout << "This is strange!!! No reactivator is found for stage: ";
-			std::cout << this->getName() << std::endl;
-			std::exit(EXIT_FAILURE);
-		} 
+			DependencyArc *closestPreArc = NULL;
+			DependencyArc *furthestSuccArc = NULL;	
+		
+			for (int i = 0; i < lpsSyncList->NumElements(); i++) {
+				SyncRequirement *sync = lpsSyncList->Nth(i);
+				DependencyArc *arc = sync->getDependencyArc();
+				
+				FlowStage *syncStage = arc->getSignalSink();
+				int syncIndex = syncStage->getIndex();
+				if (syncIndex < this->index 
+						&& (closestPreArc == NULL 
+						|| syncIndex > closestPreArc->getSignalSink()->getIndex())) {
+					closestPreArc = arc;
+				} else if (syncIndex >= this->index 
+						&& (furthestSuccArc == NULL
+						|| syncIndex > furthestSuccArc->getSignalSink()->getIndex())) {
+					furthestSuccArc = arc;
+				}
+			}
+
+			// The reactivator should be the last stage that will read change made by this stage 
+			// before this stage can execute again. That will be the closest predecessor, if exists, 
+			// or the furthest successor
+			if (closestPreArc != NULL) {
+				closestPreArc->setReactivator(true);
+			} else if (furthestSuccArc != NULL) {
+				furthestSuccArc->setReactivator(true);
+			} else {
+				std::cout << "This is strange!!! No reactivator is found for stage: ";
+				std::cout << this->getName() << std::endl;
+				std::exit(EXIT_FAILURE);
+			} 
+		}
 	}
 }
 
