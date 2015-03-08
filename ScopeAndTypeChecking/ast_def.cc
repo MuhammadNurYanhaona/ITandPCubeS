@@ -7,6 +7,7 @@
 #include "scope.h"
 #include "symbol.h"
 #include "errors.h"
+#include <iostream>
 
 //----------------------------------------- Variable Definition ------------------------------------------/
 
@@ -202,6 +203,8 @@ void CoordinatorDef::validateScope(Scope *parentScope) {
 		Stmt *stmt = code->Nth(j);
 		stmt->checkSemantics(executionScope, false);
 	}
+
+	executionScope->describe(0);	
 }
 
 //----------------------------------------- Function Definition ------------------------------------------/

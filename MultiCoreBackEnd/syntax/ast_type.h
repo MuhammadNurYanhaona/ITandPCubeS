@@ -114,6 +114,7 @@ class MapType : public Type {
   public:
         MapType(yyltype loc);
     	const char *GetPrintNameForNode() { return "Associated List (Map)"; }
+	const char *getName() { return "Map"; }
     	void PrintChildren(int indentLevel);
         bool hasElement(const char *elementName);
         Type *getElementType(const char *elementName);

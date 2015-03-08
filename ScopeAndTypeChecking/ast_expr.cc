@@ -7,6 +7,7 @@
 #include "string.h"
 #include "symbol.h"
 #include "errors.h"
+#include <iostream>
 
 //----------------------------------------------------- Expression ----------------------------------------------------/
 
@@ -901,8 +902,8 @@ void OptionalInvocationParams::PrintChildren(int indentLevel) {
 }
 
 void OptionalInvocationParams::validateTypes(Scope *scope, TaskDef *taskDef, bool ignoreFailure) {
-	
-	if (section->getName() == InitializeSection) {
+
+	if (strcmp(section->getName(), InitializeSection) == 0) {
 		List<Type*> *initArgTypes = taskDef->getInitArgTypes();
 		if (initArgTypes->NumElements() != arguments->NumElements()) {
 			ReportError::TooFewOrTooManyParameters(section, arguments->NumElements(), 
@@ -920,7 +921,7 @@ void OptionalInvocationParams::validateTypes(Scope *scope, TaskDef *taskDef, boo
 				}
 			}
 		}		
-	} else if (section->getName() == PartitionSection) {
+	} else if (strcmp(section->getName(), PartitionSection) == 0) {
 		int argsCount = taskDef->getPartitionArgsCount();
 		if (argsCount != arguments->NumElements()) {
 			ReportError::TooFewOrTooManyParameters(section, arguments->NumElements(), 
