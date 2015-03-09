@@ -475,6 +475,7 @@ class ArrayAccess : public Expr {
 	ArrayAccess(Expr *base, Expr *index, yyltype loc);		
 	const char *GetPrintNameForNode() { return "ArrayAccess"; }
     	void PrintChildren(int indentLevel);
+	Expr *getBase() { return base; }
 
 	// for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);

@@ -91,6 +91,15 @@ int PartDimension::safeNormalizeIndex(int index, bool matchToMin) {
 	return (matchToMin) ? 0 : length - 1;	
 }
 
+PartDimension PartDimension::getSubrange(int begin, int end) {
+	PartDimension subDimension = PartDimension();
+	subDimension.storage = this->storage;
+	subDimension.partition.range.min = begin;
+	subDimension.partition.range.max = end;
+	subDimension.partition.setLength();
+	return subDimension;
+}
+
 //--------------------------------------------- PPU ID --------------------------------------------------/
 
 void PPU_Ids::print(std::ofstream &stream) {

@@ -79,7 +79,11 @@ class PartDimension {
 					// transformation is made, we need to ensure that invalid use of the normalized
 					// index has not been made. To safeguard against invalid index transformation
 					// we should use this function during normalization and specified what value
-					// to choose among the min and max as the normalized safety value.  
+					// to choose among the min and max as the normalized safety value.
+
+	PartDimension getSubrange(int begin, int end); // This function generate a new part-dimension object that 
+					// represent a sub-range of the current object. The storage dimension is copied
+					// as it is and the new partition dimension is determined from the arguments.   
 					
 	void print(std::ofstream &stream, int indentLevel);
 };
