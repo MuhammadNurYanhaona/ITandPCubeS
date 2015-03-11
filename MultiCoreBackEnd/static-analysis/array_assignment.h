@@ -27,17 +27,13 @@ class ArrayName {
 	const char *name;
 	ArrayType *type;
   public:
-	ArrayName() {
-		this->partOfEnv = false;
-		this->envObjName = NULL;
-		this->name = NULL;
-		this->type = NULL;
-	}
+	ArrayName();
 	void setPartOfEnv(bool partOfEnv) { this->partOfEnv = partOfEnv; }
 	void setEnvObjName(const char *envObjName) { this->envObjName = envObjName; }
 	void setName(const char *name) { this->name = name; }
 	void setType(ArrayType *type) { this->type = type; }
 	ArrayType *getType() { return type; }
+	void describe(int indent);
 };
 
 // a function to determine if an assignment expression involves assigning of an array to another so that we can 
@@ -65,6 +61,7 @@ class DimensionAccess {
 	int getDimensionNo() { return dimensionNo; }
 	Expr *getAccessExpr() { return accessExpr; }
 	bool isSingleEntry() { return accessType == INDEX; }
+	void describe(int indent);
 };
 
 // Given an expression accessing an array, this function generates information regarding how various dimensions
@@ -101,6 +98,7 @@ class DimensionAnnotation {
 	List<DimensionAccess*> *getAssigneeInfo() { return assigneeInfo; }
 	void setAssignerInfo(List<DimensionAccess*> *assignerInfo) { this->assignerInfo = assignerInfo; }
 	List<DimensionAccess*> *getAssignerInfo() { return assignerInfo; }	
+	void describe(int indent);
 };
 
 // This class contains all information regarding appropriately translating a single array assignment expression
@@ -118,6 +116,7 @@ class AssignmentDirective {
   public:
 	AssignmentDirective(AssignmentExpr *expr);
 	void generateAnnotations();
+	void describe(int indent);
 };
 
 // An assignment statement may be a composite of the form 'a = b = c' so we need a list of directives to hold 
@@ -130,6 +129,7 @@ class AssignmentDirectiveList {
 	List<AssignmentDirective*> *directives;
   public:
 	AssignmentDirectiveList(AssignmentExpr *expr);
+	void describe(int indent);
 };
 
 #endif

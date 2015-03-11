@@ -6,6 +6,9 @@
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 
+#include <iostream>
+#include <sstream>
+
 bool isArrayAssignment(AssignmentExpr *expr) {
 	Type *type = expr->getType();
 	if (type == NULL) return false;
@@ -50,6 +53,11 @@ AssignmentMode determineAssignmentMode(AssignmentExpr *expr) {
 	Type *rightType = rightArray->getType();
 	Type *exprType = expr->getType();
 
+	// if the left side of the assignment is not referencing an stand-alone data structure then 
+	// there is no other option than copying content from right to left.
+	FieldAccess *leftField = dynamic_cast<FieldAccess*>(left);
+	if (leftField == NULL) return COPY; 
+
 	// We choose to do a reference assignment from left to right side for an assignment expression 
 	// only if the arrays on both sides have the same dimensionality and they are accessed in full
 	// as part of the assignment expression.  
@@ -91,6 +99,22 @@ List<DimensionAccess*> *generateDimensionAccessInfo(ArrayName *array, Expr *expr
 	return accessList;
 }
 
+//---------------------------------------------------------- Array Name ---------------------------------------------------------/
+
+ArrayName::ArrayName() {
+	this->partOfEnv = false;
+	this->envObjName = NULL;
+	this->name = NULL;
+	this->type = NULL;
+}
+
+void ArrayName::describe(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	if (partOfEnv) std::cout << envObjName << ".";
+	std::cout << name;
+	std::cout << ": " << type->getName() << std::endl;
+}
+
 //-------------------------------------------------------- Dimension Access -----------------------------------------------------/
 
 DimensionAccess::DimensionAccess(int dimensionNo) {
@@ -107,6 +131,29 @@ DimensionAccess::DimensionAccess(Expr *accessExpr, int dimensionNo) {
 		accessType = SUBRANGE;
 	} else accessType = WHOLE;
 	this->dimensionNo = dimensionNo;
+}
+
+void DimensionAccess::describe(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	if (accessType == INDEX) std::cout << "index-access";
+	else if (accessType == SUBRANGE) std::cout << "subrange-access";
+	else std::cout << "whole-dimension-access";
+	std::cout << ": Dimension #" << dimensionNo << std::endl;	
+}
+
+//------------------------------------------------------- Dimension Annotation --------------------------------------------------/
+
+void DimensionAnnotation::describe(int indent) {
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	std::cout << "Left trail:" << std::endl;
+	for (int i = 0; i < assigneeInfo->NumElements(); i++) {
+		assigneeInfo->Nth(i)->describe(indent + 1);
+	}	
+	for (int i = 0; i < indent; i++) std::cout << '\t';
+	std::cout << "Right trail:" << std::endl;
+	for (int i = 0; i < assignerInfo->NumElements(); i++) {
+		assignerInfo->Nth(i)->describe(indent + 1);
+	}
 }
 
 //------------------------------------------------------- Assignment Directive --------------------------------------------------/
@@ -171,6 +218,20 @@ void AssignmentDirective::generateAnnotations() {
 	}
 }
 
+void AssignmentDirective::describe(int indent) {
+	std::ostringstream indStr;
+	for (int i = 0; i < indent; i++) indStr << '\t';
+	std::cout << indStr.str();
+	if (mode == COPY) std::cout << "Copy transfer:\n";
+	else std::cout << "Reference assignment:\n";
+	assigneeArray->describe(indent + 1);
+	assignerArray->describe(indent + 1);
+	std::cout << indStr.str() << "\tTransfer detail:\n";
+	for (int i = 0; i < annotations->NumElements(); i++) {
+		annotations->Nth(i)->describe(indent + 2);
+	} 
+}
+
 //---------------------------------------------------- Assignment Directive List ------------------------------------------------/
 
 AssignmentDirectiveList::AssignmentDirectiveList(AssignmentExpr *expr) {
@@ -199,5 +260,11 @@ AssignmentDirectiveList::AssignmentDirectiveList(AssignmentExpr *expr) {
 		AssignmentDirective *directive = new AssignmentDirective(assignment);
 		directive->generateAnnotations();
 		this->directives->Append(directive);
+	}
+}
+
+void AssignmentDirectiveList::describe(int indent) {
+	for (int i = 0; i < directives->NumElements(); i++) {
+		directives->Nth(i)->describe(indent);	
 	}
 }
