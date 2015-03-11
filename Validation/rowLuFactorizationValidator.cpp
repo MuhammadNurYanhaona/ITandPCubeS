@@ -11,7 +11,7 @@
 #include "structures.h"
 #include "fileUtility.h"
 
-int main() {
+int mainLUFRV() {
 
 	// read all arrays from file
 	Dimension aDims[2];

@@ -1,0 +1,36 @@
+Task "Matrix Vector Multiply":
+	Define:
+		m: 2D Array of Real double-precision
+		u, v: 1D Array of Real double-precision
+		v_part: 2D Array of Real double-precision
+	Environment:
+		m, u: link
+		v: create
+	Initialize (parts):
+		v.dimension1 = m.dimension1
+		v_part.dimension1 = v.dimension1
+		v_part.dimension2.range.min = 0
+		v_part.dimension2.range.max = parts - 1 
+	Compute:
+		"Multiply Parts" (Space B) {
+			part_id = v_part.local.dimension2.range.min
+			do {
+				do {
+					v_part[i][part_id] = v_part[i][part_id] + m[i][j] * u[j]
+				} for j in u
+			} for i in v_part
+		}
+		"Sum Partial Results" (Space A) {
+			do {
+				v[i] = v[i] + v_part[i][j]
+			} for i, j in v_part
+		}
+	Partition (p, q):
+		Space A <1D> {
+			m<dim1>, v_part<dim1>, v: block_size(p)
+			u: replicated
+		}
+		Space B <1D> {
+			v_part<dim2>: block_size(1)
+			m<dim2>, u: block_stride(q) 
+		}

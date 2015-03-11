@@ -11,7 +11,7 @@
 #include "structures.h"
 #include "fileUtility.h"
 
-int mainMMMS() {
+int main() {
 
 	// load original inputs and output from generated files
 	Dimension aDims[2];
