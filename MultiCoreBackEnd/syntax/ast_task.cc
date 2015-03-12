@@ -183,7 +183,7 @@ void TaskDef::validateComputeSection(Scope *parentScope) {
 void TaskDef::analyseCode() {
 	Scope *scope = symbol->getNestedScope();
 	// determine what task global variable is been used where to prepare for dependency analysis
-	initialize->performVariableAccessAnalysis(scope);
+	if (initialize != NULL) initialize->performVariableAccessAnalysis(scope);
 	compute->performVariableAccessAnalysis(scope);
 	// convert the body of the compute section into a flow definition for execution control and 
 	// data movements	

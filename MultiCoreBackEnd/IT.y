@@ -43,6 +43,8 @@ void yyerror(const char *msg); // standard error-handling routine
 	ArrayType			*aType;
 	ListType			*lType;
 	Expr				*expr;
+	InitializerArg			*objInitArg;
+	List<InitializerArg*>		*objInitArgList;
 	List<Expr*>			*exprList;
 	Stmt				*stmt;
 	List<Stmt*>			*stmtList;
@@ -138,6 +140,8 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <expr>		expr field constant array_index function_call task_invocation create_obj 
 %type <expr>		step_expr restrictions repeat_loop activation_command
 %type <exprList>	args
+%type <objInitArg>	obj_arg
+%type <objInitArgList>	obj_args	
 %type <type>		type scalar_type static_array static_type dynamic_type list dynamic_array
 %type <intList>		static_dims
 %type <id>		id section
@@ -381,7 +385,7 @@ expr		: expr '+' expr					{ $$ = new ArithmaticExpr($1, ADD, $3, @2); }
 		| expr O_GTE expr				{ $$ = new LogicalExpr($1, GTE, $3, @2); }
 		| expr O_LTE expr				{ $$ = new LogicalExpr($1, LTE, $3, @2); }
 		| expr '=' expr					{ $$ = new AssignmentExpr($1, $3, @2); }
-		| REDUCE '(' String ',' expr ')'		{ $$ = new ReductionExpr($3, $5, @1); };
+		| REDUCE '(' String ',' expr ')'		{ $$ = new ReductionExpr($3, $5, @1); }
 		| constant
 		| field
 		| function_call
@@ -424,8 +428,13 @@ id		: Variable_Name 				{ $$ = new Identifier(@1, $1); }
 /* ----------------------------------------- Coordinator Program Definition--------------------------------------------------- */
 coordinator	: Program '(' Variable_Name ')' ':' meta_code	{ $$ = new CoordinatorDef(new Identifier(@3, $3), $6, @1); };
 meta_code	: {BeginProgram();} stmt_block 			{ EndProgram(); $$ = $2; };
-create_obj	: New dynamic_type				{ $$ = new ObjectCreate($2, new List<Expr*>, @1); }
-		| New static_type '(' args ')'			{ $$ = new ObjectCreate($2, $4, @1); };
+create_obj	: New dynamic_type				{ $$ = new ObjectCreate($2, new List<InitializerArg*>, @1); }
+		| New static_type '(' obj_args ')'		{ $$ = new ObjectCreate($2, $4, @1); };
+obj_args	:						{ $$ = new List<InitializerArg*>; }
+		| obj_arg					{ ($$ = new List<InitializerArg*>)->Append($1); }
+		| obj_args ',' obj_arg				{ ($$ = $1)->Append($3); };
+obj_arg		: Variable_Name ':' String			{ $$ = new InitializerArg($1, new StringConstant(@3, $3), Join(@1, @3)); }
+		| Variable_Name ':' expr			{ $$ = new InitializerArg($1, $3, Join(@1, @3)); };
 task_invocation	: Execute '(' String ';' id optional_secs ')'	{ $$ = new TaskInvocation(new Identifier(@3, $3), $5, $6, @1); };
 optional_secs	:						{ ($$ = new List<OptionalInvocationParams*>); } 
 		| ';' optional_sec				{ ($$ = new List<OptionalInvocationParams*>)->Append($2); }

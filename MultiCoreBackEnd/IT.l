@@ -167,7 +167,7 @@ FALSE			yylval.booleanConstant = false; return Boolean;
 				int actualLength = strlen(yytext) - 2;
 				yylval.stringConstant = (char *) malloc(actualLength + 1);
                                 strncpy(yylval.stringConstant, yytext + 1, actualLength);
-				yylval.stringConstant[actualLength] = '\0';		
+				yylval.stringConstant[actualLength] = '\0';	
 				return String;
 			} 
 [0-9]+\.[0-9]+  	{

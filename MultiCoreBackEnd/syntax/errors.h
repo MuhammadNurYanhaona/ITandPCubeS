@@ -42,6 +42,7 @@ class ReportError
 	static void UndefinedTask(yyltype *loc, const char *name, bool suppressFailure);
 	static void NonArrayInIndexedIteration(Identifier *id, Type *type, bool suppressFailure);	
 	static void UnknownIndexToArrayAssociation(Identifier *index, Identifier *array, bool suppressFailure);	
+	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	
 	
 	// Errors with computation stage to space mappings
 	static void SpaceNotFound(yyltype *loc, char spaceName); 

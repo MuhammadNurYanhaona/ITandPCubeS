@@ -544,12 +544,25 @@ class TaskInvocation : public Expr {
 	void resolveType(Scope *scope, bool ignoreFailure);
 };
 
+class InitializerArg : public Node {
+  protected:
+	const char *argName;
+	Expr *argValue;
+  public:
+	InitializerArg(char *argName, Expr *argValue, yyltype loc);	
+	const char *GetPrintNameForNode() { return "InitializerArg"; }
+    	void PrintChildren(int indentLevel);	    	
+	void validateType(Scope *scope, TupleDef *objectDef, bool ignoreFailure);
+	const char *getName() { return argName; }
+	Expr *getValue() { return argValue; }
+};
+
 class ObjectCreate : public Expr {
   protected:
 	Type *objectType;
-	List<Expr*> *initArgs;
+	List<InitializerArg*> *initArgs;
   public:
-	ObjectCreate(Type *objectType, List<Expr*> *initArgs, yyltype loc);		
+	ObjectCreate(Type *objectType, List<InitializerArg*> *initArgs, yyltype loc);		
 	const char *GetPrintNameForNode() { return "ObjectCreate"; }
     	void PrintChildren(int indentLevel);	    	
 	void resolveType(Scope *scope, bool ignoreFailure);

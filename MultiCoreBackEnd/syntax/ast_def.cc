@@ -225,6 +225,14 @@ void TupleDef::validateScope(Scope *parentScope) {
 	}	
 }
 
+VariableDef *TupleDef::getComponent(const char *name) {
+	for (int i = 0; i < components->NumElements(); i++) {
+		VariableDef *element = components->Nth(i);
+		if (strcmp(element->getId()->getName(), name) == 0) return element;
+	}
+	return NULL;	
+}
+
 //---------------------------------------- Coordinator/Main Definition --------------------------------------/
 
 CoordinatorDef::CoordinatorDef(Identifier *a, List<Stmt*> *c, yyltype loc) : Definition(loc) {

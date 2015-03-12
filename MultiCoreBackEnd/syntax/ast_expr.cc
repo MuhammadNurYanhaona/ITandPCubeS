@@ -862,7 +862,33 @@ void TaskInvocation::resolveType(Scope *scope, bool ignoreFailure) {
 
 //------------------------------------------------- Object Creation ---------------------------------------------------/
 
-ObjectCreate::ObjectCreate(Type *o, List<Expr*> *i, yyltype loc) : Expr(loc) {
+InitializerArg::InitializerArg(char *argName, Expr *argValue, yyltype loc) : Node(loc) {
+	Assert(argName != NULL && argValue != NULL);
+	this->argName = strdup(argName);
+	this->argValue = argValue;
+}
+
+void InitializerArg::PrintChildren(int indentLevel) {
+	argValue->Print(indentLevel, argName);
+}
+
+void InitializerArg::validateType(Scope *scope, TupleDef *objectDef, bool ignoreFailure) {
+	VariableDef *propertyDef = objectDef->getComponent(argName);
+	if (propertyDef == NULL) {
+		ReportError::InvalidInitArg(GetLocation(), objectDef->getId()->getName(), argName, ignoreFailure);
+	} else {
+		Type *argType = propertyDef->getType();
+		argValue->resolveType(scope, ignoreFailure);
+		if (argValue->getType() == NULL) {
+			argValue->inferType(scope, argType);
+		} else if (!argType->isAssignableFrom(argValue->getType())) {
+			ReportError::IncompatibleTypes(argValue->GetLocation(),
+					argValue->getType(), argType, ignoreFailure);
+		}
+	}	
+}
+
+ObjectCreate::ObjectCreate(Type *o, List<InitializerArg*> *i, yyltype loc) : Expr(loc) {
 	Assert(o != NULL && i != NULL);
 	objectType = o;
 	objectType->SetParent(this);
@@ -888,9 +914,10 @@ void ObjectCreate::resolveType(Scope *scope, bool ignoreFailure) {
 			ReportError::TaskNameRequiredInEnvironmentCreate(objectType->GetLocation(), ignoreFailure);
 			this->type = Type::errorType;
 		} else {
-			StringConstant *str = dynamic_cast<StringConstant*>(initArgs->Nth(0));
+			StringConstant *str = dynamic_cast<StringConstant*>(initArgs->Nth(0)->getValue());
 			if (str == NULL) {
-				Expr *arg = initArgs->Nth(0);
+				Expr *arg = initArgs->Nth(0)->getValue();
+				arg->resolveType(scope, ignoreFailure);
 				Type *argType = arg->getType();
 				if (argType != NULL) {
 					ReportError::IncompatibleTypes(arg->GetLocation(), argType, 
@@ -949,16 +976,10 @@ void ObjectCreate::resolveType(Scope *scope, bool ignoreFailure) {
 				ReportError::TooManyParametersInNew(GetLocation(), typeName, initArgs->NumElements(), 
 						elementTypes->NumElements(), ignoreFailure);
 			} else {
+				TupleDef *tupleDef = tuple->getTupleDef();
 				for (int i = 0; i < initArgs->NumElements(); i++) {
-					Expr *currentArg = initArgs->Nth(i);
-					Type *currentType = elementTypes->Nth(i);	
-					currentArg->resolveType(scope, ignoreFailure);
-					if (currentArg->getType() == NULL) {
-						currentArg->inferType(scope, currentType);
-					} else if (!currentType->isAssignableFrom(currentArg->getType())) {
-						ReportError::IncompatibleTypes(currentArg->GetLocation(), 
-								currentArg->getType(), currentType, ignoreFailure);
-					}
+					InitializerArg *currentArg = initArgs->Nth(i);
+					currentArg->validateType(scope, tupleDef, ignoreFailure);
 				}
 			}
 		}

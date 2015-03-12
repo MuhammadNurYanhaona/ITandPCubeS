@@ -193,6 +193,10 @@ void ReportError::UnknownIndexToArrayAssociation(Identifier *index, Identifier *
 			array->getName(), index->getName());
 }
 
+void ReportError::InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "Class '%s' has no property named '%s'", object, arg);
+}
+
 void ReportError::SpaceNotFound(yyltype *loc, char spaceName) {
 	Formatted(loc, "No space with name '%c' found in the Partition section", spaceName);
 } 

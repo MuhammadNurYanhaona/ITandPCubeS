@@ -73,6 +73,7 @@ class TupleDef : public Definition {
 	void attachScope(Scope *parentScope); 
 	void validateScope(Scope *parentScope);
 	List<VariableDef*> *getComponents() { return components; }
+	VariableDef *getComponent(const char *name);
 };
 
 class CoordinatorDef : public Definition {

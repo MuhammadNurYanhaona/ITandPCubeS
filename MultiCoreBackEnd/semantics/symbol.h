@@ -60,6 +60,7 @@ class TupleSymbol : public Symbol {
 	TupleSymbol(Identifier *id, TupleDef *def, List<Type*> *elementTypes);
 	List<Type*> *getElementTypes() { return elementTypes; }	
         void describe(int indent);
+	TupleDef *getTupleDef();
 };
 
 class VariableSymbol : public Symbol {

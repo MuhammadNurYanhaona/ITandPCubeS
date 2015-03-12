@@ -50,6 +50,8 @@ void TupleSymbol::describe(int indent) {
 	printf("Tuple %s:\n", name);
 }
 
+TupleDef *TupleSymbol::getTupleDef() { return (TupleDef*) node; }
+
 //------------------------------------- Function Symbol -------------------------------------/
 
 FunctionSymbol::FunctionSymbol(FunctionDef *def, TupleDef *returnType, List<Type*> *argumentTypes) 

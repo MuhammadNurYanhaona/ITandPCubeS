@@ -1,30 +1,29 @@
 Program (args): 
 	blockSize = args.block_size
-	initEnv = new TaskEnvironment("Initiate L & U")
+	initEnv = new TaskEnvironment(name: "Initiate LU")
 	initEnv.a = load_array(args.matrix_file)
-	execute("Initiate L & U"; initEnv; Partition: args.s)
-	luEnv = new TaskEnvironment("Transposed LU Factorization")
+	execute("Initiate LU"; initEnv; Partition: args.s)
+	luEnv = new TaskEnvironment(name: "Transposed LU Factorization")
 	luEnv.u = initEnv.u
 	luEnv.l = initEnv.l
 	rows = initEnv.a.dimension1.range
-	max1 = rows.end
-	max2 = initEnv.a.dimension2.range.end
+	max1 = rows.max
+	max2 = initEnv.a.dimension2.range.max
 
 	do in sequence {
 		lastRow = k + blockSize - 1
 		if (lastRow > max1) { lastRow = max1 }
-		range = new Range(k, lastRow)
+		range = new Range(min: k, max: lastRow)
 		execute("Transposed LU Factorization"; luEnv; Initialize: range; Partition: args.s)
 
-		mMultEnv = new TaskEnvironment("Subtract Matrix Multiply Result")
+		mMultEnv = new TaskEnvironment(name: "Subtract Matrix Multiply Result")
 		mMultEnv.a = luEnv.u[(lastRow + 1)...max1][k...lastRow]
 		mMultEnv.b = luEnv.l[k...lastRow][(lastRow + 1)...max2]
 		mMultEnv.c = luEnv.u[(lastRow + 1)...max1][(lastRow + 1)...max2]
-		execute("Subtract Matrix Multiply Result"; mMultEnv; 				\
-				Partition: args.k, args.l, args.q, args.m, args.n)
+		execute("Subtract Matrix Multiply Result"; mMultEnv; Partition: args.k, args.l, args.q)
 	} for k in rows step blockSize
 
-Task "Initiate L & U":
+Task "Initiate LU":
 	Define:
 		a, u, l: 2D Array of Real single-precision
 	Environment:
@@ -35,12 +34,12 @@ Task "Initiate L & U":
                 u.dimension2 = l.dimension2 = a.dimension1
 	Compute:
 		"Prepare" (Space A) {
-			do { u[j] = a[...][j] } for j in a
+			do { u[j][i] = a[i][j] } for i, j in a
 			do { l[i][i] = 1 } for i in l
 		}
 	Partition (s):
 		Space A <1D> {
-			a<dim2>, u<dim1>, l<dim1>: strided_block(s)
+			a<dim2>, u<dim1>, l<dim1>: block_stride(s)
 		}	
 
 Task "Transposed LU Factorization":
@@ -48,7 +47,7 @@ Task "Transposed LU Factorization":
 		u, l: 2D Array of Real single-precision
 		p: 1D Array of Integer
 		pivot, k: Integer
-		l_column: 1D Array of Real single-precision
+		l_row: 1D Array of Real single-precision
 		t: Epoch
 		k_range: Range
 	Environment:
@@ -56,83 +55,71 @@ Task "Transposed LU Factorization":
 		p: link-or-create
 	Initialize (k_range):
 		p.dimension = u.dimension1
-		l_column.dimension = l.dimension1
+		l_row.dimension = l.dimension2
 	Compute:
-		"Select Pivot" (Space A)
+		"Select Pivot" (Space B)
 		Activate if k in u.local.dimension1.range {
-			do {
-				pivot = reduce ("maxEntry", u[k][i]) 
-			} for i in u and i >= k
+			maxEntry = u[k][k]
+                        pivot = k
+                        do {    if (u[k][j] > maxEntry) {
+                                        maxEntry = u[k][j]
+                                        pivot = j               
+                                }
+                        } for j in u and j >= k
 		}
-		"Store Pivot" (Space C) {	
+		"Store Pivot" (Space A) {	
 			p[k] = pivot
 		}
 		"Interchange Rows" (Space B) {
 			if (k != pivot) {
-				do { 	u[j][k] at (t) = u[j][pivot] at (t-1)
-			     		u[j][pivot] at (t) = u[j][k] at (t-1)
-				} for j in u and j >= k
-				do { 	l[j][k] at (t) = l[j][pivot] at (t-1)
-			     		l[j][pivot] at (t) = l[j][k] at (t-1) 
-				} for j in l and j < k
-			}
+                                do {    pivot_entry = u[i][k]
+                                        u[i][k] = u[i][pivot]
+                                        u[i][pivot] = pivot_entry
+                                } for i in u and i >= k
+                                do {    pivot_entry = l[i][k]
+                                        l[i][k] = l[i][pivot]
+                                        l[i][pivot] = pivot_entry
+                                } for i in l and i < k
+                        }
 		}
-		"Update Lower" (Space A)
+		"Update Lower" (Space B)
 		Activate if k in l.local.dimension1.range {
-			do { l[k][i] = u[k][i] / u[k][k] 
-			} for i in l and i > k
-			l_column = l[k]
+			do {    l[k][j] = u[k][j] / u[k][k]
+                                l_row[j] = l[k][j]
+                        } for j in l and j > k
 		}
 		"Update Upper" (Space B) {
-			do { u[j][i] = u[j][i] - l_column[i] * u[j][k] 
-			} for i, j in u and i > k and i <= k_range.end and j >= k
+			do { u[j][i] = u[j][i] - l_row[i] * u[j][k] 
+			} for i, j in u and i > k and i <= k_range.max and j >= k
 		}
 		Repeat: from "Select Pivot" for k in k_range
 	Partition (s):
-		Space C <un-partitioned> { p }
-		Space B <1D> {
-			u<dim1>, l<dim1>: strided_block(s)
-			l_column: replicated
+		Space A <un-partitioned> { p }
+		Space B <1D> divides Space A partitions {
+			u<dim1>, l<dim1>: block_stride(s)
+			l_row: replicated
 		} 
-		Space A <1D> <dynamic> divides Space B partitions { 
-			u<dim1>, l<dim1>: block_size (1)
-			l_column: replicated
-		}
-
 
 Task "Subtract Matrix Multiply Result":
 	Define:
-		a, b, c, d: 2D Array of Real single-precision
+		a, b, c: 2D Array of Real single-precision
 	Environment:
 		a, b, c: link
-		d: create
-	Initialize:
-		d.dimension1 = a.dimension1
-		d.dimension2 = b.dimension2
 	Compute:
-		"Block multiply matrices" (Space C) { 
-			do { d[i][j] = reduce ("sum", a[i][k] * b[k][j])
-			} for i, j in d; k in a
-		}
-		Repeat: from "Block multiply matrices" foreach Space B sub-partition
-		"Subtract result" (Space A) {
-			do { c[i][j] = c[i][j] - d[i][j]
+		"Block multiply matrices" (Space A) { 
+			do {	total = 0.0 
+				do {	total = total + a[i][k] * b[k][j]
+				} for k in a
+				c[i][j] = c[i][j] - total
 			} for i, j in c
 		}
-	Partition (k, l, q, m, n):
+		Repeat: from "Block multiply matrices" foreach Space A sub-partition
+	Partition (k, l, q):
 		Space A <2D> {
-			c, d: block_size(k, l)
-		}
-		Space B <2D> divides Space A partitions {
-			d: replicated, replicated
+			c: block_size(k, l)
 			a: block_size(k), replicated
 			b: replicated, block_size(l)
 			Sub-partition <1D> <unordered> {
 				a<dim2>, b<dim1>: block_size(q)
 			}
-		}
-		Space C <2D> divides Space B sub-partitions {
-			d: block_size(m, n)	
-			a: block_size(m), replicated 
-			b: replicated, block_size(n)
 		}
