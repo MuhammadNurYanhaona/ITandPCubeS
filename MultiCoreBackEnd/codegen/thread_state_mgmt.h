@@ -25,6 +25,10 @@ void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mapp
 /* function definition for genering the routine for constructing the root LPU */
 void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
 
+/* function definition for genering the routine fo updating/setting root LPU property in the thread
+   state where the LPU has been already constructed */
+void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
+
 /* function definition for generating the routine for initializing all LPUs for different LPSes */
 void generateInitializeLpuSRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
 

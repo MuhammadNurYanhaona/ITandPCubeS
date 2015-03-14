@@ -39,6 +39,9 @@ namespace inprompt {
 	// read a boolean value from the console and return it
 	bool readBoolean(const char *varName);
 
+	// read a string from the console and return it
+	const char *readString(const char *varName);
+
 	// read dimension length information from the first line of an already openned file and construct
 	// default dimension ranges (increasing and starting from 0) using length information 
 	void readArrayDimensionInfoFromFile(std::ifstream &file, int dimensionCount, Dimension *dimensions);

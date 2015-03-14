@@ -81,11 +81,13 @@ class CoordinatorDef : public Definition {
 	Identifier *argument;
 	List<Stmt*> *code;
 	Scope *executionScope;
+	TupleDef *argumentTuple;
   public:
 	CoordinatorDef(Identifier *argument, List<Stmt*> *code, yyltype loc);
 	const char *GetPrintNameForNode() { return "Main"; } 
 	void PrintChildren(int indentLevel);	
 	void validateScope(Scope *parentScope);
+	TupleDef *getArgumentTuple() { return argumentTuple; }
 };
 
 class FunctionHeader : public Node {

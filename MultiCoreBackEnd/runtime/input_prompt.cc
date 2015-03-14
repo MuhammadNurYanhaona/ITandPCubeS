@@ -50,6 +50,14 @@ bool inprompt::readBoolean(const char *varName) {
 	return strcmp(string_utils::toLower(value.c_str()), "true") == 0;
 }
 
+const char *inprompt::readString(const char *varName) {
+	std::cout << "Enter the value for " << varName << std::endl;
+	std::string value;
+	std::getline(std::cin, value);
+	string_utils::trim(value);
+	return strdup(value.c_str());
+}
+
 void inprompt::readArrayDimensionInfoFromFile(std::ifstream &file, int dimensionCount, Dimension *dimensions) {
         std::string input;
         std::getline(file, input);

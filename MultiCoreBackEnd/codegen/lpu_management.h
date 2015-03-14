@@ -140,6 +140,7 @@ class ThreadState {
 		
 	virtual void setLpsParentIndexMap() = 0;
 	virtual void setRootLpu(Metadata *metadata) = 0;
+	virtual void setRootLpu(LPU *rootLpu) = 0;
 	virtual void initializeLPUs() = 0;
 	virtual int *computeLpuCounts(int lpsId) = 0;
 	virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;

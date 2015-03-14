@@ -730,7 +730,7 @@ Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *headerFileNa
                 MappingNode *mappingRoot,
                 List<Identifier*> *partitionArgs) {
 	
-	std::cout << "Generating founctions for determining array parts" << std::endl;
+	std::cout << "Generating functions for determining array parts" << std::endl;
 
 	// if the output files cannot be opened then return
 	std::ofstream programFile, headerFile;

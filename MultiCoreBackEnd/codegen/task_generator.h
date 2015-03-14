@@ -41,6 +41,7 @@ class TaskGenerator {
 	TaskDef *getTaskDef() { return taskDef; }
 	const char* getTaskName() { return taskDef->getName(); }
 	const char* getInitials() { return initials; }
+	static const char *getHeaderFileName(TaskDef *taskDef);
 
 	// function to generate all data structures and methods that are relevant to this task 
 	// including a thread run function to run the task as a parallel program in multiple threads

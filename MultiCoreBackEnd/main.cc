@@ -11,6 +11,7 @@
 
 #include "parser.h"
 #include "scanner.h"
+#include "codegen/task_invocation.h"
 #include "codegen/task_generator.h"	
 #include "codegen/code_generator.h"	
 #include "codegen/thread_state_mgmt.h"	
@@ -54,6 +55,9 @@ int main(int argc, const char *argv[]) {
 	// set the default output directory and common header file parameters
 	const char *outputDir = "build/";
 	const char *tupleHeader = "build/tuple.h";
+	// set the output header and program files for the coordinator program
+	const char *coordHeader = "build/coordinator.h";
+	const char *coordProgram = "build/coordinator.cc";
 	//***********************************************************************************
 
 
@@ -99,6 +103,11 @@ int main(int argc, const char *argv[]) {
 	// on the task definition	
 	if (ProgramDef::program->isIsolatedTaskProgram()) {
 		firstTaskGenerator->generateTaskMain();
+	// otherwise invoke the library handling task-invocations to generate all routines
+	// needed for multi-task management and a the main function corresponds to the 
+	// coordinator program definition
+	} else {
+		processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
 	}
 }
 

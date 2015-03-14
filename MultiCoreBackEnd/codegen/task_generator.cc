@@ -15,6 +15,7 @@
 #include "compute_translator.h"
 #include "pthread_mgmt.h"
 #include "sync_mgmt.h"
+#include "task_invocation.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -52,6 +53,14 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 	initials = string_utils::toLower(initials);
 
 	mappingRoot = NULL;
+}
+
+const char *TaskGenerator::getHeaderFileName(TaskDef *taskDef) {
+	std::ostringstream headerFileStr;
+	const char *taskName = string_utils::replaceChar(taskDef->getName(), ' ', '_');
+        const char *taskNameLower = string_utils::toLower(taskName);
+        headerFileStr << taskNameLower << ".h";
+        return strdup(headerFileStr.str().c_str());
 }
 
 void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
@@ -112,6 +121,10 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
                         = generateAllGetPartForLPURoutines(headerFile, programFile, 
 					initials, mappingConfig, partitionArgs);
         generateLpuDataStructures(headerFile, mappingConfig);
+
+	// generate routines needed for supporting task invocation from the coordinator
+	generateFnToInitEnvLinksFromEnvironment(taskDef, 
+			initials, envLinkList, headerFile, programFile);
 
 	// generate thread management functions and classes
         generateFnForThreadIdsAllocation(headerFile, 

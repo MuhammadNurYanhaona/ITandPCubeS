@@ -22,7 +22,7 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 	std::string statementSeparator = ";\n";
         std::string singleIndent = "\t";
 	
-	// specify the signature of the compute-Next-Lpu function matching the virtual function in Thread-State class
+	// specify the signature of the set-root-LPU function matching the virtual function in Thread-State class
 	std::ostringstream functionHeader;
         functionHeader << "void ThreadStateImpl::setRootLpu(Metadata *metadata)";
         std::ostringstream functionBody;
@@ -65,6 +65,33 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 	
 	// store the LPU in the proper LPS state
 	functionBody << std::endl;
+	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
+	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
+	functionBody << statementSeparator;
+	functionBody << singleIndent << "threadLog << \"set up root LPU\" << std::endl";
+	functionBody << statementSeparator;
+	functionBody << singleIndent << "threadLog.flush()";
+	functionBody << statementSeparator << "}\n";
+	
+	programFile << functionHeader.str() << " " << functionBody.str();
+	programFile << std::endl;
+}
+
+void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
+
+        programFile << "// Setting up the Root LPU reference \n";
+
+	std::string statementSeparator = ";\n";
+        std::string singleIndent = "\t";
+	Space *rootLps = mappingRoot->mappingConfig->LPS;
+	
+	// specify the signature of the set-root-LPU function matching the virtual function in Thread-State class
+	std::ostringstream functionHeader;
+        functionHeader << "void ThreadStateImpl::setRootLpu(LPU *lpu)";
+        std::ostringstream functionBody;
+	functionBody << "{\n";
+
+	// store the LPU in the proper LPS state
 	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
 	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
 	functionBody << statementSeparator;
@@ -466,6 +493,8 @@ void generateThreadStateImpl(const char *headerFileName, const char *programFile
 	generateParentIndexMapRoutine(programFile, mappingRoot);
 	// generate the function for creating the root LPU from array metadata information
 	generateRootLpuComputeRoutine(programFile, mappingRoot);
+	// generate the function for setting the root LPU constructed using some other means
+	generateSetRootLpuRoutine(programFile, mappingRoot);
 	// generate the function for allocating a pointer for each LPS'es LPU that will be updated over and over
 	generateInitializeLpuSRoutine(programFile, mappingRoot);
 	// then call the compute-LPU-Count function generator method for class specific implementation

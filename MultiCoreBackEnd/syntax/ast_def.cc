@@ -147,7 +147,9 @@ List<TaskDef*> *ProgramDef::getTasks() {
 }
 
 List<TupleDef*> *ProgramDef::getTuples() {
+	
 	List<TupleDef*> *tupleList = new List<TupleDef*>;
+	
 	for (int i = 0; i < components->NumElements(); i++) {
                 Node *node = components->Nth(i);
                 TaskDef *taskDef = dynamic_cast<TaskDef*>(node);
@@ -159,6 +161,11 @@ List<TupleDef*> *ProgramDef::getTuples() {
 		TupleDef *tupleDef = dynamic_cast<TupleDef*>(node);
 		if (tupleDef != NULL) {
 			tupleList->Append(tupleDef);
+			continue;
+		}
+		CoordinatorDef *coordDef = dynamic_cast<CoordinatorDef*>(node);
+		if (coordDef != NULL) {
+			tupleList->Append(coordDef->getArgumentTuple());
 		}
 	}
 	return tupleList;	
@@ -286,6 +293,12 @@ void CoordinatorDef::validateScope(Scope *parentScope) {
 		Stmt *stmt = code->Nth(j);
 		stmt->checkSemantics(executionScope, false);
 	}
+
+	// generate the definition for a structure to hold the arguments for the coordinator function
+	MapType *argumentMap = (MapType*) commandLineArg->getType();
+	List<VariableDef*> *argumentList = argumentMap->getElementList();
+	Identifier *tupleId = new Identifier(*argument->GetLocation(), "ProgramArgs");
+	argumentTuple = new TupleDef(tupleId, argumentList);
 }
 
 //----------------------------------------- Function Definition ------------------------------------------/

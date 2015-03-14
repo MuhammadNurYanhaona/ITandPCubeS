@@ -993,6 +993,10 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 	headerFile << "#include <iostream>\n";	
 	headerFile << "#include <vector>\n\n";	
 
+	// include the PartDimension class from compiler library to store metadata information for environment
+	// references
+	headerFile << "#include \"../codegen/structure.h\"\n\n";        
+
 	// first have a list of forward declarations for all tuples to avoid having errors during 
 	// compilation of individual classes
 	for (int i = 0; i < tupleDefList->NumElements(); i++) {
@@ -1016,6 +1020,15 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 			const char *varName = variable->getId()->getName();
 			headerFile << type->getCppDeclaration(varName);
 			headerFile << ";\n";
+                      	// include a metadata property in the class if the current property is a dynamic array
+                       	ArrayType *arrayType = dynamic_cast<ArrayType*>(type);
+                       	StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(type);
+                       	if (arrayType != NULL && staticArray == NULL) {
+                               	int dimensions = arrayType->getDimensions();
+                               	headerFile << "\tPartDimension ";
+                        	headerFile << varName << "Dims[" << dimensions << "];\n";
+                       	}
+
 		}
 		headerFile << "};\n\n";
 	}
