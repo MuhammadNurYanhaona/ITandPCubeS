@@ -8,6 +8,7 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
+#include "../utils/common_utils.h"
 
 #include <sstream>
 #include <fstream>
@@ -148,7 +149,7 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
                 const char *headerFileName,
                 const char *programFileName) {
 	
-	std::cout << "Generating routine to initiate environment-link object from environment reference\n";
+	std::cout << "\tGenerating routine to initiate environment-link from environment reference\n";
 	std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
@@ -169,14 +170,14 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
 	headerFile << comments.str();
 	programFile << comments.str();
 
-	// write function signature in header and program file
+	// write function signature in header and program files
 	programFile << "EnvironmentLinks " << initials << "::";
 	headerFile << "EnvironmentLinks ";
 	fnHeader << "initiateEnvLinks";
 	TupleDef *envTuple = taskDef->getEnvTuple();
 	fnHeader << "(" << envTuple->getId()->getName() << " *environment)";
 	programFile << fnHeader.str();
-	headerFile << fnHeader.str() << stmtSeparator;
+	headerFile << fnHeader.str() << stmtSeparator << std::endl;
 
 	// open function definition
 	programFile << " {\n";
@@ -226,6 +227,114 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
 
 	// return the populated environment link object
 	programFile << indent << "return envLinks" << stmtSeparator;
+	
+	// close function definition
+	programFile << "}\n\n";
+	
+	headerFile.close();
+	programFile.close();
+}
+
+void generateFnToInitTaskRootFromEnv(TaskDef *taskDef,
+                const char *initials,
+                const char *headerFileName,
+                const char *programFileName) {
+
+	std::cout << "\tGenerating routine to initiate thread's root LPU from Environment reference \n";
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open output header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+	std::string indent = "\t";
+	std::string doubleIndent = "\t\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", "; 
+	std::ostringstream fnHeader;
+
+	std::ostringstream  comments;
+        comments << "/*-----------------------------------------------------------------------------------\n";
+        comments << "function for initializing root LPU from environment\n";
+       	comments << "------------------------------------------------------------------------------------*/\n\n";
+	headerFile << comments.str();
+	programFile << comments.str();
+	
+	// write function signature in header and program files
+	programFile << "Space" << rootLps->getName() << "_LPU *" << initials << "::";
+	headerFile << "Space" << rootLps->getName() << "_LPU *";
+	fnHeader << "initiateRootLpu";
+	TupleDef *envTuple = taskDef->getEnvTuple();
+	fnHeader << "(" << envTuple->getId()->getName() << " *environment";
+	fnHeader << paramSeparator << "ArrayMetadata *metadata)";
+	programFile << fnHeader.str();
+	headerFile << fnHeader.str() << stmtSeparator;
+
+	// open function definition
+	programFile << " {\n\n";
+
+	// allocate a pointer reference for the root LPU instance
+	programFile << indent;
+	programFile << "Space" << rootLps->getName() << "_LPU *rootLpu = ";
+	programFile << "new Space" << rootLps->getName() << "_LPU";
+	programFile << stmtSeparator;
+	
+	// get the names of objects that are part of the environment
+	List<VariableDef*> *propertyList = envTuple->getComponents();
+	List<const char*> *envProperties = new List<const char*>;
+	for (int i = 0; i < propertyList->NumElements(); i++) {
+		VariableDef *property = propertyList->Nth(i);
+		envProperties->Append(property->getId()->getName());
+	}	
+
+	// initialize each array present in the root LPU
+        List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
+        for (int i = 0; i < localArrays->NumElements(); i++) {
+                if (i > 0) programFile << std::endl;
+                const char* arrayName = localArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
+                int dimensionCount = array->getDimensionality();
+                programFile << indent << "rootLpu->" << arrayName << " = NULL" << stmtSeparator;
+
+		// check if the array is part of the environment
+		bool partOfEnv = common_utils::isStringInList(arrayName, envProperties);
+		// if it is part of the environment then try to initiate its metadata from the 
+		// environment reference first
+		std::string currentIndent = indent;
+		if (partOfEnv) {
+			programFile << indent << "if (environment->" << arrayName << " != NULL) {\n";
+			currentIndent = doubleIndent;
+			for (int d = 0; d < dimensionCount; d++) {
+				programFile << currentIndent << "rootLpu->" << arrayName;
+				programFile << "Dims[" << d << "] = ";
+				programFile << "environment->" << arrayName;
+				programFile << "Dims[" << d << "]" << stmtSeparator;
+			}
+			programFile << indent << "} else {\n";
+		}
+		// if initialization from environment reference is unsuccessful or not applicable then
+		// initiate the metadata based on the array metadata object
+		std::ostringstream varName;
+                varName << "rootLpu->" << arrayName << "PartDims";
+                for (int j = 0; j < dimensionCount; j++) {
+                        programFile << currentIndent << varName.str() << "[" << j << "] = ";
+                        programFile << "PartDimension()" << stmtSeparator;
+                        programFile << currentIndent << varName.str() << "[" << j << "].partition = ";
+                        programFile << "metadata->" << arrayName << "Dims[" << j << "]";
+                        programFile << stmtSeparator;
+                        programFile << currentIndent << varName.str() << "[" << j << "].storage = ";
+                        programFile << "metadata->" << arrayName << "Dims[" << j;
+                        programFile << "].getNormalizedDimension()" << stmtSeparator;
+                }	 
+		
+		if (partOfEnv) programFile << indent << "}\n";
+	}
+
+	// return the root LPU reference
+	programFile << indent << "return rootLpu" << stmtSeparator;
 	
 	// close function definition
 	programFile << "}\n\n";

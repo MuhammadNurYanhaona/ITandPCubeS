@@ -123,8 +123,10 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         generateLpuDataStructures(headerFile, mappingConfig);
 
 	// generate routines needed for supporting task invocation from the coordinator
+	std::cout << "Generating task invocation related routines\n";
 	generateFnToInitEnvLinksFromEnvironment(taskDef, 
 			initials, envLinkList, headerFile, programFile);
+	generateFnToInitTaskRootFromEnv(taskDef, initials, headerFile, programFile);
 
 	// generate thread management functions and classes
         generateFnForThreadIdsAllocation(headerFile, 
