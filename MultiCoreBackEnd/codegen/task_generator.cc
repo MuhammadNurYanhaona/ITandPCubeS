@@ -122,12 +122,6 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 					initials, mappingConfig, partitionArgs);
         generateLpuDataStructures(headerFile, mappingConfig);
 
-	// generate routines needed for supporting task invocation from the coordinator
-	std::cout << "Generating task invocation related routines\n";
-	generateFnToInitEnvLinksFromEnvironment(taskDef, 
-			initials, envLinkList, headerFile, programFile);
-	generateFnToInitTaskRootFromEnv(taskDef, initials, headerFile, programFile);
-
 	// generate thread management functions and classes
         generateFnForThreadIdsAllocation(headerFile, 
 			programFile, initials, mappingConfig, pcubesConfig);
@@ -141,6 +135,13 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	syncManager->generateSyncInitializerFn();
 	syncManager->generateSyncStructureForThreads();
 	syncManager->generateFnForThreadsSyncStructureInit();
+
+	// generate routines needed for supporting task invocation from the coordinator
+	std::cout << "Generating task invocation related routines\n";
+	generateFnToInitEnvLinksFromEnvironment(taskDef, 
+			initials, envLinkList, headerFile, programFile);
+	generateFnToInitTaskRootFromEnv(taskDef, initials, headerFile, programFile);
+	generateTaskExecutor(this);
 
 	// initialize the variable transformation map that would be used to translate
 	// the code inside initialize and compute blocks
@@ -412,7 +413,9 @@ void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
 	} 	
 }
 
-void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const char*> *externalEnvLinks) {
+void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, 
+		List<const char*> *externalEnvLinks, 
+		bool skipArgInitialization) {
 	
 	std::cout << "Generating code for invoking the task initializer function\n";
 
@@ -426,33 +429,37 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, List<const cha
 	
 	std::string indent = "\t";
 	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-	
-	stream << std::endl << indent << "// determining values of initialization parameters\n";
-	stream << indent << "std::cout << \"determining initialization parameters\\n\"" << stmtSeparator;
-
-	// If there are init arguments then we have to create local variables for them and generate prompts 
-	// to read them from the console. We maintain a flag to indicate if there are init arguments that
-	// we cannot currently read from external input (such as user defined objects and lists). If there
-	// are such parameters then the programmer needs to update the generated main function to initialize
-	// them and invoke the initialize function
+	std::string paramSeparator = ", ";	
 	bool initFunctionInvocable = true;
-	if (initArguments != NULL) {
-		for (int i = 0; i < initArguments->NumElements(); i++) {
-			const char *argName = initArguments->Nth(i);
-			Type *argumentType = argumentTypes->Nth(i);
-			stream << indent << argumentType->getCppDeclaration(argName) << stmtSeparator;
-			if (isUnsupportedInputType(argumentType, argName)) {
-				initFunctionInvocable = false;
-				stream << indent << "//TODO initialize " << argName << " here\n";			
-			} else {
-				if (Type::boolType == argumentType) {
-					stream << indent << argName << " = inprompt::readBoolean(\"";
-					stream << argName << "\")" << stmtSeparator; 	
+
+	// Argument initialization only needed when we automatically generate main function for the task; thus this 
+	// checking is applied. 
+	if (!skipArgInitialization) {
+		stream << std::endl << indent << "// determining values of initialization parameters\n";
+		stream << indent << "std::cout << \"determining initialization parameters\\n\"" << stmtSeparator;
+
+		// If there are init arguments then we have to create local variables for them and generate prompts 
+		// to read them from the console. We maintain a flag to indicate if there are init arguments that
+		// we cannot currently read from external input (such as user defined objects and lists). If there
+		// are such parameters then the programmer needs to update the generated main function to initialize
+		// them and invoke the initialize function
+		if (initArguments != NULL) {
+			for (int i = 0; i < initArguments->NumElements(); i++) {
+				const char *argName = initArguments->Nth(i);
+				Type *argumentType = argumentTypes->Nth(i);
+				stream << indent << argumentType->getCppDeclaration(argName) << stmtSeparator;
+				if (isUnsupportedInputType(argumentType, argName)) {
+					initFunctionInvocable = false;
+					stream << indent << "//TODO initialize " << argName << " here\n";			
 				} else {
-					stream << indent << argName << " = inprompt::readPrimitive ";
-					stream << "<" << argumentType->getName() << "> (\"";
-					stream << argName << "\")" << stmtSeparator;
+					if (Type::boolType == argumentType) {
+						stream << indent << argName << " = inprompt::readBoolean(\"";
+						stream << argName << "\")" << stmtSeparator; 	
+					} else {
+						stream << indent << argName << " = inprompt::readPrimitive ";
+						stream << "<" << argumentType->getName() << "> (\"";
+						stream << argName << "\")" << stmtSeparator;
+					}
 				}
 			}
 		}

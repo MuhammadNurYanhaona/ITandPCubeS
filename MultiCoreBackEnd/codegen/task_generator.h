@@ -42,6 +42,7 @@ class TaskGenerator {
 	const char* getTaskName() { return taskDef->getName(); }
 	const char* getInitials() { return initials; }
 	static const char *getHeaderFileName(TaskDef *taskDef);
+	SyncManager *getSyncManager() { return syncManager; }
 
 	// function to generate all data structures and methods that are relevant to this task 
 	// including a thread run function to run the task as a parallel program in multiple threads
@@ -61,7 +62,9 @@ class TaskGenerator {
 	void readPartitionParameters(std::ofstream &stream);
 	// a supporting function for task main that get input initialization parameters and invoke
 	// tasks initialization function
-	void inovokeTaskInitializer(std::ofstream &stream, List<const char*> *externalEnvLinks);
+	void inovokeTaskInitializer(std::ofstream &stream, 
+			List<const char*> *externalEnvLinks, 
+			bool skipArgInitialization = false);
 	// a supporting function for generating an array of thread-state objects, one for each thread,
 	// then initializing them	
 	void initiateThreadStates(std::ofstream &stream);

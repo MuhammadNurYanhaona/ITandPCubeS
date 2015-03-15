@@ -46,7 +46,7 @@ void generateFnToInitTaskRootFromEnv(TaskDef *taskDef,
 
 // generate a function that serves as a task::main and handle initiation, execution, and after
 // processing of tasks.
-void generateInvocationMain(TaskGenerator *taskGenerator);
+void generateTaskExecutor(TaskGenerator *taskGenerator);
 
 // function that invokes other functions listed here to generate data structures and method for
 // needed to make multi-task programs work
