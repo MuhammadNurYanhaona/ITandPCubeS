@@ -1,7 +1,7 @@
 Program (args): 
 	blockSize = args.block_size
 	initEnv = new TaskEnvironment(name: "Initiate LU")
-	initEnv.a = load_array(args.matrix_file)
+	load_array(initEnv.a, args.matrix_file)
 	execute("Initiate LU"; initEnv; Partition: args.s)
 	luEnv = new TaskEnvironment(name: "Transposed LU Factorization")
 	luEnv.u = initEnv.u

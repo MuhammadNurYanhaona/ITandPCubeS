@@ -94,6 +94,10 @@ void ReportError::UnsupportedOperand(Expr* expr, Type *type,
 			type->getName(), operation);
 }
 
+void ReportError::InvalidExprType(Expr *expr, Type *type, bool suppressFailure) {
+	OptionalErrorReport(expr->GetLocation(), suppressFailure, "Unsupported type '%s'", type->getName());
+}
+
 void ReportError::TypeMixingError(Expr* expr, Type *type1, 
 			Type *type2, const char *operation, bool suppressFailure) {
 	OptionalErrorReport(expr->GetLocation(), suppressFailure,

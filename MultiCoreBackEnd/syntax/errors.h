@@ -25,6 +25,7 @@ class ReportError
 	static void InferredAndActualTypeMismatch(yyltype *loc, Type *inferred, Type *actual, bool suppressFailure);
 	static void UnknownExpressionType(Expr *expr, bool suppressFailure);
 	static void UnsupportedOperand(Expr *expr, Type *type, const char *operation, bool suppressFailure);
+	static void InvalidExprType(Expr *expr, Type *type, bool suppressFailure);
 	static void TypeMixingError(Expr *expr, Type *type1, Type *type2, const char *operation, bool suppressFailure);
 	static void IncompatibleTypes(yyltype *loc, Type *actual, Type *expected, bool suppressFailure);
 	static void UndefinedSymbol(Identifier *id, bool suppressFailure);

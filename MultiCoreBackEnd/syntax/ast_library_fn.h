@@ -12,11 +12,17 @@ class LibraryFunction : public Expr {
 	List<Expr*> *arguments;
 	int argumentCount;
 	Identifier *functionName;	
-	LibraryFunction(int argumentCount, Identifier *functionName, List<Expr*> *arguments, yyltype loc);
-        LibraryFunction(int argumentCount, Identifier *functionName, List<Expr*> *arguments);
+	LibraryFunction(int argumentCount, 
+			Identifier *functionName, 
+			List<Expr*> *arguments, 
+			yyltype loc);
+        LibraryFunction(int argumentCount, 
+			Identifier *functionName, 
+			List<Expr*> *arguments);
   public:
 	static bool isLibraryFunction(Identifier *id);
-	static LibraryFunction *getFunctionExpr(Identifier *id, List<Expr*> *arguments, yyltype loc);
+	static LibraryFunction *getFunctionExpr(Identifier *id, 
+			List<Expr*> *arguments, yyltype loc);
 	const char *GetPrintNameForNode() { return functionName->getName(); }
         void PrintChildren(int indentLevel);
 
@@ -42,36 +48,40 @@ class Random : public LibraryFunction {
 	}	
 };
 
-class LoadArray : public LibraryFunction {
+class ArrayOperation : public LibraryFunction {
   public:
-	static const char *Name;	
-	LoadArray(Identifier *id, List<Expr*> *arguments, yyltype loc) 
-		: LibraryFunction(1, id, arguments, loc) {}	
+	ArrayOperation(Identifier *id, List<Expr*> *arguments, yyltype loc)
+                : LibraryFunction(2, id, arguments, loc) {}
 	void validateArguments(Scope *scope, bool ignoreFailure);
-	virtual void inferType(Scope *scope, Type *type);		
+        virtual void inferType(Scope *scope, Type *type);
 };
 
-class StoreArray : public LibraryFunction {
+class LoadArray : public ArrayOperation {
   public:
 	static const char *Name;	
-	StoreArray(Identifier *id, List<Expr*> *arguments, yyltype loc) 
-		: LibraryFunction(2, id, arguments, loc) {}	
-	void validateArguments(Scope *scope, bool ignoreFailure);
-	virtual void inferType(Scope *scope, Type *type);		
+	LoadArray(Identifier *id, List<Expr*> *arguments, 
+			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
 };
 
-class LoadListOfArrays : public LibraryFunction {
+class StoreArray : public ArrayOperation {
   public:
 	static const char *Name;	
-	LoadListOfArrays(Identifier *id, List<Expr*> *arguments, yyltype loc) 
-		: LibraryFunction(1, id, arguments, loc) {}	
+	StoreArray(Identifier *id, List<Expr*> *arguments, 
+			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
 };
 
-class StoreListOfArrays : public LibraryFunction {
+class LoadListOfArrays : public ArrayOperation {
   public:
 	static const char *Name;	
-	StoreListOfArrays(Identifier *id, List<Expr*> *arguments, yyltype loc) 
-		: LibraryFunction(2, id, arguments, loc) {}	
+	LoadListOfArrays(Identifier *id, List<Expr*> *arguments, 
+			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
+};
+
+class StoreListOfArrays : public ArrayOperation {
+  public:
+	static const char *Name;	
+	StoreListOfArrays(Identifier *id, List<Expr*> *arguments, 
+			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
 };
 
 #endif

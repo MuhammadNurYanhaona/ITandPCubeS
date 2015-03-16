@@ -6,6 +6,8 @@
 #include "../semantics/scope.h"
 #include "errors.h"
 
+#include <iostream>
+
 //-------------------------------------------------------- Static Constants -----------------------------------------------------/
 
 const char *Root::Name = "root";
@@ -45,6 +47,7 @@ void LibraryFunction::PrintChildren(int indentLevel) {
 
 void LibraryFunction::resolveType(Scope *scope, bool ignoreFailure) {
 	if (argumentCount != arguments->NumElements()) {
+		std::cout << "argument count problem\n";
 		ReportError::TooFewOrTooManyParameters(functionName, arguments->NumElements(),
                 		argumentCount, ignoreFailure);
 	} else {
@@ -85,17 +88,19 @@ void Root::validateArguments(Scope *scope, bool ignoreFailure) {
 
 	Type *arg1Type = arg1->getType();
 	if (arg1Type == NULL) {
-		//TODO report error
-	} else if (arg1Type != Type::intType && arg1Type != Type::floatType 
-			&& arg1Type != Type::doubleType && arg1Type != Type::errorType) {
-		//TODO report error
+		ReportError::UnknownExpressionType(arg1, ignoreFailure);	
+	} else if (arg1Type != Type::intType 
+			&& arg1Type != Type::floatType 
+			&& arg1Type != Type::doubleType 
+			&& arg1Type != Type::errorType) {
+		ReportError::InvalidExprType(arg1, arg1Type, ignoreFailure);
 	}
 
 	Type *arg2Type = arg2->getType();
 	if (arg2Type == NULL) {
-		//TODO report error
+		ReportError::UnknownExpressionType(arg2, ignoreFailure);	
 	} else if (arg2Type != Type::intType && arg2Type != Type::errorType) {
-		//TODO report error
+		ReportError::IncompatibleTypes(arg2->GetLocation(), arg2Type, Type::intType, ignoreFailure);
 	}
 	
 	this->type = arg1Type;
@@ -111,77 +116,38 @@ void Root::inferType(Scope *scope, Type *rootType) {
 	}
 }
 
-//------------------------------------------------------- Load Array ---------------------------------------------------------/
+//--------------------------------------------------- Array Operation -----------------------------------------------------/
 
-void LoadArray::validateArguments(Scope *scope, bool ignoreFailure) {
+void ArrayOperation::validateArguments(Scope *scope, bool ignoreFailure) {
+	
 	Expr *arg1 = arguments->Nth(0);
 	arg1->resolveType(scope, ignoreFailure);
 	Type *arg1Type = arg1->getType();
 	if (arg1Type == NULL) {
-		//TODO report error	
-	} else if (arg1Type != Type::stringType && arg1Type != Type::errorType) {
-		//TODO report error
-	}	
-}
-
-void LoadArray::inferType(Scope *scope, Type *rootType) {
-	if (rootType == NULL) {
-		this->type = Type::errorType;
-	} else {
-		ArrayType *arrayType = dynamic_cast<ArrayType*>(rootType);
-		if (arrayType == NULL) {
-			this->type = Type::errorType;
-		} else {
-			this->type = arrayType;
-		}
-	}
-	if (arguments->NumElements() == 1) {
-		arguments->Nth(0)->inferType(scope, Type::stringType);
-		arguments->Nth(0)->resolveType(scope, false);
-	}
-}
-
-//------------------------------------------------------- Store Array ------------------------------------------------------/
-
-void StoreArray::validateArguments(Scope *scope, bool ignoreFailure) {
-
-	Expr *arg1 = arguments->Nth(0);
-	arg1->resolveType(scope, ignoreFailure);
-	Type *arg1Type = arg1->getType();
-	if (arg1Type == NULL) {
-		//TODO report error	
+		ReportError::UnknownExpressionType(arg1, ignoreFailure);	
 	} else {
 		ArrayType *arrayType = dynamic_cast<ArrayType*>(arg1Type);
 		if (arrayType == NULL) {
-			//TODO report error
+			ReportError::InvalidArrayAccess(arg1->GetLocation(), arg1Type, ignoreFailure);
 		}
 	}
-	
+
 	Expr *arg2 = arguments->Nth(1);
 	arg2->resolveType(scope, ignoreFailure);
 	Type *arg2Type = arg2->getType();
 	if (arg2Type == NULL) {
-		//TODO report error	
+		ReportError::UnknownExpressionType(arg2, ignoreFailure);	
 	} else if (arg2Type != Type::stringType && arg2Type != Type::errorType) {
-		//TODO report error
+		ReportError::IncompatibleTypes(arg2->GetLocation(), arg2Type, Type::stringType, ignoreFailure);
 	}
+	this->type = Type::voidType;	
 }
 
-void StoreArray::inferType(Scope *scope, Type *rootType) {
-	if (rootType == NULL) {
-		this->type = Type::errorType;
-	} else {
-		ArrayType *arrayType = dynamic_cast<ArrayType*>(rootType);
-		if (arrayType == NULL) {
-			this->type = Type::errorType;
-		} else {
-			this->type = arrayType;
-		}
-	}
+void ArrayOperation::inferType(Scope *scope, Type *rootType) {
 	if (arguments->NumElements() == 2) {
-		arguments->Nth(0)->inferType(scope, this->type);
-		arguments->Nth(0)->resolveType(scope, false);
 		arguments->Nth(1)->inferType(scope, Type::stringType);
 		arguments->Nth(1)->resolveType(scope, false);
 	}
 }
+
+//------------------------------------------------------- Load Array ------------------------------------------------------/

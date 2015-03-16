@@ -29,6 +29,7 @@ Type *Type::dimensionType  	= new Type("Dimension");
 Type *Type::rangeType   	= new Type("Range");
 Type *Type::indexType   	= new Type("Index");
 Type *Type::errorType  		= new Type("Error"); 
+Type *Type::voidType  		= new Type("void"); 
 
 //---------------------------------------------- Built in Type -------------------------------------------/
 Type::Type(const char *n) {
@@ -50,6 +51,7 @@ void Type::storeBuiltInTypesInScope(Scope *scope) {
 	scope->insert_symbol(new Symbol(boolType->getName(), boolType));
 	scope->insert_symbol(new Symbol(stringType->getName(), stringType));
 	scope->insert_symbol(new Symbol(errorType->getName(), errorType));
+	scope->insert_symbol(new Symbol(voidType->getName(), voidType));
 
 	// create nested scope for each built-in tuple types then store
 	yyltype dummyLocation;

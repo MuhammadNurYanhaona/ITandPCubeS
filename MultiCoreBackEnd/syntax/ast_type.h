@@ -19,9 +19,11 @@ class Type : public Node {
   protected:
 	const char *typeName;
 
-  public :
-    	static Type 	*intType, *floatType, *doubleType, *boolType, *charType, *stringType, 
-			*epochType, *dimensionType, *rangeType, *indexType, *errorType;
+  public:
+    	static Type 	*intType, *floatType, *doubleType, 
+			*boolType, *charType, *stringType, 
+			*epochType, *dimensionType, *rangeType, 
+			*indexType, *errorType, *voidType;
 
     	Type(yyltype loc) : Node(loc) {}
     	Type(const char *str);
