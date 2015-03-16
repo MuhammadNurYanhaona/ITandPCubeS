@@ -413,6 +413,24 @@ void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
 	} 	
 }
 
+void TaskGenerator::copyPartitionParameters(std::ofstream &stream) {
+	List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
+	std::string indent = "\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	stream << std::endl << indent << "// copying partitioning parameters into an array\n";
+	stream << indent << "int *partitionArgs = NULL" << stmtSeparator;
+	int parameterCount = partitionArgs->NumElements();
+	if (parameterCount > 0) {
+		stream << indent << "partitionArgs = new int[" << parameterCount << "]" << stmtSeparator;
+	}
+	for (int i = 0; i < partitionArgs->NumElements(); i++) {
+		const char *argName = partitionArgs->Nth(i)->getName();
+		stream << indent << "partitionArgs[" << i << "] = partition." << argName;
+		stream << stmtSeparator; 
+	} 	
+}
+
 void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream, 
 		List<const char*> *externalEnvLinks, 
 		bool skipArgInitialization) {

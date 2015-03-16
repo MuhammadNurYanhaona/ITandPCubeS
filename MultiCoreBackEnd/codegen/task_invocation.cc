@@ -60,6 +60,7 @@ void initiateProgramHeaders(const char *headerFileName, const char *programFileN
                 std::cout << "Unable to open common include file";
                 std::exit(EXIT_FAILURE);
         }
+	headerFile << commonHeaders.str();
 
 	// include headers for all tasks in the library list;
         commonHeaders << "/*-----------------------------------------------------------------------------------\n";
@@ -71,8 +72,6 @@ void initiateProgramHeaders(const char *headerFileName, const char *programFileN
 		commonHeaders << TaskGenerator::getHeaderFileName(taskList->Nth(i)) << "\"\n";
 	}
 	commonHeaders << std::endl;
-
-	headerFile << commonHeaders.str();
 	programFile << commonHeaders.str();
 
 	commIncludeFile.close();
@@ -105,7 +104,7 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 
 	// write function signature in header and program files
 	const char *tupleName = programArg->getId()->getName();
-	fnHeader << tupleName << " *getProgramArgs()";
+	fnHeader << tupleName << " getProgramArgs()";
 	headerFile << fnHeader.str() << stmtSeparator;
 	programFile << fnHeader.str();
 
@@ -113,7 +112,7 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 	programFile << " {\n";
 	
 	// create a new instance of the program argument object
-	programFile << indent << tupleName << " programArgs = new " << tupleName << "()" << stmtSeparator;
+	programFile << indent << tupleName << " programArgs = " << tupleName << "()" << stmtSeparator;
 
 	// iterate over the list of properties and generate prompt for initiating each of them
 	List<VariableDef*> *propertyList = programArg->getComponents();
@@ -314,7 +313,7 @@ void generateFnToInitTaskRootFromEnv(TaskDef *taskDef,
 			currentIndent = doubleIndent;
 			for (int d = 0; d < dimensionCount; d++) {
 				programFile << currentIndent << "rootLpu->" << arrayName;
-				programFile << "Dims[" << d << "] = ";
+				programFile << "PartDims[" << d << "] = ";
 				programFile << "environment->" << arrayName;
 				programFile << "Dims[" << d << "]" << stmtSeparator;
 			}
@@ -394,6 +393,8 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	}
 	fnHeader << paramSeparator << std::endl << doubleIndent;
 	fnHeader << partitionTuple->getId()->getName() << " partition";
+	fnHeader << paramSeparator << std::endl << doubleIndent;
+	fnHeader << "std::ofstream &logFile";
 	fnHeader << ")";
 
 	// write function signature in header and program files
@@ -413,6 +414,9 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
         programFile << indent << "TaskGlobals taskGlobals" << stmtSeparator;
         programFile << indent << "ThreadLocals threadLocals" << stmtSeparator;
         programFile << indent << "ArrayMetadata *metadata = new ArrayMetadata" << stmtSeparator;
+
+	// copy partition parameters into an array to later make them accessible for thread-state management
+	taskGenerator->copyPartitionParameters(programFile); 
 
 	// check if synchronization needed and initialize sync primitives if the answer is YES
 	SyncManager *syncManager = taskGenerator->getSyncManager();	
@@ -483,7 +487,7 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 				programFile << indent;
 				programFile << "environment->" << propertyName;
 				programFile << "Dims[" << d << "] = ";
-				programFile << "rootLpu->" << propertyName << "Dims[" << d << "]";
+				programFile << "rootLpu->" << propertyName << "PartDims[" << d << "]";
 				programFile << stmtSeparator;
 			}
 		// otherwise, copy the property from task-global object into the environment 
@@ -519,6 +523,59 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile.close();
 }
 
+void generateMain(ProgramDef *programDef, const char *programFile) {
+	
+	std::cout << "Generating main function for the program\n";
+	std::ofstream stream;
+        stream.open (programFile, std::ofstream::out | std::ofstream::app);
+        if (!stream.is_open()) {
+                std::cout << "Unable to open output program file";
+                std::exit(EXIT_FAILURE);
+        }
+
+        stream << "/*-----------------------------------------------------------------------------------\n";
+        stream << "main function\n";
+        stream << "------------------------------------------------------------------------------------*/\n";
+
+        std::string indent = "\t";
+        std::string stmtSeparator = ";\n";
+        std::string paramSeparator = ", ";
+
+        // write the function signature
+        stream << "\nint main() {\n\n";
+
+	// start execution time monitoring timer
+        stream << indent << "// starting execution timer clock\n";
+        stream << indent << "struct timeval start" << stmtSeparator;
+        stream << indent << "gettimeofday(&start, NULL)" << stmtSeparator;
+
+	// create a log file for overall program log printing
+        stream << indent << "// creating a program log file\n";
+        stream << indent << "std::cout << \"Creating diagnostic log: it-program.log\\n\"" << stmtSeparator;
+        stream << indent << "std::ofstream logFile" << stmtSeparator;
+        stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator << std::endl;
+
+	// calculate running time
+        stream << indent << "// calculating task running time\n";
+        stream << indent << "struct timeval end" << stmtSeparator;
+        stream << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
+        stream << indent << "double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
+        stream << std::endl << indent << indent << indent;
+        stream << "- (start.tv_sec + start.tv_usec / 1000000.0))" << stmtSeparator;
+        stream << indent << "logFile << \"Execution Time: \" << runningTime << \" Seconds\" << std::endl";
+        stream << stmtSeparator << std::endl;
+	
+	// close the log file
+        stream << indent << "logFile.close()" << stmtSeparator;
+        // display the running time on console
+        stream << indent << "std::cout << \"Parallel Execution Time: \" << runningTime <<";
+        stream << " \" Seconds\" << std::endl" << stmtSeparator;
+	// then exit the function
+        stream << indent << "return 0" << stmtSeparator;
+        stream << "}\n";
+        stream.close();
+}
+
 void processCoordinatorProgram(ProgramDef *programDef, const char *headerFile, const char *programFile) {
         
 	std::cout << "\n-----------------------------------------------------------------\n";
@@ -531,6 +588,8 @@ void processCoordinatorProgram(ProgramDef *programDef, const char *headerFile, c
 	initiateProgramHeaders(headerFile, programFile, programDef);
 	// generating routine for initializing program arguments
 	generateRoutineToInitProgramArgs(coordDef->getArgumentTuple(), headerFile, programFile);
+	// generating the task executing main function
+	generateMain(programDef, programFile);
         
 	// closing header file definition
 	std::ofstream header;

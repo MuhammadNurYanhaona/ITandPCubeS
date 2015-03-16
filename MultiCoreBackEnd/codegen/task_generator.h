@@ -60,6 +60,10 @@ class TaskGenerator {
 	bool isUnsupportedInputType(Type *type, const char *varName);
 	// a function for initializing partition related data structures
 	void readPartitionParameters(std::ofstream &stream);
+	// a function to be used by task-invocator library to copy parition parameters from partition
+	// object to an array of integer, the form used within thread-state; TODO we should change
+	// the thread-state implementation in the future to avoid this
+	void copyPartitionParameters(std::ofstream &stream);
 	// a supporting function for task main that get input initialization parameters and invoke
 	// tasks initialization function
 	void inovokeTaskInitializer(std::ofstream &stream, 

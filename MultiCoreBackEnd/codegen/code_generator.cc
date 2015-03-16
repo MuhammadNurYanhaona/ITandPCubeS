@@ -412,7 +412,7 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 		programFile << "};\n";
 		
 		// declare a global reference of this object to be used during LPU generation
-		programFile << "Space" << lps->getName() << "_Content space" << lps->getName() << "Content";
+		programFile << "static Space" << lps->getName() << "_Content space" << lps->getName() << "Content";
 		programFile << statementSeparator << std::endl;
 
 		// create the object for representing an LPU of the LPS
@@ -876,7 +876,7 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
 	programFile << statementIndent << "ArrayMetadata()" << statementSeparator;
 	programFile << statementIndent << "void print(std::ofstream &stream)" << statementSeparator;
 	programFile << "};\n";
-	programFile << "ArrayMetadata arrayMetadata" << statementSeparator;
+	programFile << "static ArrayMetadata arrayMetadata" << statementSeparator;
 	
 	// create a class for environment links; also generate a list of the name of such links to be returned
 	List<const char*> *linkList = new List<const char*>;
@@ -907,7 +907,7 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
 	programFile << std::endl;	
 	programFile << statementIndent << "void print(std::ofstream &stream)" << statementSeparator;
 	programFile << "};\n";
-	programFile << "EnvironmentLinks environmentLinks" << statementSeparator << std::endl;
+	programFile << "static EnvironmentLinks environmentLinks" << statementSeparator << std::endl;
 	programFile.close();
 	return linkList;
 }

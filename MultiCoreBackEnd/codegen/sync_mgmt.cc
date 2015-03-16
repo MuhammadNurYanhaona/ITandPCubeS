@@ -83,10 +83,10 @@ void SyncManager::generateSyncPrimitives() {
 			// initialize the sync variable array and array of barriers to reader-to-writer has_read signals
 			// we mentioned elsewhere that we need two primitives per update as current implementation of sync
 			// primitives does not take into account reader-to-writer okay-to-update-again signals
-			stream << "RS *" << sync->getSyncName() << "s["; 
+			stream << "static RS *" << sync->getSyncName() << "s["; 
 			stream << "Space_" << syncOwner->getName() << "_Threads]";
 			stream << stmtSeparator;
-			stream << "Barrier *" << sync->getReverseSyncName() << "s[";
+			stream << "static Barrier *" << sync->getReverseSyncName() << "s[";
 			stream << "Space_" << syncOwner->getName() << "_Threads]";
 			stream << stmtSeparator;
 		}

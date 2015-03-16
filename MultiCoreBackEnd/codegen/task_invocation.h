@@ -48,6 +48,9 @@ void generateFnToInitTaskRootFromEnv(TaskDef *taskDef,
 // processing of tasks.
 void generateTaskExecutor(TaskGenerator *taskGenerator);
 
+// generate a main function based on the configuration of the coordinator program in IT source code
+void generateMain(ProgramDef *programDef, const char *programFile);	
+
 // function that invokes other functions listed here to generate data structures and method for
 // needed to make multi-task programs work
 void processCoordinatorProgram(ProgramDef *programDef, 
