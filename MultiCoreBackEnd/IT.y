@@ -188,15 +188,6 @@ program		: components					{@1; // this is needed to make bison set up
 							     	     // the location variable yylloc
 								  ProgramDef *program = new ProgramDef($1);
 								  ProgramDef::program = program;				
-								  //program->Print(0);
-								  //program->attachScope(NULL);			
-								  //program->validateScope(NULL);
-								  //if (ReportError::NumErrors() == 0) {		
-								  //	program->performStaticAnalysis();
-								  //}
-								  //if (ReportError::NumErrors() == 0) {
-								  //	program->printTasks();
-								  //}
 								};
 components	: component					{ ($$ = new List<Node*>)->Append($1); }
 		| components component				{ ($$ = $1)->Append($2); };	
@@ -426,8 +417,9 @@ id		: Variable_Name 				{ $$ = new Identifier(@1, $1); }
 
 
 /* ----------------------------------------- Coordinator Program Definition--------------------------------------------------- */
-coordinator	: Program '(' Variable_Name ')' ':' meta_code	{ $$ = new CoordinatorDef(new Identifier(@3, $3), $6, @1); };
-meta_code	: {BeginProgram();} stmt_block 			{ EndProgram(); $$ = $2; };
+coordinator	: Program {BeginProgram();} '(' Variable_Name ')' 
+		  '{' meta_code '}'				{ $$ = new CoordinatorDef(new Identifier(@4, $4), $7, @1); };
+meta_code	: stmt_block 					{ EndProgram(); $$ = $1; };
 create_obj	: New dynamic_type				{ $$ = new ObjectCreate($2, new List<InitializerArg*>, @1); }
 		| New static_type '(' obj_args ')'		{ $$ = new ObjectCreate($2, $4, @1); };
 obj_args	:						{ $$ = new List<InitializerArg*>; }

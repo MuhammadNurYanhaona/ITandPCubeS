@@ -88,6 +88,7 @@ class CoordinatorDef : public Definition {
 	void PrintChildren(int indentLevel);	
 	void validateScope(Scope *parentScope);
 	TupleDef *getArgumentTuple() { return argumentTuple; }
+	const char *getArgumentName() { return argument->getName(); }
 };
 
 class FunctionHeader : public Node {

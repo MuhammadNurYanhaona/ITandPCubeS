@@ -1,4 +1,5 @@
 #include "input_prompt.h"
+#include "output_prompt.h"
 #include "../codegen/structure.h"
 #include "../utils/list.h"
 #include "../utils/string_utils.h"
@@ -43,17 +44,17 @@ void inprompt::readArrayDimensionInfo(const char *arrayName, int dimensionCount,
 }
 
 bool inprompt::readBoolean(const char *varName) {
-	std::cout << "Enter value for boolean variable " << varName << " as True or False\n";
+	std::cout << "Enter value for boolean variable \"" << varName << "\" as True or False\n";
 	std::string value;
-	std::getline(std::cin, value);
+	outprompt::readNonEmptyLine(value);
 	string_utils::trim(value);
 	return strcmp(string_utils::toLower(value.c_str()), "true") == 0;
 }
 
 const char *inprompt::readString(const char *varName) {
-	std::cout << "Enter the value for " << varName << std::endl;
+	std::cout << "Enter value for \"" << varName << '"' << std::endl;
 	std::string value;
-	std::getline(std::cin, value);
+	outprompt::readNonEmptyLine(value);
 	string_utils::trim(value);
 	return strdup(value.c_str());
 }

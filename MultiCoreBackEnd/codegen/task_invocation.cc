@@ -537,6 +537,7 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << "main function\n";
         stream << "------------------------------------------------------------------------------------*/\n";
 
+	CoordinatorDef *coordDef = programDef->getProgramController();
         std::string indent = "\t";
         std::string stmtSeparator = ";\n";
         std::string paramSeparator = ", ";
@@ -550,10 +551,15 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << indent << "gettimeofday(&start, NULL)" << stmtSeparator;
 
 	// create a log file for overall program log printing
-        stream << indent << "// creating a program log file\n";
+        stream << std::endl << indent << "// creating a program log file\n";
         stream << indent << "std::cout << \"Creating diagnostic log: it-program.log\\n\"" << stmtSeparator;
         stream << indent << "std::ofstream logFile" << stmtSeparator;
         stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator << std::endl;
+
+	// get all command line arguments as input from the user
+	stream << indent << "// getting command line inputs\n";
+	stream << indent << "ProgramArgs " << coordDef->getArgumentName();
+	stream << " = getProgramArgs()" << stmtSeparator << std::endl;
 
 	// calculate running time
         stream << indent << "// calculating task running time\n";

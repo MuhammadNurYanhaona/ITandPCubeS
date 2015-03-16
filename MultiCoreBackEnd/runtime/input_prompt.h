@@ -26,7 +26,7 @@ namespace inprompt {
 	
 	// read and return a primitive type from the console
 	template <class type> type readPrimitive(const char *varName) {
-        	std::cout << "Enter value for " << varName << "\n";
+        	std::cout << "Enter value for \"" << varName << "\"\n";
         	type value;
         	std::cin >> value;
         	return value;

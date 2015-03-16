@@ -11,13 +11,13 @@
 void string_utils::trim(std::string &str) {
 
 	// remove all white spaces at the end
-	while (true) {
+	while (str.length() > 0) {
 		if (std::isspace(str[0])) {
 			str.erase(0, 1);
 		} else break;
 	}
 	// remove all white spaces at the end
-	while (true) {
+	while (str.length() > 0) {
 		if (std::isspace(str[str.length() - 1])) {
 			str.erase(str.length() - 1, 1);
 		} else break;

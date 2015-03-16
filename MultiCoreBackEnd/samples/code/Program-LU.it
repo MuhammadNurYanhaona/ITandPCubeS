@@ -1,7 +1,7 @@
-Program (args): 
+Program (args) { 
 	blockSize = args.block_size
 	initEnv = new TaskEnvironment(name: "Initiate LU")
-	load_array(initEnv.a, args.matrix_file)
+	load_array(initEnv.a, args.argument_matrix_file)
 	execute("Initiate LU"; initEnv; Partition: args.s)
 	luEnv = new TaskEnvironment(name: "Transposed LU Factorization")
 	luEnv.u = initEnv.u
@@ -23,6 +23,12 @@ Program (args):
 		execute("Subtract Matrix Multiply Result"; mMultEnv; Partition: args.k, args.l, args.q)
 	} for k in rows step blockSize
 
+	store_array(initEnv.a, args.argument_matrix_file)
+	store_array(luEnv.u, args.upper_matrix_file)
+	store_array(luEnv.l, args.lower_matrix_file)
+	store_array(luEnv.p, args.pivot_matrix_file)
+}
+	
 Task "Initiate LU":
 	Define:
 		a, u, l: 2D Array of Real single-precision
