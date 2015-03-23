@@ -155,6 +155,7 @@ class ThreadState {
 	// LPUs after LPUs. It returns NULL when the recursive process has no more LPUs to return.	
 	LPU *getNextLpu(int lpsId, int containerLpsId, int currentLpuId);
 
+	LPU *getCurrentLpu(int lpsId);
 	void removeIterationBound(int lpsId);
 	ThreadIds *getThreadIds() { return threadIds; }
 	bool isValidPpu(int lpsId);
@@ -166,6 +167,7 @@ class ThreadState {
 	std::ofstream threadLog;
 	void logExecution(const char *stageName, int spaceId);
 	void logThreadAffinity();
+	void closeLogFile();
 };
 
 

@@ -55,7 +55,8 @@ class Stmt : public Node {
 
 	// back end code generation routine; subclasses should provide appropriate 
 	// implementations
-	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space) {};
+	virtual void generateCode(std::ostringstream &stream, 
+			int indentLevel, Space *space = NULL) {};
 };
 
 class StmtBlock : public Stmt {

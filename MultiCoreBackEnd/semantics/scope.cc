@@ -89,3 +89,32 @@ Scope *Scope::get_nearest_scope(ScopeType type) {
 	if (this->parent == NULL) return NULL;
 	return parent->get_nearest_scope(type);
 }
+
+void Scope::declareVariables(std::ostringstream &stream, int indent) {
+
+        std::string stmtSeparator = ";\n";
+        std::ostringstream stmtIndent;
+        for (int i = 0; i < indent; i++) stmtIndent << '\t';
+
+        Iterator<Symbol*> iterator = this->get_local_symbols();
+        Symbol *symbol;
+        while ((symbol = iterator.GetNextValue()) != NULL) {
+
+                VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
+                if (variable == NULL) continue;
+                Type *type = variable->getType();
+                const char *name = variable->getName();
+                stream << stmtIndent.str() << type->getCppDeclaration(name) << stmtSeparator;
+
+                // if the variable is a dynamic array then we need to a declare metadata variable
+                // alongside its own declaration
+                ArrayType *array = dynamic_cast<ArrayType*>(type);
+                StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(type);
+                if (array != NULL && staticArray == NULL) {
+                        int dimensions = array->getDimensions();
+                        stream << stmtIndent.str() << "PartDimension " << name << "PartDims";
+                        stream << "[" << dimensions << "]" << stmtSeparator;
+                }
+        }
+}
+

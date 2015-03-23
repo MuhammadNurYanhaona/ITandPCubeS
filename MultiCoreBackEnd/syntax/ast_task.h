@@ -74,6 +74,7 @@ class EnvironmentLink : public Node {
 
 	// Helper routines for back-end compiler
 	bool isExternal() { return (mode == TypeLink || mode == TypeCreateIfNotLinked); }
+	bool isNullable() { return (mode == TypeCreateIfNotLinked || mode == TypeCreate); }
 };
 
 class EnvironmentConfig : public Node {
@@ -319,6 +320,7 @@ class TaskDef : public Definition {
 	List<const char*> *getRepeatIndexes() { return compute->getRepeatIndexes(); }
 	InitializeInstr *getInitSection() { return initialize; }
 	CompositeStage *getComputation();
+	EnvironmentLink *getEnvironmentLink(const char *linkName);
 };
 
 #endif

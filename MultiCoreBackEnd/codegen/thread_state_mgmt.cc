@@ -68,9 +68,9 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
 	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
 	functionBody << statementSeparator;
-	functionBody << singleIndent << "threadLog << \"set up root LPU\" << std::endl";
+	functionBody << singleIndent << "//threadLog << \"set up root LPU\" << std::endl";
 	functionBody << statementSeparator;
-	functionBody << singleIndent << "threadLog.flush()";
+	functionBody << singleIndent << "//threadLog.flush()";
 	functionBody << statementSeparator << "}\n";
 	
 	programFile << functionHeader.str() << " " << functionBody.str();
@@ -95,9 +95,9 @@ void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingR
 	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
 	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
 	functionBody << statementSeparator;
-	functionBody << singleIndent << "threadLog << \"set up root LPU\" << std::endl";
+	functionBody << singleIndent << "//threadLog << \"set up root LPU\" << std::endl";
 	functionBody << statementSeparator;
-	functionBody << singleIndent << "threadLog.flush()";
+	functionBody << singleIndent << "//threadLog.flush()";
 	functionBody << statementSeparator << "}\n";
 	
 	programFile << functionHeader.str() << " " << functionBody.str();
@@ -136,9 +136,9 @@ void generateInitializeLpuSRoutine(std::ofstream &programFile, MappingNode *mapp
 		programFile << statementSeparator;
 	}
 
-	programFile << singleIndent << "threadLog << \"initialized LPU pointers\" << std::endl";
+	programFile << singleIndent << "//threadLog << \"initialized LPU pointers\" << std::endl";
 	programFile << statementSeparator;
-	programFile << singleIndent << "threadLog.flush()";
+	programFile << singleIndent << "//threadLog.flush()";
 	programFile << statementSeparator;
 	programFile << "}" << std::endl << std::endl;
 }
@@ -178,9 +178,9 @@ void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mapp
 
 	programFile << "void ThreadStateImpl::setLpsParentIndexMap() {\n";
 	programFile << allocateStmt.str() << initializeStmts.str();
-	programFile << singleIndent << "threadLog << \"set up parent LPS index map\" << std::endl";
+	programFile << singleIndent << "//threadLog << \"set up parent LPS index map\" << std::endl";
 	programFile << statementSeparator;
-	programFile << singleIndent << "threadLog.flush()";
+	programFile << singleIndent << "//threadLog.flush()";
 	programFile << statementSeparator;
 	programFile << "}\n\n";
 }

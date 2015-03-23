@@ -25,7 +25,7 @@ void inprompt::readArrayDimensionInfo(const char *arrayName, int dimensionCount,
         std::cout << "\"\n";
         std::cout << "Here a range has the form \"Start-Index:End-Index\"\n";
         std::string input;
-        std::getline(std::cin, input);
+	outprompt::readNonEmptyLine(input);
         std::string delim1 = "*";
         std::string delim2 = ":";
 

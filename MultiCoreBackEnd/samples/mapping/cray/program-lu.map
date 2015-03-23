@@ -1,0 +1,14 @@
+"Initiate LU" {
+	Space A: 1	// Core
+}
+
+"Transposed LU Factorization" {
+	Space A: 3	// CPU
+	Space B: 1	// Core
+}
+
+"Subtract Matrix Multiply Result" {
+	Space A: 1	// Core
+}
+
+

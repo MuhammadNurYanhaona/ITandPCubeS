@@ -97,7 +97,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	
 	// generate functions to initialize LPS content references
 	generateFnToInitiateRootLPSContent(headerFile, programFile, initials,
-                	mappingConfig, envLinkList);
+                	taskDef, mappingConfig, envLinkList);
 	// TODO note that we commented out the original and accurate implementation for 
 	// the sake of a simpler one as we are hard pressed with time. The latter version
 	// uses memory allocations for structures within root LPS for all other LPSes.
@@ -485,7 +485,7 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream,
 
 	// Invoke the task initializer function if it is invocable or write a comment directing code modifications
 	stream << std::endl << indent << "// invoking the initializer function\n";
-	stream << indent << "std::cout << \"invoking task initializer function\\n\"" << stmtSeparator;
+	stream << indent << "//std::cout << \"invoking task initializer function\\n\"" << stmtSeparator;
 	if (!initFunctionInvocable) {	
 		stream << indent << "//TODO invoke the initializeTask function after making required changes\n";
 		stream << indent << "//";			
@@ -550,7 +550,7 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
         }
 	
 	// create an array of thread IDs and initiate them
-	stream << indent << "std::cout << \"generating PPU Ids for threads\\n\"" << stmtSeparator;
+	stream << indent << "//std::cout << \"generating PPU Ids for threads\\n\"" << stmtSeparator;
 	stream << indent << "ThreadIds *threadIdsList[Total_Threads]" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	stream << indent << indent << "threadIdsList[i] = getPpuIdsForThread(i)" << stmtSeparator;
@@ -558,7 +558,7 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	stream << indent << "}\n";
 
 	// finally create an array of Thread-State variables and initiate them	
-	stream << indent << "std::cout << \"initiating thread-states\\n\"" << stmtSeparator;
+	stream << indent << "//std::cout << \"initiating thread-states\\n\"" << stmtSeparator;
 	stream << indent << "ThreadStateImpl *threadStateList[Total_Threads]" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	stream << indent << indent << "threadStateList[i] = new ThreadStateImpl(Space_Count, ";
@@ -580,7 +580,7 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	std::string paramSeparator = ", ";
 	
 	stream << std::endl << indent << "// starting threads\n";	
-	stream << indent << "std::cout << \"starting threads\\n\"" << stmtSeparator;
+	stream << indent << "//std::cout << \"starting threads\\n\"" << stmtSeparator;
 	
 	// declare an array of thread IDs and another array of thread arguments
 	stream << indent << "pthread_t threads[Total_Threads]" << stmtSeparator;

@@ -49,6 +49,7 @@ void generatePrintFnForLpuDataStructures(const char *initials,
 void generateFnToInitiateRootLPSContent(const char *headerFile, 
 		const char *programFile, 
 		const char *initials,
+		TaskDef *taskDef,
 		MappingNode *mappingRoot, 
 		List<const char*> *externalEnvLinks);
 

@@ -6,6 +6,7 @@
 #include <string>
 
 class TaskDef;
+class Type;
 
 /* This is an utility class for appending appropriate prefix and suffixes to variable names during
    code generation. Note that since we place different IT data structures and even sometimes their 
@@ -50,7 +51,8 @@ namespace ntransform {
 	  public:
 		static NameTransformer *transformer;
 		static void setTransformer(TaskDef *taskDef);
-		const char *getTransformedName(const char *varName, bool metadata, bool local);	
+		const char *getTransformedName(const char *varName, 
+				bool metadata, bool local, Type *type = NULL);	
 		bool isTaskGlobal(const char *varName);
 		bool isThreadLocal(const char *varName);
 		bool isGlobalArray(const char *varName);

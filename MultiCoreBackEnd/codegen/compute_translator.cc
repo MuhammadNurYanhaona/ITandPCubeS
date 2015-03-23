@@ -168,8 +168,13 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	programFile << "\tthreadState->logThreadAffinity();\n";
 
 	// set the root LPU for the thread so the computation can start
+	PartitionHierarchy *hierarchy = taskDef->getPartitionHierarchy();
+	Space *rootLps = hierarchy->getRootSpace();
 	programFile << "\n\t// set the root LPU in the thread state so that calculation can start\n";
-	programFile << "\tthreadState->setRootLpu(arrayMetadata);\n";
+	programFile << "\tLPU *rootLpu = threadState->getCurrentLpu(Space_" << rootLps->getName() << ");\n";
+	programFile << "\tif (rootLpu == NULL) {\n";
+	programFile << "\t\tthreadState->setRootLpu(arrayMetadata);\n";
+	programFile << "\t}\n";
 
 	// if the task involves synchronization then initialize the data structure that will hold sync primitives
 	// correspond to synchronizations that this thread will participate into. 
@@ -189,8 +194,11 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 
 	// invoke recursive flow stage invocation code to implement the logic of the run method
 	CompositeStage *computation = taskDef->getComputation();
-	PartitionHierarchy *hierarchy = taskDef->getPartitionHierarchy();
-	computation->generateInvocationCode(programFile, 1, hierarchy->getRootSpace());
+	computation->generateInvocationCode(programFile, 1, rootLps);
+
+	// close the thread log file
+	programFile << "\n\t// close thread's log file\n";
+	programFile << "\tthreadState->closeLogFile();\n";
 		
 	// finish function body in the program file
 	programFile << "}\n\n";

@@ -4,6 +4,7 @@
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 #include "../utils/string_utils.h"
+#include "../utils/common_utils.h"
 #include "../syntax/ast_def.h"
 #include "../syntax/ast_task.h"
 #include "../syntax/ast_type.h"
@@ -504,6 +505,7 @@ void generatePrintFnForLpuDataStructures(const char *initials, const char *outpu
 
 void generateFnToInitiateRootLPSContent(const char *headerFileName, const char *programFileName,
                 const char *initials,
+		TaskDef *taskDef,
                 MappingNode *mappingRoot,
                 List<const char*> *externalEnvLinks) {
 
@@ -543,22 +545,48 @@ void generateFnToInitiateRootLPSContent(const char *headerFileName, const char *
 	// LPSes where they are needed
 	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
 	for (int i = 0; i < localArrays->NumElements(); i++) {
+		
 		const char *arrayName = localArrays->Nth(i);
 		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
 		ArrayType *arrayType = (ArrayType*) array->getType();
 		Type *elemType = arrayType->getTerminalElementType();
-		bool isInEnvLinks = false;
-		for (int j = 0; j < externalEnvLinks->NumElements(); j++) {
-			if (strcmp(arrayName, externalEnvLinks->Nth(j)) == 0) {
-				isInEnvLinks = true;
-				break;
-			}
-		}
+		bool isInEnvLinks = common_utils::isStringInList(arrayName, externalEnvLinks);
+		
 		// if the variable in environment links then copy its reference from there
-		if (isInEnvLinks) {
+		if (isInEnvLinks) {		
 			functionBody << stmtIndent;
 			functionBody << lpsVar << "." << arrayName << " = envLinks->" << arrayName;
 			functionBody << stmtSeparator;
+			// if the link is nullable then we have to initialize it based on metadata if it does
+			// not exist
+			EnvironmentLink *link = taskDef->getEnvironmentLink(arrayName);
+			if (link->isNullable()) {
+				functionBody << stmtIndent;
+				functionBody << "if (envLinks->" << arrayName << " == NULL) {\n";
+				int dimensionCount = array->getDimensionality();
+				functionBody << stmtIndent << stmtIndent;
+				functionBody << lpsVar << "." << arrayName << " = allocate::allocateArray ";
+				functionBody << "<" << elemType->getName() << "> (";
+				functionBody << dimensionCount << paramSeparator;
+				functionBody << "metadata->" << arrayName << "Dims)";
+				functionBody << stmtSeparator;
+				
+				// if the array contains primitive type objects then zero fill it
+				ListType *list = dynamic_cast<ListType*>(elemType);
+				MapType *map = dynamic_cast<MapType*>(elemType);
+				NamedType *object = dynamic_cast<NamedType*>(elemType);
+				if (list == NULL && map == NULL && object == NULL) {
+					functionBody << stmtIndent << stmtIndent;
+					functionBody << "allocate::zeroFillArray ";
+					functionBody << "<" << elemType->getName() << "> (0";
+					functionBody << paramSeparator << lpsVar << "." << arrayName;
+					functionBody << paramSeparator << dimensionCount << paramSeparator;
+					functionBody << "metadata->" << arrayName << "Dims)";
+					functionBody << stmtSeparator;
+				}
+				functionBody << stmtIndent << "}\n";
+			}
+
 		// otherwise allocate an array for the variable
 		} else {
 			int dimensionCount = array->getDimensionality();

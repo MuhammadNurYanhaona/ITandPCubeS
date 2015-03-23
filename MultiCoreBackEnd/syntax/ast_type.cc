@@ -137,6 +137,7 @@ const char *Type::getCppDeclaration(const char *varName) {
 NamedType::NamedType(Identifier *i) : Type(*i->GetLocation()) {
     	Assert(i != NULL);
     	(id=i)->SetParent(this);
+	environmentType = false;
 } 
 
 void NamedType::PrintChildren(int indentLevel) {
@@ -151,7 +152,9 @@ bool NamedType::isEqual(Type *other) {
 
 const char *NamedType::getCppDeclaration(const char *varName) {
 	std::ostringstream decl;
-	decl << id->getName() << " " << varName;
+	decl << id->getName() << " ";
+	if (environmentType) decl << "*"; 
+	decl << varName;
 	return strdup(decl.str().c_str());
 }
 

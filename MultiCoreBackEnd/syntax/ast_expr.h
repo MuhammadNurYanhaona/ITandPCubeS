@@ -70,9 +70,9 @@ class Expr : public Stmt {
 	virtual const char *getBaseVarName() { return NULL; }
 	
 	// Helper functions for code generation
-	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space = NULL);
 	virtual void translate(std::ostringstream &stream, 
-			int indentLevel, int currentLineLength, Space *space);
+			int indentLevel, int currentLineLength = 0, Space *space = NULL);
 	virtual List<FieldAccess*> *getTerminalFieldAccesses();
 	static void copyNewFields(List<FieldAccess*> *destination, List<FieldAccess*> *source);
 	void setType(Type *type) { this->type = type; }
@@ -137,7 +137,7 @@ class StringConstant : public Expr {
 	const char *getValue() { return value; }
 	void resolveType(Scope *scope, bool ignoreFailure) { type = Type::stringType; }
 	void inferType(Scope *scope, Type *rootType);   
-	void translate(std::ostringstream &s, int i, int c, Space *space) { s << value; }
+	void translate(std::ostringstream &s, int i, int c, Space *space) { s << '\"' << value << '\"'; }
 };
 
 class CharacterConstant : public Expr {
@@ -555,6 +555,7 @@ class InitializerArg : public Node {
 	void validateType(Scope *scope, TupleDef *objectDef, bool ignoreFailure);
 	const char *getName() { return argName; }
 	Expr *getValue() { return argValue; }
+	void generateAssignment(Expr *object, std::ostringstream &stream, int indentLevel);
 };
 
 class ObjectCreate : public Expr {
@@ -566,6 +567,8 @@ class ObjectCreate : public Expr {
 	const char *GetPrintNameForNode() { return "ObjectCreate"; }
     	void PrintChildren(int indentLevel);	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+	void generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel);
 };
 
 #endif

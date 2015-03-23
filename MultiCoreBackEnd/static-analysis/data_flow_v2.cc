@@ -441,18 +441,8 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 
 	// declare any local variables found in the computation	
 	std::ostringstream localVars;
-        Iterator<Symbol*> iterator = scope->get_local_symbols();
-       	Symbol *symbol;
-	bool symbolFound = false;
-        while ((symbol = iterator.GetNextValue()) != NULL) {
-                VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
-                if (variable == NULL) continue;
-		symbolFound = true;
-                Type *type = variable->getType();
-                const char *name = variable->getName();
-        	localVars << stmtIndent << type->getCppDeclaration(name) << ";\n";
-        }
-	if (symbolFound) {
+        scope->declareVariables(localVars, 1);
+	if (localVars.str().length() > 0) {
 		stream <<  localVarDclHd;
 		stream << localVars.str();
 	}

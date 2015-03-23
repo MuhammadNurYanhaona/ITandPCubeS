@@ -7,6 +7,9 @@
 #include "../utils/list.h"
 #include "../semantics/scope.h"
 
+#include <fstream>
+#include <sstream>
+
 class TaskDef;
 class TupleDef;
 class CoordinatorDef;
@@ -59,12 +62,18 @@ class ProgramDef : public Definition {
 	List<TupleDef*> *getTuples();
 	CoordinatorDef *getProgramController();
 	bool isIsolatedTaskProgram(); 
+	Scope *getScope();
 };
 
 class TupleDef : public Definition {
   protected:
         Identifier *id;
         List<VariableDef*> *components;
+	// This is a flag to indicate if this tuple represents the environment of some task. We 
+        // need this to do specialized operations needed by environment objects. For example, 
+        // we declare pointers for environment types as opposed to object instances done for other 
+        // tuple types.
+        bool environment;
   public:
         TupleDef(Identifier *id, List<VariableDef*> *components); 
 	const char *GetPrintNameForNode() { return "Tuple"; } 
@@ -72,6 +81,8 @@ class TupleDef : public Definition {
 	Identifier *getId() { return id; }
 	void attachScope(Scope *parentScope); 
 	void validateScope(Scope *parentScope);
+	void flagAsEnvironment() { environment = true; }
+        bool isEnvironment() { return environment; }
 	List<VariableDef*> *getComponents() { return components; }
 	VariableDef *getComponent(const char *name);
 };
@@ -89,6 +100,10 @@ class CoordinatorDef : public Definition {
 	void validateScope(Scope *parentScope);
 	TupleDef *getArgumentTuple() { return argumentTuple; }
 	const char *getArgumentName() { return argument->getName(); }
+	
+	//--------------------------------------------------- helper methods for code generation
+	void declareVariablesInScope(std::ostringstream &stream, int indent);
+	void generateCode(std::ostringstream &stream, Scope *scope);
 };
 
 class FunctionHeader : public Node {

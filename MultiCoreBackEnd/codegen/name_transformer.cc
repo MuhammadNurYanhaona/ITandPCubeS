@@ -47,7 +47,7 @@ bool NameTransformer::isGlobalArray(const char *varName) {
 	return false;
 }
 
-const char *NameTransformer::getTransformedName(const char *varName, bool metadata, bool local) {
+const char *NameTransformer::getTransformedName(const char *varName, bool metadata, bool local, Type *type) {
 	std::ostringstream xformedName;
 	if (isTaskGlobal(varName)) {
 		xformedName << "taskGlobals->" << varName;
@@ -69,6 +69,19 @@ const char *NameTransformer::getTransformedName(const char *varName, bool metada
 			return strdup(xformedName.str().c_str());
 		}
 	}
+	//------------------------------------------------------------------------------------ Patch Solution
+	// This portion is a patch for translating elements within tasks' environment references. We designed
+	// the name transformer with only single task in mind. Now because of time shortage we are using it
+	// for translating the coordinator program too. Otherwise, we should TODO refactor this logic to do
+	// transformation of names properly based on the context.
+	if (type != NULL) {
+		ArrayType *array = dynamic_cast<ArrayType*>(type);
+		if (array != NULL && metadata) {
+			xformedName << varName << "Dims";
+			return strdup(xformedName.str().c_str());
+		}
+	}
+	//---------------------------------------------------------------------------------------------------
 	return varName;
 }
 

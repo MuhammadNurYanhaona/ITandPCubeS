@@ -10,6 +10,7 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/common_utils.h"
+#include "name_transformer.h"
 
 #include <sstream>
 #include <fstream>
@@ -491,7 +492,7 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 				programFile << stmtSeparator;
 			}
 		// otherwise, copy the property from task-global object into the environment 
-		} else {
+		} else if (strcmp(propertyName, "name") != 0) {
 			programFile << indent;
 			programFile << "environment->" << propertyName << " = ";
 			programFile << "taskGlobals." << propertyName;
@@ -560,6 +561,20 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
 	stream << indent << "// getting command line inputs\n";
 	stream << indent << "ProgramArgs " << coordDef->getArgumentName();
 	stream << " = getProgramArgs()" << stmtSeparator << std::endl;
+
+	// declare all local variables found in scope
+	stream << indent << "// declaring local variables\n";
+	std::ostringstream declStream;
+	coordDef->declareVariablesInScope(declStream, 1);
+	stream << declStream.str() << std::endl;
+
+	// reset the name transformer to avoid spill over of logic from task generation
+	ntransform::NameTransformer::transformer->reset();
+	
+	// translate the code found inside the coordinator function
+	std::ostringstream codeStream;
+	coordDef->generateCode(codeStream, programDef->getScope());
+	stream << codeStream.str() << std::endl;
 
 	// calculate running time
         stream << indent << "// calculating task running time\n";

@@ -180,8 +180,18 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
 		}
 		return table;
 	} else {
-		Hashtable<VariableAccess*> *table = base->getAccessedGlobalVariables(globalReferences);
 		FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+		if (baseField != NULL) {
+			ArrayType *array = dynamic_cast<ArrayType*>(baseField->getType());
+			// set some flags in the base expression that will help us during code generation
+			if (array != NULL) {
+				baseField->setMetadata(true);
+				if (this->isLocalTerminalField()) {
+					baseField->markLocal();
+				}
+			}
+		}
+		Hashtable<VariableAccess*> *table = base->getAccessedGlobalVariables(globalReferences);
 		if (baseField == NULL || !baseField->isTerminalField()) return table;
 		const char *fieldName = baseField->field->getName();
 		if (globalReferences->doesReferToGlobal(fieldName)) {
@@ -190,11 +200,6 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
 			const char *globalName = global->getName();
 			if ((dynamic_cast<ArrayType*>(globalType)) != NULL) {
 				table->Lookup(globalName)->markMetadataAccess(); 
-				// set some flags in the base expression that will help during code generation
-				baseField->setMetadata(true);
-				if (this->isLocalTerminalField()) {
-					baseField->markLocal();
-				}
 			} else {
 				table->Lookup(globalName)->markContentAccess();
 			}	
@@ -218,6 +223,7 @@ void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int cur
 		
 		// if it is an array dimension then access the appropriate index corresponding to that dimension
 		ArrayType *arrayType = dynamic_cast<ArrayType*>(base->getType());
+		NamedType *userDefinedType = dynamic_cast<NamedType*>(base->getType());
 		if (arrayType != NULL) {
 			// skip the field if it is a local flag for an array dimension
 			if (!strcmp(field->getName(), Identifier::LocalId) == 0) {
@@ -231,10 +237,28 @@ void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int cur
 				} else if (arrayType->getDimensions() == 1) {
 					stream << "[0]";
 				}
+				//------------------------------------------------------------------- Patch Solution
+				// This is a patch solution to cover quickly cover up the design difference between
+				// environment object and other objects. TODO kindly do appropriate refactoring in the
+				// future to do this in a better way.
+				FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+				if (baseField != NULL && !baseField->isTerminalField()) {
+					stream << ".partition";	
+				} 	
+				//----------------------------------------------------------------------------------
 			}
 		// if it is the length field of a dimension object then convert that into an equivalent function call
 		} else if (base->getType() == Type::dimensionType && strcmp(field->getName(), "length") == 0) {
 			stream << ".getLength()";
+		// if the base is some type of environment then according the logic we use it is a pointer reference;
+		// so this case need an especial treatment
+		} else if (userDefinedType != NULL && userDefinedType->isEnvironmentType()) {
+			ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+			stream << "->";
+			// in addition, since an environment object may contain array references, we need to get trans-
+			// formed names based on types of its properties. 
+			const char *fieldName = field->getName();
+			stream << transformer->getTransformedName(fieldName, metadata, local, type);
 		// otherwise just write the field directly
 		} else {
 			stream << "." << field->getName();

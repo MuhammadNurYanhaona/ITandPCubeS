@@ -77,6 +77,8 @@ void TaskDef::attachScope(Scope *parentScope) {
 			envElementTypes->Append(varSym->getType());	
 		}
 	}
+	envDef->Append(new VariableDef(new Identifier(*GetLocation(), "name"), Type::stringType));
+	envElementTypes->Append(Type::stringType);	
 
 	const char *initials = string_utils::getInitials(id->getName());
 	char *envTupleName = (char *) malloc(strlen(initials) + 12);
@@ -222,6 +224,16 @@ List<Identifier*> *TaskDef::getPartitionArguments() {
 }
 
 CompositeStage *TaskDef::getComputation() { return compute->getComputation(); }
+
+EnvironmentLink *TaskDef::getEnvironmentLink(const char *linkName) {
+	List<EnvironmentLink*> *linkList = environment->getLinks();
+	for (int i = 0; i < linkList->NumElements(); i++) {
+		EnvironmentLink *link = linkList->Nth(i);
+		const char *currentLinkName = link->getVariable()->getName();
+		if (strcmp(linkName, currentLinkName) == 0) return link;
+	}
+	return NULL;
+}
 
 //------------------------------------- Define Section ------------------------------------------/
 

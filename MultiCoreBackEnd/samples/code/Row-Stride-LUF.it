@@ -44,17 +44,18 @@ Task "LU Factorization":
 		"Update Lower" (Space B)
 		Activate if k in l.local.dimension1.range {
 			do {	l[k][j] = u[k][j] / u[k][k]
+				u[k][j] = 0
 				l_row[j] = l[k][j]
 			} for j in l and j > k
 		}
 		"Update Upper" (Space B) {
 			do {	u[i][j] = u[i][j] - l_row[j] * u[i][k] 
-			} for i, j in u and i >= k and j > k
+			} for i, j in u and i > k and j > k
 		}
 		Repeat: from "Select Pivot" for k in a.dimension1.range
 	Partition:
 		Space A <un-partitioned> { p }
 		Space B <1D> divides Space A partitions {
-			a<dim1>, u<dim1>, l<dim1>: stride ()
+			a<dim2>, u<dim1>, l<dim1>: stride ()
 			l_row: replicated
 		} 

@@ -48,13 +48,19 @@ class Type : public Node {
 class NamedType : public Type {
   protected:
   	Identifier *id;
-    
+	// This is a flag to indicate if this type represents the environment of some task. We 
+	// need this to do specialized operations needed by environment objects. For example, 
+	// we declare pointers for environment types as oppose to object instances done for other 
+	// named types.
+   	bool environmentType; 
   public:
     	NamedType(Identifier *i);
     	const char *GetPrintNameForNode() { return "NamedType"; }
    	void PrintChildren(int indentLevel);
 	Identifier *getId() { return id; }
 	const char *getName() { return id->getName(); }
+	void flagAsEnvironmentType() { environmentType = true; }
+	bool isEnvironmentType() { return environmentType; }
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
 	bool isEqual(Type *other);
 	const char *getCType() { return id->getName(); }	

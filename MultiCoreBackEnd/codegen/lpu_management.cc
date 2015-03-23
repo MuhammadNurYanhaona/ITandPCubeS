@@ -145,12 +145,12 @@ int *MockLpuCounter::setCurrentCompositeLpuId(int linearId) {
 
 void MockLpuCounter::logLpuCount(std::ofstream &log, int indent) {
 	for (int i = 0; i < indent; i++) log << '\t';
-	log << "LPU Count: 1\n";
+	log << "Mock LPU Count: 1\n";
 }
 
 void MockLpuCounter::logCompositeLpuId(std::ofstream &log, int indent) {
 	for (int i = 0; i < indent; i++) log << '\t';
-	log << "Composite ID: 0\n";
+	log << "Mock Composite ID: 0\n";
 }
 
 /*********************************************  LPS State  ************************************************/
@@ -166,7 +166,7 @@ LpsState::LpsState(int lpsDimensions, PPU_Ids ppuIds) {
 }
 
 LPU *LpsState::getCurrentLpu() {
-	if (lpu->isValid()) return lpu; 
+	if (lpu != NULL && lpu->isValid()) return lpu; 
 	return NULL; 
 }
 
@@ -248,6 +248,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 					/*---------------------------------- turned off	
 					// log counter update
 					counter->logLpuCount(threadLog, lpsId);
+					counter->logLpuRange(threadLog, lpsId);
 					---------------------------------------------*/
 					
 					// retrieve next LPU Id from the updated counter
@@ -284,7 +285,8 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	LpsState *parentState = lpsStates[parentLpsId];
 	// if they are not the same then do a recursive get-Next_LPU call on the parent to initiate parent's counter
 	if (containerLpsId != parentLpsId && parentLpsId != INVALID_ID) {
-		getNextLpu(parentLpsId, containerLpsId, INVALID_ID);
+		LPU *parentLpu = getNextLpu(parentLpsId, containerLpsId, INVALID_ID);
+		if (parentLpu == NULL) return NULL;
 	}
 
 	// initiate LPU counter and range variables
@@ -297,6 +299,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	/*---------------------------------- turned off	
 	// log counter update
 	counter->logLpuCount(threadLog, lpsId);
+	counter->logLpuRange(threadLog, lpsId);
 	---------------------------------------------*/
 	
 	// compute the next LPU for the current LPS using a recursive procedure
@@ -327,6 +330,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		/*---------------------------------- turned off	
 		// log counter update
 		counter->logLpuCount(threadLog, lpsId);
+		counter->logLpuRange(threadLog, lpsId);
 		---------------------------------------------*/
 		
 		// retrieve next LPU Id from the updated counter
@@ -363,20 +367,31 @@ void ThreadState::initiateLogFile(const char *fileNamePrefix) {
 	std::ostringstream fileName;
 	fileName << fileNamePrefix;
 	fileName << "_" << threadIds->threadNo << ".log";
-	threadLog.open(fileName.str().c_str());
+	threadLog.open(fileName.str().c_str(), std::ofstream::out | std::ofstream::app);
 	if (!threadLog.is_open()) {
 		std::cout << "Could not open log file for Thread-" << threadIds->threadNo << "\n";
 	}
 }
 
 void ThreadState::logExecution(const char *stageName, int spaceId) {
-	///*------------------------------------------- Turned Off
+	/*------------------------------------------- Turned Off
 	for (int i = 0; i <= spaceId; i++) threadLog << '\t';
 	threadLog << "Executed: " << stageName << std::endl;
-	//------------------------------------------------------*/
+	------------------------------------------------------*/
 }
 
 void ThreadState::logThreadAffinity() {
+	/*------------------------------------------- Turned Off
 	threadLog << "Thread Id: " << pthread_self() << std::endl;
 	threadLog << "Thread CPU Id: " << sched_getcpu() << std::endl; 	
+	------------------------------------------------------*/
+}
+
+LPU *ThreadState::getCurrentLpu(int lpsId) {
+	LpsState *state = lpsStates[lpsId];
+	return state->getCurrentLpu();
+}
+
+void ThreadState::closeLogFile() {
+	if (threadLog.is_open()) threadLog.close();
 }

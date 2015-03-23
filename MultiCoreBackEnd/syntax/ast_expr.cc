@@ -35,7 +35,7 @@ void Expr::generateCode(std::ostringstream &stream, int indentLevel, Space *spac
 
 void Expr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	std::cout << "A sub-class of expression didn't implement the code generation method\n";
-	std::exit(EXIT_FAILURE);
+	//std::exit(EXIT_FAILURE);
 }
 
 List<FieldAccess*> *Expr::getTerminalFieldAccesses() {
@@ -652,6 +652,14 @@ void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, S
 		rightPart->translate(stream, indentLevel, 0, space);
 		stream << ";\n";
 	}
+
+	// if the right side of the assignment is a new operation, i.e., an object instantiation then
+	// there might be some arguments been passed to the constructor. Those arguments need to be assigned
+	// to appropriate properties of the object as subsequent statements.  
+	ObjectCreate *objectCreate = dynamic_cast<ObjectCreate*>(rightPart);
+	if (objectCreate != NULL) {
+		objectCreate->generateCodeForProperties(left, stream, indentLevel);
+	}
 }
 
 List<FieldAccess*> *AssignmentExpr::getTerminalFieldAccesses() {
@@ -888,6 +896,18 @@ void InitializerArg::validateType(Scope *scope, TupleDef *objectDef, bool ignore
 	}	
 }
 
+void InitializerArg::generateAssignment(Expr *object, std::ostringstream &stream, int indentLevel) {
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	object->translate(stream, indentLevel);
+	NamedType *userDefinedObject = dynamic_cast<NamedType*>(object->getType());
+	if (userDefinedObject != NULL && userDefinedObject->isEnvironmentType()) {
+		stream << "->";
+	} else stream << '.';
+	stream << argName << " = ";
+	argValue->translate(stream, indentLevel);
+	stream << ";\n";
+}
+
 ObjectCreate::ObjectCreate(Type *o, List<InitializerArg*> *i, yyltype loc) : Expr(loc) {
 	Assert(o != NULL && i != NULL);
 	objectType = o;
@@ -937,7 +957,9 @@ void ObjectCreate::resolveType(Scope *scope, bool ignoreFailure) {
 						this->type = Type::errorType;
 					} else {
 						TaskDef *taskDef = (TaskDef*) task->getNode();
-						this->type = new NamedType(taskDef->getEnvTuple()->getId());
+						NamedType *envType = new NamedType(taskDef->getEnvTuple()->getId());
+						envType->flagAsEnvironmentType();
+						this->type = envType;
 					}
 				}
 			} 
@@ -984,6 +1006,22 @@ void ObjectCreate::resolveType(Scope *scope, bool ignoreFailure) {
 			}
 		}
 		this->type = objectType;
+	}
+}
+
+void ObjectCreate::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
+	
+	NamedType *userDefinedType = dynamic_cast<NamedType*>(type);
+	if (userDefinedType != NULL) {
+		if (userDefinedType->isEnvironmentType()) stream << "new ";
+	}
+	stream << type->getCType() << "()";
+}
+
+void ObjectCreate::generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel) {
+	for (int i = 0; i < initArgs->NumElements(); i++) {
+		InitializerArg *currentArg = initArgs->Nth(i);
+		currentArg->generateAssignment(object, stream, indentLevel);
 	}
 }
     	
