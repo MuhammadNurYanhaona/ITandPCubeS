@@ -109,32 +109,37 @@ int main() {
 	blockSize = args.block_size;
 	initEnv = new ILUEnvironment();
 	initEnv->name = "Initiate LU";
-
-	// substitute to load array
-	Dimension aDims[2];
-	inprompt::readArrayDimensionInfo("a", 2, aDims);
-        initEnv->a = allocate::allocateArray <double> (2, aDims);
-        allocate::randomFillPrimitiveArray <double> (initEnv->a, 2, aDims);
-	initEnv->aDims[0].partition = aDims[0];
-	initEnv->aDims[0].storage = aDims[0];
-	initEnv->aDims[1].partition = aDims[1];
-	initEnv->aDims[1].storage = aDims[1];
-
-	// substitute to task invocation
-	ILUPartition iluPartition;
-	ilu::execute(initEnv, iluPartition, logFile);
-
+	{ // scope starts for load-array operation
+	Dimension arrayDims[2];
+	if (outprompt::getYesNoAnswer("Want to read array \"initEnv->a\" from a file?")) {
+		initEnv->a = inprompt::readArrayFromFile <double> ("initEnv->a", 
+			2, arrayDims, args.argument_matrix_file);
+	} else {
+		inprompt::readArrayDimensionInfo("initEnv->a", 2, arrayDims);
+		initEnv->a = allocate::allocateArray <double> (2, arrayDims);
+		allocate::randomFillPrimitiveArray <double> (initEnv->a, 
+			2, arrayDims);
+	}
+	initEnv->aDims[0].partition = arrayDims[0];
+	initEnv->aDims[0].storage = arrayDims[0].getNormalizedDimension();
+	initEnv->aDims[1].partition = arrayDims[1];
+	initEnv->aDims[1].storage = arrayDims[1].getNormalizedDimension();
+	} // scope ends for load-array operation
+	{ // scope starts for invoking: Initiate LU
+	ILUPartition partition;
+	ilu::execute(initEnv, partition, logFile);
+	} // scope ends for task invocation
 	luEnv = new TLUFEnvironment();
 	luEnv->name = "Transposed LU Factorization";
 
 	// substitute to copying from one environment to another
-	luEnv->u = initEnv->u;
-	luEnv->uDims[0] = initEnv->uDims[0];
-	luEnv->uDims[1] = initEnv->uDims[1];
-	luEnv->l = initEnv->l;
-	luEnv->lDims[0] = initEnv->lDims[0];
-	luEnv->lDims[1] = initEnv->lDims[1];
-	luEnv->p = NULL;
+        luEnv->u = initEnv->u;
+        luEnv->uDims[0] = initEnv->uDims[0];
+        luEnv->uDims[1] = initEnv->uDims[1];
+        luEnv->l = initEnv->l;
+        luEnv->lDims[0] = initEnv->lDims[0];
+        luEnv->lDims[1] = initEnv->lDims[1];
+        luEnv->p = NULL;
 
 	rows = initEnv->aDims[0].partition.range;
 	max1 = rows.max;
@@ -160,72 +165,73 @@ int main() {
 		range = Range();
 		range.min = k;
 		range.max = lastRow;
-
-		// substitute to task invocation
-		TLUFPartition luPartition;
-		tluf::execute(luEnv, range, luPartition, logFile);
-
+		{ // scope starts for invoking: Transposed LU Factorization
+		TLUFPartition partition;
+		tluf::execute(luEnv, range, partition, logFile);
+		} // scope ends for task invocation
 		if (lastRow < max1) {
 			mMultEnv = new SMMREnvironment();
 			mMultEnv->name = "Subtract Matrix Multiply Result";
-
-			// substitute to copy from one environment to another
-			mMultEnv->a = luEnv->u;
-			mMultEnv->aDims[0] = luEnv->uDims[0].getSubrange(lastRow + 1, max1);
-			mMultEnv->aDims[1] = luEnv->uDims[1].getSubrange(k, lastRow);
-			mMultEnv->b = luEnv->l;
-			mMultEnv->bDims[0] = luEnv->lDims[0].getSubrange(k, lastRow);
-			mMultEnv->bDims[1] = luEnv->lDims[1].getSubrange(lastRow + 1, max2);
-			mMultEnv->c = luEnv->u;
-			mMultEnv->cDims[0] = luEnv->uDims[0].getSubrange(lastRow + 1, max1);
-			mMultEnv->cDims[1] = luEnv->uDims[1].getSubrange(lastRow + 1, max2);
 			
-			// substitute to task invocation
-			SMMRPartition smmrPartition;
-			smmrPartition.k = args.k;
-			smmrPartition.l = args.l;
-			smmrPartition.q = args.q;
-			smmr::execute(mMultEnv, smmrPartition, logFile);
+			// substitute to copy from one environment to another
+                        mMultEnv->a = luEnv->u;
+                        mMultEnv->aDims[0] = luEnv->uDims[0].getSubrange(lastRow + 1, max1);
+                        mMultEnv->aDims[1] = luEnv->uDims[1].getSubrange(k, lastRow);
+                        mMultEnv->b = luEnv->l;
+                        mMultEnv->bDims[0] = luEnv->lDims[0].getSubrange(k, lastRow);
+                        mMultEnv->bDims[1] = luEnv->lDims[1].getSubrange(lastRow + 1, max2);
+                        mMultEnv->c = luEnv->u;
+                        mMultEnv->cDims[0] = luEnv->uDims[0].getSubrange(lastRow + 1, max1);
+                        mMultEnv->cDims[1] = luEnv->uDims[1].getSubrange(lastRow + 1, max2);
+
+			{ // scope starts for invoking: Subtract Matrix Multiply Result
+			SMMRPartition partition;
+			partition.k = args.k;
+			partition.l = args.l;
+			partition.q = args.q;
+			smmr::execute(mMultEnv, partition, logFile);
+			} // scope ends for task invocation
 		}
 	}
 	} // scope exit for sequential loop
-	
+	if (outprompt::getYesNoAnswer("Want to save array \"initEnv->a\" in a file?")) {
+		Dimension arrayDims[2];
+		arrayDims[0] = initEnv->aDims[0].storage;
+		arrayDims[1] = initEnv->aDims[1].storage;
+		outprompt::writeArrayToFile <double> ("initEnv->a", 
+			initEnv->a, 2, arrayDims, args.argument_matrix_file);
+	}
+	if (outprompt::getYesNoAnswer("Want to save array \"luEnv->u\" in a file?")) {
+		Dimension arrayDims[2];
+		arrayDims[0] = luEnv->uDims[0].storage;
+		arrayDims[1] = luEnv->uDims[1].storage;
+		outprompt::writeArrayToFile <double> ("luEnv->u", 
+			luEnv->u, 2, arrayDims, args.upper_matrix_file);
+	}
+	if (outprompt::getYesNoAnswer("Want to save array \"luEnv->l\" in a file?")) {
+		Dimension arrayDims[2];
+		arrayDims[0] = luEnv->lDims[0].storage;
+		arrayDims[1] = luEnv->lDims[1].storage;
+		outprompt::writeArrayToFile <double> ("luEnv->l", 
+			luEnv->l, 2, arrayDims, args.lower_matrix_file);
+	}
+	if (outprompt::getYesNoAnswer("Want to save array \"luEnv->p\" in a file?")) {
+		Dimension arrayDims[1];
+		arrayDims[0] = luEnv->pDims[0].storage;
+		outprompt::writeArrayToFile <int> ("luEnv->p", 
+			luEnv->p, 1, arrayDims, args.pivot_matrix_file);
+	}
+
+	//--------------------------------------------------------------
+
 	// calculating task running time
 	struct timeval end;
 	gettimeofday(&end, NULL);
 	double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)
 			- (start.tv_sec + start.tv_usec / 1000000.0));
 	logFile << "Execution Time: " << runningTime << " Seconds" << std::endl;
+
 	logFile.close();
-
-	// substitute to store array
-	std::cout << "writing results to output files\n";
-        if (outprompt::getYesNoAnswer("Want to save array \"a\" in a file?")) {
-		Dimension aDims[2];
-		aDims[0] = initEnv->aDims[0].storage;
-		aDims[1] = initEnv->aDims[1].storage;
-                outprompt::writeArrayToFile <double> ("a", initEnv->a, 2, aDims);
-	}
-        if (outprompt::getYesNoAnswer("Want to save array \"u\" in a file?")) {
-		Dimension uDims[2];
-		uDims[0] = luEnv->uDims[0].storage;
-		uDims[1] = luEnv->uDims[1].storage;
-                outprompt::writeArrayToFile <double> ("u", luEnv->u, 2, uDims);
-	}
-        if (outprompt::getYesNoAnswer("Want to save array \"l\" in a file?")) {
-		Dimension lDims[2];
-		lDims[0] = luEnv->lDims[0].storage;
-		lDims[1] = luEnv->lDims[1].storage;
-                outprompt::writeArrayToFile <double> ("l", luEnv->l, 2, lDims);
-	}
-        if (outprompt::getYesNoAnswer("Want to save array \"p\" in a file?")) {
-		Dimension pDims[1];
-		pDims[0] = luEnv->pDims[0].storage;
-                outprompt::writeArrayToFile <int> ("p", luEnv->p, 1, pDims);
-	}
-
-	//--------------------------------------------------------------
-
 	std::cout << "Parallel Execution Time: " << runningTime << " Seconds" << std::endl;
 	return 0;
 }

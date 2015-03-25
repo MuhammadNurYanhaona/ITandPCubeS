@@ -32,10 +32,6 @@ namespace inprompt {
         	return value;
 	}
 
-	// read data for an array from an input file; TODO not implemented yet
-	template <class type> void readArray(const char *arrayName, 
-			int dimensionCount, Dimension *dimensions, type *array);
-
 	// read a boolean value from the console and return it
 	bool readBoolean(const char *varName);
 
@@ -50,16 +46,20 @@ namespace inprompt {
 	// passed along to be properly initialized 
 	template <class type> type *readArrayFromFile(const char *arrayName,
 			int dimensionCount,
-			Dimension *dimensions) {
-
-		std::cout << "Enter the file path containing array \"" << arrayName << "\"\n";
-		std::cout << "The first line should have its dimension lengths in the form: ";
-		std::cout << "dim1Length * dime2Length ...\n";
-		std::cout << "Subsequent lines should have the data in row major order format\n";
-		std::cout << "Elements of array should be separated by spaces\n";
+			Dimension *dimensions, const char *fileName = NULL) {
 
 		std::string filePath;
-		std::getline(std::cin, filePath);
+		if (fileName == NULL) {
+			std::cout << "Enter the file path containing array \"" << arrayName << "\"\n";
+			std::cout << "The first line should have its dimension lengths in the form: ";
+			std::cout << "dim1Length * dime2Length ...\n";
+			std::cout << "Subsequent lines should have the data in row major order format\n";
+			std::cout << "Elements of array should be separated by spaces\n";
+			std::getline(std::cin, filePath);
+		} else {
+			filePath = std::string(fileName);
+		}
+
 		std::ifstream file(filePath.c_str());
 		if (!file.is_open()) {
 			std::cout << "could not open the specified file\n";

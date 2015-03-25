@@ -7,6 +7,9 @@
 #include "../utils/list.h"
 #include "../semantics/scope.h"
 
+#include <fstream>
+#include <sstream>
+
 class LibraryFunction : public Expr {
   protected:
 	List<Expr*> *arguments;
@@ -60,7 +63,8 @@ class LoadArray : public ArrayOperation {
   public:
 	static const char *Name;	
 	LoadArray(Identifier *id, List<Expr*> *arguments, 
-			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
+			yyltype loc) : ArrayOperation(id, arguments, loc) {}
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 class StoreArray : public ArrayOperation {
@@ -68,6 +72,7 @@ class StoreArray : public ArrayOperation {
 	static const char *Name;	
 	StoreArray(Identifier *id, List<Expr*> *arguments, 
 			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 class LoadListOfArrays : public ArrayOperation {

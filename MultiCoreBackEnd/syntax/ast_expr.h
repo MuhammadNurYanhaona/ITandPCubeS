@@ -529,11 +529,14 @@ class OptionalInvocationParams : public Node {
 	const char *GetPrintNameForNode() { return "OptionalParameters"; }
     	void PrintChildren(int indentLevel);	    	
 	void validateTypes(Scope *scope, TaskDef *taskDef, bool ignoreFailure);
+	bool isPartitionSection();
+	List<Expr*> *getArguments() { return arguments; }
 };
 
 class TaskInvocation : public Expr {
   protected:
 	Identifier *taskName;
+	TaskDef *taskDef;
 	Identifier *environment;
 	List<OptionalInvocationParams*> *optionalArgs;	
   public:
@@ -542,6 +545,7 @@ class TaskInvocation : public Expr {
 	const char *GetPrintNameForNode() { return "TaskInvocation"; }
     	void PrintChildren(int indentLevel);	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class InitializerArg : public Node {

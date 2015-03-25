@@ -63,6 +63,11 @@ const char *TaskGenerator::getHeaderFileName(TaskDef *taskDef) {
         return strdup(headerFileStr.str().c_str());
 }
 
+const char *TaskGenerator::getNamespace(TaskDef *taskDef) {
+	const char *initials = string_utils::getInitials(taskDef->getName());
+	return string_utils::toLower(initials);
+}
+
 void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
 	std::cout << "\n-----------------------------------------------------------------\n";

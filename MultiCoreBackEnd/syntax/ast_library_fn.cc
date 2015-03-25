@@ -151,3 +151,127 @@ void ArrayOperation::inferType(Scope *scope, Type *rootType) {
 }
 
 //------------------------------------------------------- Load Array ------------------------------------------------------/
+
+void LoadArray::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	Expr *arg1 = arguments->Nth(0);
+	Expr *arg2 = arguments->Nth(1);
+	ArrayType *array = (ArrayType*) arg1->getType();
+	Type *elemType = array->getTerminalElementType();
+	int dimensions = array->getDimensions();
+
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	std::string doubleIndent = "\t\t";
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+
+	stream << indent.str() << "{ // scope starts for load-array operation\n";
+	std::ostringstream arrayExpr;
+	
+	// get the translated C++ expression for the argument array
+	arg1->translate(arrayExpr, 0);
+	
+	// create a dimension array to hold metadata about the array
+	stream << indent.str() << "Dimension arrayDims[" << dimensions << "]" << stmtSeparator;
+
+	// generate a prompt to decide if to read the array from file or not
+	stream << indent.str() << "if (outprompt::getYesNoAnswer(\"Want to read array";
+        stream << " \\\"" << arrayExpr.str() << "\\\" from a file?\"";
+        stream << ")) {\n";
+
+        // if the response is yes then generate a prompt for reading the array from a file 
+        stream << indent.str() << '\t';
+        stream << arrayExpr.str() << " = ";
+	stream << "inprompt::readArrayFromFile ";
+	stream << '<' << elemType->getName() << "> ";
+	stream << "(\"" << arrayExpr.str() << "\"" << paramSeparator;
+	stream << std::endl << indent.str() << doubleIndent;
+	stream << dimensions << paramSeparator;
+	stream << "arrayDims" << paramSeparator;
+	arg2->translate(stream, 0);
+	stream << ")" << stmtSeparator;
+
+	// otherwise, generate code for randomly initialize the array
+	stream << indent.str() << "} else {\n";
+	// create a prompt to get the dimensions information for the variable under concern
+	stream << indent.str() << '\t';
+	stream << "inprompt::readArrayDimensionInfo(\"" << arrayExpr.str() << "\"" << paramSeparator;
+	stream << dimensions << paramSeparator << "arrayDims)" << stmtSeparator;
+	// then allocate an array for the variable
+	stream << indent.str() << "\t";
+	stream << arrayExpr.str() << " = allocate::allocateArray ";
+	stream << '<' << elemType->getName() << "> ";
+	stream << '(' << dimensions << paramSeparator;
+	stream << "arrayDims)" << stmtSeparator;
+	// finally randomly initialize the array
+	stream << indent.str() << "\t";
+	stream << "allocate::randomFillPrimitiveArray ";
+	stream << '<' << elemType->getName() << "> ";
+	stream << "(" << arrayExpr.str() << paramSeparator;
+	stream << std::endl << indent.str() << doubleIndent;
+	stream << dimensions << paramSeparator;
+	stream << "arrayDims)" << stmtSeparator;
+	stream << indent.str() << "}\n";
+	
+	// populate partition dimension objects of the array based on the dimension been updated by the library function
+	for (int d = 0; d < dimensions; d++) {
+		stream << indent.str() << arrayExpr.str() << "Dims[" << d << "].partition = "; 
+		stream << "arrayDims[" << d << "]" << stmtSeparator; 
+		stream << indent.str() << arrayExpr.str() << "Dims[" << d << "].storage = "; 
+		stream << "arrayDims[" << d << "].getNormalizedDimension()" << stmtSeparator; 
+	}
+
+	stream << indent.str() << "} // scope ends for load-array operation\n";
+}
+
+//------------------------------------------------------- Store Array -----------------------------------------------------/
+
+void StoreArray::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	Expr *arg1 = arguments->Nth(0);
+	Expr *arg2 = arguments->Nth(1);
+	ArrayType *array = (ArrayType*) arg1->getType();
+	Type *elemType = array->getTerminalElementType();
+	int dimensions = array->getDimensions();
+
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	std::string doubleIndent = "\t\t";
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	
+	// get the translated C++ expression for the argument array
+	std::ostringstream arrayExpr;
+	arg1->translate(arrayExpr, 0);
+
+	// first generate a prompt that will ask the user if he wants to write this array to a file
+	stream << indent.str() << "if (outprompt::getYesNoAnswer(\"Want to save array";
+	stream << " \\\"" << arrayExpr.str() << "\\\" in a file?\"";
+	stream << ")) {\n";
+
+	// create a dimension object and copy storage information from array metadata object into 
+	// the former
+	stream << indent.str() << '\t';
+	stream << "Dimension arrayDims[" << dimensions << "]" << stmtSeparator;
+	for (int d = 0; d < dimensions; d++) {
+		stream << indent.str() << '\t'; 
+		stream << "arrayDims[" << d << "] = "; 
+		stream << arrayExpr.str() << "Dims[" << d << "].storage"; 
+		stream << stmtSeparator; 
+	}
+
+	// then generate the prompt for writing the array to the file specified by the user
+	stream << indent.str() << "\toutprompt::writeArrayToFile ";
+	stream << '<' << elemType->getName() << '>';
+	stream << " (\"" << arrayExpr.str() << "\"" << paramSeparator;
+	stream << std::endl << indent.str() << doubleIndent;
+	stream << arrayExpr.str() << paramSeparator;
+	stream << dimensions << paramSeparator;
+	stream << "arrayDims" << paramSeparator;
+	arg2->translate(stream, 0);
+	stream << ")" << stmtSeparator;
+
+	// close the if block at the end        
+	stream << indent.str() << "}\n";
+}

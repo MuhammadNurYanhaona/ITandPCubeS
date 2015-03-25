@@ -1,0 +1,14 @@
+"Initiate LU" {
+	Space A: 2	// Core-Pair
+}
+
+"Transposed LU Factorization" {
+	Space A: 5	// Socket
+	Space B: 2	// Core-Pair
+}
+
+"Subtract Matrix Multiply Result" {
+	Space A: 2	// Core-Pair
+}
+
+

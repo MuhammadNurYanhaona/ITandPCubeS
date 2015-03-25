@@ -42,6 +42,7 @@ class TaskGenerator {
 	const char* getTaskName() { return taskDef->getName(); }
 	const char* getInitials() { return initials; }
 	static const char *getHeaderFileName(TaskDef *taskDef);
+	static const char *getNamespace(TaskDef *taskDef);
 	SyncManager *getSyncManager() { return syncManager; }
 
 	// function to generate all data structures and methods that are relevant to this task 

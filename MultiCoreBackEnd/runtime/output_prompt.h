@@ -28,11 +28,15 @@ namespace outprompt {
 	template <class type> void writeArrayToFile(const char *arrayName,
 			type *array,
 			int dimensionCount,
-			Dimension *dimensions) {
+			Dimension *dimensions, const char *fileName = NULL) {
 
-		std::cout << "Enter the file path to write array \"" << arrayName << "\"\n";
 		std::string filePath;
-		readNonEmptyLine(filePath);
+		if (fileName == NULL) {
+			std::cout << "Enter the file path to write array \"" << arrayName << "\"\n";
+			readNonEmptyLine(filePath);
+		} else {
+			filePath = std::string(fileName);
+		}
 
 		std::ofstream file(filePath.c_str());
 		if (!file.is_open()) {

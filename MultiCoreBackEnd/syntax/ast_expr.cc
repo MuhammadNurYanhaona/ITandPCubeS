@@ -13,6 +13,7 @@
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/loop_index.h"
 #include "../codegen/name_transformer.h"
+#include "../codegen/task_generator.h"
 
 #include <iostream>
 #include <sstream>
@@ -817,6 +818,10 @@ void OptionalInvocationParams::validateTypes(Scope *scope, TaskDef *taskDef, boo
 	}	
 }
 
+bool OptionalInvocationParams::isPartitionSection() {
+	return strcmp(section->getName(), PartitionSection) == 0;
+}
+
 TaskInvocation::TaskInvocation(Identifier *n, Identifier *e, 
 		List<OptionalInvocationParams*> *o, yyltype loc) : Expr(loc) {
 	Assert(n != NULL && e != NULL && o != NULL);
@@ -828,6 +833,7 @@ TaskInvocation::TaskInvocation(Identifier *n, Identifier *e,
 	for (int i = 0; i < optionalArgs->NumElements(); i++) {
 		optionalArgs->Nth(i)->SetParent(this);
 	}
+	taskDef = NULL;
 }
 
 void TaskInvocation::PrintChildren(int indentLevel) {
@@ -863,9 +869,60 @@ void TaskInvocation::resolveType(Scope *scope, bool ignoreFailure) {
 			for (int i = 0; i < optionalArgs->NumElements(); i++) {
 				OptionalInvocationParams *params = optionalArgs->Nth(i);
 				params->validateTypes(scope, taskDef, ignoreFailure);	
-			}	
+			}
+			this->taskDef = taskDef;	
 		}
 	}
+}
+
+void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	TupleDef *partitionTuple = taskDef->getPartitionTuple();
+	std::string stmtSeparator = ";\n";
+        std::string paramSeparator = ", ";
+        std::ostringstream indent;
+        for (int i = 0; i < indentLevel; i++) indent << '\t';
+
+        stream << indent.str() << "{ // scope starts for invoking: " << taskName->getName() << "\n";
+        
+	// first create a partition object for the task
+	stream << indent.str() << partitionTuple->getId()->getName() << " partition" << stmtSeparator;
+
+	// collect parameters for the initialize section or populate properties of the partition 
+	// object from optional parameters, if applicable.
+	std::ostringstream initParams;
+	bool initParamsPresent = false;
+	for (int i = 0; i < optionalArgs->NumElements(); i++) {
+		OptionalInvocationParams *params = optionalArgs->Nth(i);
+		List<Expr*> *arguments = params->getArguments();
+
+		if (params->isPartitionSection()) {
+			List<VariableDef*> *tupleParts = partitionTuple->getComponents();
+			for (int j = 0; j < arguments->NumElements(); j++) {
+				stream << indent.str();
+				stream << "partition." << tupleParts->Nth(j)->getId()->getName();
+				stream << " = ";
+				arguments->Nth(j)->translate(stream, 0);
+				stream << stmtSeparator;
+			}
+		} else {
+			initParamsPresent = true;
+			for (int j = 0; j < arguments->NumElements(); j++) {
+				initParams << paramSeparator;
+				arguments->Nth(j)->translate(initParams, 0);
+			}
+		}
+	}
+
+	// then invoke the task with appropriate parameters
+	stream << indent.str();
+	stream << TaskGenerator::getNamespace(taskDef) << "::execute(";
+	stream << environment->getName();
+	if (initParamsPresent) stream << initParams.str();
+	stream << paramSeparator << "partition";
+	stream << paramSeparator << "logFile)" << stmtSeparator;	
+
+	stream << indent.str() << "} // scope ends for task invocation\n";
 }
 
 //------------------------------------------------- Object Creation ---------------------------------------------------/
