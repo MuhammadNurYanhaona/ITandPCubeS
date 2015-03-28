@@ -13,12 +13,26 @@
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_type.h"
 #include "../semantics/scope.h"
+#include "../semantics/task_space.h"
 #include "../utils/list.h"
+
+#include <fstream>
+#include <sstream>
+#include <iostream>
 
 enum AssignmentMode {COPY, REFERENCE};
 
 // Access type info used to determine how to treat a particular dimension of the array during code generation.
 enum DimensionAccessType {WHOLE, SUBRANGE, INDEX};
+
+// A flag holder to indicate if an array assignment translation is happening within the context of the coordinator
+// function or within some compute stage of a task. This is needed as how we will deal with the assignment may
+// vary depending on the context.
+namespace codecntx {
+	static bool coordinator;
+	void enterTaskContext();
+	void enterCoordinatorContext();
+}
 
 class ArrayName {
   protected:
@@ -34,6 +48,11 @@ class ArrayName {
 	void setType(ArrayType *type) { this->type = type; }
 	ArrayType *getType() { return type; }
 	void describe(int indent);
+	
+	// two functions to determine the appropriate C++ variable names representing the content and metadata
+	// for current array 
+	const char *getTranslatedName();
+	const char *getTranslatedMetadataPrefix();
 };
 
 // a function to determine if an assignment expression involves assigning of an array to another so that we can 
@@ -117,6 +136,10 @@ class AssignmentDirective {
 	AssignmentDirective(AssignmentExpr *expr);
 	void generateAnnotations();
 	void describe(int indent);
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+  private:
+	void generateCodeForReference(std::ostringstream &stream, int indentLevel, Space *space);
+	void generateCodeForCopy(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 // An assignment statement may be a composite of the form 'a = b = c' so we need a list of directives to hold 
@@ -130,6 +153,7 @@ class AssignmentDirectiveList {
   public:
 	AssignmentDirectiveList(AssignmentExpr *expr);
 	void describe(int indent);
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 #endif

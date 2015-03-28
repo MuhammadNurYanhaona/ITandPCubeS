@@ -2,6 +2,11 @@ Note that to generate executables from IT source codes you have to take the foll
 
 1. First, write a valid IT task or program, of course.
 2. Second, get or write a PCubeS description of the machine where you want to run your code.
+   Take the help of any hardware description manual to write your PCubeS file. In linux you
+   can get additional aid from the following two locations to get enough information about 
+   writing a good candidate PCubeS description
+   a) /proc/cpuinfo file for processor information
+   b) /sys/devices/system/cpu/ directory to get information about cache characteristics 
 3. Third, generates a processor description file for you target machine by parsing the content
    of /proc/cpuinfo using the following command
 	cat $CPU-Info-File | grep -e processor -e "physical id" -e "core id" | paste - - -	

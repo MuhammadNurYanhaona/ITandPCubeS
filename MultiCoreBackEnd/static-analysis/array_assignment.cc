@@ -5,9 +5,16 @@
 #include "../semantics/scope.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
+#include "../codegen/name_transformer.h"
 
 #include <iostream>
 #include <sstream>
+#include <cstdlib>
+#include <iostream>
+
+void codecntx::enterTaskContext() { codecntx::coordinator = false; }
+
+void codecntx::enterCoordinatorContext() { codecntx::coordinator = true; }
 
 bool isArrayAssignment(AssignmentExpr *expr) {
 	Type *type = expr->getType();
@@ -30,7 +37,7 @@ ArrayName *getArrayName(Expr *expr) {
 	// an environment object. This is because user defined types cannot have arrays as element. Thus
 	// we can easily determine if an array is part of an environment or not by simply checking if 
 	// corresponding field-access reference is a terminal field access. 
-	bool partOfEnv = fieldAccess->isTerminalField();
+	bool partOfEnv = !fieldAccess->isTerminalField();
 
 	arrayName->setPartOfEnv(partOfEnv);
 	arrayName->setName(fieldAccess->getField()->getName());
@@ -52,6 +59,13 @@ AssignmentMode determineAssignmentMode(AssignmentExpr *expr) {
 	ArrayName *rightArray = getArrayName(right);
 	Type *rightType = rightArray->getType();
 	Type *exprType = expr->getType();
+
+	// Right at this moment (March 28, 2015) we don't support reference assignment from one array
+	// to another within the compute stages of a task. We need to decide how to handle it as the
+	// mechanism will affect how we do dependency analysis and consequently synchronization and 
+	// communication. For now as a quick solution, we avoid reference passing altogether within the
+	// confinement of a task
+	if (!codecntx::coordinator) return COPY;
 
 	// if the left side of the assignment is not referencing an stand-alone data structure then 
 	// there is no other option than copying content from right to left.
@@ -115,6 +129,22 @@ void ArrayName::describe(int indent) {
 	std::cout << ": " << type->getName() << std::endl;
 }
 
+const char *ArrayName::getTranslatedName() {
+	std::ostringstream nameStr;
+	if (partOfEnv) {
+		nameStr << envObjName << "->" << name;
+		return strdup(nameStr.str().c_str());
+	} else return ntransform::NameTransformer::transformer->getTransformedName(name, false, true);
+}
+
+const char *ArrayName::getTranslatedMetadataPrefix() {
+	std::ostringstream prefixStr;
+	if (partOfEnv) {
+		prefixStr << envObjName << "->" << name << "Dims";
+		return strdup(prefixStr.str().c_str());
+	} else return ntransform::NameTransformer::transformer->getTransformedName(name, true, true);
+}
+
 //-------------------------------------------------------- Dimension Access -----------------------------------------------------/
 
 DimensionAccess::DimensionAccess(int dimensionNo) {
@@ -126,10 +156,9 @@ DimensionAccess::DimensionAccess(int dimensionNo) {
 DimensionAccess::DimensionAccess(Expr *accessExpr, int dimensionNo) {
 	this->accessExpr = accessExpr;
 	SubRangeExpr *subRange = dynamic_cast<SubRangeExpr*>(accessExpr);
-	if (subRange != NULL) accessType = INDEX;
-	else if (subRange->isFullRange()) {
-		accessType = SUBRANGE;
-	} else accessType = WHOLE;
+	if (subRange == NULL) accessType = INDEX;
+	else if (!subRange->isFullRange()) accessType = SUBRANGE;
+	else accessType = WHOLE;
 	this->dimensionNo = dimensionNo;
 }
 
@@ -189,9 +218,10 @@ void AssignmentDirective::generateAnnotations() {
 		// once a whole/partial dimension access is found for the left side, determine how to get to
 		// the corresponding dimension on the right side
 		List<DimensionAccess*> *rightAccessList = new List<DimensionAccess*>;
-		for (; j < rightSideAccesses->NumElements(); j++) {
+		for (; j < rightSideAccesses->NumElements(); ) {
 			DimensionAccess *rightAccess = rightSideAccesses->Nth(j);
 			rightAccessList->Append(rightAccess);
+			j++;
 			if (!rightAccess->isSingleEntry()) break;
 		}
 		
@@ -232,6 +262,55 @@ void AssignmentDirective::describe(int indent) {
 	} 
 }
 
+void AssignmentDirective::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	if (mode == COPY) generateCodeForCopy(stream, indentLevel, space);
+	else generateCodeForReference(stream, indentLevel, space);
+}
+
+void AssignmentDirective::generateCodeForCopy(std::ostringstream &stream, int indentLevel, Space *space) {
+	std::cout << "Code for translating array assignments as copying data is still not implemented\n";
+	std::cout << "Kindly, rewrite the concerned expression as a for loop having direct data copy.\n";
+	std::exit(EXIT_FAILURE);	
+}
+
+void AssignmentDirective::generateCodeForReference(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	
+	const char *leftName = assigneeArray->getTranslatedName();
+	const char *leftMetaPrefix = assigneeArray->getTranslatedMetadataPrefix();
+	const char *rightName = assignerArray->getTranslatedName();
+	const char *rightMetaPrefix = assignerArray->getTranslatedMetadataPrefix();
+
+	// assign the array reference from the right to that of the left
+	stream << indent.str() << leftName << " = " << rightName << stmtSeparator;
+
+	// copy metadata from right to left for each dimension of the array
+	// Note that given that it is known that this can be translated into a reference transfer, we can
+	// assume many things about the dimension access annotations that does not hold for copy transfer. So
+	// the simplicity of metadata assignment in this case should not fool us.
+	for (int i = 0; i < annotations->NumElements(); i++) {
+		DimensionAnnotation *annotation = annotations->Nth(i);
+		DimensionAccess *leftAccess = annotation->getAssigneeInfo()->Nth(0);
+		DimensionAccess *rightAccess = annotation->getAssignerInfo()->Nth(0);
+		stream << indent.str();
+		stream << leftMetaPrefix << "[" << leftAccess->getDimensionNo() << "]";
+		stream << " = " << rightMetaPrefix << "[" << rightAccess->getDimensionNo() << "]";
+		if (rightAccess->getAccessType() == SUBRANGE) {
+			stream << ".getSubrange(";
+			SubRangeExpr *accessExpr = (SubRangeExpr*) rightAccess->getAccessExpr();
+			accessExpr->getBegin()->translate(stream, indentLevel);
+			stream << paramSeparator;
+			accessExpr->getEnd()->translate(stream, indentLevel);
+			stream << ")";
+		}
+		stream << stmtSeparator;
+	}
+}
+
 //---------------------------------------------------- Assignment Directive List ------------------------------------------------/
 
 AssignmentDirectiveList::AssignmentDirectiveList(AssignmentExpr *expr) {
@@ -266,5 +345,11 @@ AssignmentDirectiveList::AssignmentDirectiveList(AssignmentExpr *expr) {
 void AssignmentDirectiveList::describe(int indent) {
 	for (int i = 0; i < directives->NumElements(); i++) {
 		directives->Nth(i)->describe(indent);	
+	}
+}
+
+void AssignmentDirectiveList::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	for (int i = 0; i < directives->NumElements(); i++) {
+		directives->Nth(i)->generateCode(stream, indentLevel, space);	
 	}
 }

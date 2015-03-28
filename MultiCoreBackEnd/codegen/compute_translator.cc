@@ -3,6 +3,7 @@
 #include "../utils/list.h"
 #include "../utils/string_utils.h"
 #include "../static-analysis/data_flow.h"
+#include "../static-analysis/array_assignment.h"
 #include "../semantics/scope.h"
 #include "../semantics/task_space.h"
 #include "../syntax/ast_task.h"
@@ -24,6 +25,9 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 	std::string paramSeparator = ", ";
 	std::string stmtSeparator = ";\n";
 	std::string paramIndent = "\n\t\t";
+
+	// set the context for code translation to task
+	codecntx::enterTaskContext();
 
 	// if this is a composite stage, recursively call this generator function to sub stages
 	CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(currentStage);

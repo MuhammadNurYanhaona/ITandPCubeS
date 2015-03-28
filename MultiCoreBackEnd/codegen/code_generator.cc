@@ -1035,10 +1035,10 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 
 	// then generate a class for each tuple in the list
 	for (int i = 0; i < tupleDefList->NumElements(); i++) {
-		// if the tuple definition has no element inside then ignore it and proceed to the next
+		// retrieve the tuple definition
 		TupleDef *tupleDef = tupleDefList->Nth(i);
 		List<VariableDef*> *variables = tupleDef->getComponents();
-		// otherwise, generate a new class and add the elements as public components
+		// generate a new class and add the elements as public components
 		headerFile << "class " << tupleDef->getId()->getName() << " {\n";
 		headerFile << "  public:\n";
 		for (int j = 0; j < variables->NumElements(); j++) {
@@ -1058,6 +1058,24 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
                        	}
 
 		}
+		// create a constructor for the class
+		headerFile << "\t" << tupleDef->getId()->getName() << "() {\n";
+		for (int j = 0; j < variables->NumElements(); j++) {
+			VariableDef *variable = variables->Nth(j);
+			Type *type = variable->getType();
+			const char *varName = variable->getId()->getName();
+			if (type == Type::boolType) {
+				headerFile << "\t\t" << varName << " = false;\n";
+			} else if (type == Type::intType 
+					|| type == Type::floatType 
+					|| type == Type::doubleType
+					|| type == Type::charType) {
+				headerFile << "\t\t" << varName << " = 0;\n";
+			} else if (type == Type::stringType || dynamic_cast<ArrayType*>(type) != NULL) {
+				headerFile << "\t\t" << varName << " = NULL;\n";
+			}
+		}	
+		headerFile << "\t}\n";
 		headerFile << "};\n\n";
 	}
 

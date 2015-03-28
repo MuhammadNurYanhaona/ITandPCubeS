@@ -6,6 +6,7 @@
 #include "../utils/list.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
+#include "../static-analysis/array_assignment.h"
 #include "errors.h"
 
 #include <fstream>
@@ -324,6 +325,9 @@ void CoordinatorDef::generateCode(std::ostringstream &stream, Scope *scope) {
                 Stmt *stmt = code->Nth(j);
         	stmt->getAccessedGlobalVariables(references);
         }
+
+	// set the context for code translation to coordinator function
+	codecntx::enterCoordinatorContext();
 
 	// Then generate code.
 	stream << "\t//------------------------------------------ Coordinator Program\n\n";		
