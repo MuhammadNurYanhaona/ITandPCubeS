@@ -381,10 +381,10 @@ void ThreadState::logExecution(const char *stageName, int spaceId) {
 }
 
 void ThreadState::logThreadAffinity() {
-	/*------------------------------------------- Turned Off
+	///*------------------------------------------- Turned Off
 	threadLog << "Thread Id: " << pthread_self() << std::endl;
 	threadLog << "Thread CPU Id: " << sched_getcpu() << std::endl; 	
-	------------------------------------------------------*/
+	//------------------------------------------------------*/
 }
 
 LPU *ThreadState::getCurrentLpu(int lpsId) {
