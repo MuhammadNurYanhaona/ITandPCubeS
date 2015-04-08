@@ -569,10 +569,15 @@ class ObjectCreate : public Expr {
   public:
 	ObjectCreate(Type *objectType, List<InitializerArg*> *initArgs, yyltype loc);		
 	const char *GetPrintNameForNode() { return "ObjectCreate"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+	
+	// for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
+	
+	// for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	void generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel);
+	static bool isDynamicArrayCreate(Expr *candidateExpr);
 };
 
 #endif

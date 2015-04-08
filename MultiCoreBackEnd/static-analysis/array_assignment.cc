@@ -19,6 +19,10 @@ void codecntx::enterCoordinatorContext() { codecntx::coordinator = true; }
 bool isArrayAssignment(AssignmentExpr *expr) {
 	Type *type = expr->getType();
 	if (type == NULL) return false;
+	Expr *right = expr->getRight();
+	FieldAccess *field = dynamic_cast<FieldAccess*>(right);
+	ArrayAccess *array = dynamic_cast<ArrayAccess*>(right);
+	if (field == NULL && array == NULL) return false;
 	ArrayType *arrayType = dynamic_cast<ArrayType*>(type);
 	StaticArrayType *staticType = dynamic_cast<StaticArrayType*>(type);
 	return (arrayType != NULL && staticType == NULL);

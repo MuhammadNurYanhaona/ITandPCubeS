@@ -1,10 +1,10 @@
 "Initiate LU" {
-	Space A: 1	// hyperthreads
+	Space A: 2	// Cores
 }
 
 "Transposed LU Factorization" {
 	Space A: 3	// CPU
-	Space B: 1	// hyperthreads
+	Space B: 2	// Cores
 }
 
 "Subtract Matrix Multiply Result" {

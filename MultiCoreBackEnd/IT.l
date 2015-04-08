@@ -181,6 +181,15 @@ FALSE			yylval.booleanConstant = false; return Boolean;
 				}
 			}
 [0-9]+          	yylval.intConstant = atoi(yytext); return Integer;
+-[0-9]+          	{
+				int length = strlen(yytext);
+				char *magnitude = (char *) malloc(length);
+				strncpy(magnitude, yytext + 1, length - 1);
+				magnitude[length - 1] = '\0';
+				yylval.intConstant = atoi(magnitude) * -1;
+				free(magnitude); 
+				return Integer;
+			}
 [A-Z][0-9a-zA-Z_]+	{
 				yylval.stringConstant = (char *) malloc(strlen(yytext) + 1);
 			 	strcpy(yylval.stringConstant, yytext);

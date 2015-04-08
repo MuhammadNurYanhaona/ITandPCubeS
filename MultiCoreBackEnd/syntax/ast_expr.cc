@@ -624,28 +624,41 @@ void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, S
 			rightExpr->generateCode(stream, indentLevel, space);	
 		}
 
-		// If this is a dimension assignment statement with multiple dimensions of an array assigned once to
-		// another one then we need to handle it separately.
-		Type *leftType = left->getType();
-		FieldAccess *fieldAccess = dynamic_cast<FieldAccess*>(left);
-		if (leftType == Type::dimensionType 
-				&& fieldAccess != NULL 
-				&& fieldAccess->getBase() != NULL) {
-			
-			ArrayType *array = dynamic_cast<ArrayType*>(fieldAccess->getBase()->getType());
-			DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(fieldAccess->getField());
-			if (array != NULL && dimension != NULL 
-					&& dimension->getDimensionNo() == 0
-					&& array->getDimensions() > 1) {
-				int dimensionCount = array->getDimensions();
-				for (int i = 0; i < dimensionCount; i++) {
-					for (int j = 0; j < indentLevel; j++) stream << '\t';
+		// Check if the assignment is a new declaration of a dynamic array. If it is so, we can ignore it as
+		// such a variable is only placeholder for some other environment variable and already declared at 
+		// the time of scope translation.
+		if (!ObjectCreate::isDynamicArrayCreate(right)) {	
+
+			// If this is a dimension assignment statement with multiple dimensions of an array assigned 
+			// once to another one then we need to handle it separately.
+			Type *leftType = left->getType();
+			FieldAccess *fieldAccess = dynamic_cast<FieldAccess*>(left);
+			if (leftType == Type::dimensionType 
+					&& fieldAccess != NULL 
+					&& fieldAccess->getBase() != NULL) {
+				
+				ArrayType *array = dynamic_cast<ArrayType*>(fieldAccess->getBase()->getType());
+				DimensionIdentifier *dimension 
+						= dynamic_cast<DimensionIdentifier*>(fieldAccess->getField());
+				if (array != NULL && dimension != NULL 
+						&& dimension->getDimensionNo() == 0
+						&& array->getDimensions() > 1) {
+					int dimensionCount = array->getDimensions();
+					for (int i = 0; i < dimensionCount; i++) {
+						for (int j = 0; j < indentLevel; j++) stream << '\t';
+						left->translate(stream, indentLevel, 0, space);
+						stream << '[' << i << "] = ";
+						rightPart->translate(stream, indentLevel, 0, space);
+						stream << '[' << i << "];\n";
+					}
+				// If the array is unidimensional then it follows the normal assignment procedure
+				} else {
+					for (int i = 0; i < indentLevel; i++) stream << '\t';
 					left->translate(stream, indentLevel, 0, space);
-					stream << '[' << i << "] = ";
+					stream << " = ";
 					rightPart->translate(stream, indentLevel, 0, space);
-					stream << '[' << i << "];\n";
+					stream << ";\n";
 				}
-			// If the array is unidimensional then it follows the normal assignment procedure
 			} else {
 				for (int i = 0; i < indentLevel; i++) stream << '\t';
 				left->translate(stream, indentLevel, 0, space);
@@ -653,20 +666,14 @@ void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, S
 				rightPart->translate(stream, indentLevel, 0, space);
 				stream << ";\n";
 			}
-		} else {
-			for (int i = 0; i < indentLevel; i++) stream << '\t';
-			left->translate(stream, indentLevel, 0, space);
-			stream << " = ";
-			rightPart->translate(stream, indentLevel, 0, space);
-			stream << ";\n";
-		}
 
-		// if the right side of the assignment is a new operation, i.e., an object instantiation then
-		// there might be some arguments been passed to the constructor. Those arguments need to be assigned
-		// to appropriate properties of the object as subsequent statements.  
-		ObjectCreate *objectCreate = dynamic_cast<ObjectCreate*>(rightPart);
-		if (objectCreate != NULL) {
-			objectCreate->generateCodeForProperties(left, stream, indentLevel);
+			// if the right side of the assignment is a new operation, i.e., an object instantiation then
+			// there might be some arguments been passed to the constructor. Those arguments need to be 
+			// assigned to appropriate properties of the object as subsequent statements.  
+			ObjectCreate *objectCreate = dynamic_cast<ObjectCreate*>(rightPart);
+			if (objectCreate != NULL) {
+				objectCreate->generateCodeForProperties(left, stream, indentLevel);
+			}
 		}
 	}
 }
@@ -1075,12 +1082,14 @@ void ObjectCreate::resolveType(Scope *scope, bool ignoreFailure) {
 }
 
 void ObjectCreate::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
-	
-	NamedType *userDefinedType = dynamic_cast<NamedType*>(type);
-	if (userDefinedType != NULL) {
-		if (userDefinedType->isEnvironmentType()) stream << "new ";
+	ArrayType *array = dynamic_cast<ArrayType*>(type);
+	if (array == NULL) {	
+		NamedType *userDefinedType = dynamic_cast<NamedType*>(type);
+		if (userDefinedType != NULL) {
+			if (userDefinedType->isEnvironmentType()) stream << "new ";
+		}
+		stream << type->getCType() << "()";
 	}
-	stream << type->getCType() << "()";
 }
 
 void ObjectCreate::generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel) {
@@ -1088,5 +1097,14 @@ void ObjectCreate::generateCodeForProperties(Expr *object, std::ostringstream &s
 		InitializerArg *currentArg = initArgs->Nth(i);
 		currentArg->generateAssignment(object, stream, indentLevel);
 	}
+}
+
+bool ObjectCreate::isDynamicArrayCreate(Expr *candidateExpr) {
+	ObjectCreate *objectCreate = dynamic_cast<ObjectCreate*>(candidateExpr);
+	if (objectCreate == NULL) return false;
+	Type *objectType = candidateExpr->getType();
+	ArrayType *array = dynamic_cast<ArrayType*>(objectType);
+	StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(objectType);
+	return (array != NULL && staticArray == NULL);
 }
     	

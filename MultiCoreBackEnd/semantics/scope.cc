@@ -112,7 +112,7 @@ void Scope::declareVariables(std::ostringstream &stream, int indent) {
                 StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(type);
                 if (array != NULL && staticArray == NULL) {
                         int dimensions = array->getDimensions();
-                        stream << stmtIndent.str() << "PartDimension " << name << "PartDims";
+                        stream << stmtIndent.str() << "PartDimension " << name << "Dims";
                         stream << "[" << dimensions << "]" << stmtSeparator;
                 }
         }
