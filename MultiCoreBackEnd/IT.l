@@ -41,24 +41,26 @@ static void DoBeforeEachAction();
 
 OPERATOR          ([-+/*%=.,;:!<>()[\]{}])
 SINGLE_COMMENT    ("//"[^\n]*)
+comment_line      ("//"[^\n]*\n)
+
 
 /*---------------------------------------------Rules------------------------------------------------*/
 %%
 
 {SINGLE_COMMENT}       { /* skip to end of line for // comment */ }
 
-<CODE,PROGRAM>[[:space:]]*"{"[[:space:]]*	adjustLineAndColumnNo(yytext, '{'); return '{';
-<CODE,PROGRAM>[[:space:]]*"}"			adjustLineAndColumnNo(yytext, '}'); return '}';	
-<CODE,PROGRAM>\\[ \t]*\n			resetLine();
-<CODE,PROGRAM>\n				resetLine(); return New_Line;
-[\n]						resetLine();
-[ ]+                   				;		
-[\t]                				curColNum += TAB_SIZE - curColNum % TAB_SIZE + 1;
-[[:space:]]*":"[[:space:]]*			adjustLineAndColumnNo(yytext, ':'); return ':';				
+<CODE,PROGRAM>[[:space:]]*"{"([[:space:]]|{comment_line})*	adjustLineAndColumnNo(yytext, '{'); return '{';
+<CODE,PROGRAM>[[:space:]]*"}"					adjustLineAndColumnNo(yytext, '}'); return '}';	
+<CODE,PROGRAM>\\[ \t]*\n					resetLine();
+<CODE,PROGRAM>\n						resetLine(); return New_Line;
+[\n]								resetLine();
+[ ]+                   						;		
+[\t]                						curColNum += TAB_SIZE - curColNum % TAB_SIZE + 1;
+[[:space:]]*":"[[:space:]]*					adjustLineAndColumnNo(yytext, ':'); return ':';				
 
-<PROGRAM>execute				return Execute;
-<PROGRAM>new					return New;
-<CODE>at					return At;
+<PROGRAM>execute						return Execute;
+<PROGRAM>new							return New;
+<CODE>at							return At;
 
 Program			return Program;
 Tuple			return Tuple;
