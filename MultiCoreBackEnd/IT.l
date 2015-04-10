@@ -165,7 +165,7 @@ dim[0-9]+		{
 TRUE			yylval.booleanConstant = true; return Boolean;
 FALSE			yylval.booleanConstant = false; return Boolean;
 \'.\'			yylval.characterConstant = yytext[1]; return Character;
-\".*\"			{	
+\"[^\"\n]*\"		{	
 				int actualLength = strlen(yytext) - 2;
 				yylval.stringConstant = (char *) malloc(actualLength + 1);
                                 strncpy(yylval.stringConstant, yytext + 1, actualLength);

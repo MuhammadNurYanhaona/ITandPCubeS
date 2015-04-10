@@ -24,7 +24,7 @@ Program (args) {
 	// radius less than 1
 	iteration = 0
 	maxIterations = args.maxIterations
-	do {
+	do {	
 		// calculate A * x_i
 		mvmEnv.v = x_i
 		execute("CSR Matrix Vector Multiply"; mvmEnv; Partition: args.r)
@@ -59,11 +59,18 @@ Program (args) {
 		vaEnv.v = r_i
 		vaEnv.beta = alpha_i		
 		execute("Vector Addition"; vaEnv; Partition: args.b)
+
+		// calculate the norm of the residual to determine if x has converged
+		dpEnv.u = r_i
+		dpEnv.v = r_i
+		execute("Vector Dot Product"; dpEnv)
+		norm = dpEnv.product
 	
 		// prepare for the next iteration
 		x_i = vaEnv.w	
 		iteration = iteration + 1
-	} while iteration < maxIterations
+
+	} while iteration < maxIterations and norm > args.precision
 
 	// store the solution vector in an output file
 	store_array(x_i, args.solution_vector)
@@ -77,15 +84,11 @@ Task "Vector Addition":
 		u, v, alpha, beta: link
 		w: create
 	Compute:
-		"" (Space A) {
-			do {	w[i] = alpha * u[i] + beta * v[i]
-			} for i in u
-		}
+		"" (Space A) { do { w[i] = alpha * u[i] + beta * v[i] } for i in u }
 	Partition(b):
 		Space A <1D> {
 			u, v, w: block_size(b)
 		}
-
 
 Task "Vector Dot Product":
 	Define:
@@ -95,14 +98,9 @@ Task "Vector Dot Product":
 		u, v: link
 		product: create
 	Compute:
-		"" (Space A) {
-			do {	product = reduce("sum", u[i]*v[i])
-			} for i in u
-		}
+		"" (Space A) { do { product = reduce("sum", u[i]*v[i]) } for i in u }
 	Partition: 
 		Space A <un-partitioned> {u, v}
-		
-
 
 Task "CSR Matrix Vector Multiply":
 	Define:
