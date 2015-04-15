@@ -10,6 +10,7 @@
 // for math functions
 #include <math.h>
 #include <algorithm>
+#include <climits>
 
 // for tuple definitions found in the source code
 #include "tuple.h"

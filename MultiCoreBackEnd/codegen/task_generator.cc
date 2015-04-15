@@ -174,7 +174,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 void TaskGenerator::generateTaskMain() {
 	
 	std::cout << "\n-----------------------------------------------------------------\n";
-	std::cout << "Generating a main fcuntion for task: " << taskDef->getName();
+	std::cout << "Generating a main function for task: " << taskDef->getName();
 	std::cout << "\n-----------------------------------------------------------------\n";
 	
 	std::ofstream stream;
@@ -662,7 +662,8 @@ void TaskGenerator::writeResults(std::ofstream &stream) {
                 DataStructure *structure = rootLps->getLocalStructure(linkName);
                 ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 
-		// we will write all scalar variables in a separate file altogether
+		// we will output all scalar variables on the console as opposed to writing in a file 
+		// as done in the case of arrays 
 		if (array == NULL) {
 			scalarVarList->Append(linkName);
 			continue;
@@ -698,6 +699,11 @@ void TaskGenerator::writeResults(std::ofstream &stream) {
 	}
 
 	if (scalarVarList->NumElements() > 0) {
-
+		for (int i = 0; i < scalarVarList->NumElements(); i++) {
+			const char *var = scalarVarList->Nth(i);
+			stream << indent << "std::cout << \"" <<  var << ": \"";
+			stream << " << taskGlobals." << var << " << '\\n'";
+			stream << stmtSeparator;
+		}
 	}	
 }

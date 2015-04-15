@@ -31,9 +31,41 @@ void Stmt::mergeAccessedVariables(Hashtable<VariableAccess*> *first,
 
 //------------------------------------------ Loop Statement -----------------------------------------/
 
+LoopStmt *LoopStmt::currentLoop = NULL;
+
+LoopStmt::LoopStmt() : Stmt() { 
+	scope = NULL; 
+	reductionLoop = false;
+	reduction = NULL; 
+}
+
+LoopStmt::LoopStmt(yyltype loc) : Stmt(loc) { 
+	scope == NULL; 
+	reductionLoop = false;
+	reduction = NULL; 
+}
+
 void LoopStmt::setIndexScope(IndexScope *indexScope) { this->indexScope = indexScope; }
 
 IndexScope *LoopStmt::getIndexScope() { return indexScope; }
+
+void LoopStmt::setReductionExpr(ReductionExpr *reduction) { this->reduction = reduction; }
+
+void LoopStmt::checkSemantics(Scope *excutionScope, bool ignoreTypeFailures) {
+	if (reductionLoop) {
+		StmtBlock *stmtBlock = (StmtBlock*) body;
+		List<Stmt*> *stmtList = stmtBlock->getStmtList();
+		if (stmtList->NumElements() != 1) {
+			ReportError::CouplingOfReductionWithOtherExpr(GetLocation(), ignoreTypeFailures);
+		} else {
+			AssignmentExpr *assignment = dynamic_cast<AssignmentExpr*>(stmtList->Nth(0));
+			if (assignment == NULL) {
+				ReportError::CouplingOfReductionWithOtherExpr(GetLocation(), 
+						ignoreTypeFailures);
+			}
+		}
+	}
+}
 
 void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLevel) { 
 	scope->declareVariables(stream, indentLevel);	
@@ -43,6 +75,9 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 			Space *space, Stmt *body, List<LogicalExpr*> *indexRestrictions) {
 	
 	IndexScope::currentScope->enterScope(indexScope);
+
+	// check if the loop is a reduction loop; if it is then do initialization for reduction
+	if (reductionLoop) initializeReductionLoop(stream, indentLevel, space); 
 
 	// create two helper lists to keep track of the index restrictions that remains to be examined as we
 	// put different restrictions in appropriate index traversal loops
@@ -152,8 +187,12 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 
 	}
 
-	// translate the body of the for loop
-	body->generateCode(stream, indentLevel + indentIncrease, space);
+	// translate the body of the for loop if it is not a reduction loop; otherwise do reduce iteration
+	if (!reductionLoop) {
+		body->generateCode(stream, indentLevel + indentIncrease, space);
+	} else {
+		performReduction(stream, indentLevel + indentIncrease, space);
+	}
 
 	// close the for loops and the scopes
 	for (int i = associateList->NumElements() - 1; i >= 0; i--) {
@@ -176,6 +215,9 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 		for (int i = 0; i < newIndent; i++) stream << '\t';
 		stream << "}// scope exit for parallel loop on index " << association->getIndex() << "\n"; 
 	}	
+
+	// if this is a reduction loop then do any finalization needed for the reduction
+	if (reductionLoop) finalizeReductionLoop(stream, indentLevel, space);
 
 	IndexScope::currentScope->goBackToOldScope();
 }
@@ -201,6 +243,25 @@ List<LogicalExpr*> *LoopStmt::getApplicableExprs(Hashtable<const char*> *indexes
 	}
 	
 	return includedExprList;
+}
+
+void LoopStmt::initializeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	stream << indent.str() << "{ //scope starts for reduction\n";
+	reduction->setupForReduction(stream, indentLevel);
+}
+
+void LoopStmt::performReduction(std::ostringstream &stream, int indentLevel, Space *space) {
+	reduction->generateCode(stream, indentLevel, space);
+}
+
+void LoopStmt::finalizeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space) {
+	reduction->finalizeReduction(stream, indentLevel);
+	body->generateCode(stream, indentLevel, space);
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	stream << indent.str() << "} //scope ends for reduction\n";
 }
 
 //------------------------------------------ Statement Block ----------------------------------------/
@@ -505,15 +566,25 @@ void PLoopStmt::PrintChildren(int indentLevel) {
 }
 
 void PLoopStmt::performTypeInference(Scope *executionScope) {
+	
+	this->previousLoop = LoopStmt::currentLoop;
+	LoopStmt::currentLoop = this;
+
 	Scope *loopScope = executionScope->enter_scope(this->scope);
 	for (int i = 0; i < rangeConditions->NumElements(); i++) {
 		IndexRangeCondition *cond = rangeConditions->Nth(i);
 		cond->inferTypes(loopScope);
 	}
 	body->performTypeInference(loopScope);
+
+	LoopStmt::currentLoop = this->previousLoop;
+	this->previousLoop = NULL;
 }
 
 void PLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
+	
+	this->previousLoop = LoopStmt::currentLoop;
+	LoopStmt::currentLoop = this;
 	
 	Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
 	
@@ -539,6 +610,10 @@ void PLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 
 	loopScope->detach_from_parent();
 	this->scope = loopScope;
+	
+	LoopStmt::currentLoop = this->previousLoop;
+	this->previousLoop = NULL;
+	LoopStmt::checkSemantics(loopScope, ignoreTypeFailures);
 }
 
 Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
@@ -548,6 +623,18 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 		mergeAccessedVariables(table, cond->getAccessedGlobalVariables(globalReferences));
 	}
 	return table;	
+}
+
+List<const char*> *PLoopStmt::getIndexNames() {
+	List<const char*> *indexNames = new List<const char*>;
+	for (int i = 0; i < rangeConditions->NumElements(); i++) {
+		IndexRangeCondition *cond = rangeConditions->Nth(i);
+		List<Identifier*> *indexes = cond->getIndexes();
+		for (int j = 0 ; j < indexes->NumElements(); j++) {
+			indexNames->Append(indexes->Nth(j)->getName());
+		}
+	}
+	return indexNames;
 }
 
 void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
@@ -593,14 +680,24 @@ void SLoopStmt::PrintChildren(int indentLevel) {
 }
 
 void SLoopStmt::performTypeInference(Scope *executionScope) {
+	
+	this->previousLoop = LoopStmt::currentLoop;
+	LoopStmt::currentLoop = this;
+	
 	Scope *loopScope = executionScope->enter_scope(this->scope);
 	rangeExpr->inferType(loopScope, Type::rangeType);
 	if (stepExpr != NULL) stepExpr->inferType(loopScope, Type::intType);
 	body->performTypeInference(loopScope);
+	
+	LoopStmt::currentLoop = this->previousLoop;
+	this->previousLoop = NULL;
 }
 
 void SLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 
+	this->previousLoop = LoopStmt::currentLoop;
+	LoopStmt::currentLoop = this;
+	
 	// create a loop scope for normal variables and an index scope for index variables and enter both
 	Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
 	IndexScope::currentScope->deriveNewScope();
@@ -676,6 +773,10 @@ void SLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 
 	loopScope->detach_from_parent();
 	this->scope = loopScope;
+	
+	LoopStmt::currentLoop = this->previousLoop;
+	this->previousLoop = NULL;
+	LoopStmt::checkSemantics(loopScope, ignoreTypeFailures);
 }
 
 Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
@@ -696,12 +797,22 @@ Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 	return table; 
 }
 
+List<const char*> *SLoopStmt::getIndexNames() { 
+	List<const char*> *indexNames = new List<const char*>;
+	indexNames->Append(id->getName());
+	return indexNames; 
+}
+
 void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 
 	if(isArrayIndexTraversal) {
 		LoopStmt::generateIndexLoops(stream, indentLevel, space, body);
 	} else {
 		IndexScope::currentScope->enterScope(indexScope);
+
+		// check if the loop is a reduction loop; if it is then do initialization for reduction
+		if (reductionLoop) initializeReductionLoop(stream, indentLevel, space); 
+
 		std::ostringstream indent;
 		for (int i = 0; i < indentLevel; i++) indent << '\t';	
 		// create a scope for loop
@@ -714,12 +825,22 @@ void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
         	std::ostringstream rangeLoop;
         	range->generateLoopForRangeExpr(rangeLoop, indentLevel, space);
         	stream << rangeLoop.str();
-        	// translate the loop body
-		body->generateCode(stream, indentLevel + 1, space);	
+		
+		// translate the body of the for loop if it is not a reduction loop; otherwise do reduce iteration
+		if (!reductionLoop) {
+			body->generateCode(stream, indentLevel + 1, space);
+		} else {
+			performReduction(stream, indentLevel + 1, space);
+		}
+	
         	// close the range loop
         	stream << indent.str() << "}\n";
         	// exit the scope created for the loop 
         	stream << indent.str() << "} // scope exit for sequential loop\n";
+
+		// if this is a reduction loop then do any finalization needed for the reduction
+		if (reductionLoop) finalizeReductionLoop(stream, indentLevel, space);
+	
 		IndexScope::currentScope->goBackToOldScope();
 	}
 }

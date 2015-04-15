@@ -201,6 +201,14 @@ void ReportError::InvalidInitArg(yyltype *loc, const char *object, const char *a
 	OptionalErrorReport(loc, suppressFailure, "Class '%s' has no property named '%s'", object, arg);
 }
 
+void ReportError::CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "Current compiler cannot process other operations alongside a reduction within the same loop");
+}
+
+void ReportError::ReductionOutsideForLoop(yyltype *loc, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "Reduction expression must be within an encompassing loop statement");
+}
+
 void ReportError::SpaceNotFound(yyltype *loc, char spaceName) {
 	Formatted(loc, "No space with name '%c' found in the Partition section", spaceName);
 } 

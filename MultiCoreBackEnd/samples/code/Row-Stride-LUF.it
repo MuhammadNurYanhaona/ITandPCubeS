@@ -18,13 +18,7 @@ Task "LU Factorization":
 		}
 		"Select Pivot" (Space B)
 		Activate if k in u.local.dimension1.range {
-			maxEntry = u[k][k]
-			pivot = k
-			do {	if (u[k][j] > maxEntry) {
-					maxEntry = u[k][j]
-					pivot = j		
-				}
-			} for j in u and j >= k
+			do { pivot = reduce("maxEntry", u[k][j]) } for j in u and j >= k
 		}
 		"Store Pivot" (Space A) {	
 			p[k] = pivot

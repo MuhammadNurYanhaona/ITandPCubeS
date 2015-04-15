@@ -66,13 +66,7 @@ Task "Transposed LU Factorization":
 	Compute:
 		"Select Pivot" (Space B)
 		Activate if k in u.local.dimension1.range {
-			maxEntry = u[k][k]
-                        pivot = k
-                        do {    if (u[k][j] > maxEntry) {
-                                        maxEntry = u[k][j]
-                                        pivot = j               
-                                }
-                        } for j in u and j >= k
+                        do { pivot = reduce ("maxEntry", u[k][j]) } for j in u and j >= k
 		}
 		"Store Pivot" (Space A) {	
 			p[k] = pivot
@@ -125,9 +119,8 @@ Task "Subtract Matrix Multiply Result":
 		a, b, c: link
 	Compute:
 		"Block multiply matrices" (Space A) { 
-			do {	total = 0.0000000 
-				do {	total = total + a[i][k] * b[k][j]
-				} for k in a
+			do { 
+				do { total = reduce ("sum", a[i][k] * b[k][j]) } for k in a
 				c[i][j] = c[i][j] - total
 			} for i, j in c
 		}

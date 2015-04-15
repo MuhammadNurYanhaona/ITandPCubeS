@@ -812,7 +812,13 @@ void generateFnToInitiateLPSesContentSimple(const char *headerFileName, const ch
 		for (int i = 0; i < localArrays->NumElements(); i++) {
 			const char *arrayName = localArrays->Nth(i);
 			DataStructure *structure = lps->getLocalStructure(arrayName);
-			if (structure->getUsageStat()->isAccessed()) {
+
+			// Note that ideally a reduction should not require data to be allocated in the PPS that
+			// is the receiver of reduction result - only the space for holding the result need to 
+			// be allocated. The current compiler, however, does reductions by sequential traversal
+			// of the underlying array(s). Therefore, the second clause is added for identifying
+			// allocation needs. 
+			if (structure->getUsageStat()->isAccessed() || structure->getUsageStat()->isReduced()) {
 				filteredArrays->Append(arrayName);
 			}
 		} 

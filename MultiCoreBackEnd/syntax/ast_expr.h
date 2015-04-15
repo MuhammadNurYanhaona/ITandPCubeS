@@ -37,7 +37,7 @@ class Expr : public Stmt {
     	Expr(yyltype loc) : Stmt(loc) { type = NULL; }
     	Expr() : Stmt() { type = NULL; }
 
-	// Helper functions for semantic analysis
+	//--------------------------------------------------------------------Helper functions for semantic analysis
 	void performTypeInference(Scope *executionScope);
         void checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 		resolveType(executionScope, ignoreTypeFailures);
@@ -54,7 +54,7 @@ class Expr : public Stmt {
 	void inferType(Scope *scope) { inferType(scope, type); }   
 	Type *getType() { return type; }
 	
-	// Helper functions for static analysis
+	//-----------------------------------------------------------------------Helper functions for static analysis
 	// This function decides, as its name suggests, the global variables been accessed by the expression.
 	// It can track assignment of global array reference assignments to some local variables and then 
 	// indirect changes to the global array through that local reference. This analysis is required to 
@@ -69,7 +69,7 @@ class Expr : public Stmt {
  	// process.
 	virtual const char *getBaseVarName() { return NULL; }
 	
-	// Helper functions for code generation
+	//-----------------------------------------------------------------------Helper functions for code generation
 	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space = NULL);
 	virtual void translate(std::ostringstream &stream, 
 			int indentLevel, int currentLineLength = 0, Space *space = NULL);
@@ -162,14 +162,14 @@ class ArithmaticExpr : public Expr {
 	const char *GetPrintNameForNode() { return "ArithmaticExpr"; }
     	void PrintChildren(int indentLevel);
 
-	// for semantic analysis	    	
+	//--------------------------------------------------------------------------------------for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 	
-	// for static analysis
+	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 
-	// for code generation
+	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 };
@@ -187,14 +187,14 @@ class LogicalExpr : public Expr {
 	LogicalOperator getOp() { return op; }	
 	Expr *getRight() { return right; }    	
 	
-	// for semantic analysis
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 
-	// for static analysis
+	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
-	// for code generation
+	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	
@@ -257,22 +257,32 @@ class ReductionExpr : public Expr {
   protected:
 	ReductionOperator op;
 	Expr *right;
+	// a reference to the loop that contains this reduction operation
+	LoopStmt *reductionLoop;
   public:
 	ReductionExpr(char *opName, Expr *right, yyltype loc);
 	const char *GetPrintNameForNode() { return "ReductionExpr"; }
     	void PrintChildren(int indentLevel);
 
-	// for semantic analysis	    	
+	//--------------------------------------------------------------------------------------for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 
-	// for static analysis
+	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 
-	// for code generation
+	//----------------------------------------------------------------------------------------for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
-	void translate(std::ostringstream &stream, int indentLevel, 
-			int currentLineLength, Space *space) { stream << "\"reduction\""; }
+	// the following function should be used to assign the result of reduction to the left hand side
+	// of the assignment expression the reduction is a part of
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+	// the following function should be used to generate the code for doing the actual reduction
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+	// the following function should be used to initialize the reduction loop (declaration of supplementary
+	// variables, setting initial value for result variable)
+	void setupForReduction(std::ostringstream &stream, int indentLevel);
+	// the following function should be used to do any finalization, if needed, after reduction loop completes
+	void finalizeReduction(std::ostringstream &stream, int indentLevel);
 };
 
 class EpochValue : public Expr {
@@ -296,12 +306,12 @@ class EpochExpr : public Expr {
 	const char *GetPrintNameForNode() { return "EpochExpr"; }
     	void PrintChildren(int indentLevel);
 
-	// for semantic analysis	    	
+	//------------------------------------------------------------------------------------for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 	Expr *getRootExpr() { return root; }
 
-	// for code generation
+	//--------------------------------------------------------------------------------------for code generation
 	const char *getBaseVarName() { return root->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
@@ -330,15 +340,17 @@ class FieldAccess : public Expr {
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "FieldAccess"; }
     	void PrintChildren(int indentLevel);	    	
+	
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);   
+	
+	//----------------------------------------------------------------------------------------for static analysis
 	const char *getBaseVarName();
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
-	
-	// an additional helper function for static analysis
 	bool isTerminalField() { return base == NULL; }
 	
-	// helper functions for back end compiler
+	//---------------------------------------------------------------------helper functions for back end compiler
 	bool isLocalTerminalField();
 	void markLocal() { local = true; }
 	void setMetadata(bool metadata) { this->metadata = metadata; }
@@ -372,11 +384,13 @@ class RangeExpr : public Expr {
 	RangeExpr(Identifier *index, Expr *range, Expr *step, bool loopingRange, yyltype loc);		
 	const char *GetPrintNameForNode() { return "RangeExpr"; }
     	void PrintChildren(int indentLevel);	    	
+	
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	const char *getIndexName() { return index->getName(); }
 	
-	// helper functions for backend compiler
+	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	
 	// As a range expression can be used as the condition for a repeat loop that needs to be
@@ -440,15 +454,15 @@ class AssignmentExpr : public Expr {
 	Expr *getLeft() { return left; }
 	Expr *getRight() { return right; }
 
-	// for semantic analysis	    	
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 
-	// for static analysis
+	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	const char *getBaseVarName() { return left->getBaseVarName(); }
 	
-	// for code generation
+	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	
@@ -488,15 +502,15 @@ class ArrayAccess : public Expr {
 	Expr *getBase() { return base; }
 	Expr *getIndex() { return index; }
 
-	// for semantic analysis	    	
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
 
-	// for static analysis
+	//----------------------------------------------------------------------------------------for static analysis
 	const char *getBaseVarName() { return base->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	int getIndexPosition();
 	
-	// for code generation
+	//----------------------------------------------------------------------------------------for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	Expr *getEndpointOfArrayAccess();
 	void generate1DIndexAccess(std::ostringstream &stream, 
@@ -571,10 +585,10 @@ class ObjectCreate : public Expr {
 	const char *GetPrintNameForNode() { return "ObjectCreate"; }
     	void PrintChildren(int indentLevel);
 	
-	// for semantic analysis	    	
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
 	
-	// for code generation
+	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 	void generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel);
 	static bool isDynamicArrayCreate(Expr *candidateExpr);

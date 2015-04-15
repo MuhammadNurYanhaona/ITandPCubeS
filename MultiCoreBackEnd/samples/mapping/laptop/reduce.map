@@ -1,0 +1,4 @@
+"Reduction" {
+	// syntax LPS ':' PPS
+	Space A: 3	// CPU
+}

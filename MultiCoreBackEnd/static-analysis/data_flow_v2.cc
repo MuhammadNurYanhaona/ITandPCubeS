@@ -466,13 +466,17 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	std::ostringstream nextIndent;
 	nextIndent << indent.str();
 
+	// TODO logic for handling stages with reduction operation need to be investigated further. For now
+	// we are not using the group entry restriction as reductions are converted into sequential traversal
+	// of underlying array(s). Therefore the if block is commented out below.
+	//
 	// if this is not a group entry execution stage then add a condition ensure that a PPU with only
 	// valid ID corresponding to this stage's LPS should go on executing the code
-	if (!isGroupEntry()) {
+	// if (!isGroupEntry()) {
 		nextIndent << '\t';
 		stream << indent.str() << "if (threadState->isValidPpu(Space_" << space->getName();
 		stream << ")) {\n";
-	}
+	// }
 
 	// invoke the related method with current LPU parameter
 	stream << nextIndent.str() << "// invoking user computation\n";
@@ -498,13 +502,14 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	stream << name << "\", Space_" << space->getName() << ");\n";
 	----------------------------------------------------------*/ 	
 	
+	// Again the condition below is commented out as we are not using the group-entrance logic properly
 	// close the if condition if applicable
-	if (!isGroupEntry()) {
+	// if (!isGroupEntry()) {
 		stream << indent.str() << "}\n";
-	}
+	// }
 }
 
-// An execution stage is a group entry if it contain any reduction operation
+// An execution stage is a group entry if it contains any reduction operation
 bool ExecutionStage::isGroupEntry() {
 	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
 	VariableAccess *access;

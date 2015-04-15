@@ -1,11 +1,3 @@
-/* File: ast_stmt.h
- * ----------------
- * The Stmt class and its subclasses are used to represent
- * statements in the parse tree.  For each statment in the
- * language (for, if, return, etc.) there is a corresponding
- * node class for that construct. 
- */
-
 #ifndef _H_ast_stmt
 #define _H_ast_stmt
 
@@ -19,6 +11,7 @@
 
 class Expr;
 class LogicalExpr;
+class ReductionExpr;
 class Space;
 class IndexScope;	
 
@@ -53,8 +46,7 @@ class Stmt : public Node {
 	static void mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
 				Hashtable<VariableAccess*> *second);
 
-	// back end code generation routine; subclasses should provide appropriate 
-	// implementations
+	// back end code generation routine; subclasses should provide appropriate implementations
 	virtual void generateCode(std::ostringstream &stream, 
 			int indentLevel, Space *space = NULL) {};
 };
@@ -62,22 +54,22 @@ class Stmt : public Node {
 class StmtBlock : public Stmt {
   protected:
     	List<Stmt*> *stmts;
-
   public:
     	StmtBlock(List<Stmt*> *statements);
     
-	// Syntex Analysis Routines	
+	//-------------------------------------------------------------------------Syntax Analysis Routines	
     	const char *GetPrintNameForNode() { return "StmtBlock"; }
     	void PrintChildren(int indentLevel);
     
-	// Semantic Analysis Routines	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	void performTypeInference(Scope *executionScope);
 	void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
+	List<Stmt*> *getStmtList() { return stmts; }
     
-	// Static Analysis Routines	
+	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
-	// Code Generation Routines
+	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
@@ -88,18 +80,18 @@ class ConditionalStmt: public Stmt {
   public:
 	ConditionalStmt(Expr *condition, Stmt *stmt, yyltype loc);	
     
-	// Syntex Analysis Routines	
+	//-------------------------------------------------------------------------Syntax Analysis Routines	
     	const char *GetPrintNameForNode() { return "ConditionalStmt"; }
     	void PrintChildren(int indentLevel);
     
-	// Semantic Analysis Routines	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	void performTypeInference(Scope *executionScope);
 	void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
     
-	// Static Analysis Routines	
+	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
-	// Code Generation Routines
+	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space);
 };
 
@@ -109,18 +101,19 @@ class IfStmt: public Stmt {
   public:
 	IfStmt(List<ConditionalStmt*> *ifBlocks, yyltype loc);	
     
-	// Syntex Analysis Routines	
+	//-------------------------------------------------------------------------Syntax Analysis Routines	
     	const char *GetPrintNameForNode() { return "IfBlock"; }
     	void PrintChildren(int indentLevel);
     
-	// Semantic Analysis Routines	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	void performTypeInference(Scope *executionScope);
 	void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
     
-	// Static Analysis Routines	
-	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	//-------------------------------------------------------------------------Static Analysis Routines	
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
+			TaskGlobalReferences *globalReferences);
 	
-	// Code Generation Routines
+	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
@@ -135,20 +128,22 @@ class IndexRangeCondition: public Node {
 			Identifier *collection, int dimensionNo, 
 			Expr *restrictions, yyltype loc);
     
-	// Syntex Analysis Routines	
+	//-------------------------------------------------------------------------Syntax Analysis Routines	
     	const char *GetPrintNameForNode() { return "RangeCondition"; }
     	void PrintChildren(int indentLevel);
+	List<Identifier*> *getIndexes() { return indexes; }
     
-	// Semantic Analysis Routines	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	void resolveTypes(Scope *executionScope, bool ignoreTypeFailures);
 	void inferTypes(Scope *executionScope);
 	void putIndexesInIndexScope();
 	void validateIndexAssociations(Scope *scope, bool ignoreFailures);
 	
-	// Static Analysis Routines	
-	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	//-------------------------------------------------------------------------Static Analysis Routines	
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
+			TaskGlobalReferences *globalReferences);
 
-	// Code Generation Routines
+	//-------------------------------------------------------------------------Code Generation Routines
 	LogicalExpr *getRestrictions();
 };
 
@@ -156,19 +151,41 @@ class LoopStmt: public Stmt {
   protected:
 	Scope *scope;
 	IndexScope *indexScope;
+	Stmt *body;
+	// when a loop embodies a reduction operation it needs to be translated in a way different
+	// than normal loop translation. Furthermore, currently the compiler cannot handle other
+	// statements within the same loop containing a reduction. To serve both of these needs we
+	// need a flag separating reduction loops from other loops.
+	bool reductionLoop;
+	// need to maintain a reference to the reduction expression when this embodies reduction
+	ReductionExpr *reduction;
   public:
-	LoopStmt() : Stmt() { scope = NULL; }
-     	LoopStmt(yyltype loc) : Stmt(loc) { scope == NULL; }
+	LoopStmt();
+     	LoopStmt(yyltype loc);
+	
+	// These two pointers are used to determine what is the closest enclosing loop for a 
+	// reduction operation (possibly within the loop). During semantic analysis of the code
+	// as a loop is encountered and exited these two references are updated accordingly to 
+	// be accessed by any embedded reduction operation.   
+	static LoopStmt *currentLoop;
+	LoopStmt *previousLoop;
     
-	// Semantic Analysis Routines	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
 	void setIndexScope(IndexScope *indexScope);
 	IndexScope *getIndexScope();
+	void flagAsReductionLoop() { reductionLoop = true; }
+	bool isReductionLoop() { return reductionLoop; }
+	void setReductionExpr(ReductionExpr *reduction);
+	virtual void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
+
+	//-------------------------------------------------------------------------Static Analysis Routines
+	virtual List<const char*> *getIndexNames() = 0;
 	
+	//-------------------------------------------------------------------------Code Generation Routines
 	// a helper routine for code generation that declares variables in the scope
 	void declareVariablesInScope(std::ostringstream &stream, int indentLevel);	
-	// Code Generation Routine
 	void generateIndexLoops(std::ostringstream &stream, int indentLevel, 
 			Space *space, Stmt *body, List<LogicalExpr*> *indexRestrictions = NULL);
 	// a helper routine that decides what index restrictions can be applied to the current 
@@ -184,27 +201,34 @@ class LoopStmt: public Stmt {
 	List<LogicalExpr*> *getApplicableExprs(Hashtable<const char*> *indexesInvisible, 
 			List<LogicalExpr*> *currentExprList, 
 			List<LogicalExpr*> *remainingExprList);
+	// a routine to declare any supplementary variable and do initialization of result variable 
+	// when the loop is a reduction operation  
+	void initializeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
+	// counterpart routine to terminate/finalize the result of reduction after iteration ends
+	void finalizeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
+	// a routine to carry on actual reduction operation inside the loop
+	void performReduction(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class PLoopStmt: public LoopStmt {
   protected:
 	List<IndexRangeCondition*> *rangeConditions;
-	Stmt *body;
   public:
 	PLoopStmt(List<IndexRangeCondition*> *rangeConditions, Stmt *body, yyltype loc);	
     
-	// Syntex Analysis Routines	
+	//--------------------------------------------------------------------------Syntax Analysis Routines	
     	const char *GetPrintNameForNode() { return "ParallelForLoop"; }
     	void PrintChildren(int indentLevel);
     
-	// Semantic Analysis Routines	
+	//------------------------------------------------------------------------Semantic Analysis Routines	
 	void performTypeInference(Scope *executionScope);
 	void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
     
-	// Static Analysis Routines	
+	//--------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	List<const char*> *getIndexNames();
 	
-	// Code Generation Routines
+	//--------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 	// a function for retrieving a list of boolean expressions that may be part of the range conditions
 	// associated with this loop. A mechanism was needed to break such additional index traversal
@@ -218,7 +242,6 @@ class SLoopStmt: public LoopStmt {
 	Identifier *id;
 	Expr *rangeExpr;
 	Expr *stepExpr;
-	Stmt *body;
 	// a flag used for code generation efficiency; if the sequential loop is traversing some
 	// array dimension then its code can be generated by invoking the utility method in loop
 	// statement class 
@@ -226,18 +249,19 @@ class SLoopStmt: public LoopStmt {
   public:
 	SLoopStmt(Identifier *id, Expr *rangeExpr, Expr *stepExpr, Stmt *body, yyltype loc);	
     
-	// Syntex Analysis Routines	
+	//-------------------------------------------------------------------------Syntex Analysis Routines	
     	const char *GetPrintNameForNode() { return "SequentialForLoop"; }
     	void PrintChildren(int indentLevel);
     
-	// Semantic Analysis Routines	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	void performTypeInference(Scope *executionScope);
 	void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
     
-	// Static Analysis Routines	
+	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	List<const char*> *getIndexNames();
 	
-	// Code Generation Routines
+	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
@@ -248,18 +272,18 @@ class WhileStmt: public Stmt {
   public:
 	WhileStmt(Expr *condition, Stmt *body, yyltype loc);	
     
-	// Syntex Analysis Routines	
+	//-------------------------------------------------------------------------Syntex Analysis Routines	
 	const char *GetPrintNameForNode() { return "WhileLoop"; }
     	void PrintChildren(int indentLevel);
     
-	// Semantic Analysis Routines	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	void performTypeInference(Scope *executionScope);
 	void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
     
-	// Static Analysis Routines	
+	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
-	// Code Generation Routines
+	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
