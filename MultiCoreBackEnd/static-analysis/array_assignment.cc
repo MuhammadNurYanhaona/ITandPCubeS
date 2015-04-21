@@ -22,7 +22,8 @@ bool isArrayAssignment(AssignmentExpr *expr) {
 	Expr *right = expr->getRight();
 	FieldAccess *field = dynamic_cast<FieldAccess*>(right);
 	ArrayAccess *array = dynamic_cast<ArrayAccess*>(right);
-	if (field == NULL && array == NULL) return false;
+	AssignmentExpr *nextAssignment = dynamic_cast<AssignmentExpr*>(right);
+	if (field == NULL && array == NULL && nextAssignment == NULL) return false;
 	ArrayType *arrayType = dynamic_cast<ArrayType*>(type);
 	StaticArrayType *staticType = dynamic_cast<StaticArrayType*>(type);
 	return (arrayType != NULL && staticType == NULL);
@@ -138,7 +139,10 @@ const char *ArrayName::getTranslatedName() {
 	if (partOfEnv) {
 		nameStr << envObjName << "->" << name;
 		return strdup(nameStr.str().c_str());
-	} else return ntransform::NameTransformer::transformer->getTransformedName(name, false, true);
+	} else {
+		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+		return transformer->getTransformedName(name, false, true, type);
+	}
 }
 
 const char *ArrayName::getTranslatedMetadataPrefix() {
@@ -146,7 +150,10 @@ const char *ArrayName::getTranslatedMetadataPrefix() {
 	if (partOfEnv) {
 		prefixStr << envObjName << "->" << name << "Dims";
 		return strdup(prefixStr.str().c_str());
-	} else return ntransform::NameTransformer::transformer->getTransformedName(name, true, true);
+	} else {
+		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+		return transformer->getTransformedName(name, true, true, type);
+	}
 }
 
 //-------------------------------------------------------- Dimension Access -----------------------------------------------------/

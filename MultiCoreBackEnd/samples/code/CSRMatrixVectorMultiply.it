@@ -1,7 +1,7 @@
-Task "CSR Matrix Vector Multiplication":
+Task "CSR Matrix Vector Multiply":
 	Define:
 		columns, rows: 1D Array of Integer	
-		values, v, w: 1D Array of Real single-precision
+		values, v, w: 1D Array of Real double-precision
 	Environment:
 		values, columns, rows, v: link
 		w: create
@@ -9,8 +9,9 @@ Task "CSR Matrix Vector Multiplication":
 		w.dimension = rows.dimension
 	Compute:
 		"" (Space A) {
-			do {
-				if (i > 0) {
+			start = rows.local.dimension1.range.min
+			if (start == 0) { start = -1 }
+			do {	if (i > 0) {
 					beginIndex = rows[i - 1] + 1
 				} else {
 					beginIndex = 0
@@ -19,10 +20,11 @@ Task "CSR Matrix Vector Multiplication":
 				do {
 					w[i] = w[i] + values[j] * v[columns[j]] 
 				} for j in columns and j >= beginIndex and j <= endIndex
-			} for i in rows
+			} for i in rows and i > start
 		}	
 	Partition(r):
 		Space A <1D> {
 			values, columns, v: replicated
-			rows, w: block_size(r)
+			w: block_size(r)
+			rows: block_size(r) padding(1, 0)
 		}

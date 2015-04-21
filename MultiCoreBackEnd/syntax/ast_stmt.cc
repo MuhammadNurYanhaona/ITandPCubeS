@@ -879,14 +879,14 @@ Hashtable<VariableAccess*> *WhileStmt::getAccessedGlobalVariables(
 
 void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 	for (int i = 0; i < indentLevel; i++) stream << '\t';
-	stream << "while (";
+	stream << "do {\n";
+	body->generateCode(stream, indentLevel + 1, space);
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "} while(";
 	if (condition != NULL) {
 		condition->translate(stream, indentLevel, 0, space);
 	} else {
 		stream << "true";
 	}
-	stream << ") {\n";
-	body->generateCode(stream, indentLevel + 1, space);
-	for (int i = 0; i < indentLevel; i++) stream << '\t';
-	stream << "}\n";
+	stream << ");\n";
 }

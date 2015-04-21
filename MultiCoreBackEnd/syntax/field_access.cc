@@ -242,7 +242,9 @@ void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int cur
 				// environment object and other objects. TODO kindly do appropriate refactoring in the
 				// future to do this in a better way.
 				FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
-				if (baseField != NULL && !baseField->isTerminalField()) {
+				if (baseField != NULL 
+						&& !baseField->isTerminalField() 
+						&& strcmp(baseField->field->getName(), Identifier::LocalId) != 0) {
 					stream << ".partition";	
 				} 	
 				//----------------------------------------------------------------------------------

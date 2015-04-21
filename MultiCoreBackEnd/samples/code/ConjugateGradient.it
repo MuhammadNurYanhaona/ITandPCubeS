@@ -14,7 +14,7 @@ Program (args) {
 	load_array(b, args.known_vector)
 	r_i = new 1D Array of Real double-precision
 	x_i = new 1D Array of Real double-precision
-	load_array(x_i, args.initial_prediction)
+	load_array(x_i, args.prediction_vector)
 	
 	// run the conjugate gradient logic
 	// note that here iteration should continue until the estimate for solution vector
@@ -37,10 +37,10 @@ Program (args) {
 		execute("Vector Addition"; vaEnv; Partition: args.b)
 		r_i = vaEnv.w
 
-		// determine the dot product of r_i to itself
-		dpEnv.u = dpEnv.u = r_i
+		// determine the dot product of r_i to itself as the residual norm
+		dpEnv.u = dpEnv.v = r_i
 		execute("Vector Dot Product"; dpEnv)
-		alpha_i = dpEnv.product
+		norm = dpEnv.product
 		
 		// determine A * r_i
 		mvmEnv.v = r_i
@@ -51,21 +51,15 @@ Program (args) {
 		execute("Vector Dot Product"; dpEnv)
 
 		// determine the next step size alpha_i as (r_i.r_i) / (r_i.(A * r_i))
-		alpha_i = alpha_i / dpEnv.product
+		alpha_i = norm / dpEnv.product
 
-		// calculate the next estimate for the solution vector
+		// calculate the next estimate x_i = x_i + alpha_i * r_i
 		vaEnv.u = x_i
 		vaEnv.alpha = 1
 		vaEnv.v = r_i
 		vaEnv.beta = alpha_i		
 		execute("Vector Addition"; vaEnv; Partition: args.b)
 
-		// calculate the norm of the residual to determine if x has converged
-		dpEnv.u = r_i
-		dpEnv.v = r_i
-		execute("Vector Dot Product"; dpEnv)
-		norm = dpEnv.product
-	
 		// prepare for the next iteration
 		x_i = vaEnv.w	
 		iteration = iteration + 1
@@ -83,6 +77,8 @@ Task "Vector Addition":
 	Environment:
 		u, v, alpha, beta: link
 		w: create
+	Initialize:
+		w.dimension = u.dimension
 	Compute:
 		"" (Space A) { do { w[i] = alpha * u[i] + beta * v[i] } for i in u }
 	Partition(b):
@@ -113,6 +109,8 @@ Task "CSR Matrix Vector Multiply":
 		w.dimension = rows.dimension
 	Compute:
 		"" (Space A) {
+			start = rows.local.dimension1.range.min
+			if (start == 0) { start = -1 }
 			do {	if (i > 0) {
 					beginIndex = rows[i - 1] + 1
 				} else {
@@ -122,10 +120,11 @@ Task "CSR Matrix Vector Multiply":
 				do {
 					w[i] = w[i] + values[j] * v[columns[j]] 
 				} for j in columns and j >= beginIndex and j <= endIndex
-			} for i in rows
+			} for i in rows and i > start
 		}	
 	Partition(r):
 		Space A <1D> {
 			values, columns, v: replicated
-			rows, w: block_size(r)
+			w: block_size(r)
+			rows: block_size(r) padding(1, 0)
 		}
