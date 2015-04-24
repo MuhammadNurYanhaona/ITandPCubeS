@@ -1,0 +1,35 @@
+Task "Matrix Multiply":
+	Define:
+		a, b, c: 2D Array of Real single-precision
+	Environment:
+		a, b: link
+		c: create
+	Initialize:
+		c.dimension1 = a.dimension1
+		c.dimension2 = b.dimension2
+	Compute:
+		"Block multiply matrices" (Space A) {
+			"Actual multiplication" (Space B) { 
+				do { c[i][j] = c[i][j] + sum (a[i][k] * b[k][j])
+				} for i, j in c; k in a
+			}
+			"Sample update" (Space B) {
+				do { b[i][j] = a[j][i]
+				} for i, j in a
+			}
+		}
+		Repeat: from "Block multiply matrices" foreach Space A sub-partition
+	Partition (k, l, q, r, m, n): 
+		Space A <2D> {
+			c: block_size(k, l)
+			a: block_size(k), replicated
+			b: replicated, block_size(l)
+			Sub-partition <1D> <unordered> {
+				a<dim2>, b<dim1>: block_size(q)
+			}
+		}
+		Space B <2D> divides Space A sub-partitions {
+			c: block_size(m, n)	
+			a: block_size(m), replicated 
+			b: replicated, block_size(n)
+		}

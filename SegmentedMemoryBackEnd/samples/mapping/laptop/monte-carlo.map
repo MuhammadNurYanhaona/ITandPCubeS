@@ -1,0 +1,5 @@
+"Monte Carlo Area Estimation" {
+	Space C: 3	// CPU
+	Space B: 2	// core
+	Space A: 1	// hyperthread
+}

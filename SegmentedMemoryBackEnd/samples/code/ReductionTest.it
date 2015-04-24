@@ -1,0 +1,15 @@
+Task "Reduction":
+	Define:
+		m: 1D Array of Real single-precision
+		result: Integer
+	Environment:
+		m: link
+		result: create
+	Compute:
+		"Perform Reduction" (Space A) {
+			do {
+				result = reduce ("minEntry", m[i])
+			} for i in m
+		}
+	Partition: 
+		Space A <un-partitioned> {m}	 	

@@ -1,0 +1,11 @@
+Task "Vector Dot Product":
+	Define:
+		u, v: 1D Array of Real double-precision
+		product: Real double-precision	
+	Environment:
+		u, v: link
+		product: create
+	Compute:
+		"" (Space A) { do { product = reduce("sum", u[i]*v[i]) } for i in u }
+	Partition: 
+		Space A <un-partitioned> {u, v}

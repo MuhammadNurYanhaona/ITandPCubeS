@@ -5,8 +5,9 @@ Front End
 	3. AST Generation
 	4. Scope and Type Checking
 	5. Static Analysis
-Back End
-	1. Multi-core Backend 
+Back Ends
+	1. Multi-core Backend
+	2. Segmented-memory Backend 
 
 We made changes as needed along the development process. So always look at the last phase 
 to get most up-to-date status of the language syntax and its features.

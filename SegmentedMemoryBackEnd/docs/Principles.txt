@@ -1,0 +1,25 @@
+1. Parallelism in multicore environment will be realized as threads.
+2. There should be exactly one controller thread per core in a multicore CPU. 
+   That thread will be responsible for all PCUs of all spaces that are been 
+   mapped to that core.
+3. Repeat loops should execute in each controller thread independently to avoid
+   further information exchanges among threads due to index update of loop 
+   variables.
+4. Reduction operations should be implemented as library routines taking
+	a. references and metadata of arrays to be reduced
+	b. possibly a pointer for the function that implement index filtering 
+	   and any operations to be done on individual elements
+	c. output reference
+	d. and number of participating threads
+5. For the un-optimized initial compiler we fix a storage order for array
+   dimensions. In addition, we duplicate part of data structure as it been 
+   partitioned differently in different spaces. This is because for the unoptimzed
+   compiler, the programmer is responsible for laying out the loop iterations
+   appropriately to ensure memory access alignment. He needs to know how the
+   data layout to be able to perform his job. Data structures that are used 
+   only once should not be re-arranged.
+6. A set of inline functions corresponding to different partitioning methods
+   should do the index transformation inside generated methods for computation
+   stages (and also for their activating conditions, if exist). This is needed
+   because of the reordering of data mentioned in (5). 
+ 

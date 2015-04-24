@@ -1,0 +1,60 @@
+Task "LU Factorization":
+	Define:
+		a, u, l: 2D Array of Real double-precision
+		p: 1D Array of Integer
+		pivot, k: Integer
+		l_column: 1D Array of Real double-precision
+	Environment:
+		a: link
+		u, l, p: create
+	Initialize:
+		u.dimension = l.dimension = a.dimension
+		l_column.dimension = l.dimension1
+		p.dimension = a.dimension1
+	Compute:
+		"Prepare" (Space B) {
+			do { u[i][j] = a[i][j] } for i, j in a
+			do { l[i][i] = 1 } for i in l
+		}
+		"Select Pivot" (Space B)
+		Activate if k in u.local.dimension2.range {
+			maxEntry = u[k][k]
+			pivot = k
+			do {	if (u[i][k] > maxEntry) {
+					maxEntry = u[i][k]
+					pivot = i		
+				}
+			} for i in u and i >= k
+		}
+		"Store Pivot" (Space A) {	
+			p[k] = pivot
+		}
+		"Interchange Rows" (Space B) {
+			if (k != pivot) {
+				do { 	pivot_entry = u[k][j]
+					u[k][j] = u[pivot][j]
+			     		u[pivot][j] = pivot_entry
+				} for j in u and j >= k
+				do { 	pivot_entry = l[k][j]
+					l[k][j] = l[pivot][j]
+			     		l[pivot][j] = pivot_entry
+				} for j in l and j < k
+			}
+		}
+		"Update Lower" (Space B)
+		Activate if k in l.local.dimension2.range {
+			do {	l[i][k] = u[i][k] / u[k][k]
+				l_column[i] = l[i][k]
+			} for i in l and i > k
+		}
+		"Update Upper" (Space B) {
+			do { u[i][j] = u[i][j] - l_column[i] * u[k][j] 
+			} for i, j in u and i > k and j >= k
+		}
+		Repeat: from "Select Pivot" for k in a.dimension1.range
+	Partition:
+		Space A <un-partitioned> { p }
+		Space B <1D> divides Space A partitions {
+			a<dim2>, u<dim2>, l<dim2>: stride ()
+			l_column: replicated
+		} 

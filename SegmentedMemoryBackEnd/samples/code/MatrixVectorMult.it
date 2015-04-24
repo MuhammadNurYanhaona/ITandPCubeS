@@ -1,0 +1,22 @@
+Task "Matrix Vector Multiply":
+	Define:
+		m: 2D Array of Real double-precision
+		u, v: 1D Array of Real double-precision
+	Environment:
+		m, u: link
+		v: create
+	Initialize:
+		v.dimension1 = m.dimension1
+	Compute:
+		"Multiply Part" (Space A) {
+			do {
+				do {
+					v[i] = v[i] + m[i][j] * u[j]
+				} for j in u
+			} for i in v
+		}
+	Partition (p):
+		Space A <1D> {
+			m<dim1>, v: block_size(p)
+			u: replicated
+		}

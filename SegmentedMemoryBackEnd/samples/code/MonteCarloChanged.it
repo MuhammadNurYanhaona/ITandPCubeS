@@ -1,0 +1,109 @@
+Tuple Point:
+	x, y: Real single-precision
+
+Tuple Rectangle:
+	top, right, bottom, left: Integer
+
+Tuple Coefficients:
+	order: Integer
+	values: Array[2] of Real single-precision
+
+Tuple PlacementStatistic:
+	pointsInside, pointsOutside: Integer
+
+// A Monte-Carlo area estimation task that determines the area under a curve. A rectangular grid
+// surrounds the curve and the grid is partitioned into sections to be handled by different LPUs.
+// Each the computation for each section continues until the estimate for that section reaches a
+// desirable precision. Finally, the total area is calculated by summing up the areas estimated
+// for the curve in individual sections.   
+Task "Monte Carlo Area Estimation":
+	Define:
+		// a list of coefficients represents the equation for the curve
+		shape: List of Coefficients
+		// the 2D array representing the rectangular grid 
+		grid: 2D Array of Rectangle
+		// a 2D array used to hold the estimate of the curve within each grid section 
+		sub_estimates: 2D Array of Real single-precision
+		// an auxiliary array to temporarily hold the relative position of a generated
+		// point relative to the give curve 
+		point_placements: 3D Array of Integer
+		// an auxiliary array to hold information about so far total points inside and
+		// outside of the curve for a sub-region
+		stats: 2D Array of PlacementStatistic
+		// an array holding the local precision of estimate
+		local_pre: 2D Array of Real single-precision
+		// some global variables useful for the compution (area holds the final result)
+		area, cell_size, precision: Real single-precision
+		// two temporary variables to terminate iterations for now as we are still not
+		// translating array access
+		t: Epoch
+		maxIterations : Integer
+	Environment:
+		grid, shape: link
+		area: create
+	Initialize (precision, cell_size, maxIterations):
+		sub_estimates.dimension = stats.dimension = local_pre.dimension  = grid.dimension
+		point_placements.dimension1 = grid.dimension1
+		point_placements.dimension2 = grid.dimension2
+		point_placements.dimension3.range.min = 0	
+		point_placements.dimension3.range.max = partition.p - 1
+	Compute:
+		"Calculate Point Position" (Space A) {
+			do { 
+				point = generatePoint(grid[i][j])
+				point_placements[i][j][k] = computePosition(shape, point)
+			} for i, j, k in point_placements
+		}
+		"Refine Subarea Estimate" (Space B) {
+			local_points = point_placements.dimension3.length
+			do { 
+				do {
+					internal_points = reduce ("sum", point_placements[i][j][k])
+				} for k in point_placements
+				external_points = local_points - internal_points
+				stats[i][j].pointsInside = stats[i][j].pointsInside + internal_points
+				stats[i][j].pointsOutside = stats[i][j].pointsOutside + external_points
+				total_points = stats[i][j].pointsInside + stats[i][j].pointsOutside
+				oldEstimate = sub_estimates[i][j]
+				sub_estimates[i][j] = cell_size * stats[i][j].pointsInside / total_points
+				local_pre[i][j] at (t) = sub_estimates[i][j] - oldEstimate
+			} for i, j in sub_estimates
+		}
+		Repeat: from "Calculate Point Position" while t.current < maxIterations
+		"Estimate Total Area" (Space C) {
+			do {
+				area = reduce ("sum", sub_estimates[i][j])
+			} for i, j in sub_estimates
+		}
+	Partition(p):
+		Space C <un-partitioned> { sub_estimates }
+		Space B <2D> divides Space C partitions {
+			point_placements<dim1, dim2>: block_size (1, 1)
+			grid, sub_estimates, local_pre, stats: block_size (1, 1)
+		}
+		Space A <1D> divides Space B partitions {
+			point_placements<dim3>: block_count (p)
+			grid: replicated
+		}
+
+// function for generating a random point within a rectangular boundary
+Function generatePoint:
+	Arguments: 
+		boundary: Rectangle
+	Results:
+		point: Point
+	Compute:
+		height = boundary.top - boundary.bottom
+		width = boundary.right - boundary.left
+		point.y = random() * 1.0 / height + boundary.bottom
+		point.x = random() * 1.0 / width + boundary.left
+
+// a mock implementation that does nothing
+Function computePosition:
+	Arguments:
+		shape: List of Coefficients
+		point: Point
+	Results:
+		position: Integer
+	Compute:
+		position = 1

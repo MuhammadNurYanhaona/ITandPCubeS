@@ -1,0 +1,11 @@
+"Vector Addition" {
+        Space A: 2      // Core-Pair
+}
+
+"Vector Dot Product" {
+        Space A: 5      // Socket
+}
+
+"CSR Matrix Vector Multiply" {
+        Space A: 2      // Core-Pair
+}

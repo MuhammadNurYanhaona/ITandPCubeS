@@ -1,0 +1,18 @@
+Task "Partition Test":
+	Define:
+		matrix: 2D Array of Real single-precision
+	Environment:
+		matrix: create
+	Initialize (length):
+		matrix.dimension1.range.min = 0
+		matrix.dimension1.range.max = length - 1
+		matrix.dimension2 = matrix.dimension1
+	Compute:
+		"Update Entries" (Space A) {
+			do { matrix[i][j] = 1
+			} for i, j in matrix
+		}
+	Partition (k, l):
+		Space A <2D> {
+			matrix: block_stride(k, l)
+		}
