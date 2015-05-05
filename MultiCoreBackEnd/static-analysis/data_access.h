@@ -47,6 +47,7 @@ class VariableAccess {
 	AccessFlags *contentAccessFlags;
 	bool metadataAccess;
 	AccessFlags *metadataAccessFlags;
+	bool localAccess;
   public:
 	VariableAccess(const char *varName);
 	void markContentAccess();
@@ -63,6 +64,8 @@ class VariableAccess {
 				|| contentAccessFlags->isReduced()); 
 	}
 	bool isModified() { return contentAccess && contentAccessFlags->isWritten(); }
+	void markLocalAccess() { localAccess = true; }
+	bool isLocalAccess() { return localAccess; }
 };
 
 /*	This class is used to store information about local variables within a computation stage that refer to

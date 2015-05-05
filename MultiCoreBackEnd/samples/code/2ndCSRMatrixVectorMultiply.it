@@ -1,0 +1,58 @@
+Task "CSR Matrix Vector Multiply":
+	Define:
+		columns, rows, scan_index: 1D Array of Integer	
+		values, v, w: 1D Array of Real double-precision
+		i, s, segmentLength: Integer
+		segments: Range
+	Environment:
+		values, columns, rows, v: link
+		w: create
+	Initialize:
+		segments.min = 0
+		segments.max = partition.p - 1
+		segmentLength = v.dimension.length / partition.p
+		w.dimension = scan_index.dimension = rows.dimension
+	Compute:
+		// initialize the array that keep track of how far progress has been made processing
+		// elements from a row of the sparse matrix
+		"Calculate Start Scan Indexes" (Space A) {
+			do {	
+				if (r > 0) { scan_index[r] = rows[r - 1] + 1
+				} else { scan_index[r] = 0 }
+			} for r in rows
+		}
+		"Process Segments" (Space A) {
+			// multiply a segment of input vector with a section of a row of the matrix 
+			"Multiply Segment" (Space B) {
+				lastColumn = columns[rows[i]]
+				beginIndex = s * segmentLength
+				endIndex = beginIndex + segmentLength - 1
+				if (s == segments.max || endIndex > lastColumn) { 
+					endIndex = lastColumn 
+				}
+				if (beginIndex <= columns[scan_index[i]]) {
+					index = scan_index[i]
+					column = columns[index]
+					do {
+						value = values[index]	
+						w[i] = w[i] + value * v[column]
+						index = index + 1
+						column = columns[index]
+					} while column <= endIndex
+					scan_index[i] = index
+				}				
+			}
+			// iterate over all rows that have been assigned to current Space A LPU	
+			Repeat: from "Multiply Segment" for i in rows.local.dimension.range
+		}
+		// process only a single segment of the input vector at a time for all rows in the matrix
+		Repeat: from "Process Segments" for s in segments	
+	Partition(p, r):
+		Space A <1D> {
+			w, scan_index: block_size(r)
+			rows: block_size(r) padding(1, 0)
+		}
+		Space B <1D> divides Space A partitions {
+			w, scan_index, rows, columns, values: replicated
+			v: block_size(p)
+		}

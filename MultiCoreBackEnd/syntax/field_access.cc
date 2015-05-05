@@ -198,11 +198,13 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
 			VariableSymbol *global = globalReferences->getGlobalRoot(fieldName);
 			Type *globalType = global->getType();
 			const char *globalName = global->getName();
+			VariableAccess *accessLog = table->Lookup(globalName);
 			if ((dynamic_cast<ArrayType*>(globalType)) != NULL) {
-				table->Lookup(globalName)->markMetadataAccess(); 
+				accessLog->markMetadataAccess(); 
 			} else {
-				table->Lookup(globalName)->markContentAccess();
-			}	
+				accessLog->markContentAccess();
+			}
+			if (this->isLocalTerminalField()) accessLog->markLocalAccess();	
 		}
 		return table;
 	}
