@@ -21,9 +21,9 @@ Task "CSR Matrix Vector Multiply":
 				} else { scan_index[r] = 0 }
 			} for r in rows
 		}
-		"Process Segments" (Space A) {
+		"Process Segments" (Space B) {
 			// multiply a segment of input vector with a section of a row of the matrix 
-			"Multiply Segment" (Space B) {
+			"Multiply Segment" (Space C) {
 				lastColumn = columns[rows[i]]
 				beginIndex = s * segmentLength
 				endIndex = beginIndex + segmentLength - 1
@@ -48,11 +48,9 @@ Task "CSR Matrix Vector Multiply":
 		// process only a single segment of the input vector at a time for all rows in the matrix
 		Repeat: from "Process Segments" for s in segments	
 	Partition(p, r):
-		Space A <1D> {
-			w, scan_index: block_size(r)
-			rows: block_size(r) padding(1, 0)
-		}
-		Space B <1D> divides Space A partitions {
+		Space A <un-partitioned> { rows, scan_index }
+		Space B <1D> { w, rows, scan_index: block_size(r) }
+		Space C <1D> divides Space B partitions {
 			w, scan_index, rows, columns, values: replicated
-			v: block_size(p)
+			v: block_count(p)
 		}
