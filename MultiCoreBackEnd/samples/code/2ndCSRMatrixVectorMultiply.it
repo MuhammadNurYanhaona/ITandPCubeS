@@ -24,22 +24,24 @@ Task "CSR Matrix Vector Multiply":
 		"Process Segments" (Space B) {
 			// multiply a segment of input vector with a section of a row of the matrix 
 			"Multiply Segment" (Space C) {
-				lastColumn = columns[rows[i]]
-				beginIndex = s * segmentLength
-				endIndex = beginIndex + segmentLength - 1
-				if (s == segments.max || endIndex > lastColumn) { 
-					endIndex = lastColumn 
+				last_column = columns[rows[i]]
+				start_column = s * segmentLength
+				end_column = start_column + segmentLength - 1
+				if (s == segments.max || end_column > last_column) { 
+					end_column = last_column 
 				}
-				if (beginIndex <= columns[scan_index[i]]) {
+				if (scan_index[i] <= rows[i]) {
 					index = scan_index[i]
 					column = columns[index]
-					do {
-						value = values[index]	
-						w[i] = w[i] + value * v[column]
-						index = index + 1
-						column = columns[index]
-					} while column <= endIndex
-					scan_index[i] = index
+					if (start_column <= column && end_column >= column) {
+						do {
+							value = values[index]	
+							w[i] = w[i] + value * v[column]
+							index = index + 1
+							if (index <= rows[i]) { column = columns[index] }
+						} while column <= end_column && index <= rows[i]
+						scan_index[i] = index
+					}
 				}				
 			}
 			// iterate over all rows that have been assigned to current Space A LPU	
@@ -49,7 +51,7 @@ Task "CSR Matrix Vector Multiply":
 		Repeat: from "Process Segments" for s in segments	
 	Partition(p, r):
 		Space A <un-partitioned> { rows, scan_index }
-		Space B <1D> { w, rows, scan_index: block_size(r) }
+		Space B <1D> divides Space A partitions { w, rows, scan_index: block_size(r) }
 		Space C <1D> divides Space B partitions {
 			w, scan_index, rows, columns, values: replicated
 			v: block_count(p)
