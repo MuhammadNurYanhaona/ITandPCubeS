@@ -36,6 +36,7 @@ VariableAccess::VariableAccess(const char *varName) {
 	metadataAccess = false;
 	contentAccessFlags = NULL;
 	metadataAccessFlags = NULL;
+	localAccess = false;
 }
 
 void VariableAccess::markContentAccess() {

@@ -960,7 +960,8 @@ void CompositeStage::genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &
 		// then signal synchronization
 		stream << indent.str() << '\t';
 		stream << "threadSync->" << currentSync->getSyncName() << "->signal(";
-		if (sourceStage->getRepeatIndex() > 0) stream << "repeatIteration";
+		FlowStage *signalSource = currentSync->getDependencyArc()->getSignalSrc();
+		if (signalSource->getRepeatIndex() > 0) stream << "repeatIteration";
 		else stream << "0";
 		stream << ")" << stmtSeparator;
 		// then reset the counter	 
@@ -977,7 +978,8 @@ void CompositeStage::genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &
 		stream << ")) {\n";
 		stream << indent.str() << '\t';
 		stream << "threadSync->" << currentSync->getSyncName() << "->wait(";
-		if (waitingStage->getRepeatIndex() > 0) stream << "repeatIteration";
+		FlowStage *signalSink = currentSync->getDependencyArc()->getSignalSink();
+		if (signalSink->getRepeatIndex() > 0) stream << "repeatIteration";
 		else stream << "0";
 		stream << ")" << stmtSeparator;
 		stream << indent.str() << "}\n";
@@ -1147,7 +1149,9 @@ bool RepeatCycle::isLpsDependent() {
 	VariableAccess *accessLog;
 	Iterator<VariableAccess*> iterator = repeatConditionAccessMap->GetIterator();
 	while ((accessLog = iterator.GetNextValue()) != NULL) {
-		if (!accessLog->isContentAccessed()) continue;
+		if (!(accessLog->isContentAccessed() 
+			|| (accessLog->isMetadataAccessed() 
+				&& accessLog->isLocalAccess()))) continue;
 		const char *varName = accessLog->getName();
 		DataStructure *structure = space->getStructure(varName);
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);

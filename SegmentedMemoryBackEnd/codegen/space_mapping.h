@@ -17,6 +17,16 @@ class PPS_Definition {
 	   marked as '*' besides its name.
 	*/
 	bool coreSpace;
+	/* We need another variable to identify where memory segmentation occurs in the hardware.
+	   That is, either we have distributed memory in the PPS or there is non-uniformity in 
+	   the access latency for memory modules. Note that if the memory of a PPS is segmented
+	   among its PPUs then any memory available in an ancestor PPS in not directly available
+	   in those PPUs either as an addressible memory.
+	   The marker '^' after a PPS name indicates that it has segmented memory.	 	
+	*/
+	bool segmented;
+
+	void print(int indentLevel);
 };
 
 /* structure definition to identify an LPS-PPS mapping */

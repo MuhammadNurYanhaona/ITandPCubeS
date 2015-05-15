@@ -16,6 +16,16 @@
 #include <string>
 #include <deque>
 
+void PPS_Definition::print(int indentLevel) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	std::cout << indent.str() << name << ": Space " << id << '\n';
+	indent << '\t';
+	std::cout << indent.str() << "Units: " << units << '\n';
+	if (coreSpace) std::cout << indent.str() << "Computation Core\n";
+	if (segmented) std::cout << indent.str() << "Segmented Memory\n";
+}
+
 List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 
 	List<PPS_Definition*> *list = new List<PPS_Definition*>;
@@ -45,15 +55,28 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		std::string spaceNoStr = tokenList->Nth(0);
 		std::string spaceNameStr = tokenList->Nth(1);
 
-		// retrieve the space ID; also determine if current space represents CPU cores
+		// retrieve the space ID; also determine if current space represents CPU cores and if
+		// it has segmented memory
 		tokenList = string_utils::tokenizeString(spaceNoStr, separator2);
 		std::string spaceNo = tokenList->Nth(1);
 		int spaceId;
+		std::string markerStr1 = "^*";
+		std::string markerStr2 = "*^";
 		bool coreSpace = false;
-		if (string_utils::endsWith(spaceNo, '*')) {
+		bool segmented = false;
+		if (string_utils::endsWith(spaceNo, markerStr1) || string_utils::endsWith(spaceNo, markerStr2)) {
+			spaceNo = spaceNo.substr(0, spaceNo.length() - 2);
+			spaceId = atoi(spaceNo.c_str());
+			coreSpace = true;
+			segmented = true;	
+		} else if (string_utils::endsWith(spaceNo, '*')) {
 			spaceNo = spaceNo.substr(0, spaceNo.length() - 1);
 			spaceId = atoi(spaceNo.c_str());
 			coreSpace = true;
+		} else if (string_utils::endsWith(spaceNo, '^')) {
+			spaceNo = spaceNo.substr(0, spaceNo.length() - 1);
+			spaceId = atoi(spaceNo.c_str());
+			segmented = true;
 		} else {
 			spaceId = atoi(spaceNo.c_str());
 		}
@@ -71,6 +94,7 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		spaceDefinition->name = strdup(spaceName.c_str());
 		spaceDefinition->units = ppuCount;
 		spaceDefinition->coreSpace = coreSpace;
+		spaceDefinition->segmented = segmented;
 			
 		// store the space definition in the list in top-down order
 		int i = 0;	
@@ -82,8 +106,9 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 	}
 	pcubesfile.close();
 
+	std::cout << "PCubeS Description of the hardware\n";
 	for (int i = 0; i < list->NumElements(); i++) {
-		printf("Space %s-%d-%d\n", list->Nth(i)->name, list->Nth(i)->id, list->Nth(i)->units);
+		list->Nth(i)->print(1);
 	}
 	return list;
 }
