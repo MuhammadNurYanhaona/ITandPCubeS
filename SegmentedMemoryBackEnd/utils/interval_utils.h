@@ -133,8 +133,9 @@ class IntervalSet {
 	void remove(HyperplaneInterval *interval);
 	// remove all intervals from the set; thereby empties it
 	void clear();
+	inline List<HyperplaneInterval*> *getIntervalList() { return intervals; }
 
-	// TODO implement the following	two methods
+	// TODO implement the following	three methods
 	// This computes the union of current interval set and the argument set. Note that the union computation
 	// is not a mere accumulation of unique interval sequences from both sets. Overlappings among intervals
 	// need to be taken into consideration and should be removed so that the new set has no element appearing
@@ -144,6 +145,9 @@ class IntervalSet {
 	// This computes the intersection of current interval set with the argument interval set. If the two sets
 	// do not overlap then it should return NULL
 	IntervalSet *getIntersection(IntervalSet *other);
+	// Subtract the interval sequences found in the argument interval set from the current one. If the two 
+	// sets are the same then return NULL
+	IntervalSet *getSubtraction(IntervalSet *other);
 };
 
 #endif
