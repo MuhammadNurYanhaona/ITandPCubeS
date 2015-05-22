@@ -52,6 +52,9 @@ class DimPartitionConfig {
 		this->ppuCount = ppuCount;
 		this->lpsAlignment = lpsAlignment;
 	}
+	bool hasPadding() { return paddings[0] > 0 || paddings[1] > 0; }
+	Dimension getDataDimension() { return dimension; }
+
 	// determines how many unique parts of the data structure can be found along this dimension 
 	virtual int getPartsCount() = 0;
 
@@ -172,9 +175,8 @@ class DataPartitionConfig {
 		this->dimensionCount = dimensionCount;
 		this->dimensionConfigs = dimensionConfigs;
 	}
-	// the function to be used to generate data parts for subsequent use; note that generated parts
-	// do not have their memory allocated by default
-	DataPart *generateDataPart(int *partId);
+	// the function is to be used for generating metadata for subsequent use in generating a data part
+	PartMetadata *generatePartMetadata(int *partId);
 	// utility function to retrieve multi-dimensional LPU ids from a translated linear id
 	int *getMultidimensionalLpuId(int lpsDimensions, int *lpuCount, int linearId);
 	
@@ -191,6 +193,28 @@ class DataPartitionConfig {
 	// to it for execution
 	List<int*> *getLocalPartIds(int lpsDimensions, int *lpuCount, Range localRange);
 	List<int*> *getLocalPartIds(List<int*> *localLpuIds);
+
+	// function to generate the list of data parts (see allocation.h) from the partition configuration
+	template <class type> DataPartsList *partList(List<int*> *localPartIds, int epochCount) {
+		List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
+		for (int i = 0; i < localPartIds->NumElements(); i++) {
+			int *partId = localPartIds->Nth(i);
+			partMetadataList->Append(generatePartMetadata(partId));
+		}
+		Dimension *dataDimensions = new Dimension[dimensionCount];
+		bool hasPadding = false;
+		for (int d = 0; d < dimensionCount; d++) {
+			DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
+			dataDimensions[d] = dimConfig->getDataDimension();
+			hasPadding = hasPadding || dimConfig->hasPadding();
+		}
+		ListMetadata *listMetadata = new ListMetadata(dimensionCount, dataDimensions);
+		listMetadata->setPadding(hasPadding);
+		listMetadata->generateIntervalSpec(partMetadataList);
+		DataPartsList *dataPartsList = new DataPartsList(listMetadata, epochCount);
+		dataPartsList->allocate <type> (partMetadataList);
+        	return dataPartsList;
+	}
 };
 
 #endif

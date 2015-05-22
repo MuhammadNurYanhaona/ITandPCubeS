@@ -262,7 +262,7 @@ Dimension BlockStrideConfig::getPartDimension(int partId) {
 
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
 
-DataPart *DataPartitionConfig::generateDataPart(int *partId) {
+PartMetadata *DataPartitionConfig::generatePartMetadata(int *partId) {
 	
 	Dimension *partDimensions = new Dimension[dimensionCount];
 	List<LineInterval*> *linearIntervals = new List<LineInterval*>;
@@ -285,7 +285,7 @@ DataPart *DataPartitionConfig::generateDataPart(int *partId) {
 			dimensionCount, paddedIntervals);
 	PartMetadata *metadata = new PartMetadata(dimensionCount, partId, partDimensions, padding);
 	metadata->setIntervals(coreInterval, paddedInterval);
-	return new DataPart(metadata);
+	return metadata;
 }
 
 int *DataPartitionConfig::getMultidimensionalLpuId(int lpsDimensions, int *lpuCount, int linearId) {

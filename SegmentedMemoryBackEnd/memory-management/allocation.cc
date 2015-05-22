@@ -37,23 +37,21 @@ bool PartMetadata::isMatchingId(int *id) {
 
 //---------------------------------------------------------------- List Metadata ---------------------------------------------------------------/
 
-ListMetadata::ListMetadata(int dimensionality, Dimension *boundary, int *partitionedDims, int *partsCount) {
+ListMetadata::ListMetadata(int dimensionality, Dimension *boundary) {
 	this->dimensionality = dimensionality;
 	this->boundary = boundary;
-	this->partitionedDims = partitionedDims;
-	this->partsCount = partsCount;
 	this->hasPadding = false;
 	this->intervalSpec = NULL;
 	this->paddedIntervalSpec = NULL;
 }
 
-void ListMetadata::generateIntervalSpec(List<DataPart*> *partList) {
+void ListMetadata::generateIntervalSpec(List<PartMetadata*> *partList) {
 	intervalSpec = new IntervalSet;
-	intervalSpec->add(partList->Nth(0)->getMetadata()->getCoreInterval());
+	intervalSpec->add(partList->Nth(0)->getCoreInterval());
 	for (int i = 1; i < partList->NumElements(); i++) {
 		IntervalSet *dataSpec = new IntervalSet;
 		IntervalSet *currentSpec = intervalSpec;
-		dataSpec->add(partList->Nth(i)->getMetadata()->getCoreInterval());
+		dataSpec->add(partList->Nth(i)->getCoreInterval());
 		intervalSpec = currentSpec->getUnion(dataSpec);
 		delete currentSpec;
 		delete dataSpec;
@@ -62,16 +60,15 @@ void ListMetadata::generateIntervalSpec(List<DataPart*> *partList) {
 		paddedIntervalSpec = intervalSpec;
 	} else {
 		paddedIntervalSpec = new IntervalSet;
-		paddedIntervalSpec->add(partList->Nth(0)->getMetadata()->getPaddedInterval());
+		paddedIntervalSpec->add(partList->Nth(0)->getPaddedInterval());
 		for (int i = 1; i < partList->NumElements(); i++) {
 			IntervalSet *dataSpec = new IntervalSet;
 			IntervalSet *currentSpec = paddedIntervalSpec;
-			dataSpec->add(partList->Nth(i)->getMetadata()->getPaddedInterval());
+			dataSpec->add(partList->Nth(i)->getPaddedInterval());
 			paddedIntervalSpec = currentSpec->getUnion(dataSpec);
 			delete currentSpec;
 			delete dataSpec;
 		}
-
 	}
 }
 
