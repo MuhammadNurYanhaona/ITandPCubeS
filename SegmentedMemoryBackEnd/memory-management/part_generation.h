@@ -138,6 +138,20 @@ class StrideConfig : public DimPartitionConfig {
 	Dimension getPartDimension(int partId);
 };
 
+/* configuration subclass for 'block_stride' partition function that takes a 'block_size' parameter */
+class BlockStrideConfig : public DimPartitionConfig {
+  public:
+	BlockStrideConfig(Dimension dimension, int *partitionArgs, 
+			int ppuCount, int lpsAlignment) : DimPartitionConfig(dimension, 
+			partitionArgs, ppuCount, lpsAlignment) {}
+	int getPartsCount();
+	LineInterval *getCoreInterval(int partId);
+	LineInterval *getInterval(int partId) { return getCoreInterval(partId); }
+	LineInterval *getXformedCoreInterval(int partId);
+	LineInterval *getXformedInterval(int partId) { return getXformedCoreInterval(partId); }
+	Dimension getPartDimension(int partId);
+};
+
 /* This is the class that holds the partition configuration for different dimensions of a single data 
    structure within an LPS. An instance of this class needs to be instantiated based on the instructions
    about partitions and once the length of different dimensions are known. Know that will be one dim-

@@ -142,7 +142,7 @@ Dimension block_stride_getRange(Dimension d, int lpuCount, int lpuId, bool copyM
 		extraEntriesBefore = blockCount * size;
 	}
 	Range range;
-	range.min = lpuId * strideCount * size + extraEntriesBefore;
+	range.min = lpuId * strideCount * stride + extraEntriesBefore;
 	range.max = range.min + myEntries - 1;
 
 	Dimension dimension;

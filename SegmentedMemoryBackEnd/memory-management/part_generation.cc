@@ -186,6 +186,80 @@ Dimension StrideConfig::getPartDimension(int partId) {
 	return partDimension;
 }
 
+//----------------------------------------------------------- Block Stride Config ---------------------------------------------------------/
+
+int BlockStrideConfig::getPartsCount() {
+	int blockSize = partitionArgs[0];
+	int length = dimension.length;
+        int strides = length / blockSize;
+        return std::max(1, std::min(strides, ppuCount));
+}
+
+LineInterval *BlockStrideConfig::getCoreInterval(int partId) {
+	
+	int partsCount = getPartsCount();
+	int blockSize = partitionArgs[0];
+        int strideLength = blockSize * partsCount;
+        int strideCount = dimension.length / strideLength;
+
+	// the stride count for the current part may be increased by one if dimension is not divisible
+	// by the strideLength
+	int partialStrideElements = dimension.length % strideLength;
+        int extraBlockCount = partialStrideElements / blockSize;
+	if (extraBlockCount > partId || 
+		(extraBlockCount == partId 
+		&& partialStrideElements % blockSize != 0)) strideCount++;
+
+	int begin = blockSize * partId;
+	int length = blockSize;
+	int count = strideCount;
+	int gap = strideLength;
+	LineInterval *interval = new LineInterval(begin, length, count, gap);
+	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	return interval;	
+}
+
+LineInterval *BlockStrideConfig::getXformedCoreInterval(int partId) {
+	Dimension partDimension = getPartDimension(partId);
+	int begin = partDimension.range.min;
+	int length = partDimension.length;
+	LineInterval *interval = new LineInterval(begin, length, 1, 0);
+	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	return interval;	
+}
+
+Dimension BlockStrideConfig::getPartDimension(int partId) {
+
+	int partsCount = getPartsCount();
+	int blockSize = partitionArgs[0];
+        int strideLength = blockSize * partsCount;
+        int strideCount = dimension.length / strideLength;
+        int myEntries = strideCount * blockSize;
+        
+	int partialStrideElements = dimension.length % strideLength;
+        int blockCount = partialStrideElements / blockSize;
+        int extraEntriesBefore = partialStrideElements;
+
+        // if extra entries fill up a complete new block in the stride of the current LPU then its number of 
+	// entries should increase by the size parameter and extra preceeding entries should equal to 
+	// block_size * preceeding strides count
+        if (blockCount > partId) {
+                myEntries += blockSize;
+                extraEntriesBefore = partId * blockSize;
+        // If the extra entries does not fill a complete block for the current one then it should have whatever 
+	// remains after filling up preceeding blocks
+        } else if (blockCount == partId) {
+                myEntries += extraEntriesBefore - partId * blockSize;
+                extraEntriesBefore = partId * blockSize;
+        }
+        
+	Dimension partDimension;
+        partDimension.range.min = partId * strideCount * strideLength + extraEntriesBefore;
+        partDimension.range.max = partDimension.range.min + myEntries - 1;
+        partDimension.setLength();
+        return partDimension;
+}
+
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
 
 DataPart *DataPartitionConfig::generateDataPart(int *partId) {
