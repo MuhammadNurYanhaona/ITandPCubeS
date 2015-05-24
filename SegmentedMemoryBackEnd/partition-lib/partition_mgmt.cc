@@ -8,7 +8,7 @@
 /******************************** partitionCount functions ****************************************/
 
 int block_size_partitionCount(Dimension d, int ppuCount, int size) {
-        return std::max(1, d.length / size);
+        return (d.length + size - 1) / size;
 }
 
 int block_count_partitionCount(Dimension d, int ppuCount, int count) {

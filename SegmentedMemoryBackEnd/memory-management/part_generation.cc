@@ -395,3 +395,31 @@ List<int*> *DataPartitionConfig::getLocalPartIds(List<int*> *localLpuIds) {
 	}
 	return uniqueParts;
 }
+
+int *DataPartitionConfig::generatePartId(int *lpuId) {
+	int *partId = new int[dimensionCount];
+	for (int d = 0; d < dimensionCount; d++) {
+		DimPartitionConfig *dimensionConfig = dimensionConfigs->Nth(d);
+		partId[d] = dimensionConfig->pickPartId(lpuId);
+	}
+	return partId;
+}
+
+ListMetadata *DataPartitionConfig::generatePartsMetadata(List<int*> *partIds) {
+	List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
+	for (int i = 0; i < partIds->NumElements(); i++) {
+		int *partId = partIds->Nth(i);
+		partMetadataList->Append(generatePartMetadata(partId));
+	}
+	Dimension *dataDimensions = new Dimension[dimensionCount];
+	bool hasPadding = false;
+	for (int d = 0; d < dimensionCount; d++) {
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
+		dataDimensions[d] = dimConfig->getDataDimension();
+		hasPadding = hasPadding || dimConfig->hasPadding();
+	}
+	ListMetadata *listMetadata = new ListMetadata(dimensionCount, dataDimensions);
+	listMetadata->setPadding(hasPadding);
+	listMetadata->generateIntervalSpec(partMetadataList);
+	return listMetadata;
+}

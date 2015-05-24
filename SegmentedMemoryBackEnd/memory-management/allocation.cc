@@ -93,3 +93,12 @@ DataPart *DataPartsList::getPart(int *partId) {
 	return NULL;
 }
 
+DataPart *DataPartsList::getPart(int *partId, int epoch) {
+	int epochVersion = (epochHead - epoch) % epochCount;
+	List<DataPart*> *currentList = partLists[epochVersion];
+	for (int i = 0; i < currentList->NumElements(); i++) {
+		DataPart *currentPart = currentList->Nth(i);
+		if (currentPart->getMetadata()->isMatchingId(partId)) return currentPart;
+	}
+	return NULL;
+}

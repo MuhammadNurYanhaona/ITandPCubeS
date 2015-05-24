@@ -125,7 +125,8 @@ class DataPartsList {
 			}
 		}
 	}
-	DataPart *getPart(int *partId);	
+	DataPart *getPart(int *partId);
+	DataPart *getPart(int *partId, int epoch);	
 	// moves the head of the circular array one step ahead
 	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }
 	inline int getEpochCount() { return epochCount; }

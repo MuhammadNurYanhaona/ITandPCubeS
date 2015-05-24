@@ -194,8 +194,11 @@ class DataPartitionConfig {
 	List<int*> *getLocalPartIds(int lpsDimensions, int *lpuCount, Range localRange);
 	List<int*> *getLocalPartIds(List<int*> *localLpuIds);
 
+	// generate a data part Id for an LPU from the LPU Id
+	int *generatePartId(int *lpuId);
+
 	// function to generate the list of data parts (see allocation.h) from the partition configuration
-	template <class type> DataPartsList *partList(List<int*> *localPartIds, int epochCount) {
+	template <class type> DataPartsList *generatePartList(List<int*> *localPartIds, int epochCount) {
 		List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
 		for (int i = 0; i < localPartIds->NumElements(); i++) {
 			int *partId = localPartIds->Nth(i);
@@ -215,6 +218,10 @@ class DataPartitionConfig {
 		dataPartsList->allocate <type> (partMetadataList);
         	return dataPartsList;
 	}
+
+	// this function is used to determine the data-parts content of PPUs other than the current one
+	// so that decision about the nature and content of communication for shared data can be made.
+	ListMetadata *generatePartsMetadata(List<int*> *partIds);
 };
 
 #endif
