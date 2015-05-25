@@ -643,6 +643,11 @@ void ComputeStage::checkVariableAccess(Scope *taskGlobalScope) {
 		}
 	}
 
+	// partitionable data structures, currently only arrays are partitionable, must be explicitly
+	// mentioned in the partition section correspond to the LPS within which a computation stage
+	// executes. Scalar or non partitionable structures, on the other hand, are not specified 
+	// explicitly. They get added to the LPS (here the executionSpace variable) as they have been
+	// found to be used within an LPS's compute stages.
 	Iterator<VariableAccess*> iter = accessMap->GetIterator();
 	VariableAccess *accessLog;
 	while ((accessLog = iter.GetNextValue()) != NULL) {
@@ -651,7 +656,8 @@ void ComputeStage::checkVariableAccess(Scope *taskGlobalScope) {
 		VariableSymbol *symbol = (VariableSymbol*) taskGlobalScope->lookup(name);
 		Type *type = symbol->getType();
 		ArrayType *arrayType = dynamic_cast<ArrayType*>(type);
-		if (arrayType != NULL) {
+		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(type);
+		if (arrayType != NULL && staticArray == NULL) {
 			ReportError::ArrayPartitionUnknown(GetLocation(), 
 					name, header->getStageName(), header->getSpaceId());
 		} else {

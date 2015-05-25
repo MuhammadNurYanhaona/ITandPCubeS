@@ -184,6 +184,7 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		// create a mapping configuration object
 		MapEntry *entry = new MapEntry();
 		entry->LPS = lps;
+		lps->setPpsId(ppsId);
 		entry->PPS = pps;
 		MappingNode *node = new MappingNode();
 		node->parent = NULL;

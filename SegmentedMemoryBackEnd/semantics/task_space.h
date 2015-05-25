@@ -134,12 +134,18 @@ class DataStructure {
 	// data structure under concern
 	LPSVarUsageStat *usageStat;
 
-	// this variable is only useful for subpartitioned data structures. If it true, it signifies that
+	// This variable is only useful for subpartitioned data structures. If it true, it signifies that
 	// the immediate parent space of the subpartition space, i.e., the space some of whose data 
 	// structures are subpartitioned, cannot store the content of this data structure due to space
 	// limitation. Therefore, any update must be moved further up in the partition hierarchy if persistence
 	// is desired.	
 	bool nonStorable;
+
+	// The LPS that allocates a data structure is not necessarily always the primary source. Not all LPSes 
+	// allocate their data structures either. Therefore a reference is needed to point to the LPS allocation 
+	// the this data structure reference should point to. These pointers are then used to set up variables in
+	// LPUs properly    
+	Space *allocator;
   public:
 	DataStructure(VariableDef *definition);
 	DataStructure(DataStructure *source);
@@ -152,7 +158,12 @@ class DataStructure {
 	void flagAsNonStorable() { nonStorable = true; }
 	bool isNonStorable() { return nonStorable; }
 	virtual bool hasOverlappingsAmongPartitions() { return false; }
-	LPSVarUsageStat *getUsageStat() { return usageStat; };	
+	LPSVarUsageStat *getUsageStat() { return usageStat; }
+	void setAllocator(Space *allocator) { this->allocator = allocator; }
+	Space *getAllocator() { return allocator; }
+	// returns current structure if it has been marked allocated or gets the closest source reference that is
+	// marked allocated  
+	DataStructure *getClosestAllocation();
 };
 
 class ArrayDataStructure : public DataStructure {
@@ -262,6 +273,8 @@ class CoordinateSystem {
 	Coordinate *getCoordinate(int dimensionNo);		
 };
 
+/* 	the class correspond to a logical processing space (LPS) 
+*/
 class Space {
   protected:
 	const char *id;
@@ -272,6 +285,12 @@ class Space {
 	Space *parent;
 	Space *subpartition;
 	Hashtable<DataStructure*> *dataStructureList;
+	List<Space*> *children;
+	
+	// This is a variable used for the backend compiler. It represents the position in the PCubeS hierarchy
+	// the current LPS has been mapped to. PPSes are labeled from 1 to up from the lowest physical space to
+	// the highest 
+	int ppsId;
   public:
 	static const char *RootSpaceName;
 	static const char *SubSpaceSuffix;
@@ -284,6 +303,8 @@ class Space {
 	DataStructure *getLocalStructure(const char *name);
 	void setParent(Space *parent) { this->parent = parent; }
 	Space *getParent() { return parent; }
+	void addChildSpace(Space *child) { children->Append(child); }
+	List<Space*> *getChildrenSpaces() { return children; }
 	int getDimensionCount() { return dimensions; }
 	const char *getName() { return id; }
 	void storeToken(int coordinate, Token *token);
@@ -305,6 +326,8 @@ class Space {
 	bool isRoot() { return parent == NULL; }
 	Space *getRoot() { return (parent == NULL) ? this : parent->getRoot(); }
 	Symbol *getLpuIdSymbol();
+	void setPpsId(int ppsId) { this->ppsId = ppsId; }
+	int getPpsId() { return ppsId; }
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy
@@ -321,6 +344,12 @@ class PartitionHierarchy {
 	Space *getRootSpace();
 	bool addNewSpace(Space *space);
 	Space *getCommonAncestor(Space *space1, Space *space2);	
+	
+	// This routine sets up allocator LPS references to all data structures of different LPSes in the 
+	// partition hierarchy so that memory allocations can be done appropriately and also structure 
+	// references can be set accordingly during LPU generations. The analysis done here is dependent
+	// on the LPS-to-PPS mapping. Therefore, it should be done after ppsIds are set to LPSes properly. 	
+	void performAllocationAnalysis(int segmentedPPS);
 };
 
 #endif

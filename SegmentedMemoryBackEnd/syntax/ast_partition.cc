@@ -128,11 +128,14 @@ void PartitionSpec::addSpaceConfiguration(TaskDef *taskDef, PartitionHierarchy *
 			ReportError::ParentSpaceNotFound(parentLink->GetLocation(), parentLink->getParentId(), 
 					spaceId, parentLink->linkedToSubpartition());	
 			space->setParent(currentHierarchy->getRootSpace());
+			currentHierarchy->getRootSpace()->addChildSpace(space);
 		} else {
 			space->setParent(parentSpace);
+			parentSpace->addChildSpace(space);
 		}
 	} else {
 		space->setParent(currentHierarchy->getRootSpace());
+		currentHierarchy->getRootSpace()->addChildSpace(space);
 	}
 
 	// Unpartitioned spaces should only specify the list of variables they hold without any partition
