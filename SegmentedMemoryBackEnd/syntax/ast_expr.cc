@@ -255,6 +255,11 @@ Hashtable<VariableAccess*> *ArithmaticExpr::getAccessedGlobalVariables(TaskGloba
 	return table;
 }
 
+void ArithmaticExpr::setEpochVersions(Space *space, int epoch) {
+	left->setEpochVersions(space, epoch);
+	right->setEpochVersions(space, epoch);
+}
+
 void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	if (op != POWER) {
 		left->translate(stream, indentLevel, currentLineLength, space);
@@ -364,6 +369,10 @@ Hashtable<VariableAccess*> *EpochExpr::getAccessedGlobalVariables(TaskGlobalRefe
 		table->Enter(globalName, accessLog, true);
 	}
 	return table;
+}
+
+void EpochExpr::setEpochVersions(Space *space, int oldEpochValue) {
+	root->setEpochVersions(space, epoch->getLag());	
 }
 
 List<FieldAccess*> *EpochExpr::getTerminalFieldAccesses() { return root->getTerminalFieldAccesses(); }
@@ -495,6 +504,11 @@ Hashtable<VariableAccess*> *AssignmentExpr::getAccessedGlobalVariables(TaskGloba
 		}
 	}
 	return table;
+}
+
+void AssignmentExpr::setEpochVersions(Space *space, int epoch) {
+	left->setEpochVersions(space, epoch);
+	right->setEpochVersions(space, epoch);
 }
 
 void AssignmentExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
@@ -657,6 +671,13 @@ Hashtable<VariableAccess*> *FunctionCall::getAccessedGlobalVariables(TaskGlobalR
 		}
 	}
 	return table;	
+}
+
+void FunctionCall::setEpochVersions(Space *space, int epoch) {
+	for (int i = 0; i < arguments->NumElements(); i++) {
+		Expr *expr = arguments->Nth(i);
+		expr->setEpochVersions(space, 0);
+	}	
 }
 
 List<FieldAccess*> *FunctionCall::getTerminalFieldAccesses() {

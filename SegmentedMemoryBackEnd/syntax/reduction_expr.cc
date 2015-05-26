@@ -133,6 +133,10 @@ Hashtable<VariableAccess*> *ReductionExpr::getAccessedGlobalVariables(TaskGlobal
 	return table;
 }
 
+void ReductionExpr::setEpochVersions(Space *space, int epoch) {
+	right->setEpochVersions(space, epoch);
+}
+
 List<FieldAccess*> *ReductionExpr::getTerminalFieldAccesses() { return right->getTerminalFieldAccesses(); }
 
 void ReductionExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {

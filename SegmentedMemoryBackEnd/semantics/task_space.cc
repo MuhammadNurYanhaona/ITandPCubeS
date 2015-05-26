@@ -10,6 +10,7 @@
 #include "symbol.h"
 
 #include <deque>
+#include <algorithm>
 
 //------------------------------------------------- DataDimensionConfig -----------------------------------------------/
 
@@ -125,6 +126,7 @@ DataStructure::DataStructure(VariableDef *definition) {
 	this->nonStorable = false;
 	this->usageStat = new LPSVarUsageStat;
 	this->allocator = NULL;
+	this->versionCount = 0;
 }
 
 DataStructure::DataStructure(DataStructure *source) {
@@ -136,6 +138,7 @@ DataStructure::DataStructure(DataStructure *source) {
 	this->nonStorable = false;
 	this->usageStat = new LPSVarUsageStat;
 	this->allocator = NULL;
+	this->versionCount = 0;
 }
 
 void DataStructure::setSpaceReference(Space *space) {
@@ -160,6 +163,30 @@ DataStructure *DataStructure::getClosestAllocation() {
 	if (usageStat->isAllocated()) return this;
 	if (source == NULL) return NULL;
 	return source->getClosestAllocation();
+}
+
+void DataStructure::updateVersionCount(int version) {
+	
+	int oldVersionCount = versionCount;
+	versionCount = std::max(oldVersionCount, version);
+	
+	// if the version count has been changed then we should update the version count
+	// of the reference in the root space that will be used to determine how to set
+	// variables within generated LPUs
+	if (oldVersionCount != versionCount) {
+		DataStructure *structure = getPrimarySource();
+		structure->versionCount = versionCount;
+	}
+}
+
+int DataStructure::getVersionCount() {
+	DataStructure *structure = getPrimarySource();
+	return structure->versionCount;
+}
+
+DataStructure *DataStructure::getPrimarySource() {
+	if (source == NULL) return this;
+	else return source->getPrimarySource();
 }
 
 //--------------------------------------------- ArrayDataStructure -----------------------------------------------/

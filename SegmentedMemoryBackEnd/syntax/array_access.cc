@@ -62,6 +62,11 @@ Hashtable<VariableAccess*> *SubRangeExpr::getAccessedGlobalVariables(TaskGlobalR
 	return table;
 }
 
+void SubRangeExpr::setEpochVersions(Space *space, int epoch) {
+	if (begin != NULL) begin->setEpochVersions(space, epoch);
+	if (end != NULL) end->setEpochVersions(space, epoch);
+}
+
 List<FieldAccess*> *SubRangeExpr::getTerminalFieldAccesses() {
 	List<FieldAccess*> *list = Expr::getTerminalFieldAccesses();
 	if (begin != NULL) Expr::copyNewFields(list, begin->getTerminalFieldAccesses());
@@ -157,6 +162,11 @@ int ArrayAccess::getIndexPosition() {
 	ArrayAccess *precedingAccess = dynamic_cast<ArrayAccess*>(base);
 	if (precedingAccess != NULL) return precedingAccess->getIndexPosition() + 1;
 	return 0;
+}
+
+void ArrayAccess::setEpochVersions(Space *space, int epoch) {
+	base->setEpochVersions(space, epoch);
+	index->setEpochVersions(space, 0);
 }
 
 Expr *ArrayAccess::getEndpointOfArrayAccess() {

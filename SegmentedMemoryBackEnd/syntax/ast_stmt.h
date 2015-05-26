@@ -20,6 +20,7 @@ class Stmt : public Node {
 	Stmt() : Node() {}
      	Stmt(yyltype loc) : Node(loc) {}
 
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
 	// Semantic checking is done by recursively going through each statement within
 	// a code block and then by examining each expression within that statement. All
 	// sub-classes of statement therefore should provide an implementation for this
@@ -35,6 +36,7 @@ class Stmt : public Node {
 	// inference step is needed before we can proceed to semantic analysis.
 	virtual void performTypeInference(Scope *executionScope) {}
 
+	//-------------------------------------------------------------------------Static Analysis Routines	
 	// The first stage of static analysis is to determine which task global variable
 	// been modified where. In that regard, statement class just facilitate a recursive
 	// analysis by invoking the access checking method in all nested expressions. The
@@ -45,8 +47,13 @@ class Stmt : public Node {
 	}
 	static void mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
 				Hashtable<VariableAccess*> *second);
+	// this sets up the proper epoch versions to all variables used in expressions that
+	// are parts of this statement 
+	virtual void analyseEpochDependencies(Space *space) {}
 
-	// back end code generation routine; subclasses should provide appropriate implementations
+	//-------------------------------------------------------------------------Code Generation Routines
+	// back end code generation routine; subclasses should provide appropriate 
+	// implementations
 	virtual void generateCode(std::ostringstream &stream, 
 			int indentLevel, Space *space = NULL) {};
 };
@@ -68,6 +75,7 @@ class StmtBlock : public Stmt {
     
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void analyseEpochDependencies(Space *space);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -90,6 +98,7 @@ class ConditionalStmt: public Stmt {
     
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void analyseEpochDependencies(Space *space);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space);
@@ -112,6 +121,7 @@ class IfStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences);
+	void analyseEpochDependencies(Space *space);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -142,6 +152,7 @@ class IndexRangeCondition: public Node {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences);
+	void analyseEpochDependencies(Space *space);
 
 	//-------------------------------------------------------------------------Code Generation Routines
 	LogicalExpr *getRestrictions();
@@ -182,6 +193,7 @@ class LoopStmt: public Stmt {
 
 	//-------------------------------------------------------------------------Static Analysis Routines
 	virtual List<const char*> *getIndexNames() = 0;
+	virtual void analyseEpochDependencies(Space *space) { body->analyseEpochDependencies(space); }
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	// a helper routine for code generation that declares variables in the scope
@@ -227,6 +239,7 @@ class PLoopStmt: public LoopStmt {
 	//--------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<const char*> *getIndexNames();
+	void analyseEpochDependencies(Space *space);
 	
 	//--------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -260,6 +273,7 @@ class SLoopStmt: public LoopStmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<const char*> *getIndexNames();
+	void analyseEpochDependencies(Space *space);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -282,6 +296,7 @@ class WhileStmt: public Stmt {
     
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void analyseEpochDependencies(Space *space);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);

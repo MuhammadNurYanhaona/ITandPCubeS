@@ -151,6 +151,11 @@ Hashtable<VariableAccess*> *LogicalExpr::getAccessedGlobalVariables(TaskGlobalRe
 	return table;
 }
 
+void LogicalExpr::setEpochVersions(Space *space, int epoch) {
+	if (left != NULL) left->setEpochVersions(space, epoch);
+	right->setEpochVersions(space, epoch);
+}
+
 void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	if (left != NULL) {
 		left->translate(stream, indentLevel, currentLineLength, space);

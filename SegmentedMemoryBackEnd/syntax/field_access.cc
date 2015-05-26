@@ -31,6 +31,7 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
 	metadata = false;
 	local = false;
 	index = false;
+	epochVersion = 0;
 }
 
 void FieldAccess::PrintChildren(int indentLevel) {
@@ -208,6 +209,16 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
 		}
 		return table;
 	}
+}
+
+void FieldAccess::setEpochVersions(Space *space, int epoch) {
+	if (base == NULL) {
+		this->epochVersion = epoch;
+		DataStructure *structure = space->getStructure(field->getName());
+		if (structure != NULL) {
+			structure->updateVersionCount(epoch);
+		}
+	} else base->setEpochVersions(space, epoch);
 }
 
 bool FieldAccess::isLocalTerminalField() {

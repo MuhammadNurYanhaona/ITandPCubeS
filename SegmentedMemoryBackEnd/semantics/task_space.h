@@ -130,6 +130,7 @@ class DataStructure {
 	DataStructure *source;
 	List<DataStructure*> *dependents;
 	Space *space;
+
 	// a variable used for static analysis to make decision about the memory allocation requirement for the
 	// data structure under concern
 	LPSVarUsageStat *usageStat;
@@ -146,6 +147,9 @@ class DataStructure {
 	// the this data structure reference should point to. These pointers are then used to set up variables in
 	// LPUs properly    
 	Space *allocator;
+
+	// denotes the maximum number of versions to be maintained for this data structure if it is epoch dependent
+	int versionCount;
   public:
 	DataStructure(VariableDef *definition);
 	DataStructure(DataStructure *source);
@@ -161,9 +165,17 @@ class DataStructure {
 	LPSVarUsageStat *getUsageStat() { return usageStat; }
 	void setAllocator(Space *allocator) { this->allocator = allocator; }
 	Space *getAllocator() { return allocator; }
+	
 	// returns current structure if it has been marked allocated or gets the closest source reference that is
 	// marked allocated  
 	DataStructure *getClosestAllocation();
+	
+	// functions for determining epoch dependencies
+	void updateVersionCount(int version);
+	int getLocalVersionCount() { return versionCount; }
+	int getVersionCount();
+	// returns the root reference of this data structure
+	DataStructure *getPrimarySource();
 };
 
 class ArrayDataStructure : public DataStructure {

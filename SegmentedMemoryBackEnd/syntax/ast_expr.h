@@ -1,12 +1,3 @@
-/* File: ast_expr.h
- * ----------------
- * The Expr class and its subclasses are used to represent
- * expressions in the parse tree.  For each expression in the
- * language (add, call, New, etc.) there is a corresponding
- * node class for that construct. 
- */
-
-
 #ifndef _H_ast_expr
 #define _H_ast_expr
 
@@ -68,6 +59,13 @@ class Expr : public Stmt {
 	// however added to the common expression class to simply some recursive array/field access finding
  	// process.
 	virtual const char *getBaseVarName() { return NULL; }
+	// The following two functions are used to determine what version number to be used for epoch dependent
+	// variables in any particular expression. They also update the epoch counter in the LPS referene if
+	// an epoch dependent variable is task-global (currently we only take care of this case as having 
+	// multiple versions for local variables found in computation stages, since they are not retained 
+	// across executions). 
+	void analyseEpochDependencies(Space *space) { setEpochVersions(space, 0); }
+	virtual void setEpochVersions(Space *space, int epoch) {}
 	
 	//-----------------------------------------------------------------------Helper functions for code generation
 	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space = NULL);
@@ -168,6 +166,7 @@ class ArithmaticExpr : public Expr {
 	
 	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void setEpochVersions(Space *space, int epoch);
 
 	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
@@ -193,6 +192,7 @@ class LogicalExpr : public Expr {
 
 	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void setEpochVersions(Space *space, int epoch);
 	
 	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
@@ -270,6 +270,7 @@ class ReductionExpr : public Expr {
 
 	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void setEpochVersions(Space *space, int epoch);
 
 	//----------------------------------------------------------------------------------------for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
@@ -295,6 +296,7 @@ class EpochValue : public Expr {
     	void PrintChildren(int indentLevel);
 	void resolveType(Scope *scope, bool ignoreFailure);
 	Identifier *getId() { return epoch; }
+	int getLag() { return lag; }
 };
 
 class EpochExpr : public Expr {
@@ -306,12 +308,15 @@ class EpochExpr : public Expr {
 	const char *GetPrintNameForNode() { return "EpochExpr"; }
     	void PrintChildren(int indentLevel);
 
-	//------------------------------------------------------------------------------------for semantic analysis	    	
+	//--------------------------------------------------------------------------------------for semantic analysis	    	
 	void resolveType(Scope *scope, bool ignoreFailure);
 	void inferType(Scope *scope, Type *rootType);
 	Expr *getRootExpr() { return root; }
 
-	//--------------------------------------------------------------------------------------for code generation
+	//----------------------------------------------------------------------------------------for static analysis
+	void setEpochVersions(Space *space, int oldEpochValue);
+	
+	//----------------------------------------------------------------------------------------for code generation
 	const char *getBaseVarName() { return root->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
@@ -331,11 +336,14 @@ class FieldAccess : public Expr {
 	// the access as metadata and data for an array are kept separate. 
 	bool metadata;
 	bool local;
-	// a flag to indicate if this field is an index access on an array where the index is part of 
+	// A flag to indicate if this field is an index access on an array where the index is part of 
 	// some loop range traversal. In that case, we can just replace the field name with some other
 	// back-end variable that holds the result of computation of multi to unidirectional index 
 	// transform
-	bool index; 
+	bool index;
+	// If the field is epoch dependent then we need to know which particular version of the field
+	// to be used during generating code for this field access. The default version number is zero. 
+	int epochVersion; 
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "FieldAccess"; }
@@ -349,6 +357,7 @@ class FieldAccess : public Expr {
 	const char *getBaseVarName();
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	bool isTerminalField() { return base == NULL; }
+	void setEpochVersions(Space *space, int epoch);
 	
 	//---------------------------------------------------------------------helper functions for back end compiler
 	bool isLocalTerminalField();
@@ -387,8 +396,11 @@ class RangeExpr : public Expr {
 	
 	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreFailure);
-	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	const char *getIndexName() { return index->getName(); }
+	
+	//----------------------------------------------------------------------------------------for static analysis
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void setEpochVersions(Space *space, int epoch);
 	
 	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
@@ -461,6 +473,7 @@ class AssignmentExpr : public Expr {
 	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	const char *getBaseVarName() { return left->getBaseVarName(); }
+	void setEpochVersions(Space *space, int epoch);
 	
 	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
@@ -483,9 +496,16 @@ class SubRangeExpr : public Expr {
 	SubRangeExpr(Expr *begin, Expr *end, yyltype loc);
 	const char *GetPrintNameForNode() { return "SubRangeExpr"; }
     	void PrintChildren(int indentLevel);	    	
+	
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void inferType(Scope *scope, Type *rootType); 
+	
+	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void setEpochVersions(Space *space, int epoch);
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	
+	//----------------------------------------------------------------------------------------for code generation
 	bool isFullRange() { return fullRange; }
 	Expr *getBegin() { return begin; }	
 	Expr *getEnd() { return end; }
@@ -509,6 +529,7 @@ class ArrayAccess : public Expr {
 	const char *getBaseVarName() { return base->getBaseVarName(); }
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	int getIndexPosition();
+	void setEpochVersions(Space *space, int epoch);
 	
 	//----------------------------------------------------------------------------------------for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
@@ -526,9 +547,16 @@ class FunctionCall : public Expr {
 	FunctionCall(Identifier *base, List<Expr*> *arguments, yyltype loc);		
 	const char *GetPrintNameForNode() { return "FunctionCall"; }
     	void PrintChildren(int indentLevel);	    	
+	
+	//--------------------------------------------------------------------------------------for semantic analysis
 	void resolveType(Scope *scope, bool ignoreType);
+	
+	//----------------------------------------------------------------------------------------for static analysis
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
+	void setEpochVersions(Space *space, int epoch);
+	
+	//----------------------------------------------------------------------------------------for code generation
 	void translate(std::ostringstream &stream, int indentLevel, 
 			int currentLineLength, Space *space) { stream << "\"function-call\""; }
 };

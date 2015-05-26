@@ -307,6 +307,13 @@ void StmtBlock::generateCode(std::ostringstream &stream, int indentLevel, Space 
 		stmt->generateCode(stream, indentLevel, space);
 	}	
 }
+
+void StmtBlock::analyseEpochDependencies(Space *space) {
+	for (int i = 0; i < stmts->NumElements(); i++) {
+		Stmt *stmt = stmts->Nth(i);
+		stmt->analyseEpochDependencies(space);
+	}	
+}
 	
 //-------------------------------------- Conditional Statement ---------------------------------------/
 
@@ -371,6 +378,13 @@ void ConditionalStmt::generateCode(std::ostringstream &stream, int indentLevel, 
 	}
 }
 
+void ConditionalStmt::analyseEpochDependencies(Space *space) {
+	if (condition != NULL) {
+		condition->setEpochVersions(space, 0);
+	}
+	stmt->analyseEpochDependencies(space);
+}
+
 IfStmt::IfStmt(List<ConditionalStmt*> *ib, yyltype loc) : Stmt(loc) {
 	Assert(ib != NULL);
 	ifBlocks = ib;
@@ -412,6 +426,13 @@ void IfStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *sp
 		stmt->generateCode(stream, indentLevel, i == 0, space);
 	}
 	stream << '\n';
+}
+
+void IfStmt::analyseEpochDependencies(Space *space) {
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+		ConditionalStmt *stmt = ifBlocks->Nth(i);
+		stmt->analyseEpochDependencies(space);
+	}
 }
 
 //----------------------------------------- Parallel Loop -------------------------------------------/
@@ -545,6 +566,12 @@ void IndexRangeCondition::validateIndexAssociations(Scope *scope, bool ignoreFai
 	}
 }
 
+void IndexRangeCondition::analyseEpochDependencies(Space *space) {
+	if (restrictions != NULL) {
+		restrictions->setEpochVersions(space, 0);
+	}
+}
+
 LogicalExpr *IndexRangeCondition::getRestrictions() { 
 	if (restrictions == NULL) return NULL;
 	return dynamic_cast<LogicalExpr*>(restrictions); 
@@ -635,6 +662,14 @@ List<const char*> *PLoopStmt::getIndexNames() {
 		}
 	}
 	return indexNames;
+}
+
+void PLoopStmt::analyseEpochDependencies(Space *space) {
+	LoopStmt::analyseEpochDependencies(space);
+	for (int i = 0; i < rangeConditions->NumElements(); i++) {
+		IndexRangeCondition *cond = rangeConditions->Nth(i);
+		cond->analyseEpochDependencies(space);
+	}
 }
 
 void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
@@ -803,6 +838,12 @@ List<const char*> *SLoopStmt::getIndexNames() {
 	return indexNames; 
 }
 
+void SLoopStmt::analyseEpochDependencies(Space *space) {
+	LoopStmt::analyseEpochDependencies(space);
+	rangeExpr->setEpochVersions(space, 0);
+	if (stepExpr != NULL) stepExpr->setEpochVersions(space, 0);
+}
+
 void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 
 	if(isArrayIndexTraversal) {
@@ -875,6 +916,11 @@ Hashtable<VariableAccess*> *WhileStmt::getAccessedGlobalVariables(
 	Hashtable<VariableAccess*> *table = condition->getAccessedGlobalVariables(globalReferences);
 	mergeAccessedVariables(table, body->getAccessedGlobalVariables(globalReferences));
 	return table;
+}
+
+void WhileStmt::analyseEpochDependencies(Space *space) {
+	body->analyseEpochDependencies(space);
+	condition->setEpochVersions(space, 0);
 }
 
 void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {

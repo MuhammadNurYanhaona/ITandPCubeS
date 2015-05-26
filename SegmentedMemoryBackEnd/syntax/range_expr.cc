@@ -116,6 +116,11 @@ Hashtable<VariableAccess*> *RangeExpr::getAccessedGlobalVariables(TaskGlobalRefe
 	return table;
 }
 
+void RangeExpr::setEpochVersions(Space *space, int epoch) {
+	range->setEpochVersions(space, epoch);
+	if (step != NULL) step->setEpochVersions(space, epoch);
+}
+
 void RangeExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 
 	// get the appropriate back-end name for the index variable
