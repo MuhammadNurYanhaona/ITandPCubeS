@@ -16,6 +16,7 @@
 #include "pthread_mgmt.h"
 #include "sync_mgmt.h"
 #include "task_invocation.h"
+#include "memory_mgmt.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -82,6 +83,25 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
                         mappingFile, lpsHierarchy, pcubesConfig);
 	this->mappingRoot = mappingConfig;
 
+	// determine where memory segmentation happens in the hardware
+	int segmentedPPS = 0;
+	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
+		PPS_Definition *pps = pcubesConfig->Nth(i);
+		if (pps->segmented) {
+			segmentedPPS = pps->id;	
+			break;
+		} 
+	}
+	if (segmentedPPS == 0) {
+		std::cout << "No segmentation observed in the PCubeS configuration\n";
+		// assign the topmost PPS the segmentation marker to make the code work for
+		// non segmented memory architectures
+		segmentedPPS = pcubesConfig->Nth(0)->id;
+	}
+
+	// do back-end architecture dependent static analyses of the task
+	lpsHierarchy->performAllocationAnalysis(segmentedPPS);
+
 	// generate a constant array for processor ordering in the hardware
 	generateProcessorOrderArray(headerFile, processorFile);
         
@@ -90,12 +110,17 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         generatePPSCountConstants(headerFile, pcubesConfig);
         generateThreadCountConstants(headerFile, mappingConfig, pcubesConfig);
         
-	// generate task specific data structures and their functions 
+	// generate data structures and functions for task environment management 
 	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
         List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
 			mappingConfig, taskDef->getEnvironmentLinks());
 	generateFnForMetadataAndEnvLinks(taskDef->getName(), initials, 
 			programFile, mappingConfig, envLinkList);
+
+	// generate functions related to memory management
+	const char *upperInitials = string_utils::getInitials(taskDef->getName());
+	genRoutinesForTaskPartitionConfigs(headerFile, programFile, upperInitials, lpsHierarchy);
+
 	List<TaskGlobalScalar*> *globalScalars 
 			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
 	generateClassesForGlobalScalars(headerFile, globalScalars);

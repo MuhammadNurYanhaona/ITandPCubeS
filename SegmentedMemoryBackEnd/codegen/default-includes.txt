@@ -25,10 +25,17 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/common_utils.h"
+#include "../utils/interval_utils.h"
 
 // for routines related to partition functions
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
+
+// for memory management
+#include "../memory-management/allocation.h"
+#include "../memory-management/communication.h"
+#include "../memory-management/part_generation.h"
+#include "../memory-management/part_management.h"
 
 // to input-output and initialization
 #include "../runtime/input_prompt.h"

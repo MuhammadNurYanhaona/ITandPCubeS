@@ -31,6 +31,11 @@ void DataItems::generatePartitionConfig() {
 	ready = true;
 }
 
+void DataItems::setPartitionConfig(DataPartitionConfig *partitionConfig) {
+	ready = true;
+	this->partitionConfig = partitionConfig;
+}
+
 DataPartitionConfig *DataItems::getPartitionConfig() { 
 	Assert(ready);
 	return partitionConfig; 
@@ -84,3 +89,21 @@ void LpsContent::advanceItemEpoch(const char *varName) {
 		dataItems->advanceEpoch();
 	}
 }
+
+//------------------------------------------------------------- Task Data ----------------------------------------------------------------/
+
+TaskData::TaskData() { lpsContentMap = new Hashtable<LpsContent*>; }
+
+void TaskData::addLpsContent(const char *lpsId, LpsContent *content) { lpsContentMap->Enter(lpsId, content); }
+
+DataItems *TaskData::getDataItemsOfLps(const char *lpsId, const char *varName) {
+	LpsContent *lpsContent = lpsContentMap->Lookup(lpsId);
+	return lpsContent->getDataItems(varName);
+}
+
+void TaskData::advanceItemEpoch(const char *lpsId, const char *varName) {
+	LpsContent *lpsContent = lpsContentMap->Lookup(lpsId);
+	lpsContent->advanceItemEpoch(varName);
+}
+
+

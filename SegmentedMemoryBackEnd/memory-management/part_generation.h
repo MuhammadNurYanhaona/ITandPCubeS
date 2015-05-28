@@ -84,8 +84,7 @@ class DimPartitionConfig {
 /* configuration subclass to be instantiated when a data dimension has not been divided within the LPS */
 class ReplicationConfig : public DimPartitionConfig {
   public:
-	ReplicationConfig(Dimension dimension, int ppuCount, int lpsAlignment) 
-			: DimPartitionConfig(dimension, NULL, ppuCount, lpsAlignment) {}
+	ReplicationConfig(Dimension dimension) : DimPartitionConfig(dimension, NULL, 0, 0) {}
 	int getPartsCount() { return 1; }
 	LineInterval *getCoreInterval(int partId) {
 		Line *line = new Line(dimension.range.min, dimension.range.max);

@@ -39,6 +39,7 @@ class BlockSize : public SingleArgumentPartitionFunction {
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	List<int> *getBlockedDimensions(Type *structureType);
 	bool doesSupportGhostRegion() { return true; }
+	const char *getDimensionConfigClassName() { return "BlockSizeConfig"; }
 };
 
 class BlockCount : public SingleArgumentPartitionFunction {
@@ -49,6 +50,7 @@ class BlockCount : public SingleArgumentPartitionFunction {
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	List<int> *getBlockedDimensions(Type *structureType);
 	bool doesSupportGhostRegion() { return true; }
+	const char *getDimensionConfigClassName() { return "BlockCountConfig"; }
 };
 
 class StridedBlock : public SingleArgumentPartitionFunction {
@@ -69,6 +71,8 @@ class StridedBlock : public SingleArgumentPartitionFunction {
         const char *getInclusionTestExpr(int dimensionNo, const char *origIndexName, bool copyMode);
 	const char *getImpreciseBoundOnXformedIndex(int dimension, 
 			const char *index, bool lowerBound, bool copyMode, int indent); 
+	
+	const char *getDimensionConfigClassName() { return "BlockStrideConfig"; }
 };
 
 class Strided : public PartitionFunctionConfig {
@@ -84,6 +88,8 @@ class Strided : public PartitionFunctionConfig {
         const char *getInclusionTestExpr(int dimensionNo, const char *origIndexName, bool copyMode);
 	const char *getImpreciseBoundOnXformedIndex(int dimension, 
 			const char *index, bool lowerBound, bool copyMode, int indent); 
+	
+	const char *getDimensionConfigClassName() { return "StrideConfig"; }
 };
 
 #endif

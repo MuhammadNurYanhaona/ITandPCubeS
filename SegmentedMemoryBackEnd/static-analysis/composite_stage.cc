@@ -193,6 +193,12 @@ void CompositeStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 	}
 }
 
+void CompositeStage::performEpochUsageAnalysis() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		stageList->Nth(i)->performEpochUsageAnalysis();
+	}
+}
+
 void CompositeStage::reorganizeDynamicStages() {
 	
 	int currentStageIndex = 0;
@@ -1014,6 +1020,11 @@ void RepeatCycle::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 	CompositeStage::performDependencyAnalysis(hierarchy);	
 	FlowStage::performDependencyAnalysis(repeatConditionAccessMap, hierarchy);
 	CompositeStage::performDependencyAnalysis(hierarchy);	
+}
+
+void RepeatCycle::performEpochUsageAnalysis() {
+	CompositeStage::performEpochUsageAnalysis();
+	if (repeatCond != NULL) repeatCond->setEpochVersions(space, 0);
 }
 
 void RepeatCycle::calculateLPSUsageStatistics() {

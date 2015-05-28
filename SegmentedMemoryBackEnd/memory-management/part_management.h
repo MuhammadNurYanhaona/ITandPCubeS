@@ -38,6 +38,7 @@ class DataItems {
 	DataItems(const char *name, int dimensionality, int epochCount);
 	void addDimPartitionConfig(int dimensionId, DimPartitionConfig *dimConfig);
 	void generatePartitionConfig();
+	void setPartitionConfig(DataPartitionConfig *partitionConfig);
 	DataPartitionConfig *getPartitionConfig();
 	void setPartsList(DataPartsList *partsList) { this->partsList = partsList; }
 	// function to get the most uptodate version of a part of the structure
@@ -91,6 +92,17 @@ class LpsContent {
 	}
 	inline DataItems *getDataItems(const char *varName) { return dataItemsMap->Lookup(varName); }
 	void advanceItemEpoch(const char *varName);
+};
+
+/* This class holds all data structure informations and references regarding different LPSes of a task */
+class TaskData {
+  protected:
+	Hashtable<LpsContent*> *lpsContentMap;
+  public:
+	TaskData();
+	void addLpsContent(const char *lpsId, LpsContent *content);
+	DataItems *getDataItemsOfLps(const char *lpsId, const char *varName);		
+	void advanceItemEpoch(const char *lpsId, const char *varName);
 };
 
 #endif

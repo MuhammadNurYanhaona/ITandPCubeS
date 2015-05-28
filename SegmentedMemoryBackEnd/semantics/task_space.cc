@@ -11,6 +11,8 @@
 
 #include <deque>
 #include <algorithm>
+#include <sstream>
+#include <cstdlib>
 
 //------------------------------------------------- DataDimensionConfig -----------------------------------------------/
 
@@ -27,6 +29,19 @@ DataDimensionConfig::DataDimensionConfig(int dimensionNo, Node *dividingArg, Nod
 	this->dividingArg = dividingArg;
 	this->frontPaddingArg = frontPaddingArg;
 	this->backPaddingArg = backPaddingArg;
+}
+
+const char *DataDimensionConfig::getArgumentString(Node *arg, const char *prefix) {
+	std::ostringstream stream;
+	IntConstant *intConst = dynamic_cast<IntConstant*>(arg);
+	if (intConst != NULL) {
+		stream << intConst->getValue();
+	} else {
+		if (prefix != NULL) stream << prefix;
+		Identifier *identifier = (Identifier*) arg;
+		stream << identifier->getName();
+	}
+	return strdup(stream.str().c_str());
 }
 
 //---------------------------------------------- PartitionFunctionConfig ---------------------------------------------/
@@ -419,6 +434,7 @@ Space::Space(const char *name, int dimensions, bool dynamic, bool subpartitionSp
 	this->parent = NULL;
 	this->dataStructureList = new Hashtable<DataStructure*>;
 	this->subpartition = NULL;
+	this->children = new List<Space*>;
 
 	// a mark of an invalid PPS id as PPS ids are positive integers
 	this->ppsId = 0;
@@ -599,6 +615,15 @@ Symbol *Space::getLpuIdSymbol() {
 	return symbol;	
 }
 
+bool Space::allocateStructures() {
+	Iterator<DataStructure*> iter = dataStructureList->GetIterator();
+	DataStructure *structure;
+	while ((structure = iter.GetNextValue()) != NULL) {
+		if (structure->getUsageStat()->isAllocated()) return true;	
+	}
+	return false;
+}
+
 //-------------------------------------------- Partition Hierarchy -------------------------------------------------/
 
 PartitionHierarchy::PartitionHierarchy() {
@@ -649,7 +674,6 @@ Space *PartitionHierarchy::getCommonAncestor(Space *space1, Space *space2) {
 }
 
 void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {	
-	
 	Space *root = getRootSpace();
 	List<const char*> *variableList = root->getLocalDataStructureNames();
 	
@@ -721,6 +745,7 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 					|| reordered || lastAllocInaccessible) {
 				array->setAllocator(lps);
 				array->getUsageStat()->flagAllocated();
+				std::cout << "\t\tallocation should happen here\n";
 			} 
 		}	
 	}

@@ -58,6 +58,7 @@ class DataDimensionConfig {
 	bool hasPadding() { return (frontPaddingArg != NULL || backPaddingArg != NULL); }		
 	Node *getFrontPaddingArg() { return frontPaddingArg; }
 	Node *getBackPaddingArg() { return backPaddingArg; }
+	static const char *getArgumentString(Node *arg, const char *prefix);
 }; 
 
 /*	This class embodies the detail of application of a single partition functions on a data structure.
@@ -122,6 +123,14 @@ class PartitionFunctionConfig {
 	virtual const char *getImpreciseBoundOnXformedIndex(int dimensionNo, 
 			const char *origIndexName, 
 			bool lowerBound, bool copyMode, int indent) { return NULL; }
+
+	// A dimension configuration object is created for each dimension of a data structure at runtime to decide
+	// about the shape of each data part. The configuration object been instantiated depends on the partition
+	// function been used to divide the dimension of the structure. This function returns the name of the dim-
+	// configuration object class to make this logic works. Note that this implies that each partition function
+	// has a corresponding dimension configuration class. That class should be added in the part_generation.h
+	// library file of memory_management module.
+	virtual const char *getDimensionConfigClassName() { return NULL; }
 };
 
 class DataStructure {
@@ -340,11 +349,15 @@ class Space {
 	Symbol *getLpuIdSymbol();
 	void setPpsId(int ppsId) { this->ppsId = ppsId; }
 	int getPpsId() { return ppsId; }
+
+	// a helper routine for code generation that determines if any of the structures listed in the partition
+	// configuration of the LPS referred by this instance needs to be allocated a memory
+	bool allocateStructures();
 };
 
-/*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy
-	is rooted in the RootSpace that holds all task-global data structures. Below it a tree is formed
-	based on the partial ordering visible in the user's specification for the partition block.
+/*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy is 
+	rooted in the RootSpace that holds all task-global data structures. Below it a tree is formed based on 
+	the partial ordering visible in the user's specification for the partition block.
 */
 class PartitionHierarchy {
   protected:
@@ -358,9 +371,9 @@ class PartitionHierarchy {
 	Space *getCommonAncestor(Space *space1, Space *space2);	
 	
 	// This routine sets up allocator LPS references to all data structures of different LPSes in the 
-	// partition hierarchy so that memory allocations can be done appropriately and also structure 
-	// references can be set accordingly during LPU generations. The analysis done here is dependent
-	// on the LPS-to-PPS mapping. Therefore, it should be done after ppsIds are set to LPSes properly. 	
+	// partition hierarchy so that memory allocations can be done appropriately and also structure references 
+	// can be set accordingly during LPU generations. The analysis done here is dependent on the LPS-to-PPS 
+	// mapping. Therefore, it should be done after ppsIds are set to LPSes properly. 	
 	void performAllocationAnalysis(int segmentedPPS);
 };
 

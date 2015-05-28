@@ -101,6 +101,11 @@ class FlowStage {
 		performDependencyAnalysis(accessMap, hierarchy); 
 	}
 	void performDependencyAnalysis(Hashtable<VariableAccess*> *accessLogs, PartitionHierarchy *hierarchy);
+	
+	// A recursive process to determine how many versions of different data structures need to be maintained for
+	// epoch dependent calculatations happening within the flow stages.
+	virtual void performEpochUsageAnalysis() {}
+
 	DataDependencies *getDataDependencies() { return dataDependencies; }
 	bool isDataModifierRelevant(FlowStage *modifier);
 
@@ -193,6 +198,7 @@ class ExecutionStage : public FlowStage {
 	void setCode(List<Stmt*> *stmtList);
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
+	void performEpochUsageAnalysis();
 
 	// helper method for generating back-end code
 	void translateCode(std::ofstream &stream);
@@ -223,6 +229,7 @@ class CompositeStage : public FlowStage {
 	virtual void addSyncStagesOnReturn(List<FlowStage*> *stageList);
 	virtual void print(int indent);
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	virtual void performEpochUsageAnalysis();
 	void reorganizeDynamicStages();
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
@@ -320,6 +327,7 @@ class RepeatCycle : public CompositeStage {
 	void addSyncStagesOnReturn(List<FlowStage*> *stageList);
 	void setRepeatConditionAccessMap(Hashtable<VariableAccess*> *map) { repeatConditionAccessMap = map; }
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	void performEpochUsageAnalysis();
 	void calculateLPSUsageStatistics();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);

@@ -75,12 +75,12 @@ class LineInterval {
 	// Returns the actual index of the nth element in the interval sequence. For example, if an interval 
 	// specification is like <0, 1, 10, 5> then getNthElement(2) should return 10. If there is no nth 
 	// element then it should return INT_MIN of <climits> library to indicate an invalid request.
-	int getNthElement(int n);
+	int getNthElement(int n) { return -1; }
 	// Returns the total number of elements of the dimension line that fall within the interval sequence
 	// represented by current specification
-	int getTotalElements();	
+	int getTotalElements() { return 0; }
 	// decides if two interval sequences overlap anywhere
-	bool doesOverlap(LineInterval *other);
+	bool doesOverlap(LineInterval *other) { return false; }
 };
 
 // A hyperplane interval specification defines a multidimensional interval sequence where configurations for 
@@ -107,15 +107,15 @@ class HyperplaneInterval {
 	
 	// TODO implement the following three methods
 	// Returns the n-th element of a multidimensional interval sequence. The element returned is a point 
-	// in in the hyperplane and represented by its index along different dimensions; i.e., a tuple. Just 
+	// in the hyperplane and represented by its index along different dimensions; i.e., a tuple. Just 
 	// like for the linear interval sequence, if there are less than n elements then it should return 
 	// INT_MIN as an invalid  request indicator. Any fixed layout of the elements of the multidimensional 
 	// sequence is exceptable.      
-	int *getNthElement(int n);
+	int *getNthElement(int n) { return NULL; }
 	// returns the total number elements this multidimensional interval sequence posesses
-	int getTotalElements();
+	int getTotalElements() { return 0; }
 	// decides if two interval sequences overlap anywhere
-	bool doesOverlap(HyperplaneInterval *other);
+	bool doesOverlap(HyperplaneInterval *other) { return false; }
 };
 
 // A helper collection class built over the list data structure to hold a set of unique interval sequences. It
@@ -141,13 +141,13 @@ class IntervalSet {
 	// need to be taken into consideration and should be removed so that the new set has no element appearing
 	// more than once. Finally, note that the returned set is a new interval set instance. The current set
 	// remains unchanged after the function call. 
-	IntervalSet *getUnion(IntervalSet *other);
+	IntervalSet *getUnion(IntervalSet *other) { return NULL; }
 	// This computes the intersection of current interval set with the argument interval set. If the two sets
 	// do not overlap then it should return NULL
-	IntervalSet *getIntersection(IntervalSet *other);
+	IntervalSet *getIntersection(IntervalSet *other) { return NULL; }
 	// Subtract the interval sequences found in the argument interval set from the current one. If the two 
 	// sets are the same then return NULL
-	IntervalSet *getSubtraction(IntervalSet *other);
+	IntervalSet *getSubtraction(IntervalSet *other) { return NULL; }
 };
 
 #endif

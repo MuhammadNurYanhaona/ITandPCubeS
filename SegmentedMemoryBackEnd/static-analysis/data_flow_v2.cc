@@ -381,6 +381,10 @@ void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 	this->code = new StmtBlock(stmtList);
 }
 
+void ExecutionStage::performEpochUsageAnalysis() {
+	code->analyseEpochDependencies(space);
+}
+
 void ExecutionStage::translateCode(std::ofstream &stream) {
 
 	std::string activateHd = 	"\n\t//---------------------- Activating Condition -------------------------------\n\n";

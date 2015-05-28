@@ -193,6 +193,10 @@ void TaskDef::analyseCode() {
 	compute->constructComputationFlow(hierarchy->getRootSpace());
 	// determine the read-write dependencies that occur as flow of computation moves along stages	
 	compute->performDependencyAnalysis(hierarchy);
+	// transfer variable access information to partition hierarchy to aid memory management
+	compute->getComputation()->calculateLPSUsageStatistics();
+	// determine how many versions of different data structures need to be maintained at runtime
+	compute->getComputation()->performEpochUsageAnalysis();
 	// assign stages stage, group, and nesting indexes to aid latter analysis
 	compute->getComputation()->assignIndexAndGroupNo(0, 0, 0);
 	// determine what dependency relationships should be translated into synchronization require-
