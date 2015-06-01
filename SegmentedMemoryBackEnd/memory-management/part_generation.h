@@ -18,13 +18,28 @@
 #include "../utils/interval_utils.h"
 #include "../codegen/structure.h"
 
+/* This is just a helper class to hold the results of different configuration functions of Dim Parition 
+   Config class as needed for data parts construction. 
+*/
+class DimensionMetadata {
+  public:
+	LineInterval *coreInterval;
+	LineInterval *interval;
+	Dimension partDimension;
+	int paddings[2];
+};
+
 /* Superclass to represent the partition configuration applied for a particular dimension of an array for
-   an LPS. 
+   an LPS. Note that this class has a parent reference. This is needed as partitioning in IT is hierarchi-
+   cal and the properties of a lower LPS data part often cannot be found without investigating its higher
+   LPS ancestor parts. For the same reasons most of the public method of this class takes a list of part
+   Ids as input as oppose to a single part id. Here each item in the list identifies a part in some LPS
+   that is in the path that leads to the data part of the LPS under concern.  
 */
 class DimPartitionConfig {
   protected:
 	// span of the dimension of the underlying array
-	Dimension dimension;
+	Dimension dataDimension;
 	// any arguments needed by the partition function applied on this dimension
 	int *partitionArgs;
 	// for any partition there may be a padding at the beginning and a padding at the end 
@@ -33,30 +48,36 @@ class DimPartitionConfig {
 	int ppuCount;
 	// represents which dimension of the LPS current dimension of the array is aligned to 
 	int lpsAlignment;
+	// represent the ancestor config if the current instance is dividing an already divided dimension
+	DimPartitionConfig *parentConfig;
+
+	// determines how many unique parts of the data structure can be found along this dimension by
+	// dividing the parent dimension 
+	virtual int getPartsCount(Dimension parentDimension) = 0;
+
+	// a recursive helper routine to get the part of the dimension that been subject to partitioning
+	// by the current dimension configuration instance 
+	Dimension getDimensionFromParent(List<int> *partIdList, int position);
+	
+	// determines the part dimension given a part Id; for reordering partition function it is the
+	// part dimension after the indexes have been shuffled to have each part occupying a contiguous
+	// chunk along the dimension line
+	virtual Dimension getPartDimension(int partId, Dimension parentDimension) = 0;
+	
+	// these two functions determine the actual amount of padding been applied to a particular part;
+	// the effective padding may differ from the configuration for parts at the boundary 
+	virtual int getEffectiveFrontPadding(int partId, Dimension parentDimension) { return paddings[0]; }		
+	virtual int getEffectiveRearPadding(int partId, Dimension parentDimension) {  return paddings[1]; }
+
   public:
 	DimPartitionConfig(Dimension dimension, int *partitionArgs, 
-			int paddings[2], int ppuCount, int lpsAlignment) {
-		this->dimension = dimension;
-		this->partitionArgs = partitionArgs;
-		this->paddings[0] = paddings[0];
-		this->paddings[1] = paddings[1];
-		this->ppuCount = ppuCount;
-		this->lpsAlignment = lpsAlignment;
-	}
+			int paddings[2], int ppuCount, int lpsAlignment);
 	// constructor to be overriden by functions that do not support padding
-	DimPartitionConfig(Dimension dimension, int *partitionArgs, int ppuCount, int lpsAlignment) {
-		this->dimension = dimension;
-		this->partitionArgs = partitionArgs;
-		this->paddings[0] = 0;
-		this->paddings[1] = 0;
-		this->ppuCount = ppuCount;
-		this->lpsAlignment = lpsAlignment;
-	}
-	bool hasPadding() { return paddings[0] > 0 || paddings[1] > 0; }
-	Dimension getDataDimension() { return dimension; }
+	DimPartitionConfig(Dimension dimension, int *partitionArgs, int ppuCount, int lpsAlignment);
 
-	// determines how many unique parts of the data structure can be found along this dimension 
-	virtual int getPartsCount() = 0;
+	bool hasPadding() { return paddings[0] > 0 || paddings[1] > 0; }
+	Dimension getDataDimension() { return dataDimension; }
+	void setParentConfig(DimPartitionConfig *parentConfig) { this->parentConfig = parentConfig; }
 
 	// Four functions to determine the interval configuration for a data part. The first and third 
 	// ignores padding and the second and fourth do not. The last two are needed for index reordering 
@@ -64,94 +85,91 @@ class DimPartitionConfig {
 	// and block-stride get their allocation holding non-consecutive indexes in shuffled into a 
 	// consecutive order. Maintaining an interval configuration for the storage format may sometimes 
 	// allow us to streamline the calculation of communication need.    
-	virtual LineInterval *getCoreInterval(int partId) = 0;
-	virtual LineInterval *getInterval(int partId) = 0;
-	virtual LineInterval *getXformedCoreInterval(int partId) { return getCoreInterval(partId); }
-	virtual LineInterval *getXformedInterval(int partId) { return getInterval(partId); }
+	virtual LineInterval *getCoreInterval(List<int> *partIdList) = 0;
+	virtual LineInterval *getInterval(List<int> *partIdList) = 0;
+	virtual LineInterval *getXformedCoreInterval(List<int> *partIdList);
+	virtual LineInterval *getXformedInterval(List<int> *partIdList);
 
-	// determines the part dimension given a part Id; for reordering partition function it is the
-	// part dimension after the indexes have been shuffled to have each part occupying a contiguous
-	// chunk along the dimension line
-	virtual Dimension getPartDimension(int partId) = 0;
-	// these two functions determine the actual amount of padding been applied to a particular part;
-	// the effective padding may differ from the configuration for parts at the boundary 
-	virtual int getEffectiveFrontPadding(int partId) { return paddings[0]; }		
-	virtual int getEffectiveRearPadding(int partId) {  return paddings[1]; }
-	// retrieves the dimension index, or part-Id, from the lpuId
-	virtual int pickPartId(int *lpuId) { return lpuId[lpsAlignment]; } 		
+	// retrieves the dimension index, or part-Id, from the lpuId for current LPS
+	virtual int pickPartId(int *lpuId) { return lpuId[lpsAlignment]; }
+
+	// an accumulator function that returns results of different dimension configuration utilies above 
+	DimensionMetadata *generateDimMetadata(List<int> *partIdList);
 };
 
 /* configuration subclass to be instantiated when a data dimension has not been divided within the LPS */
 class ReplicationConfig : public DimPartitionConfig {
+  protected:
+	int getPartsCount(Dimension parentDimension) { return 1; }
+	int getEffectiveFrontPadding(int partId, Dimension parentDimension) { return 0; } 		
+	int getEffectiveRearPadding(int partId, Dimension parentDimension) { return 0;  }		
+	Dimension getPartDimension(int partId, Dimension parentDimension) { return parentDimension; }		
   public:
 	ReplicationConfig(Dimension dimension) : DimPartitionConfig(dimension, NULL, 0, 0) {}
-	int getPartsCount() { return 1; }
-	LineInterval *getCoreInterval(int partId) {
-		Line *line = new Line(dimension.range.min, dimension.range.max);
-		return LineInterval::getFullLineInterval(line);
-	}
-	LineInterval *getInterval(int partId) { return getCoreInterval(partId); }
-	LineInterval *getXformedCoreInterval(int partId) { return getCoreInterval(partId); }
-	LineInterval *getXformedInterval(int partId) { return getCoreInterval(partId); }		
-	Dimension getPartDimension(int partId) { return dimension; }		
-	int getEffectiveFrontPadding(int partId) { return 0; } 		
-	int getEffectiveRearPadding(int partId) { return 0;  }		
+	LineInterval *getCoreInterval(List<int> *partIdList);
+	LineInterval *getInterval(List<int> *partIdList);
+	LineInterval *getXformedCoreInterval(List<int> *partIdList);
+	LineInterval *getXformedInterval(List<int> *partIdList);		
 	int pickPartId(int *lpsId) { return 0; } 		
 };
 
 /* configuration subclass corresponding to 'block_size' partition function; it takes a 'size' parameter */
 class BlockSizeConfig : public DimPartitionConfig {
+  protected:
+	int getPartsCount(Dimension parentDimension);
+	int getEffectiveFrontPadding(int partId, Dimension parentDimension); 		
+	int getEffectiveRearPadding(int partId,  Dimension parentDimension);
+	Dimension getPartDimension(int partId,   Dimension parentDimension);
   public:
 	BlockSizeConfig(Dimension dimension, int *partitionArgs, int paddings[2], 
 			int ppuCount, int lpsAlignment) : DimPartitionConfig(dimension, 
 			partitionArgs, paddings, ppuCount, lpsAlignment) {}
-	int getPartsCount();
-	LineInterval *getCoreInterval(int partId);
-	LineInterval *getInterval(int partId);
-	Dimension getPartDimension(int partId);
-	int getEffectiveFrontPadding(int partId); 		
-	int getEffectiveRearPadding(int partId);
+	LineInterval *getCoreInterval(List<int> *partIdList);
+	LineInterval *getInterval(List<int> *partIdIdList);
 };
 
 /* configuration subclass corresponding to 'block_count' partition function; it takes a 'count' parameter */
 class BlockCountConfig : public DimPartitionConfig {
+  protected:
+	int getPartsCount(Dimension parentDimension);
+	int getEffectiveFrontPadding(int partId, Dimension parentDimension); 		
+	int getEffectiveRearPadding(int partId,  Dimension parentDImension);
+	Dimension getPartDimension(int partId,   Dimension parentDimension);
   public:
 	BlockCountConfig(Dimension dimension, int *partitionArgs, int paddings[2], 
 			int ppuCount, int lpsAlignment) : DimPartitionConfig(dimension, 
 			partitionArgs, paddings, ppuCount, lpsAlignment) {}
-	int getPartsCount();
-	LineInterval *getCoreInterval(int partId);
-	LineInterval *getInterval(int partId);
-	Dimension getPartDimension(int partId);
-	int getEffectiveFrontPadding(int partId); 		
-	int getEffectiveRearPadding(int partId);
+	LineInterval *getCoreInterval(List<int> *partIdList);
+	LineInterval *getInterval(List<int> *partIdList);
 };
 
 /* configuration subclass for parameter-less 'stride' partition function */
 class StrideConfig : public DimPartitionConfig {
+  protected:
+	int getPartsCount(Dimension parentDimension);
+	Dimension getPartDimension(int partId, Dimension parentDimension);
   public:
 	StrideConfig(Dimension dimension, int ppuCount, int lpsAlignment) 
 			: DimPartitionConfig(dimension, NULL, ppuCount, lpsAlignment) {}
-	int getPartsCount();
-	LineInterval *getCoreInterval(int partId);
-	LineInterval *getInterval(int partId) { return getCoreInterval(partId); }
-	LineInterval *getXformedCoreInterval(int partId);
-	LineInterval *getXformedInterval(int partId) { return getXformedCoreInterval(partId); }
-	Dimension getPartDimension(int partId);
+	LineInterval *getCoreInterval(List<int> *partIdList);
+	LineInterval *getInterval(List<int> *partIdList) { return getCoreInterval(partIdList); }
+	LineInterval *getXformedCoreInterval(List<int> *partIdList);
+	LineInterval *getXformedInterval(List<int> *partIdList) { return getXformedCoreInterval(partIdList); }
 };
 
 /* configuration subclass for 'block_stride' partition function that takes a 'block_size' parameter */
 class BlockStrideConfig : public DimPartitionConfig {
+  protected:
+	int getPartsCount(Dimension parentDimension);
+	Dimension getPartDimension(int partId, Dimension parentDimension);
   public:
 	BlockStrideConfig(Dimension dimension, int *partitionArgs, 
 			int ppuCount, int lpsAlignment) : DimPartitionConfig(dimension, 
 			partitionArgs, ppuCount, lpsAlignment) {}
-	int getPartsCount();
-	LineInterval *getCoreInterval(int partId);
-	LineInterval *getInterval(int partId) { return getCoreInterval(partId); }
-	LineInterval *getXformedCoreInterval(int partId);
-	LineInterval *getXformedInterval(int partId) { return getXformedCoreInterval(partId); }
-	Dimension getPartDimension(int partId);
+	LineInterval *getCoreInterval(List<int> *partIdList);
+	LineInterval *getInterval(List<int> *partIdList) { return getCoreInterval(partIdList); }
+	LineInterval *getXformedCoreInterval(List<int> *partIdList);
+	LineInterval *getXformedInterval(List<int> *partIdList) { return getXformedCoreInterval(partIdList); }
 };
 
 /* This is the class that holds the partition configuration for different dimensions of a single data 
@@ -169,13 +187,22 @@ class DataPartitionConfig {
 	int dimensionCount;
 	// partition configuration along each of those dimensions
 	List<DimPartitionConfig*> *dimensionConfigs;
+	// A reference to the parition configuration of immediate ancestor LPS cantaining the underlying 
+	// data structure
+	DataPartitionConfig *parent;
   public:
 	DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfig) {
 		this->dimensionCount = dimensionCount;
 		this->dimensionConfigs = dimensionConfigs;
+		this->parent = NULL;
 	}
+	void setParent(DataPartitionConfig *parent);
+	
 	// the function is to be used for generating metadata for subsequent use in generating a data part
-	PartMetadata *generatePartMetadata(int *partId);
+	PartMetadata *generatePartMetadata(List<int*> *partIdList);
+
+	//-------------------------- Unused Functions; May Come in Handy Later ---------------------------
+	//------------------------------------------------------------------------------------------------
 	// utility function to retrieve multi-dimensional LPU ids from a translated linear id
 	int *getMultidimensionalLpuId(int lpsDimensions, int *lpuCount, int linearId);
 	
@@ -192,16 +219,17 @@ class DataPartitionConfig {
 	// to it for execution
 	List<int*> *getLocalPartIds(int lpsDimensions, int *lpuCount, Range localRange);
 	List<int*> *getLocalPartIds(List<int*> *localLpuIds);
+	//------------------------------------------------------------------------------------------------
 
 	// generate a data part Id for an LPU from the LPU Id
-	int *generatePartId(int *lpuId);
+	List<int*> *generatePartId(List<int*> *lpuIds);
 
 	// function to generate the list of data parts (see allocation.h) from the partition configuration
-	template <class type> DataPartsList *generatePartList(List<int*> *localPartIds, int epochCount) {
+	template <class type> DataPartsList *generatePartList(List<List<int*>*> *localPartIds, int epochCount) {
 		List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
 		for (int i = 0; i < localPartIds->NumElements(); i++) {
-			int *partId = localPartIds->Nth(i);
-			partMetadataList->Append(generatePartMetadata(partId));
+			List<int*> *partIdList = localPartIds->Nth(i);
+			partMetadataList->Append(generatePartMetadata(partIdList));
 		}
 		Dimension *dataDimensions = new Dimension[dimensionCount];
 		bool hasPadding = false;
@@ -220,7 +248,11 @@ class DataPartitionConfig {
 
 	// this function is used to determine the data-parts content of PPUs other than the current one
 	// so that decision about the nature and content of communication for shared data can be made.
-	ListMetadata *generatePartsMetadata(List<int*> *partIds);
+	ListMetadata *generatePartsMetadata(List<List<int*>*> *partIds);
+
+  private:
+	// a recursive helper routine for the generatePartId(List<int*> lpuIds) function
+	void generatePartId(List<int*> *lpuIds, int position, List<int*> *partIdUnderConstr);
 };
 
 #endif

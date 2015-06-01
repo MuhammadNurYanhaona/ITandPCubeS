@@ -32,7 +32,7 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFile,
 void genRoutineForLpsContent(std::ofstream &headerFile,
                 std::ofstream &programFile,
                 const char *initials,
-		Space *lps);
+		Space *lps, Space *rootLps);
 
 /* generates a routine to produce a map object that keep track of all allocations been done for a task's 
    computations. Note that it excludes memory allocation for communication, that will be dealt separately.  

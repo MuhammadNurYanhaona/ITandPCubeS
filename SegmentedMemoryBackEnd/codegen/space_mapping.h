@@ -11,10 +11,10 @@ class PPS_Definition {
 	int id;
 	const char *name;
 	int units;
-	/* We need a variable that designate the PPS representing CPU cores. This is required 
-	   to manage thread affinity. For the sake of identification, the current requirement 
-           is that in the PCubeS description file, the space correspond to CPU cores should be 
-	   marked as '*' besides its name.
+	/* We need a variable that designate the PPS representing CPU cores. This is required to 
+	   manage thread affinity. For the sake of identification, the current requirement is 
+	   that in the PCubeS description file, the space correspond to CPU cores should be marked 
+	   as '*' besides its name.
 	*/
 	bool coreSpace;
 	/* We need another variable to identify where memory segmentation occurs in the hardware.
@@ -29,11 +29,12 @@ class PPS_Definition {
 	void print(int indentLevel);
 };
 
-/* structure definition to identify an LPS-PPS mapping */
-typedef struct {
+/* object definition to identify an LPS-PPS mapping */
+class MapEntry {
+  public:
 	Space *LPS;
 	PPS_Definition *PPS;
-} MapEntry;
+};
 
 /* object definition to generate mapping hierarchy from partition and mapping configurations */
 class MappingNode {

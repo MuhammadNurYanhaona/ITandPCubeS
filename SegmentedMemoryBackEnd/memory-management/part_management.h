@@ -42,9 +42,9 @@ class DataItems {
 	DataPartitionConfig *getPartitionConfig();
 	void setPartsList(DataPartsList *partsList) { this->partsList = partsList; }
 	// function to get the most uptodate version of a part of the structure
-	DataPart *getDataPart(int *lpuId);
+	DataPart *getDataPart(List<int*> *lpuIds);
 	// function to get an older epoch version of a part
-	DataPart *getDataPart(int *lpuId, int epoch);
+	DataPart *getDataPart(List<int*> *lpuIds, int epoch);
 	List<DataPart*> *getAllDataParts();
 	virtual void advanceEpoch() { partsList->advanceEpoch(); }
 };

@@ -31,7 +31,9 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
 	functionHeader << "\n" << doubleIndent;
 	functionHeader << initials << "Partition partition" << paramSeparator;
 	functionHeader << "\n" << doubleIndent;
-	functionHeader << "int ppuCount)";
+	functionHeader << "int ppuCount" << paramSeparator;
+	functionHeader << "\n" << doubleIndent;
+	functionHeader << "Hashtable<DataPartitionConfig*> *configMap)";
 
 	headerFile << "DataPartitionConfig *" << functionHeader.str() << stmtSeparator;
 	programFile << "DataPartitionConfig *" << string_utils::toLower(initials);
@@ -132,8 +134,22 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
 			programFile << "))" << stmtSeparator;
 		}
 	}
-	programFile << indent << "return new DataPartitionConfig(";
+
+	// create the partition config object
+	programFile << indent << "DataPartitionConfig *config =  new DataPartitionConfig(";
 	programFile << dimensionCount << paramSeparator << "dimensionConfigs)" << stmtSeparator;
+
+	// check if there is any ancestor partition in higher LPSes for this data; if YES then set the parent
+	// config reference in the newly created config
+	DataStructure *source = array->getSource();
+	if (source != NULL && !source->getSpace()->isRoot()) {
+		Space *parentLps = source->getSpace();
+		programFile << indent << "config->setParent(configMap->Lookup(\"";
+		programFile << array->getName() << "Space" << parentLps->getName() << "Config";
+		programFile << "\"))" << stmtSeparator;
+	}
+
+	programFile << indent << "return config" << stmtSeparator;
 	programFile << "}\n";
 }
 
@@ -142,8 +158,10 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
                 const char *initials,
                 PartitionHierarchy *hierarchy) {
 	
-	std::string statementSeparator = ";\n";
-        std::string statementIndent = "\t";
+	std::string stmtSeparator = ";\n";
+        std::string indent = "\t";
+        std::string doubleIndent = "\t\t";
+	std::string paramSeparator = ", ";
         std::ofstream programFile, headerFile;
 
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
@@ -156,13 +174,31 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
 	decorator::writeSectionHeader(headerFile, header);
 	decorator::writeSectionHeader(programFile, header);
 
+	// generate a header for the function that will create dimension configuration of data structures in
+	// different LPSes and store them in a map
+	std::ostringstream functionHeader;
+	functionHeader << "getDataPartitionConfigMap("; 
+	functionHeader << "ArrayMetadata *metadata" << paramSeparator;
+	functionHeader << "\n" << doubleIndent;
+	functionHeader << initials << "Partition partition" << paramSeparator;
+	functionHeader << "int *ppuCounts)";
+
+	// first create the map in the function body
+	std::ostringstream functionBody;
+	functionBody << indent << "Hashtable<DataPartitionConfig*> *configMap = ";
+	functionBody << "new Hashtable<DataPartitionConfig*>" << stmtSeparator;
+
+	// iterate all LPSes except the root and create functions for partition configs for relevent arrays
 	Space *root = hierarchy->getRootSpace();
 	std::deque<Space*> lpsQueue;
-	lpsQueue.push_back(root);
+	List<Space*> *children = root->getChildrenSpaces();
+	for (int i = 0; i < children->NumElements(); i++) {
+		lpsQueue.push_back(children->Nth(i));
+	}
         while (!lpsQueue.empty()) {
                 Space *lps = lpsQueue.front();
                 lpsQueue.pop_front();
-                List<Space*> *children = lps->getChildrenSpaces();
+                children = lps->getChildrenSpaces();
                 for (int i = 0; i < children->NumElements(); i++) {
                         lpsQueue.push_back(children->Nth(i));
                 }
@@ -174,7 +210,6 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
 			DataStructure *structure = lps->getLocalStructure(structureList->Nth(i));
 			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 			if (array == NULL) continue;
-			else if (!array->getUsageStat()->isAllocated()) continue;
 
 			if (generationCount == 0) {
 				std::ostringstream message;
@@ -186,6 +221,89 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
 			programFile << std::endl;
 			genRoutineForDataPartConfig(headerFile, programFile, initials, lps, array);
 			generationCount++;
+			
+			// add statements in the accumulator function for calling the generated method and
+			// storing its result in the map
+			std::ostringstream configName;
+			configName << array->getName() << "Space" << lps->getName() << "Config";
+			std::ostringstream configFunction;
+			configFunction << "get" << array->getName() << "ConfigForSpace" << lps->getName();
+			configFunction << "(metadata" << paramSeparator; 
+			configFunction << "\n" << doubleIndent;
+			configFunction << "partition" << paramSeparator;
+			configFunction << "ppuCounts[Space_" << lps->getName() << "]" << paramSeparator;
+			configFunction << "configMap)";
+			functionBody << indent << "DataPartitionConfig *" << configName.str();
+			functionBody << " = " << configFunction.str() << stmtSeparator;
+			functionBody << indent << "configMap->Enter(\"" << configName.str() << "\"";
+			functionBody << paramSeparator << configName.str() << ")" << stmtSeparator;			
 		}
 	}
+
+	// write the accumulator function in both files
+	const char *message = "Partition Configuration Accumulator";
+	decorator::writeSubsectionHeader(headerFile, message);
+	headerFile << "Hashtable<DataPartitionConfig*> *" << functionHeader.str() << stmtSeparator;
+	headerFile << "\n";
+	decorator::writeSubsectionHeader(programFile, message);
+	programFile << "\n";
+	programFile << "Hashtable<DataPartitionConfig*> *";
+	programFile << string_utils::toLower(initials) << "::" << functionHeader.str();
+	functionBody << indent << "return configMap" << stmtSeparator;
+	programFile << " {\n" << functionBody.str() << "}\n\n";
+
+	headerFile.close();
+	programFile.close();
+}
+	
+void genRoutineForLpsContent(std::ofstream &headerFile,
+                std::ofstream &programFile,
+                const char *initials,
+                Space *lps, Space *rootLps) {
+	
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	std::string indent = "\t";
+	std::string doubleIndent = "\t\t";
+
+	std::ostringstream functionHeader;
+	functionHeader << "gen" << lps->getName() << "Content(";
+	functionHeader << "List<ThreadState*> *threads";
+	functionHeader << paramSeparator << "ArrayMetadata *metadata";
+	functionHeader << paramSeparator << initials << "Parition partition";
+	functionHeader << paramSeparator << "Hashtable<DataPartitionConfig*> *partitionConfigMap)";
+
+	headerFile << "LpsContent *" << functionHeader.str() << stmtSeparator;
+	programFile << "LpsContent *" << string_utils::toLower(initials) << "::";
+	programFile << functionHeader.str() << " {\n";
+
+	// write a checking for non-empty thread list; if the list is empty then return NULL
+	programFile << indent << "if(threads->NumElements() == 0) return NULL" << stmtSeparator;
+
+	// investigate the first thread in the list to determine the number of PPUs that will participate
+	// in the computations assigned to the current LPS
+	programFile << indent << "int ppuCount = threads->Nth(0)->getThreadIds()->getPpuCount";
+	programFile << "(Space_" << lps->getName() << ")" << stmtSeparator;
+
+	// generate a list to hold all lpu-ids of different threads in the group
+	programFile << indent << "List<int*> *lpuIdList = new List<int*>" << stmtSeparator;
+
+	// iterate over the threads and get their lpu-ids for the LPS under concern
+	programFile << indent << "for (int i = 0; i < threads->NumElements(); i++) {\n";
+	programFile << doubleIndent << "ThreadState *thread = threads->Nth(i)" << stmtSeparator;
+	programFile << doubleIndent << "List<int*> *threadLpuIds = thread->getAllLpuIds(";
+	programFile << "Space_" << lps->getName() << paramSeparator;
+	programFile << "Space_" << rootLps->getName();	
+	programFile << ")" << stmtSeparator;
+	programFile << doubleIndent << "lpuIdList->AppendAll(threadLpuIds)" << stmtSeparator;
+	programFile << indent << "}\n";
+
+	// if the lpuIdList is empty then return NULL as there will be no need of data allocations for 
+	// current LPS for the group
+	programFile << indent << "if (lpuIdList->NumElements() == 0) return NULL" << stmtSeparator;
+
+	// iterate over the data structures of this LPS and create data items for those that are flagged
+	// to be allocated in it.
+
+	programFile << "}\n";	
 }

@@ -5,171 +5,317 @@
 #include "../codegen/structure.h"
 #include <algorithm>
 
+//---------------------------------------------------------- Dim Partition Config ---------------------------------------------------------/
+
+DimPartitionConfig::DimPartitionConfig(Dimension dimension, int *partitionArgs,
+		int paddings[2], int ppuCount, int lpsAlignment) {
+	this->dataDimension = dimension;
+	this->partitionArgs = partitionArgs;
+	this->paddings[0] = paddings[0];
+	this->paddings[1] = paddings[1];
+	this->ppuCount = ppuCount;
+	this->lpsAlignment = lpsAlignment;
+	this->parentConfig = NULL;
+}
+
+DimPartitionConfig::DimPartitionConfig(Dimension dimension, int *partitionArgs, int ppuCount, int lpsAlignment) {
+	this->dataDimension = dimension;
+	this->partitionArgs = partitionArgs;
+	this->paddings[0] = 0;
+	this->paddings[1] = 0;
+	this->ppuCount = ppuCount;
+	this->lpsAlignment = lpsAlignment;
+	this->parentConfig = NULL;
+}
+
+Dimension DimPartitionConfig::getDimensionFromParent(List<int> *partIdList, int position) {
+	if (parentConfig == NULL) return dataDimension;
+	Dimension parentDataDimension = parentConfig->getDimensionFromParent(partIdList, position - 1);
+	int parentPartId = partIdList->Nth(position - 1);
+	return parentConfig->getPartDimension(parentPartId, parentDataDimension);
+}
+
+LineInterval *DimPartitionConfig::getXformedCoreInterval(List<int> *partIdList) { 
+	return getCoreInterval(partIdList); 
+}
+
+LineInterval *DimPartitionConfig::getXformedInterval(List<int> *partIdList) { 
+	return getInterval(partIdList); 
+}
+
+DimensionMetadata *DimPartitionConfig::generateDimMetadata(List<int> *partIdList) {
+
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+
+	DimensionMetadata *metadata = new DimensionMetadata();
+	metadata->coreInterval = getCoreInterval(partIdList);
+	if (hasPadding()) metadata->interval = getInterval(partIdList);
+	else metadata->interval = metadata->coreInterval;
+	metadata->partDimension = getPartDimension(partId, parentDimension);
+	
+	metadata->paddings[0] = 0;
+	metadata->paddings[1] = 0;
+	if (paddings[0] > 0) metadata->paddings[0] = getEffectiveFrontPadding(partId, parentDimension);
+	if (paddings[1] > 0) metadata->paddings[1] = getEffectiveRearPadding(partId, parentDimension);
+
+	return metadata;
+}
+
+//----------------------------------------------------------- Replication Config ----------------------------------------------------------/
+
+LineInterval *ReplicationConfig::getCoreInterval(List<int> *partIdList) {
+	Line *line = new Line(dataDimension.range.min, dataDimension.range.max);
+	if (parentConfig == NULL) {
+		return LineInterval::getFullLineInterval(line);
+	} else {
+		int position = partIdList->NumElements() - 1;
+		Dimension parentDimension = getDimensionFromParent(partIdList, position);
+		int begin = parentDimension.range.min;
+		int length = parentDimension.length;
+		LineInterval *interval = new LineInterval(begin, length, 1, 0);
+		interval->setLine(line);
+		return interval;
+	}
+}
+
+LineInterval *ReplicationConfig::getInterval(List<int> *partIdList) { 
+	return getCoreInterval(partIdList); 
+}
+
+LineInterval *ReplicationConfig::getXformedCoreInterval(List<int> *partIdList) { 
+	return getCoreInterval(partIdList); 
+}
+        
+LineInterval *ReplicationConfig::getXformedInterval(List<int> *partIdList) { 
+	return getCoreInterval(partIdList); 
+}
+
 //------------------------------------------------------------ Block Size Config ----------------------------------------------------------/
 
-int BlockSizeConfig::getPartsCount() {
+int BlockSizeConfig::getPartsCount(Dimension parentDimension) {
 	int size = partitionArgs[0];
-	int dimLength = dimension.length;
+	int dimLength = parentDimension.length;
 	return (dimLength + size - 1) / size;
 }
 
-LineInterval *BlockSizeConfig::getCoreInterval(int partId) {
+LineInterval *BlockSizeConfig::getCoreInterval(List<int> *partIdList) {
+	
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+	
 	int size = partitionArgs[0];
-	int partsCount = getPartsCount();
-	int begin = dimension.range.min + partId * size;
-	int remaining = dimension.range.max - begin + 1;
+	int partsCount = getPartsCount(parentDimension);
+	int begin = parentDimension.range.min + partId * size;
+	int remaining = parentDimension.range.max - begin + 1;
 	int intervalLength = (remaining >= size) ? size : remaining;
 	LineInterval *interval = new LineInterval(begin, intervalLength, 1, 0);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(dataDimension.range.min, dataDimension.range.max));
 	return interval;	
 }
 
-LineInterval *BlockSizeConfig::getInterval(int partId) {
-	LineInterval *coreInterval = getCoreInterval(partId);
+LineInterval *BlockSizeConfig::getInterval(List<int> *partIdList) {
+	
+	LineInterval *coreInterval = getCoreInterval(partIdList);
 	int begin = coreInterval->getBegin();
 	int length = coreInterval->getLength();
+	
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
 	if (paddings[0] > 0) {
-		int frontPadding = getEffectiveFrontPadding(partId);
+		int frontPadding = getEffectiveFrontPadding(partId, parentDimension);
 		begin -= frontPadding;
 		length += frontPadding;
 	}
 	if (paddings[1] > 0) {
-		length += getEffectiveRearPadding(partId);
+		length += getEffectiveRearPadding(partId, parentDimension);
 	}
+
 	LineInterval *interval = new LineInterval(begin, length, 1, 0);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(dataDimension.range.min, dataDimension.range.max));
 	return interval;	
 }
 
-Dimension BlockSizeConfig::getPartDimension(int partId) {
-	LineInterval *interval = getInterval(partId);
-	int begin = interval->getBegin();
-	int end = begin + interval->getLength() - 1;
+Dimension BlockSizeConfig::getPartDimension(int partId, Dimension parentDimension) {
+	
+	int size = partitionArgs[0];
+	int partsCount = getPartsCount(parentDimension);
+	int begin = parentDimension.range.min + partId * size;
+	int remaining = parentDimension.range.max - begin + 1;
+	int intervalLength = (remaining >= size) ? size : remaining;
+
+	if (paddings[0] > 0) {
+		int frontPadding = getEffectiveFrontPadding(partId, parentDimension);
+		begin -= frontPadding;
+		intervalLength += frontPadding;
+	}
+	if (paddings[1] > 0) {
+		intervalLength += getEffectiveRearPadding(partId, parentDimension);
+	}
+
 	Dimension partDimension;
 	partDimension.range.min = begin;
-	partDimension.range.max = end;
+	partDimension.range.max = begin + intervalLength - 1;
 	partDimension.setLength();
 	return partDimension;
 }
 
-int BlockSizeConfig::getEffectiveFrontPadding(int partId) {
+int BlockSizeConfig::getEffectiveFrontPadding(int partId, Dimension parentDimension) {
 	if (paddings[0] == 0) return 0;
 	int size = partitionArgs[0];
-	int partsCount = getPartsCount();
-	int begin = dimension.range.min + partId * size;
-	int paddedBegin = std::max(dimension.range.min, begin - paddings[0]);
+	int partsCount = getPartsCount(parentDimension);
+	int begin = parentDimension.range.min + partId * size;
+	int paddedBegin = std::max(parentDimension.range.min, begin - paddings[0]);
 	return begin - paddedBegin;
 }
 
-int BlockSizeConfig::getEffectiveRearPadding(int partId) {
+int BlockSizeConfig::getEffectiveRearPadding(int partId, Dimension parentDimension) {
 	if (paddings[1] == 0) return 0;
 	int size = partitionArgs[0];
-	int partsCount = getPartsCount();
-	int begin = dimension.range.min + partId * size;
-	int remaining = dimension.range.max - begin + 1;
+	int partsCount = getPartsCount(parentDimension);
+	int begin = parentDimension.range.min + partId * size;
+	int remaining = parentDimension.range.max - begin + 1;
 	int length = (remaining >= size) ? size : remaining;
 	int end = begin + length - 1;
-	int paddedEnd = std::min(dimension.range.max, end + paddings[1]);
+	int paddedEnd = std::min(parentDimension.range.max, end + paddings[1]);
 	return paddedEnd - end;
 }
 
 //----------------------------------------------------------- Block Count Config ----------------------------------------------------------/
 
-int BlockCountConfig::getPartsCount() {
+int BlockCountConfig::getPartsCount(Dimension parentDimension) {
 	int count = partitionArgs[0];
-	int length = dimension.length;
+	int length = parentDimension.length;
         return std::max(1, std::min(count, length));
 }
         
-LineInterval *BlockCountConfig::getCoreInterval(int partId) {
-	int count = getPartsCount();
-	int size = dimension.length / count;
+LineInterval *BlockCountConfig::getCoreInterval(List<int> *partIdList) {
+
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+
+	int count = getPartsCount(parentDimension);
+	int size = parentDimension.length / count;
 	int begin = partId * size;
-	int length = (partId < count - 1) ? size : dimension.range.max - begin + 1;
+	int length = (partId < count - 1) ? size : parentDimension.range.max - begin + 1;
 	LineInterval *interval = new LineInterval(begin, length, 1, 0);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(parentDimension.range.min, parentDimension.range.max));
 	return interval;	
 }
 
-LineInterval *BlockCountConfig::getInterval(int partId) {
-	LineInterval *coreInterval = getCoreInterval(partId);
+LineInterval *BlockCountConfig::getInterval(List<int> *partIdList) {
+	
+	LineInterval *coreInterval = getCoreInterval(partIdList);
 	int begin = coreInterval->getBegin();
 	int length = coreInterval->getLength();
+
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+
 	if (paddings[0] > 0) {
-		int frontPadding = getEffectiveFrontPadding(partId);
+		int frontPadding = getEffectiveFrontPadding(partId, parentDimension);
 		begin -= frontPadding;
 		length += frontPadding;
 	}
 	if (paddings[1] > 0) {
-		length += getEffectiveRearPadding(partId);
+		length += getEffectiveRearPadding(partId, parentDimension);
 	}
+
 	LineInterval *interval = new LineInterval(begin, length, 1, 0);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(dataDimension.range.min, dataDimension.range.max));
 	return interval;	
 }
 
-Dimension BlockCountConfig::getPartDimension(int partId) {
-	LineInterval *interval = getInterval(partId);
-	int begin = interval->getBegin();
-	int end = begin + interval->getLength() - 1;
+Dimension BlockCountConfig::getPartDimension(int partId, Dimension parentDimension) {
+	
+	int count = getPartsCount(parentDimension);
+	int size = parentDimension.length / count;
+	int begin = partId * size;
+	int length = (partId < count - 1) ? size : parentDimension.range.max - begin + 1;
+
+	if (paddings[0] > 0) {
+		int frontPadding = getEffectiveFrontPadding(partId, parentDimension);
+		begin -= frontPadding;
+		length += frontPadding;
+	}
+	if (paddings[1] > 0) {
+		length += getEffectiveRearPadding(partId, parentDimension);
+	}
+
 	Dimension partDimension;
 	partDimension.range.min = begin;
-	partDimension.range.max = end;
+	partDimension.range.max = begin + length - 1;
 	partDimension.setLength();
 	return partDimension;
 }
 
-int BlockCountConfig::getEffectiveFrontPadding(int partId) {
+int BlockCountConfig::getEffectiveFrontPadding(int partId, Dimension parentDimension) {
 	if (paddings[0] == 0) return 0;
-	int count = getPartsCount();
-	int size = dimension.length / count;
+	int count = getPartsCount(parentDimension);
+	int size = parentDimension.length / count;
 	int begin = partId * size;
-	int paddedBegin = std::max(dimension.range.min, begin - paddings[0]);
+	int paddedBegin = std::max(parentDimension.range.min, begin - paddings[0]);
 	return begin - paddedBegin;
 }
                
-int BlockCountConfig::getEffectiveRearPadding(int partId) {
+int BlockCountConfig::getEffectiveRearPadding(int partId, Dimension parentDimension) {
 	if (paddings[1] == 0) return 0;
-	int count = getPartsCount();
-	int size = dimension.length / count;
+	int count = getPartsCount(parentDimension);
+	int size = parentDimension.length / count;
 	int begin = partId * size;
-	int length = (partId < count - 1) ? size : dimension.range.max - begin + 1;
+	int length = (partId < count - 1) ? size : parentDimension.range.max - begin + 1;
 	int end = begin + length - 1;
-	int paddedEnd = std::min(dimension.range.max, end + paddings[1]);
+	int paddedEnd = std::min(parentDimension.range.max, end + paddings[1]);
 	return paddedEnd - end;
 }
 
 //-------------------------------------------------------------- Stride Config ------------------------------------------------------------/
 
-int StrideConfig::getPartsCount() {
-	int length = dimension.length;
+int StrideConfig::getPartsCount(Dimension parentDimension) {
+	int length = parentDimension.length;
         return std::max(1, std::min(ppuCount, length));
 }
 
-LineInterval *StrideConfig::getCoreInterval(int partId) {
-	int partsCount = getPartsCount();
-	int length = dimension.length;
+LineInterval *StrideConfig::getCoreInterval(List<int> *partIdList) {
+	
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+
+	int partsCount = getPartsCount(parentDimension);
+	int length = parentDimension.length;
 	int strides = length /partsCount;
 	int remaining = length % partsCount;
 	if (remaining > partId) strides++;
-	int begin = dimension.range.min + partId;
+	int begin = parentDimension.range.min + partId;
 	LineInterval *interval = new LineInterval(begin, 1, strides, partsCount);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(dataDimension.range.min, dataDimension.range.max));
 	return interval;	
 }
 
-LineInterval *StrideConfig::getXformedCoreInterval(int partId) {
-	Dimension partDimension = getPartDimension(partId);
+LineInterval *StrideConfig::getXformedCoreInterval(List<int> *partIdList) {
+	
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+	
+	Dimension partDimension = getPartDimension(partId, parentDimension);
 	int begin = partDimension.range.min;
 	int length = partDimension.length;
+
 	LineInterval *interval = new LineInterval(begin, length, 1, 0);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(dataDimension.range.min, dataDimension.range.max));
 	return interval;	
 }
 
-Dimension StrideConfig::getPartDimension(int partId) {
-	int partsCount = getPartsCount();
-	int length = dimension.length;
+Dimension StrideConfig::getPartDimension(int partId, Dimension parentDimension) {
+	int partsCount = getPartsCount(parentDimension);
+	int length = parentDimension.length;
 	int perStrideEntries = length / partsCount;
         int myEntries = perStrideEntries;
         int remainder = length % partsCount;
@@ -180,7 +326,7 @@ Dimension StrideConfig::getPartDimension(int partId) {
                 extra = partId;
         }
         Dimension partDimension;
-        partDimension.range.min = dimension.range.min + perStrideEntries * partId + extra;
+        partDimension.range.min = parentDimension.range.min + perStrideEntries * partId + extra;
         partDimension.range.max = partDimension.range.min + myEntries - 1;
         partDimension.setLength();
 	return partDimension;
@@ -188,23 +334,27 @@ Dimension StrideConfig::getPartDimension(int partId) {
 
 //----------------------------------------------------------- Block Stride Config ---------------------------------------------------------/
 
-int BlockStrideConfig::getPartsCount() {
+int BlockStrideConfig::getPartsCount(Dimension parentDimension) {
 	int blockSize = partitionArgs[0];
-	int length = dimension.length;
+	int length = parentDimension.length;
         int strides = length / blockSize;
         return std::max(1, std::min(strides, ppuCount));
 }
 
-LineInterval *BlockStrideConfig::getCoreInterval(int partId) {
+LineInterval *BlockStrideConfig::getCoreInterval(List<int> *partIdList) {
 	
-	int partsCount = getPartsCount();
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+	
+	int partsCount = getPartsCount(parentDimension);
 	int blockSize = partitionArgs[0];
         int strideLength = blockSize * partsCount;
-        int strideCount = dimension.length / strideLength;
+        int strideCount = parentDimension.length / strideLength;
 
 	// the stride count for the current part may be increased by one if dimension is not divisible
 	// by the strideLength
-	int partialStrideElements = dimension.length % strideLength;
+	int partialStrideElements = parentDimension.length % strideLength;
         int extraBlockCount = partialStrideElements / blockSize;
 	if (extraBlockCount > partId || 
 		(extraBlockCount == partId 
@@ -214,29 +364,36 @@ LineInterval *BlockStrideConfig::getCoreInterval(int partId) {
 	int length = blockSize;
 	int count = strideCount;
 	int gap = strideLength;
+
 	LineInterval *interval = new LineInterval(begin, length, count, gap);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(dataDimension.range.min, dataDimension.range.max));
 	return interval;	
 }
 
-LineInterval *BlockStrideConfig::getXformedCoreInterval(int partId) {
-	Dimension partDimension = getPartDimension(partId);
+LineInterval *BlockStrideConfig::getXformedCoreInterval(List<int> *partIdList) {
+
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+	
+	Dimension partDimension = getPartDimension(partId, parentDimension);
 	int begin = partDimension.range.min;
 	int length = partDimension.length;
+
 	LineInterval *interval = new LineInterval(begin, length, 1, 0);
-	interval->setLine(new Line(dimension.range.min, dimension.range.max));
+	interval->setLine(new Line(dataDimension.range.min, dataDimension.range.max));
 	return interval;	
 }
 
-Dimension BlockStrideConfig::getPartDimension(int partId) {
+Dimension BlockStrideConfig::getPartDimension(int partId, Dimension parentDimension) {
 
-	int partsCount = getPartsCount();
+	int partsCount = getPartsCount(parentDimension);
 	int blockSize = partitionArgs[0];
         int strideLength = blockSize * partsCount;
-        int strideCount = dimension.length / strideLength;
+        int strideCount = parentDimension.length / strideLength;
         int myEntries = strideCount * blockSize;
         
-	int partialStrideElements = dimension.length % strideLength;
+	int partialStrideElements = parentDimension.length % strideLength;
         int blockCount = partialStrideElements / blockSize;
         int extraEntriesBefore = partialStrideElements;
 
@@ -254,7 +411,8 @@ Dimension BlockStrideConfig::getPartDimension(int partId) {
         }
         
 	Dimension partDimension;
-        partDimension.range.min = partId * strideCount * strideLength + extraEntriesBefore;
+        partDimension.range.min = parentDimension.range.min 
+			+ partId * strideCount * strideLength + extraEntriesBefore;
         partDimension.range.max = partDimension.range.min + myEntries - 1;
         partDimension.setLength();
         return partDimension;
@@ -262,7 +420,16 @@ Dimension BlockStrideConfig::getPartDimension(int partId) {
 
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
 
-PartMetadata *DataPartitionConfig::generatePartMetadata(int *partId) {
+void DataPartitionConfig::setParent(DataPartitionConfig *parent) { 
+	this->parent = parent; 
+	for (int i = 0; i < dimensionCount; i++) {
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
+		DimPartitionConfig *parentConfig = parent->dimensionConfigs->Nth(i);
+		dimConfig->setParentConfig(parentConfig);
+	}
+}
+
+PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) {
 	
 	Dimension *partDimensions = new Dimension[dimensionCount];
 	List<LineInterval*> *linearIntervals = new List<LineInterval*>;
@@ -270,21 +437,31 @@ PartMetadata *DataPartitionConfig::generatePartMetadata(int *partId) {
 	int *padding = new int[dimensionCount * 2];
 
 	for (int i = 0; i < dimensionCount; i++) {
+
+		List<int> *dimIdList = new List<int>;
+		for (int j = 0; j < partIdList->NumElements(); j++) {
+			int *partId = partIdList->Nth(i);
+			dimIdList->Append(partId[i]);
+		}
+
 		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
-		int dimId = partId[i];
-		linearIntervals->Append(dimConfig->getCoreInterval(dimId));
-		paddedIntervals->Append(dimConfig->getInterval(dimId));
-		partDimensions[i] = dimConfig->getPartDimension(dimId);
-		padding[2 * i] = dimConfig->getEffectiveFrontPadding(dimId);
-		padding[2 * i + 1] = dimConfig->getEffectiveRearPadding(dimId);
+		DimensionMetadata *dimMetadata = dimConfig->generateDimMetadata(dimIdList);
+		
+		linearIntervals->Append(dimMetadata->coreInterval);
+		paddedIntervals->Append(dimMetadata->interval);
+		partDimensions[i] = dimMetadata->partDimension;
+
+		padding[2 * i] = dimMetadata->paddings[0];
+		padding[2 * i + 1] = dimMetadata->paddings[1];
 	}
 
 	HyperplaneInterval *coreInterval = new HyperplaneInterval(
 			dimensionCount, linearIntervals);
 	HyperplaneInterval *paddedInterval = new HyperplaneInterval(
 			dimensionCount, paddedIntervals);
-	PartMetadata *metadata = new PartMetadata(dimensionCount, partId, partDimensions, padding);
+	PartMetadata *metadata = new PartMetadata(dimensionCount, partIdList, partDimensions, padding);
 	metadata->setIntervals(coreInterval, paddedInterval);
+
 	return metadata;
 }
 
@@ -396,20 +573,31 @@ List<int*> *DataPartitionConfig::getLocalPartIds(List<int*> *localLpuIds) {
 	return uniqueParts;
 }
 
-int *DataPartitionConfig::generatePartId(int *lpuId) {
-	int *partId = new int[dimensionCount];
-	for (int d = 0; d < dimensionCount; d++) {
-		DimPartitionConfig *dimensionConfig = dimensionConfigs->Nth(d);
-		partId[d] = dimensionConfig->pickPartId(lpuId);
-	}
+List<int*> *DataPartitionConfig::generatePartId(List<int*> *lpuIds) {
+	List<int*> *partId = new List<int*>;
+	int position = lpuIds->NumElements() - 1;
+	generatePartId(lpuIds, position, partId);
 	return partId;
 }
 
-ListMetadata *DataPartitionConfig::generatePartsMetadata(List<int*> *partIds) {
+void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, List<int*> *partId) {
+	if (parent != NULL) {
+		parent->generatePartId(lpuIds, position - 1, partId);
+	}
+	int *lpuId = lpuIds->Nth(position);
+	int *partIdForLpu = new int[dimensionCount];
+	for (int d = 0; d < dimensionCount; d++) {
+		DimPartitionConfig *dimensionConfig = dimensionConfigs->Nth(d);
+		partIdForLpu[d] = dimensionConfig->pickPartId(lpuId);
+	}
+	partId->Append(partIdForLpu);
+}
+
+ListMetadata *DataPartitionConfig::generatePartsMetadata(List<List<int*>*> *partIds) {
 	List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
 	for (int i = 0; i < partIds->NumElements(); i++) {
-		int *partId = partIds->Nth(i);
-		partMetadataList->Append(generatePartMetadata(partId));
+		List<int*> *partIdList = partIds->Nth(i);
+		partMetadataList->Append(generatePartMetadata(partIdList));
 	}
 	Dimension *dataDimensions = new Dimension[dimensionCount];
 	bool hasPadding = false;
@@ -423,3 +611,4 @@ ListMetadata *DataPartitionConfig::generatePartsMetadata(List<int*> *partIds) {
 	listMetadata->generateIntervalSpec(partMetadataList);
 	return listMetadata;
 }
+

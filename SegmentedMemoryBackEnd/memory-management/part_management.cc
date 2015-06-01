@@ -41,16 +41,16 @@ DataPartitionConfig *DataItems::getPartitionConfig() {
 	return partitionConfig; 
 }
 
-DataPart *DataItems::getDataPart(int *lpuId) {
+DataPart *DataItems::getDataPart(List<int*> *lpuIds) {
 	Assert(partsList != NULL);
-	int *partId = partitionConfig->generatePartId(lpuId);
-	return partsList->getPart(partId);
+	List<int*> *partIdList = partitionConfig->generatePartId(lpuIds);
+	return partsList->getPart(partIdList);
 }
 
-DataPart *DataItems::getDataPart(int *lpuId, int epoch) {
+DataPart *DataItems::getDataPart(List<int*> *lpuIds, int epoch) {
 	Assert(partsList != NULL);
-	int *partId = partitionConfig->generatePartId(lpuId);
-	return partsList->getPart(partId, epoch);
+	List<int*> *partIdList = partitionConfig->generatePartId(lpuIds);
+	return partsList->getPart(partIdList, epoch);
 }
         
 List<DataPart*> *DataItems::getAllDataParts() {

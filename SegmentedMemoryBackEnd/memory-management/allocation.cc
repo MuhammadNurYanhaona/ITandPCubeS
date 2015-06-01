@@ -6,10 +6,10 @@
 
 //---------------------------------------------------------------- Part Metadata ---------------------------------------------------------------/
 
-PartMetadata::PartMetadata(int dimensionality, int *id, Dimension *boundary, int *padding) {
-	Assert(dimensionality > 0 && id != NULL && boundary != NULL);
+PartMetadata::PartMetadata(int dimensionality, List<int*> *idList, Dimension *boundary, int *padding) {
+	Assert(dimensionality > 0 && idList != NULL && boundary != NULL);
 	this->dimensionality = dimensionality;
-	this->id = id;
+	this->idList = idList;
 	this->boundary = boundary;
 	this->padding = padding;
 }
@@ -28,9 +28,14 @@ int PartMetadata::getSize() {
 	return size;
 }
 
-bool PartMetadata::isMatchingId(int *id) {
-	for (int i = 0; i < dimensionality; i++) {
-		if (this->id[i] != id[i]) return false;
+bool PartMetadata::isMatchingId(List<int*> *candidateId) {
+	if (idList->NumElements() != candidateId->NumElements()) return false;
+	for (int i = 0; i < idList->NumElements(); i++) {
+		int *lpsId1 = idList->Nth(i);
+		int *lpsId2 = candidateId->Nth(i); 
+		for (int j = 0; j < dimensionality; i++) {
+			if (lpsId1[j] != lpsId2[j]) return false;
+		}
 	}
 	return true;
 }
@@ -84,7 +89,7 @@ DataPartsList::DataPartsList(ListMetadata *metadata, int epochCount) {
 	this->epochHead = 0;
 }
 
-DataPart *DataPartsList::getPart(int *partId) {
+DataPart *DataPartsList::getPart(List<int*> *partId) {
 	List<DataPart*> *currentList = partLists[epochHead];
 	for (int i = 0; i < currentList->NumElements(); i++) {
 		DataPart *currentPart = currentList->Nth(i);
@@ -93,7 +98,7 @@ DataPart *DataPartsList::getPart(int *partId) {
 	return NULL;
 }
 
-DataPart *DataPartsList::getPart(int *partId, int epoch) {
+DataPart *DataPartsList::getPart(List<int*> *partId, int epoch) {
 	int epochVersion = (epochHead - epoch) % epochCount;
 	List<DataPart*> *currentList = partLists[epochVersion];
 	for (int i = 0; i < currentList->NumElements(); i++) {

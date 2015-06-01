@@ -2,6 +2,7 @@
 #define _H_lpu_management
 
 #include "structure.h"
+#include "../utils/list.h"
 #include <fstream>
 
 /* Remember that there is a partial ordering of logical processing spaces (LPS). Thereby, the number of
@@ -11,7 +12,7 @@
 
    For the same reason, the mechanism for generating the next LPU for an LPS is a recursive procedure.
    Depending on the scenario, if a thread exhausts all LPUs of the current LPS it is doing some 
-   computation on it may just declare that there is nothing more to compute; or it may go recursively
+   computation on, it may just declare that there is nothing more to compute; or it may go recursively
    up to reset the ancester LPUs and renew its list for current LPS and continue from there.
 
    Consequently, determining how to get and update LPU counts and LPU references is an involved procedure
@@ -47,6 +48,7 @@ class LpuCounter {
 	virtual int *getLpuCounts() { return lpuCounts; }
 	virtual void setCurrentRange(PPU_Ids ppuIds);
 	virtual int *getCompositeLpuId() { return currentLpuId; }
+	virtual int *copyCompositeLpuId();
 	virtual int *setCurrentCompositeLpuId(int linearId);
 	int getCurrentLpuId() { return currentLinearLpuId; }
 	virtual int getNextLpuId(int previousLpuId);
@@ -65,6 +67,7 @@ class MockLpuCounter : public LpuCounter {
 	int *getLpuCounts() { return NULL; }
 	void setCurrentRange(PPU_Ids ppuIds) {}
 	int *getCompositeLpuId() { return &currentLinearLpuId; }
+	int *copyCompositeLpuId();
 	int *setCurrentCompositeLpuId(int linearId);
 	int getNextLpuId(int previousLpuId);
 	void resetCounter() { currentLinearLpuId = INVALID_ID; }
@@ -154,6 +157,19 @@ class ThreadState {
 	// and the current. Furthermore, it maintains the state of those LPSes as computation continues on
 	// LPUs after LPUs. It returns NULL when the recursive process has no more LPUs to return.	
 	LPU *getNextLpu(int lpsId, int containerLpsId, int currentLpuId);
+
+	// Following two routines are added to aid memory management in segmented memory system. The idea here 
+	// is to get the Ids of all LPUs that are multiplexed to a thread before it begin executions. A 
+	// segmented-PPU controller then accumulates all these Ids and passes them as a part of initialization 
+	// arguments to the memory management module. Once memory has been allocated for all data structure 
+	// parts needed for different LPUs and they have been scheduled, the segmented-PPU controller can 
+	// launch its threads. Then each thread will proceed just like it does in the case of multicore CPU 
+	// backends.
+	int getNextLpuId(int lpsId, int containerLpsId, int currentLpuId);
+	// Note that for each LPU, we need to return not only the -- possibly multidimensional -- LPU id but
+	// also the ids of its ancestor LPUs in upper LPSes. This is because, LPU ids are hierarchical and
+	// sizes of different data parts in a lower LPS varies depending on the size of their ancestor parts.
+	List<List<int*>*> *getAllLpuIds(int lpsId, int rootLpsId);
 
 	LPU *getCurrentLpu(int lpsId);
 	void removeIterationBound(int lpsId);

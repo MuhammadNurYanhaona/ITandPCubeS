@@ -82,6 +82,14 @@ int *LpuCounter::setCurrentCompositeLpuId(int linearId) {
 	return currentLpuId;
 }
 
+int *LpuCounter::copyCompositeLpuId() {
+	int *copy = new int[lpsDimensions];
+	for (int i = 0; i < lpsDimensions; i++) {
+		copy[i] = currentLpuId[i];
+	}
+	return copy;
+} 
+
 int LpuCounter::getNextLpuId(int previousLpuId) {
 	if (previousLpuId == INVALID_ID) {
 		return currentRange->startId;
@@ -143,6 +151,12 @@ int *MockLpuCounter::setCurrentCompositeLpuId(int linearId) {
 	return &currentLinearLpuId; 
 }
 
+int *MockLpuCounter::copyCompositeLpuId() {
+	int *copy = new int;
+	copy[0] = currentLinearLpuId;
+	return copy;
+}
+
 void MockLpuCounter::logLpuCount(std::ofstream &log, int indent) {
 	for (int i = 0; i < indent; i++) log << '\t';
 	log << "Mock LPU Count: 1\n";
@@ -152,6 +166,7 @@ void MockLpuCounter::logCompositeLpuId(std::ofstream &log, int indent) {
 	for (int i = 0; i < indent; i++) log << '\t';
 	log << "Mock Composite ID: 0\n";
 }
+
 
 /*********************************************  LPS State  ************************************************/
 
@@ -198,13 +213,13 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 			int *lpuCounts = counter->getLpuCounts();
 			LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
 			
-			///*----------------------------------------- turned off
+			/*----------------------------------------- turned off
 			// log LPU execution
 			for (int i = 0; i < lpsId; i++) threadLog << '\t';
 			threadLog << "Next LPU: " << nextLpuId << std::endl;
 			counter->logCompositeLpuId(threadLog, lpsId);
 			lpu->print(threadLog, lpsId + 1);
-			//----------------------------------------------------*/
+			----------------------------------------------------*/
 		
 			// set the LPU Id so that recursion can advance to the next LPU in next call 
 			lpu->setId(nextLpuId);	
@@ -245,11 +260,11 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 					counter->setLpuCounts(newLpuCounts);
 					counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 	
-					///*---------------------------------- turned off	
+					/*---------------------------------- turned off	
 					// log counter update
 					counter->logLpuCount(threadLog, lpsId);
 					counter->logLpuRange(threadLog, lpsId);
-					//---------------------------------------------*/
+					---------------------------------------------*/
 					
 					// retrieve next LPU Id from the updated counter
 					nextLpuId = counter->getNextLpuId(INVALID_ID);
@@ -260,13 +275,13 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				int *lpuCounts = counter->getLpuCounts();
 				LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
 				
-				///*----------------------------------------- turned off
+				/*----------------------------------------- turned off
 				// log LPU execution
 				for (int i = 0; i < lpsId; i++) threadLog << '\t';
 				threadLog << "Return LPU: " << nextLpuId << std::endl;
 				counter->logCompositeLpuId(threadLog, lpsId);
 				lpu->print(threadLog, lpsId + 1);
-				//----------------------------------------------------*/
+				----------------------------------------------------*/
 	
 				// set the LPU Id so that recursion can advance to the next LPU in next call 
 				lpu->setId(nextLpuId);	
@@ -296,11 +311,11 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	counter->setLpuCounts(newLpuCounts);
 	counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 			
-	///*---------------------------------- turned off	
+	/*---------------------------------- turned off	
 	// log counter update
 	counter->logLpuCount(threadLog, lpsId);
 	counter->logLpuRange(threadLog, lpsId);
-	//---------------------------------------------*/
+	---------------------------------------------*/
 	
 	// compute the next LPU for the current LPS using a recursive procedure
 	int nextLpuId = counter->getNextLpuId(INVALID_ID);
@@ -327,11 +342,11 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		counter->setLpuCounts(newLpuCounts);
 		counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 
-		///*---------------------------------- turned off	
+		/*---------------------------------- turned off	
 		// log counter update
 		counter->logLpuCount(threadLog, lpsId);
 		counter->logLpuRange(threadLog, lpsId);
-		//---------------------------------------------*/
+		---------------------------------------------*/
 		
 		// retrieve next LPU Id from the updated counter
 		nextLpuId = counter->getNextLpuId(INVALID_ID);
@@ -340,17 +355,55 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	int *lpuCounts = counter->getLpuCounts();
 	LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
 	
-	///*----------------------------------------- turned off
+	/*----------------------------------------- turned off
 	// log LPU execution
 	for (int i = 0; i < lpsId; i++) threadLog << '\t';
 	threadLog << "Start LPU: " << nextLpuId << std::endl;
 	counter->logCompositeLpuId(threadLog, lpsId);
 	lpu->print(threadLog, lpsId + 1);
-	//----------------------------------------------------*/
+	----------------------------------------------------*/
 	
 	// set the LPU Id so that recursion can advance to the next LPU in next call 
 	lpu->setId(nextLpuId);	
 	return lpu;
+}
+
+int ThreadState::getNextLpuId(int lpsId, int containerLpsId, int currentLpuId) {
+	LPU *lpu = getNextLpu(lpsId, containerLpsId, currentLpuId);
+	if (lpu == NULL) return INVALID_ID;
+	else return lpu->id;
+}
+
+List<List<int*>*> *ThreadState::getAllLpuIds(int lpsId, int rootLpsId) {
+	
+	// return an empty list if the current thread is not a handling any computation from concerned LPS
+	List<List<int*>*> *lpuIdList = new List<List<int*>*>;
+	if (!isValidPpu(lpsId)) return lpuIdList;
+	
+	// determine the list of ancestor LPSes including the argument LPS whose LPU ids will be needed to
+	// make sense of an LPU id in the latter.
+	List<int> *relevantLpsIds = new List<int>;
+	relevantLpsIds->Append(lpsId);
+	int currentLpsId = lpsId;
+	while ((currentLpsId == lpsParentIndexMap[currentLpsId]) != rootLpsId) {
+		relevantLpsIds->Append(currentLpsId);
+	}
+
+	// recursively get all LPU ids and process them	
+	int currentLpuId = INVALID_ID;
+	while ((currentLpuId = getNextLpuId(lpsId, rootLpsId, currentLpuId)) != INVALID_ID) {
+		List<int*> *idList = new List<int*>;
+		// enter LPU ids in the list from upper to lower LPS order to simplify future processing
+		for (int i = relevantLpsIds->NumElements() - 1; i >= 0; i--) {
+			currentLpsId = relevantLpsIds->Nth(i);
+			LpsState *state = lpsStates[currentLpsId];
+        		LpuCounter *counter = state->getCounter();
+			idList->Append(counter->copyCompositeLpuId());
+		}
+		lpuIdList->Append(idList);
+	}
+
+	return lpuIdList;
 }
 
 void ThreadState::removeIterationBound(int lpsId) {
@@ -381,10 +434,10 @@ void ThreadState::logExecution(const char *stageName, int spaceId) {
 }
 
 void ThreadState::logThreadAffinity() {
-	///*------------------------------------------- Turned Off
+	/*------------------------------------------- Turned Off
 	threadLog << "Thread Id: " << pthread_self() << std::endl;
 	threadLog << "Thread CPU Id: " << sched_getcpu() << std::endl; 	
-	//------------------------------------------------------*/
+	------------------------------------------------------*/
 }
 
 LPU *ThreadState::getCurrentLpu(int lpsId) {

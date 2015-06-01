@@ -21,8 +21,10 @@ class PartMetadata {
   protected:
 	// the number of dimensions in the data structure
 	int dimensionality;
-	// possibly multi-dimensional part Id specifying the index of the part within the whole
-	int *id;
+	// possibly multi-dimensional part Id specifying the index of the part within the whole; note that we
+	// have a list here as partitioning in IT is hierarchical and for identificant of a part in an LPS we 
+	// may need to identify its ancestor parts in higher LPSes
+	List<int*> *idList;
 	// spread of the part along different dimensions
 	// note that even for data reordering partition functions we should have a contiguous spread for a data 
 	// part as then we will consider all indexes within the data has been transformed in a way to conform 
@@ -35,16 +37,16 @@ class PartMetadata {
 	// this is valid for only those partition functions that support paddings
 	HyperplaneInterval *paddedInterval;
   public:
-	PartMetadata(int dimensionality, int *id, Dimension *boundary, int *padding);
+	PartMetadata(int dimensionality, List<int*> *idList, Dimension *boundary, int *padding);
 	void setIntervals(HyperplaneInterval *coreInterval, HyperplaneInterval *paddedInterval);
 	int getSize();
 	inline int getDimensions() { return dimensionality; }
-	inline int *getId() { return id; }
+	inline List<int*> *getIdList() { return idList; }
 	inline Dimension *getBoundary() { return boundary; }
 	inline int *getPadding() { return padding; }
 	inline HyperplaneInterval *getCoreInterval() { return coreInterval; }
 	inline HyperplaneInterval *getPaddedInterval() { return paddedInterval; }
-	bool isMatchingId(int *id);
+	bool isMatchingId(List<int*> *candidateId);
 };
 
 /* This class holds the metadata and actual memory allocation for a part of a data structure
@@ -125,8 +127,8 @@ class DataPartsList {
 			}
 		}
 	}
-	DataPart *getPart(int *partId);
-	DataPart *getPart(int *partId, int epoch);	
+	DataPart *getPart(List<int*> *partId);
+	DataPart *getPart(List<int*> *partId, int epoch);	
 	// moves the head of the circular array one step ahead
 	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }
 	inline int getEpochCount() { return epochCount; }

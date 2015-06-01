@@ -120,6 +120,8 @@ class ThreadIds {
 	PPU_Ids *ppuIds;	// IDs for different LPSes
 
 	void print(std::ofstream &stream);
+	inline int getPpuId(int lpsId) { return ppuIds[lpsId].id; }
+	inline int getPpuCount(int lpsId) { return ppuIds[lpsId].ppuCount; }
 };
 
 /* a structure to group active LPUs of a dynamic space against corresponding PPUs */
