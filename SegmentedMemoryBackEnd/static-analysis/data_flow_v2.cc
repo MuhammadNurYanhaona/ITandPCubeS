@@ -524,3 +524,7 @@ bool ExecutionStage::isGroupEntry() {
 	}
 	return false;
 }
+
+void ExecutionStage::setLpsExecutionFlags() {
+	space->flagToExecuteCode();
+}

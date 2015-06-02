@@ -157,6 +157,8 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
                 const char *programFileName,
                 const char *initials,
                 PartitionHierarchy *hierarchy) {
+
+	std::cout << "Generating routines to construct data partition configuration\n";
 	
 	std::string stmtSeparator = ";\n";
         std::string indent = "\t";
@@ -370,6 +372,8 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
                 const char *programFileName,
                 const char *initials,
                 PartitionHierarchy *hierarchy) {
+	
+	std::cout << "Generating routines to construct and manage task's memory allocations\n";
 
 	std::string stmtSeparator = ";\n";
         std::string indent = "\t";
@@ -385,6 +389,7 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
         }
 	const char *header = "functions for generating memory blocks for data parts of various LPUs";
 	decorator::writeSectionHeader(headerFile, header);
+	headerFile << std::endl;
 	decorator::writeSectionHeader(programFile, header);
 
 	// generate the function header for the routine that will generate a task-data object tracking all

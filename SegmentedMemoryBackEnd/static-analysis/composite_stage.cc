@@ -535,12 +535,19 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 // A composite stage is a group entry if it has flow stages of multiple LPSes inside or any stage inside it
 // is a group entry.
 bool CompositeStage::isGroupEntry() {
-	for (int i = 1; i < stageList->NumElements(); i++) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		if (stage->isGroupEntry()) return true;
 	}
 	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
 	return (stageGroups->NumElements() > 1 || space != stageGroups->Nth(0)->Nth(0)->getSpace());
+}
+
+void CompositeStage::setLpsExecutionFlags() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->setLpsExecutionFlags();
+	}
 }
 
 void CompositeStage::calculateLPSUsageStatistics() {
@@ -1169,5 +1176,12 @@ bool RepeatCycle::isLpsDependent() {
 		if (array != NULL) return true;
 	}
 	return false;
+}
+
+void RepeatCycle::setLpsExecutionFlags() {
+	CompositeStage::setLpsExecutionFlags();
+	if (isLpsDependent()) {
+		space->flagToExecuteCode();
+	}
 }
 

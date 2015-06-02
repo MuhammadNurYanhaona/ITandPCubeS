@@ -126,9 +126,11 @@ bool Type::isAssignableFrom(Type *other) {
 	} else { return this == other; }
 }
 
-const char *Type::getCppDeclaration(const char *varName) {
+const char *Type::getCppDeclaration(const char *varName, bool pointer) {
 	std::ostringstream decl;
-	decl << typeName << " " << varName;
+	decl << typeName << " ";
+	if (pointer) decl << "*";
+	decl << varName;
 	return strdup(decl.str().c_str());
 }
 	
@@ -150,7 +152,7 @@ bool NamedType::isEqual(Type *other) {
 	return strcmp(this->getName(), otherType->getName()) == 0;
 }
 
-const char *NamedType::getCppDeclaration(const char *varName) {
+const char *NamedType::getCppDeclaration(const char *varName, bool pointer) {
 	std::ostringstream decl;
 	decl << id->getName() << " ";
 	if (environmentType) decl << "*"; 
@@ -214,7 +216,7 @@ const char *ArrayType::getCType() {
 	return strdup(cName.str().c_str());
 }
 
-const char *ArrayType::getCppDeclaration(const char *varName) {
+const char *ArrayType::getCppDeclaration(const char *varName, bool pointer) {
 	std::ostringstream decl;
 	decl << this->getCType() << " " << varName;
 	return strdup(decl.str().c_str());
@@ -243,9 +245,11 @@ Type *StaticArrayType::reduceADimension() {
 	return arrayType; 
 }
 
-const char *StaticArrayType::getCppDeclaration(const char *varName) {
+const char *StaticArrayType::getCppDeclaration(const char *varName, bool pointer) {
 	std::ostringstream decl;
-	decl << elemType->getCType() << " " << varName;
+	decl << elemType->getCType() << " ";
+	if (pointer) decl << "*";
+	decl << varName;
 	for (int i = 0; i < dimensionLengths->NumElements(); i++) {
 		decl << '[' << dimensionLengths->Nth(i) << ']';
 	}
@@ -293,9 +297,11 @@ const char *ListType::getCType() {
 	return strdup(cType.str().c_str());
 }
 
-const char *ListType::getCppDeclaration(const char *varName) {
+const char *ListType::getCppDeclaration(const char *varName, bool pointer) {
 	std::ostringstream decl;
-	decl << this->getCType() << " " << varName;
+	decl << this->getCType() << " ";
+	if (pointer) decl << "*";  
+	decl << varName;
 	return strdup(decl.str().c_str());
 }
 

@@ -42,7 +42,7 @@ class Type : public Node {
 	// These are helper methods for generating the C++ type declaration of an IT variable.
 	// Subclasses should override these methods to apply appropriate equivalent C++ type.
 	virtual const char *getCType() { return typeName; }	
-	virtual const char *getCppDeclaration(const char *varName);
+	virtual const char *getCppDeclaration(const char *varName, bool pointer = false);
 };
 
 class NamedType : public Type {
@@ -64,7 +64,7 @@ class NamedType : public Type {
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
 	bool isEqual(Type *other);
 	const char *getCType() { return id->getName(); }	
-	virtual const char *getCppDeclaration(const char *varName);
+	virtual const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class ArrayType : public Type {
@@ -83,7 +83,7 @@ class ArrayType : public Type {
 	virtual Type *reduceADimension();
 	Type *getTerminalElementType();
 	const char *getCType();	
-	virtual const char *getCppDeclaration(const char *varName);
+	virtual const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class StaticArrayType : public ArrayType {
@@ -96,7 +96,7 @@ class StaticArrayType : public ArrayType {
     	void PrintChildren(int indentLevel);
 	void setLengths(List<int> *dimensionLengths);	
 	Type *reduceADimension();
-	const char *getCppDeclaration(const char *varName);
+	const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 /*  TODO: Need to add the methods for accessing list elements and related other features. */
@@ -113,7 +113,7 @@ class ListType : public Type {
 	bool isEqual(Type *other);
 	Type *getElementType() { return elemType; }
 	const char *getCType();	
-	const char *getCppDeclaration(const char *varName);
+	const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class MapType : public Type {

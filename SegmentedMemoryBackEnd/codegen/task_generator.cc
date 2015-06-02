@@ -124,25 +124,8 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
 	List<TaskGlobalScalar*> *globalScalars 
 			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
-	generateClassesForGlobalScalars(headerFile, globalScalars);
+	generateClassesForGlobalScalars(headerFile, globalScalars, lpsHierarchy->getRootSpace());
 	
-	// generate functions to initialize LPS content references
-	generateFnToInitiateRootLPSContent(headerFile, programFile, initials,
-                	taskDef, mappingConfig, envLinkList);
-	// TODO note that we commented out the original and accurate implementation for 
-	// the sake of a simpler one as we are hard pressed with time. The latter version
-	// uses memory allocations for structures within root LPS for all other LPSes.
-	// There is no usage based allocations or reference redirections as done in the 
-	// former implementation. Using a single LPS for all allocations make it easy to
-	// generate code for LPS transition at the expense of performance. In the future
-	// we must go back to the original implementation if we want to optimize the 
-	// compiler. 
-	// generateFnToInitiateLPSesContent(headerFile, 
-	//		programFile, initials, mappingConfig);
-	generateFnToInitiateLPSesContentSimple(headerFile, 
-			programFile, initials, mappingConfig);
-        
-        
 	// generate library routines for LPUs management        
         List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
         Hashtable<List<PartitionParameterConfig*>*> *partitionFnParamConfigs

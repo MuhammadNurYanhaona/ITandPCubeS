@@ -197,6 +197,8 @@ void TaskDef::analyseCode() {
 	compute->getComputation()->calculateLPSUsageStatistics();
 	// determine how many versions of different data structures need to be maintained at runtime
 	compute->getComputation()->performEpochUsageAnalysis();
+	// flag LPSes those have computation stages in them to decide about LPU generation
+	compute->getComputation()->setLpsExecutionFlags();
 	// assign stages stage, group, and nesting indexes to aid latter analysis
 	compute->getComputation()->assignIndexAndGroupNo(0, 0, 0);
 	// determine what dependency relationships should be translated into synchronization require-

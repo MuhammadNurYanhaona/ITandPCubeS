@@ -435,6 +435,7 @@ Space::Space(const char *name, int dimensions, bool dynamic, bool subpartitionSp
 	this->dataStructureList = new Hashtable<DataStructure*>;
 	this->subpartition = NULL;
 	this->children = new List<Space*>;
+	this->executesCode = false;
 
 	// a mark of an invalid PPS id as PPS ids are positive integers
 	this->ppsId = 0;
@@ -745,7 +746,6 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 					|| reordered || lastAllocInaccessible) {
 				array->setAllocator(lps);
 				array->getUsageStat()->flagAllocated();
-				std::cout << "\t\tallocation should happen here\n";
 			} 
 		}	
 	}

@@ -529,7 +529,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 // A composite stage is a group entry if it has flow stages of multiple LPSes inside or any stage inside it
 // is a group entry.
 bool CompositeStage::isGroupEntry() {
-	for (int i = 1; i < stageList->NumElements(); i++) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		if (stage->isGroupEntry()) return true;
 	}

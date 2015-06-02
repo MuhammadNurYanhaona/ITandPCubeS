@@ -1,6 +1,0 @@
-"Matrix Multiply" {
-	// syntax LPS ':' PPS
-	Space A: 4	// CPU
-	Space B: 3	// NUMA Node
-	Space C: 1	// Core
-}

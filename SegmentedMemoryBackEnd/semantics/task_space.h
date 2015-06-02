@@ -312,6 +312,10 @@ class Space {
 	// the current LPS has been mapped to. PPSes are labeled from 1 to up from the lowest physical space to
 	// the highest 
 	int ppsId;
+
+	// a flag indicating if the LPS has some compution stages executing in it; this information is needed to
+	// determine whether or not to generate LPUs for this LPS
+	bool executesCode;
   public:
 	static const char *RootSpaceName;
 	static const char *SubSpaceSuffix;
@@ -349,6 +353,8 @@ class Space {
 	Symbol *getLpuIdSymbol();
 	void setPpsId(int ppsId) { this->ppsId = ppsId; }
 	int getPpsId() { return ppsId; }
+	void flagToExecuteCode() { executesCode = true; }
+	bool doesExecuteCode() { return executesCode; }
 
 	// a helper routine for code generation that determines if any of the structures listed in the partition
 	// configuration of the LPS referred by this instance needs to be allocated a memory

@@ -1,4 +1,4 @@
-Task "Five Point Stencil":
+Task "Five Points Stencil":
 	Define:
 		plate: 2D Array of Real single-precision
 		t: Epoch
@@ -14,14 +14,15 @@ Task "Five Point Stencil":
 				localRows = plate.local.dimension1.range
 				localCols = plate.local.dimension2.range
 				do { 
-					do { plate[i][j] at (t)					\
-						   = 1/4 * (plate[i-1][j] 			\
-						   + plate[i+1][j] 				\
-						   + plate[i][j-1]				\
-						   + plate[i][j+1]) at (t-1)
+					do { 
+						plate[i][j] at (t)				\
+						  = 1/4 * (plate[i - 1][j] 			\
+						  + plate[i + 1][j] 				\
+						  + plate[i][j - 1]				\
+						  + plate[i][j + 1]) at (t - 1)
 					} for i, j in plate 					\
-					  and (i > localRows.start and i < localRows.end) 	\
-					  and (j > localCols.start and j < localCols.end) 
+					  and (i > localRows.min and i < localRows.max) 	\
+					  and (j > localCols.min and j < localCols.max) 
 				} while t.current % partition.n != 0
 			} 
 			Repeat: from "Refine Estimate" while t.current % partition.m != 0

@@ -167,6 +167,10 @@ class FlowStage {
 	// this function is used to determine what reader of a data modified by the current stage should notify it
 	// about completion of read so that this stage can execute again if need may be.
 	virtual void setReactivatorFlagsForSyncReqs();
+
+	// an analysis to flag LPSes to indicate some computation has taken place within it; this is needed to 
+	// determine whether or not to generate LPUs for an LPS
+	virtual void setLpsExecutionFlags() {}
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -204,6 +208,7 @@ class ExecutionStage : public FlowStage {
 	void translateCode(std::ofstream &stream);
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	bool isGroupEntry();
+	void setLpsExecutionFlags();
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 
@@ -255,17 +260,21 @@ class CompositeStage : public FlowStage {
 	void printSyncRequirements();
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 
-	// helper functions for code generation-----------------------------------------------------------------
+	// helper functions for code generation-------------------------------------------------------------------
+	
 	// A composite stage organize the stages within into groups based on their LPSes so that iterations over 
 	// LPUs happens in group basis instead of individual computation basis. This reduces the number of times
 	// we need to invoke the LPU generation library at runtime.
 	List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();
+	
 	// override for the code generation method inherited from Flow-Stage class
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace);
+	
 	// For multi-core backends there is no need to generate codes for sync-stages; therefore, we filter them
 	// out during nested stages grouping.
 	static List<FlowStage*> *filterOutSyncStages(List<FlowStage*> *originalList);
+	
 	// For multi-core backends our current decision is to drag down LPU-LPU synchronization to PPU-PPU syn-
 	// chronization. As we group flow-stages during code generations and iterations over multiplexed LPUs
 	// take place on a group basis, we need to know all synchronization dependencies the stages of a group
@@ -274,7 +283,9 @@ class CompositeStage : public FlowStage {
 	static List<SyncRequirement*> *getSyncDependeciesOfGroup(List<FlowStage*> *group);
 	void generateSyncCodeForGroupTransitions(std::ofstream &stream, int indentation, 
 			List<SyncRequirement*> *syncDependencies);
+
 	bool isGroupEntry();
+	void setLpsExecutionFlags();
 	List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
 
 	// this function is used by only the first composite stage (that represents the entire computation) and
@@ -331,6 +342,7 @@ class RepeatCycle : public CompositeStage {
 	void calculateLPSUsageStatistics();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
+	void setLpsExecutionFlags();
 	
 	// This function indicates if the repeat loop condition evaluation includes any LPS dependent varialbe. If
 	// it does not then the repeat loop can be lifted up and can be executed above the LPS indicated by its 
