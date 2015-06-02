@@ -120,6 +120,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// generate functions related to memory management
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
 	genRoutinesForTaskPartitionConfigs(headerFile, programFile, upperInitials, lpsHierarchy);
+	genTaskMemoryConfigRoutine(headerFile, programFile, upperInitials, lpsHierarchy);
 
 	List<TaskGlobalScalar*> *globalScalars 
 			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);

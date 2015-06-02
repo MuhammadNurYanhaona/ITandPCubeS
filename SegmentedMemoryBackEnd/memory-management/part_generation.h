@@ -201,54 +201,37 @@ class DataPartitionConfig {
 	// the function is to be used for generating metadata for subsequent use in generating a data part
 	PartMetadata *generatePartMetadata(List<int*> *partIdList);
 
-	//-------------------------- Unused Functions; May Come in Handy Later ---------------------------
-	//------------------------------------------------------------------------------------------------
-	// utility function to retrieve multi-dimensional LPU ids from a translated linear id
-	int *getMultidimensionalLpuId(int lpsDimensions, int *lpuCount, int linearId);
-	
-	// A recursive function to determine lpu ids from the multiplex range configuration that specifies 
-	// a section of the LPS been assigned to the current PPU. This will be useful when we will allow
-	// programming control of the nature of LPU-to-PPU multiplexing. Currently the strategy we are 
-	// using, which is the same default been imported from the multicore backend, is to linearize the
-	// lpu ids then give each PPU a contiguous segment from the id line. This strategy seems to not be 
-	// the best choice when we want better control over the nature of commmunications and memory load
-	// balancing.  
-	List<int*> *getLpuIdsFromRange(int lpsDimensions, int currentDimension, Range *localLpus);
-	
-	// two functions for determining part-ids that are unique to current PPU from the lpus allocated
-	// to it for execution
-	List<int*> *getLocalPartIds(int lpsDimensions, int *lpuCount, Range localRange);
-	List<int*> *getLocalPartIds(List<int*> *localLpuIds);
-	//------------------------------------------------------------------------------------------------
-
-	// generate a data part Id for an LPU from the LPU Id
+	// generates a data part Id for an LPU from the LPU Id
 	List<int*> *generatePartId(List<int*> *lpuIds);
+	// function to generate a list of unique part Ids from LPU Ids list
+	List<List<int*>*> *generatePartIdList(List<List<int*>*> *lpuIdList); 
 
 	// function to generate the list of data parts (see allocation.h) from the partition configuration
-	template <class type> DataPartsList *generatePartList(List<List<int*>*> *localPartIds, int epochCount) {
+	template <class type> static DataPartsList *generatePartList(DataPartitionConfig *config, 
+			List<List<int*>*> *localPartIds, int epochCount) {
 		List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
 		for (int i = 0; i < localPartIds->NumElements(); i++) {
 			List<int*> *partIdList = localPartIds->Nth(i);
-			partMetadataList->Append(generatePartMetadata(partIdList));
+			partMetadataList->Append(config->generatePartMetadata(partIdList));
 		}
-		Dimension *dataDimensions = new Dimension[dimensionCount];
+		Dimension *dataDimensions = new Dimension[config->dimensionCount];
 		bool hasPadding = false;
-		for (int d = 0; d < dimensionCount; d++) {
-			DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
+		for (int d = 0; d < config->dimensionCount; d++) {
+			DimPartitionConfig *dimConfig = config->dimensionConfigs->Nth(d);
 			dataDimensions[d] = dimConfig->getDataDimension();
 			hasPadding = hasPadding || dimConfig->hasPadding();
 		}
-		ListMetadata *listMetadata = new ListMetadata(dimensionCount, dataDimensions);
+		ListMetadata *listMetadata = new ListMetadata(config->dimensionCount, dataDimensions);
 		listMetadata->setPadding(hasPadding);
 		listMetadata->generateIntervalSpec(partMetadataList);
 		DataPartsList *dataPartsList = new DataPartsList(listMetadata, epochCount);
-		dataPartsList->allocate <type> (partMetadataList);
+		DataPartsList::allocate<type>(dataPartsList, partMetadataList);
         	return dataPartsList;
 	}
 
 	// this function is used to determine the data-parts content of PPUs other than the current one
 	// so that decision about the nature and content of communication for shared data can be made.
-	ListMetadata *generatePartsMetadata(List<List<int*>*> *partIds);
+	ListMetadata *generatePartListMetadata(List<List<int*>*> *partIds);
 
   private:
 	// a recursive helper routine for the generatePartId(List<int*> lpuIds) function

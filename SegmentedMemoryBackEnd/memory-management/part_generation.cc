@@ -465,114 +465,6 @@ PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) 
 	return metadata;
 }
 
-int *DataPartitionConfig::getMultidimensionalLpuId(int lpsDimensions, int *lpuCount, int linearId) {
-	int *id = new int[lpsDimensions];
-	int subId = linearId;
-	for (int i = 0; i < lpsDimensions; i++) {
-		int denominator = 1;
-		for (int j = i + 1; j < lpsDimensions; j++) {
-			denominator *= lpuCount[j];
-		}
-		id[i] = subId / denominator;
-		subId = subId % denominator;
-	}
-	return id;
-}
-
-List<int*> *DataPartitionConfig::getLpuIdsFromRange(int lpsDimensions, 
-		int currentDimension, Range *localLpus) {
-	
-	Range currentRange = localLpus[currentDimension];
-	// if this is not the last dimension of the lps then first do a recursion then update the list of ids
-	// retrieved from the lower dimensions
-	if (currentDimension < lpsDimensions - 1) {
-		// recursive call for next lower dimension
-		List<int*> *lowerIdList = getLpuIdsFromRange(lpsDimensions, currentDimension + 1, localLpus);
-		int lowerIdDimensions = lpsDimensions - (currentDimension + 1);
-		// generate a higher dimensional id including the values for current dimension on the result of
-		// the recursion	
-		List<int*> *updatedIdList = new List<int*>;
-		for (int i = currentRange.min; i <= currentRange.max; i++) {
-			int currDimId = i;
-			for (int j = 0; j < lowerIdList->NumElements(); j++) {
-				int *nextId = new int[lowerIdDimensions + 1];
-				int *lowerId = lowerIdList->Nth(j);
-				for (int d = 0; d < lowerIdDimensions; d++) {
-					nextId[d + 1] = lowerId[d];
-				}
-				nextId[0] = currDimId;
-				updatedIdList->Append(nextId); 
-			}
-		}
-		// delete all ids from the previous list
-		while (lowerIdList->NumElements() > 0) {
-			int *lowerId = lowerIdList->Nth(0);
-			lowerIdList->RemoveAt(0);
-			delete[] lowerId;
-		}
-		// delete the previous list and return the updated list
-		delete lowerIdList;
-		return updatedIdList;
-	// if this is the last LPS dimension then create ids for allocated entries directly from the last range
-	} else {
-		List<int*> *idList = new List<int*>;
-		for (int i = currentRange.min; i <= currentRange.max; i++) {
-			int *id = new int[1];
-			id[0] = i;
-			idList->Append(id);
-		}
-		return idList;	
-	}
-}
-
-List<int*> *DataPartitionConfig::getLocalPartIds(int lpsDimensions, int *lpuCount, Range localRange) {
-	List<int*> *lpuIdList = new List<int*>;
-	for (int i = localRange.min; i <= localRange.max; i++) {
-		int *lpuId = getMultidimensionalLpuId(lpsDimensions, lpuCount, i);
-		lpuIdList->Append(lpuId);
-	}
-	List<int*> *partIdList = getLocalPartIds(lpuIdList);
-	while (lpuIdList->NumElements() > 0) {
-		int *lpuId = lpuIdList->Nth(0);
-		lpuIdList->RemoveAt(0);
-		delete[] lpuId;
-	}
-	delete lpuIdList;
-	return partIdList;
-}
-
-List<int*> *DataPartitionConfig::getLocalPartIds(List<int*> *localLpuIds) {
-	List<int*> *uniqueParts = new List<int*>;
-	for (int i = 0; i < localLpuIds->NumElements(); i++) {
-		int *lpuId = localLpuIds->Nth(i);
-		int *partId = new int[dimensionCount];
-		for (int d = 0; d < dimensionCount; d++) {
-			DimPartitionConfig *dimensionConfig = dimensionConfigs->Nth(d);
-			partId[d] = dimensionConfig->pickPartId(lpuId);
-		}
-		// check if the part has already been added in the list before
-		bool partAlreadyAdded = false;
-		for (int j = 0; j < uniqueParts->NumElements(); j++) {
-			int *existingId = uniqueParts->Nth(j);
-			bool match = true;
-			for (int d = 0; d < dimensionCount; d++) {
-				if (partId[d] != existingId[d]) {
-					match = false; 
-					break;
-				}
-			}
-			if (match) {
-				partAlreadyAdded = true;
-				break;
-			}
-		}
-		// if the part is redundant then delete it otherwise add it in the list
-		if (partAlreadyAdded) delete[] partId;
-		else uniqueParts->Append(partId);
-	}
-	return uniqueParts;
-}
-
 List<int*> *DataPartitionConfig::generatePartId(List<int*> *lpuIds) {
 	List<int*> *partId = new List<int*>;
 	int position = lpuIds->NumElements() - 1;
@@ -593,7 +485,37 @@ void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, List<
 	partId->Append(partIdForLpu);
 }
 
-ListMetadata *DataPartitionConfig::generatePartsMetadata(List<List<int*>*> *partIds) {
+List<List<int*>*> *DataPartitionConfig::generatePartIdList(List<List<int*>*> *lpuIdList) {
+	List<List<int*>*> *partIdList = new List<List<int*>*>;
+	for (int i = 0; i < lpuIdList->NumElements(); i++) {
+		List<int*> *lpuIds = lpuIdList->Nth(i);
+		List<int*> *partId = generatePartId(lpuIds);
+		bool partFound = false;
+		for (int j = 0; j < partIdList->NumElements(); j++) {
+			List<int*> *currentPartId = partIdList->Nth(j);
+			bool mismatchFound = false;
+			for (int k = 0; k < partId->NumElements(); k++) {
+				int *part1IdForLpu = partId->Nth(k);
+				int *part2IdForLpu = currentPartId->Nth(k);
+				for (int d = 0; d < dimensionCount; d++) {
+					if (part1IdForLpu[d] != part2IdForLpu[d]) {
+						mismatchFound = true;
+						break;
+					}
+				}
+				if (mismatchFound) break;
+			}
+			if (!mismatchFound) {
+				partFound = true;
+				break;
+			}
+		}
+		if (!partFound) partIdList->Append(partId);
+	}
+	return partIdList;
+}
+
+ListMetadata *DataPartitionConfig::generatePartListMetadata(List<List<int*>*> *partIds) {
 	List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
 	for (int i = 0; i < partIds->NumElements(); i++) {
 		List<int*> *partIdList = partIds->Nth(i);

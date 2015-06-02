@@ -60,12 +60,12 @@ class DataPart {
 		this->metadata = metadata;
 		this->data = NULL; 
 	}
-	template <class type> void allocate() {
-		int size = metadata->getSize();
-		this->data = new type[size];
+	template <class type> static void allocate(DataPart *dataPart) {
+		int size = dataPart->metadata->getSize();
+		dataPart->data = new type[size];
 	}
 	inline PartMetadata *getMetadata() { return metadata; }
-	template <class type> type *getData() { return (type*) data; }	
+	void *getData() { return data; }	
 };
 
 /* This class describes all the parts of a data structure that a PPU hold. This metadata is needed to derive infor-
@@ -118,12 +118,13 @@ class DataPartsList {
 	int epochHead;
   public:
 	DataPartsList(ListMetadata *metadata, int epochCount);
-	template <class type> void allocate(List<PartMetadata*> *partMetadataList) {
+	template <class type> static void allocate(DataPartsList *dataPartsList, 
+			List<PartMetadata*> *partMetadataList) {
 		for (int i = 0; i < partMetadataList->NumElements(); i++) {
 			PartMetadata *partMetadata = partMetadataList->Nth(i);
-			for (int t = 0; t < epochCount; t++) {
-				partLists[t]->Append(new DataPart(partMetadata));
-				partLists[t]->Nth(i)->allocate<type>();
+			for (int t = 0; t < dataPartsList->epochCount; t++) {
+				dataPartsList->partLists[t]->Append(new DataPart(partMetadata));
+				DataPart::allocate<type>(dataPartsList->partLists[t]->Nth(i));
 			}
 		}
 	}

@@ -5,15 +5,15 @@
 #include <string.h>
 
 void decorator::writeSectionHeader(std::ofstream &stream, const char *message) {
-	stream << "\n/*-------------------------------------------------------------------------------------\n";
+	stream << "\n/*-----------------------------------------------------------------------------------------------\n";
         stream << message << '\n';
-        stream <<  "-------------------------------------------------------------------------------------*/\n";
+        stream <<  "-----------------------------------------------------------------------------------------------*/\n";
 }
 
 void decorator::writeSubsectionHeader(std::ofstream &stream, const char *message) {
 	int messageLength = strlen(message);
-	int defaultLength = 85;
-	int remaining = 85 - messageLength;
+	int defaultLength = 95;
+	int remaining = 95 - messageLength;
 	stream << '\n' << '/' << '/';
 	for (int i = 0; i < remaining; i++) stream << "-";
 	stream << message;

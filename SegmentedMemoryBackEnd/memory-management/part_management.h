@@ -62,14 +62,13 @@ class ScalarDataItems : public DataItems {
 	int epochHead;
   public:
 	ScalarDataItems(const char *name, int epochCount);
-	template <class type> void allocate(type zeroValue) {
-		variableList = (void **) new type*[epochCount];
-		for (int i = 0; i < epochCount; i++) {
+	template <class type> static void allocate(ScalarDataItems *items) {
+		items->variableList = (void **) new type*[items->epochCount];
+		for (int i = 0; i < items->epochCount; i++) {
 			type *version = new type;
-			*version = zeroValue;
-			variableList[i] = (void*) version;
+			items->variableList[i] = (void*) version;
 		}
-		ready = true;
+		items->ready = true;
 	}
 	// function to get the reference of the latest version of the variable
 	void *getVariable();
@@ -77,6 +76,8 @@ class ScalarDataItems : public DataItems {
 	void *getVariable(int version);
 	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; };
 };
+
+
 
 /* This class holds LPU data parts of all variables correspond to a single LPS */
 class LpsContent {

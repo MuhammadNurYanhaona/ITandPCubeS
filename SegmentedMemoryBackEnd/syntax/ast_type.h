@@ -39,7 +39,7 @@ class Type : public Node {
 	virtual bool isAssignableFrom(Type *other);
 	virtual bool isEqual(Type *other) { return this == other; }
 
-	// These are helper method for generating the C++ type declaration of an IT variable.
+	// These are helper methods for generating the C++ type declaration of an IT variable.
 	// Subclasses should override these methods to apply appropriate equivalent C++ type.
 	virtual const char *getCType() { return typeName; }	
 	virtual const char *getCppDeclaration(const char *varName);

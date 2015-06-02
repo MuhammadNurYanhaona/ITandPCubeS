@@ -250,7 +250,7 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
 	programFile << "Hashtable<DataPartitionConfig*> *";
 	programFile << string_utils::toLower(initials) << "::" << functionHeader.str();
 	functionBody << indent << "return configMap" << stmtSeparator;
-	programFile << " {\n" << functionBody.str() << "}\n\n";
+	programFile << " {\n" << functionBody.str() << "}\n";
 
 	headerFile.close();
 	programFile.close();
@@ -267,11 +267,13 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 	std::string doubleIndent = "\t\t";
 
 	std::ostringstream functionHeader;
-	functionHeader << "gen" << lps->getName() << "Content(";
-	functionHeader << "List<ThreadState*> *threads";
-	functionHeader << paramSeparator << "ArrayMetadata *metadata";
-	functionHeader << paramSeparator << initials << "Parition partition";
-	functionHeader << paramSeparator << "Hashtable<DataPartitionConfig*> *partitionConfigMap)";
+	functionHeader << "genSpace" << lps->getName() << "Content(";
+	functionHeader << "List<ThreadState*> *threads" << paramSeparator;
+	functionHeader << "ArrayMetadata *metadata" << paramSeparator;
+	functionHeader << '\n' << doubleIndent;
+	functionHeader << initials << "Partition partition" << paramSeparator;
+	functionHeader << '\n' << doubleIndent;
+	functionHeader << "Hashtable<DataPartitionConfig*> *partConfigMap)";
 
 	headerFile << "LpsContent *" << functionHeader.str() << stmtSeparator;
 	programFile << "LpsContent *" << string_utils::toLower(initials) << "::";
@@ -285,13 +287,15 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 	programFile << indent << "int ppuCount = threads->Nth(0)->getThreadIds()->getPpuCount";
 	programFile << "(Space_" << lps->getName() << ")" << stmtSeparator;
 
-	// generate a list to hold all lpu-ids of different threads in the group
-	programFile << indent << "List<int*> *lpuIdList = new List<int*>" << stmtSeparator;
+	// generate a list to hold all lpu-ids of different threads in the group; note that this is a 
+	// list of lists as to identify an LPU in a lower LPS its ancestor LPUs in higher LPSes need to 
+	// be mentioned too.
+	programFile << indent << "List<List<int*>*> *lpuIdList = new List<List<int*>*>" << stmtSeparator;
 
 	// iterate over the threads and get their lpu-ids for the LPS under concern
 	programFile << indent << "for (int i = 0; i < threads->NumElements(); i++) {\n";
 	programFile << doubleIndent << "ThreadState *thread = threads->Nth(i)" << stmtSeparator;
-	programFile << doubleIndent << "List<int*> *threadLpuIds = thread->getAllLpuIds(";
+	programFile << doubleIndent << "List<List<int*>*> *threadLpuIds = thread->getAllLpuIds(";
 	programFile << "Space_" << lps->getName() << paramSeparator;
 	programFile << "Space_" << rootLps->getName();	
 	programFile << ")" << stmtSeparator;
@@ -299,11 +303,145 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 	programFile << indent << "}\n";
 
 	// if the lpuIdList is empty then return NULL as there will be no need of data allocations for 
-	// current LPS for the group
+	// current LPS for the thread group
 	programFile << indent << "if (lpuIdList->NumElements() == 0) return NULL" << stmtSeparator;
+
+	// create an LPS content object
+	const char *lpsName = lps->getName();
+	programFile << indent << "LpsContent *space" << lpsName << "Content = new LpsContent(";
+	programFile << "Space_" << lpsName << ")" << stmtSeparator;
 
 	// iterate over the data structures of this LPS and create data items for those that are flagged
 	// to be allocated in it.
+	List<const char*> *structureList = lps->getLocalDataStructureNames();
+	for (int i = 0; i < structureList->NumElements(); i++) {
+		DataStructure *structure = lps->getLocalStructure(structureList->Nth(i));
+		if (!structure->getUsageStat()->isAllocated()) continue;
+		
+		Type *type = structure->getType();
+		int epochCount = structure->getVersionCount();
+		const char *varName = structure->getName();
+	
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array == NULL) {
+			programFile << indent << "ScalarDataItems *" << varName << " = ";
+			programFile << "new ScalarDataItems(\"" << varName << "\"" << paramSeparator;
+			programFile << epochCount << ")" << stmtSeparator;
+			programFile << indent<< "ScalarDataItems::allocate";
+			programFile << "<" << type->getCType() << ">(" << varName << ")" << stmtSeparator;
+		} else {
+			int dimensionCount = array->getDimensionality();
+			programFile << indent << "DataItems *" << varName << " = new DataItems(";
+			programFile << '"' << varName << '"' << paramSeparator;
+			programFile << dimensionCount << paramSeparator;
+			programFile << epochCount << ")" << stmtSeparator;
 
+			programFile << indent << "DataPartitionConfig *" << varName << "Config = ";
+			programFile << "partConfigMap->Lookup(";
+			programFile << '"' << varName << "Space" << lpsName << "Config" << '"' << ")";
+			programFile << stmtSeparator;
+			programFile << indent << varName << "->setPartitionConfig(" << varName;
+			programFile << "Config" << ")" << stmtSeparator;
+
+			programFile << indent << "List<List<int*>*> *" << varName << "PartIds = ";
+			programFile << varName << "Config->generatePartIdList(lpuIdList)" << stmtSeparator;
+		
+			programFile << indent << "DataPartsList *" << varName << "Parts = ";
+			programFile << "DataPartitionConfig::generatePartList";
+			ArrayType *arrayType = dynamic_cast<ArrayType*>(type);
+			Type *elementType = arrayType->getTerminalElementType();
+			programFile << '<' << elementType->getCType() << '>'; 
+			programFile << "(" << varName << "Config" << paramSeparator;
+			programFile << varName << "PartIds" << paramSeparator; 
+			programFile << epochCount << ")" << stmtSeparator;	
+		}
+
+		// add the data item in the LPS content
+		programFile << indent << "space" << lpsName << "Content->addDataItems(";
+		programFile << '"' << varName << '"' << paramSeparator;
+		programFile << varName << ")" << stmtSeparator;
+	}
+
+	programFile << indent << "return space" << lpsName << "Content" << stmtSeparator;		
 	programFile << "}\n";	
+}
+
+void genTaskMemoryConfigRoutine(const char *headerFileName,
+                const char *programFileName,
+                const char *initials,
+                PartitionHierarchy *hierarchy) {
+
+	std::string stmtSeparator = ";\n";
+        std::string indent = "\t";
+        std::string doubleIndent = "\t\t";
+	std::string paramSeparator = ", ";
+        std::ofstream programFile, headerFile;
+
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+	const char *header = "functions for generating memory blocks for data parts of various LPUs";
+	decorator::writeSectionHeader(headerFile, header);
+	decorator::writeSectionHeader(programFile, header);
+
+	// generate the function header for the routine that will generate a task-data object tracking all
+	// data pieces of different structures needed within a PPU for a task's computations
+	std::ostringstream functionHeader;	
+	functionHeader << "initializeTaskData("; 
+	functionHeader << "List<ThreadState*> *threads" << paramSeparator;
+	functionHeader << "ArrayMetadata *metadata" << paramSeparator;
+	functionHeader << "\n" << doubleIndent;
+	functionHeader << initials << "Partition partition" << paramSeparator;
+	functionHeader << "int *ppuCounts)";
+
+	// generate an instance of data partition configuration map first within the function body
+	std::ostringstream functionBody;
+	functionBody << indent << "Hashtable<DataPartitionConfig*> *configMap = ";
+	functionBody << "getDataPartitionConfigMap(metadata" << paramSeparator << "partition";
+	functionBody << paramSeparator << "ppuCounts)" << stmtSeparator;
+
+	// create a task data object
+	functionBody << indent << "TaskData *taskData = new TaskData()" << stmtSeparator;
+	
+	// iterate all LPSes and create LPS Content instance in each that has any data structure to allocate 
+	Space *root = hierarchy->getRootSpace();
+	std::deque<Space*> lpsQueue;
+	lpsQueue.push_back(root);
+        while (!lpsQueue.empty()) {
+                Space *lps = lpsQueue.front();
+                lpsQueue.pop_front();
+                List<Space*> *children = lps->getChildrenSpaces();
+                for (int i = 0; i < children->NumElements(); i++) {
+                        lpsQueue.push_back(children->Nth(i));
+                }
+                if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
+		if (!lps->allocateStructures()) continue;
+		
+		programFile << std::endl;
+		genRoutineForLpsContent(headerFile, programFile, initials, lps, root);
+
+		const char *lpsName = lps->getName();
+		functionBody << indent << "LpsContent *space" << lpsName << "Content = ";
+		functionBody << "genSpace" << lpsName << "Content(threads" << paramSeparator;
+		functionBody << "metadata" << paramSeparator << "partition" << paramSeparator;
+		functionBody << "configMap)" << stmtSeparator;
+		functionBody << "taskData->addLpsContent(\"" << lpsName << '"';
+		functionBody << paramSeparator << "space" << lpsName << "Content)" << stmtSeparator;
+	}
+	
+	// write the task data initializer function in both files
+	const char *message = "Task Data Initializer";
+	decorator::writeSubsectionHeader(headerFile, message);
+	headerFile << "TaskData *" << functionHeader.str() << stmtSeparator << "\n";
+	decorator::writeSubsectionHeader(programFile, message);
+	programFile << "\n" << "TaskData *";
+	programFile << string_utils::toLower(initials) << "::" << functionHeader.str();
+	functionBody << indent << "return taskData" << stmtSeparator;
+	programFile << " {\n" << functionBody.str() << "}\n";
+	
+	headerFile.close();
+	programFile.close();
 }
