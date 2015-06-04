@@ -211,12 +211,10 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 		std::exit(EXIT_FAILURE);
 	}
                 
-	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
-        headerFile << "function to generate PPU IDs and PPU group IDs for a thread\n";
-        headerFile << "------------------------------------------------------------------------------------*/\n";
-	programFile << "/*-----------------------------------------------------------------------------------\n";
-        programFile << "function to generate PPU IDs and PPU group IDs for a thread\n";
-        programFile << "------------------------------------------------------------------------------------*/\n";
+	const char *message = "function to generate PPU IDs and PPU group IDs for a thread";
+	decorator::writeSectionHeader(headerFile, message);
+	headerFile << std::endl;
+	decorator::writeSectionHeader(programFile, message);
 
 	std::ostringstream functionHeader;
         functionHeader << "getPpuIdsForThread(int threadNo)";

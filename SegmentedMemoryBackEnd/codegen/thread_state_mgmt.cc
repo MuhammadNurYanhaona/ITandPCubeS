@@ -3,6 +3,7 @@
 #include "space_mapping.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
+#include "../utils/decorator_utils.h"
 #include "../syntax/ast_task.h"
 
 #include <cstdlib>
@@ -18,7 +19,8 @@
 void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
 	
 	std::cout << "\tGenerating routine for root LPU calculation" << std::endl;
-        programFile << "// Construction of task specific root LPU\n";
+	const char *header = "Root LPU Construction";
+	decorator::writeSubsectionHeader(programFile, header);
 
 	std::string statementSeparator = ";\n";
         std::string singleIndent = "\t";
@@ -68,19 +70,12 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 	functionBody << std::endl;
 	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
 	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
-	functionBody << statementSeparator;
-	functionBody << singleIndent << "//threadLog << \"set up root LPU\" << std::endl";
-	functionBody << statementSeparator;
-	functionBody << singleIndent << "//threadLog.flush()";
 	functionBody << statementSeparator << "}\n";
 	
 	programFile << functionHeader.str() << " " << functionBody.str();
-	programFile << std::endl;
 }
 
 void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
-
-        programFile << "// Setting up the Root LPU reference \n";
 
 	std::string statementSeparator = ";\n";
         std::string singleIndent = "\t";
@@ -95,20 +90,18 @@ void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingR
 	// store the LPU in the proper LPS state
 	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
 	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
-	functionBody << statementSeparator;
-	functionBody << singleIndent << "//threadLog << \"set up root LPU\" << std::endl";
-	functionBody << statementSeparator;
-	functionBody << singleIndent << "//threadLog.flush()";
 	functionBody << statementSeparator << "}\n";
 	
-	programFile << functionHeader.str() << " " << functionBody.str();
 	programFile << std::endl;
+	programFile << functionHeader.str() << " " << functionBody.str();
 }
 
-void generateInitializeLpuSRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
+void generateInitializeLpusRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
 	
 	std::cout << "\tGenerating function for initializing LPU pointers" << std::endl;
-        programFile << "// Initialization of LPU pointers of different LPSes\n";
+
+	const char *header = "State Initialization";
+	decorator::writeSubsectionHeader(programFile, header);
 	
 	std::string statementSeparator = ";\n";
         std::string singleIndent = "\t";
@@ -137,17 +130,15 @@ void generateInitializeLpuSRoutine(std::ofstream &programFile, MappingNode *mapp
 		programFile << statementSeparator;
 	}
 
-	programFile << singleIndent << "//threadLog << \"initialized LPU pointers\" << std::endl";
-	programFile << statementSeparator;
-	programFile << singleIndent << "//threadLog.flush()";
-	programFile << statementSeparator;
-	programFile << "}" << std::endl << std::endl;
+	programFile << "}\n";
 }
 
 void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
 	
 	std::cout << "\tGenerating parent pointer index map" << std::endl;
-        programFile << "// Construction of task specific LPS hierarchy index map\n";
+        
+	const char *header = "LPS Hierarchy Trace";
+	decorator::writeSubsectionHeader(programFile, header);
 	
 	std::string statementSeparator = ";\n";
         std::string singleIndent = "\t";
@@ -179,18 +170,16 @@ void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mapp
 
 	programFile << "void ThreadStateImpl::setLpsParentIndexMap() {\n";
 	programFile << allocateStmt.str() << initializeStmts.str();
-	programFile << singleIndent << "//threadLog << \"set up parent LPS index map\" << std::endl";
-	programFile << statementSeparator;
-	programFile << singleIndent << "//threadLog.flush()";
-	programFile << statementSeparator;
-	programFile << "}\n\n";
+	programFile << "}\n";
 }
 
 void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *mappingRoot, 
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig) {
 
 	std::cout << "\tGenerating compute LPU count function" << std::endl;
-        programFile << "// Implementation of task specific compute-LPU-Count function ";
+        
+	const char *header = "LPU Count Function";
+	decorator::writeSubsectionHeader(programFile, header);
 	
 	std::string statementSeparator = ";\n";
         std::string singleIndent = "\t";
@@ -203,6 +192,10 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
         functionHeader << "int *ThreadStateImpl::computeLpuCounts(int lpsId)";
         std::ostringstream functionBody;
 	functionBody << "{\n";
+
+	// retrieve the data partition configuration map from thread state that will be used by LPS count functions
+	functionBody << singleIndent << "Hashtable<DataPartitionConfig*> *configMap = getPartConfigMap()";
+	functionBody << statementSeparator;
 
 	std::deque<MappingNode*> nodeQueue;
         nodeQueue.push_back(mappingRoot);
@@ -219,11 +212,6 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 			functionBody << doubleIndent << "return NULL" << statementSeparator;
 		// otherwise, we have to call the appropriate get-LPU-count function generated before 
 		} else {
-			// declare a local variable for PPU count which is a default argument to all count functions
-			functionBody << doubleIndent << "int ppuCount = ";
-			functionBody << "threadIds->ppuIds[Space_" << lps->getName() << "].ppuCount";
-			functionBody << statementSeparator;
-			
 			// create local variables for ancestor LPUs that will be needed to determine the dimension
 			// arguments for the get-LPU-Count function 
 			List<PartitionParameterConfig*> *paramConfigs 
@@ -257,7 +245,7 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 
 			// call the get-LPU-Count function with appropriate parameters
 			functionBody << doubleIndent << "return getLPUsCountOfSpace" << lps->getName();
-			functionBody << "(ppuCount";
+			functionBody << "(configMap";
 			for (int i = 0; i < paramConfigs->NumElements(); i++) {
 				PartitionParameterConfig *currentConfig = paramConfigs->Nth(i);	 
 				const char *arrayName = currentConfig->arrayName;
@@ -277,7 +265,6 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 	functionBody << "}\n";
 	
 	programFile << std::endl << functionHeader.str() << " " << functionBody.str();
-	programFile << std::endl;
 }
 
 void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot, 
@@ -447,10 +434,10 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 	programFile << std::endl;
 }
 
-void generateThreadStateImpl(const char *headerFileName, const char *programFileName, 
+void generateThreadStateImpl(const char *headerFileName, 
+		const char *programFileName, 
 		MappingNode *mappingRoot, 
-                Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig,
-                Hashtable<List<int>*> *lpuPartFunctionsArgsConfig) {
+                Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig) {
 
 	std::cout << "Generating task spacific Thread State implementation task" << std::endl;	
 	std::ofstream programFile, headerFile;
@@ -462,9 +449,9 @@ void generateThreadStateImpl(const char *headerFileName, const char *programFile
 	}
                 
 	// write the common class definition from the sample file in the header file
-	headerFile << "/*-----------------------------------------------------------------------------------\n";
-        headerFile << "Thread-State implementation class for the task" << std::endl;
-        headerFile << "------------------------------------------------------------------------------------*/\n\n";
+	const char *message = "Thread-State implementation class for the task";
+	decorator::writeSectionHeader(headerFile, message);
+	headerFile << std::endl;
 	std::string line;
         std::ifstream classDefinitionFile("codegen/thread-state-class-def.txt");
 	if (classDefinitionFile.is_open()) {
@@ -479,11 +466,9 @@ void generateThreadStateImpl(const char *headerFileName, const char *programFile
 	}
 	headerFile.close();
 
-	// write the implementions of virtual functions in the program file
-	programFile << "/*-----------------------------------------------------------------------------------\n";
-        programFile << "Thread-State implementation class for the task" << std::endl;
-        programFile << "------------------------------------------------------------------------------------*/\n\n";
+	decorator::writeSectionHeader(programFile, message);
 	
+	//---------------------------------------write the implementions of virtual functions in the program file
 	// construct the index array that encode the LPS hierarchy for this task
 	generateParentIndexMapRoutine(programFile, mappingRoot);
 	// generate the function for creating the root LPU from array metadata information
@@ -491,11 +476,12 @@ void generateThreadStateImpl(const char *headerFileName, const char *programFile
 	// generate the function for setting the root LPU constructed using some other means
 	generateSetRootLpuRoutine(programFile, mappingRoot);
 	// generate the function for allocating a pointer for each LPS'es LPU that will be updated over and over
-	generateInitializeLpuSRoutine(programFile, mappingRoot);
+	generateInitializeLpusRoutine(programFile, mappingRoot);
 	// then call the compute-LPU-Count function generator method for class specific implementation
 	generateComputeLpuCountRoutine(programFile, mappingRoot, countFunctionsArgsConfig);
 	// then call the compute-Next-LPU function generator method for class specific implementation
-	generateComputeNextLpuRoutine(programFile, mappingRoot, lpuPartFunctionsArgsConfig);
+	//generateComputeNextLpuRoutine(programFile, mappingRoot, lpuPartFunctionsArgsConfig);
+	//-------------------------------------------------------------------------------------------------------
  
 	programFile.close();
 }

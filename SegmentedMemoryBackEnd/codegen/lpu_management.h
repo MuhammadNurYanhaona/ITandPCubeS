@@ -2,7 +2,10 @@
 #define _H_lpu_management
 
 #include "structure.h"
+#include "../memory-management/part_generation.h"
+#include "../memory-management/part_management.h"
 #include "../utils/list.h"
+#include "../utils/hashtable.h"
 #include <fstream>
 
 /* Remember that there is a partial ordering of logical processing spaces (LPS). Thereby, the number of
@@ -137,9 +140,18 @@ class ThreadState {
 	// a reference to the partition arguments (all are integers) passed during task invocation is 
 	// maintaines as these arguments are needed for LPU calculation	
 	int *partitionArgs;
+	// a map to keep track of all partition configurations used for data structures in various LPSes
+	Hashtable<DataPartitionConfig*> *partConfigMap;
+	// a reference to the instance that holds all memory allocated for the task
+	TaskData *taskData;
 	
   public:
 	ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, ThreadIds *threadIds);
+
+	void setPartConfigMap(Hashtable<DataPartitionConfig*> *map) { partConfigMap = map; }
+	Hashtable<DataPartitionConfig*> *getPartConfigMap() { return partConfigMap; }
+	void setTaskData(TaskData *taskData) { this->taskData = taskData; }
+	TaskData *getTaskData() { return taskData; }
 		
 	virtual void setLpsParentIndexMap() = 0;
 	virtual void setRootLpu(Metadata *metadata) = 0;

@@ -133,10 +133,9 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generateAllLpuConstructionFunctions(headerFile, programFile, initials, mappingRoot);
 
 	// generate thread management functions and classes
-        //generateFnForThreadIdsAllocation(headerFile, 
-	//		programFile, initials, mappingConfig, pcubesConfig);
-        //generateThreadStateImpl(headerFile, programFile, mappingConfig,
-        //               partitionFnParamConfigs, lpuPartFnParamsConfigs);
+        generateFnForThreadIdsAllocation(headerFile, 
+			programFile, initials, mappingConfig, pcubesConfig);
+        generateThreadStateImpl(headerFile, programFile, mappingConfig, partParamConfigMap);
 
 	// generate synchronization primitives and their initialization functions
 	syncManager = new SyncManager(taskDef, headerFile, programFile, initials);

@@ -190,6 +190,7 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		const char *varName = array->getName();
 		
 		// retrieve the part configuration object for current array
+		programFile << std::endl;
 		programFile << indent << "DataPartitionConfig *" << varName << "Config = ";
 		programFile << "partConfigMap->Lookup(";
 		programFile << '"' << varName << "Space" << lpsName << "Config" << '"' << ")";

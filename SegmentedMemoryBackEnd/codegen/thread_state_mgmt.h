@@ -30,7 +30,7 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
 
 /* function definition for generating the routine for initializing all LPUs for different LPSes */
-void generateInitializeLpuSRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
+void generateInitializeLpusRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
 
 /* function definition to generate task specific implementation of compute-LPU-Count routine that 
    is part of the Thread-State object.
@@ -45,7 +45,6 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 /* function definition for generating the task specific implementation of Thread-State class */
 void generateThreadStateImpl(const char *headerFileName, const char *programFileName, 
 		MappingNode *mappingRoot,
-                Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig,
-                Hashtable<List<int>*> *lpuPartFunctionsArgsConfig);
+                Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig);
 
 #endif
