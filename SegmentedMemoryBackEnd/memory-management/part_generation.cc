@@ -63,6 +63,13 @@ DimensionMetadata *DimPartitionConfig::generateDimMetadata(List<int> *partIdList
 	return metadata;
 }
 
+Dimension DimPartitionConfig::getPartDimension(List<int> *partIdList) {
+	int position = partIdList->NumElements() - 1;
+	int partId = partIdList->Nth(position);
+	Dimension parentDimension = getDimensionFromParent(partIdList, position);
+	return getPartDimension(partId, parentDimension);	
+}
+
 //----------------------------------------------------------- Replication Config ----------------------------------------------------------/
 
 LineInterval *ReplicationConfig::getCoreInterval(List<int> *partIdList) {
@@ -472,6 +479,19 @@ List<int*> *DataPartitionConfig::generatePartId(List<int*> *lpuIds) {
 	return partId;
 }
 
+List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int backsteps) {
+	List<int*> *partId = new List<int*>;
+	int position = lpuIds->NumElements() - 1 - backsteps;
+	int steps = 0;
+	DataPartitionConfig *lastConfig = this;
+	while (steps < backsteps) {
+		lastConfig = lastConfig->parent;
+		steps++;
+	}
+	lastConfig->generatePartId(lpuIds, position, partId);
+	return partId;
+}
+
 void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, List<int*> *partId) {
 	if (parent != NULL) {
 		parent->generatePartId(lpuIds, position - 1, partId);
@@ -513,6 +533,29 @@ List<List<int*>*> *DataPartitionConfig::generatePartIdList(List<List<int*>*> *lp
 		if (!partFound) partIdList->Append(partId);
 	}
 	return partIdList;
+}
+
+int DataPartitionConfig::getPartsCountAlongDimension(int dimensionNo, Dimension *parentDimension) {
+	DimPartitionConfig *dimConfig = dimensionConfigs->Nth(dimensionNo);
+	if (parentDimension == NULL) {
+		Dimension dataDimension = dimConfig->getDataDimension();
+		return dimConfig->getPartsCount(dataDimension);
+	} else {
+		return dimConfig->getPartsCount(*parentDimension);
+	}
+}
+
+void DataPartitionConfig::updatePartDimensionInfo(List<int*> *partIdList, PartDimension *partDimension) {
+	for (int i = 0; i < dimensionCount; i++) {
+		List<int> *dimIdList = new List<int>;
+		for (int j = 0; j < partIdList->NumElements(); j++) {
+			int *partId = partIdList->Nth(i);
+			dimIdList->Append(partId[i]);
+		}
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
+		Dimension dimension = dimConfig->getPartDimension(dimIdList);
+		partDimension[i].partition = dimension;
+	}
 }
 
 ListMetadata *DataPartitionConfig::generatePartListMetadata(List<List<int*>*> *partIds) {

@@ -398,11 +398,13 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
                         nodeQueue.push_back(node->children->Nth(i));
                 }
 		Space *lps = node->mappingConfig->LPS;
-		if (!lps->doesExecuteCode()) continue;
 
 		List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
 
-		programFile << std::endl;
+		std::ostringstream header;
+		header << "Space " << lps->getName();
+		decorator::writeSubsectionHeader(programFile, header.str().c_str());
+
 		// create the object for representing an LPU of the LPS
 		programFile << "class Space" << lps->getName() << "_LPU : public LPU {\n";
 		programFile << "  public:\n";
@@ -452,9 +454,8 @@ void generatePrintFnForLpuDataStructures(const char *initials, const char *outpu
         
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
         if (programFile.is_open()) {
-                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "Print functions for LPUs " << std::endl;
-                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+		const char *message = "LPU print functions";
+		decorator::writeSectionHeader(programFile, message);
 	} else {
 		std::cout << "Unable to open output program file";
 		std::exit(EXIT_FAILURE);

@@ -45,21 +45,6 @@ class MappingNode {
 	List<MappingNode*> *children;
 };
 
-/* As we generate getPartitionCount() functions from source code specification, we need to know
-   which array's what dimension can be used for determining the LPU count along any dimension 
-   of the concerned space. At the same time we need to know the indexes of the arguments passed
-   in the partition section of the task that been used within the partition function for the
-   chosen array. Instances of this  object will hold all these information during getPartition-
-   Count() function generation so that appropriate parameters are been passed from the rest of
-   the during count investigation.
-*/
-class PartitionParameterConfig {
-  public:
-	const char *arrayName;
-	int dimensionNo;
-	List<int> *partitionArgsIndexes; 	
-};
-
 /* function definition to read the PCubeS description of the hardware from a file */
 List<PPS_Definition*> *parsePCubeSDescription(const char *filePath);
 
@@ -84,38 +69,5 @@ void generatePPSCountConstants(const char *outputFile, List<PPS_Definition*> *pc
    the physical unit intended for a virtual processor id.
 */
 void generateProcessorOrderArray(const char *outputFile, const char *processorFile);
-
-/* function definition to generate get-partition-count() routine for any given space */
-List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerFile, 
-		std::ofstream &programFile, 
-		const char *initials,
-		Space *space, 
-		List<Identifier*> *partitionArgs);
-
-/* function that calls the above function repeatedly to generate get-partition-count() 
-   functions for all un-partitioned spaces.
-*/
-Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const char *headerFile, 
-		const char *programFile, 
-		const char *initials, 
-		MappingNode *mappingRoot, 
-		List<Identifier*> *partitionArgs);
-
-/* function definition to generate routine for retrieving dimensions metadata for an array
-   in a given space given the id of the LPU for which the routine is invoked 
-*/
-List<int> *generateGetArrayPartForLPURoutine(Space *space, 
-		ArrayDataStructure *array,
-		std::ostream &headerFile,  
-		std::ofstream &programFile, 
-		const char *initials, 
-		List<Identifier*> *partitionArgs);
-
-/* function that calls the above function for all arrays partitioned in different spaces */
-Hashtable<List<int>*> *generateAllGetPartForLPURoutines(const char *headerFile, 
-		const char *programFile, 
-		const char *initials, 
-		MappingNode *mappingRoot, 
-		List<Identifier*> *partitionArgs);
 
 #endif

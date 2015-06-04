@@ -82,7 +82,7 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerF
 		List<Identifier*> *partitionArgs);
 
 /* function that calls the above function repeatedly to generate get-partition-count() 
-   functions for all un-partitioned spaces.
+   functions for all partitioned spaces.
 */
 Hashtable<List<PartitionParameterConfig*>*> *generateLPUCountFunctions(const char *headerFile, 
 		const char *programFile, 

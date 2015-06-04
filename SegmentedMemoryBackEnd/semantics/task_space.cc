@@ -275,6 +275,20 @@ bool ArrayDataStructure::isPartitionedAlongDimension(int dimensionNo) {
 	return partConfig != NULL;
 }
 
+bool ArrayDataStructure::isPartitionedEarlier() {
+	if (source == NULL) return false;
+	ArrayDataStructure *parentArray = (ArrayDataStructure*) source;
+	if (parentArray->isPartitioned()) return true;
+	return parentArray->isPartitionedEarlier();
+}
+
+bool ArrayDataStructure::isPartitionedAlongDimensionEarlier(int dimensionNo) {
+	if (source == NULL) return false;
+	ArrayDataStructure *parentArray = (ArrayDataStructure*) source;
+	if (parentArray->isPartitionedAlongDimension(dimensionNo)) return true;
+	return parentArray->isPartitionedAlongDimensionEarlier(dimensionNo);
+}
+
 int ArrayDataStructure::getDimensionality() {
 	if (source != NULL) {
 		return ((ArrayDataStructure*) source)->getDimensionality(); 

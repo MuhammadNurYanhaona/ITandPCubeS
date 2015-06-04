@@ -1,4 +1,5 @@
 #include "thread_state_mgmt.h"
+#include "lpu_generation.h"
 #include "space_mapping.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
@@ -265,12 +266,6 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 					functionBody << arrayToParentLpus->Lookup(arrayName) << "->" << arrayName;
 					functionBody << "PartDims[" << currentConfig->dimensionNo - 1;
 					functionBody << "].partition"; 
-				}
-				// pass any partition arguments used by current count function
-				for (int j = 0; j < currentConfig->partitionArgsIndexes->NumElements(); j++) {
-					int index = currentConfig->partitionArgsIndexes->Nth(j);
-					functionBody << parameterSeparator << "\n" << doubleIndent << doubleIndent;
-					functionBody << "partitionArgs[" << index << "]";		
 				}
 			}
 			functionBody << ")" << statementSeparator; 

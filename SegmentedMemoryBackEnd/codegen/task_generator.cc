@@ -8,6 +8,7 @@
 #include <fcntl.h>
 #include <deque>
 
+#include "lpu_generation.h"
 #include "code_generator.h"
 #include "thread_state_mgmt.h"
 #include "space_mapping.h"
@@ -114,33 +115,28 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
         List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
 			mappingConfig, taskDef->getEnvironmentLinks());
-	generateFnForMetadataAndEnvLinks(taskDef->getName(), initials, 
-			programFile, mappingConfig, envLinkList);
+	generateFnForMetadataAndEnvLinks(taskDef->getName(), 
+			initials, programFile, mappingConfig, envLinkList);
+        generateLpuDataStructures(headerFile, mappingConfig);
+	List<TaskGlobalScalar*> *globalScalars 
+			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
+	generateClassesForGlobalScalars(headerFile, globalScalars, lpsHierarchy->getRootSpace());
 
 	// generate functions related to memory management
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
 	genRoutinesForTaskPartitionConfigs(headerFile, programFile, upperInitials, lpsHierarchy);
 	genTaskMemoryConfigRoutine(headerFile, programFile, upperInitials, lpsHierarchy);
 
-	List<TaskGlobalScalar*> *globalScalars 
-			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
-	generateClassesForGlobalScalars(headerFile, globalScalars, lpsHierarchy->getRootSpace());
-	
-	// generate library routines for LPUs management        
-        List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
-        Hashtable<List<PartitionParameterConfig*>*> *partitionFnParamConfigs
-                        = generateLPUCountFunctions(headerFile, 
-					programFile, initials, mappingConfig, partitionArgs);
-        Hashtable<List<int>*> *lpuPartFnParamsConfigs
-                        = generateAllGetPartForLPURoutines(headerFile, programFile, 
-					initials, mappingConfig, partitionArgs);
-        generateLpuDataStructures(headerFile, mappingConfig);
+	// generate routines to contruct LPUs
+	Hashtable<List<PartitionParameterConfig*>*> *partParamConfigMap 
+		= generateLPUCountFunctions(headerFile, programFile, initials, mappingRoot);
+	generateAllLpuConstructionFunctions(headerFile, programFile, initials, mappingRoot);
 
 	// generate thread management functions and classes
-        generateFnForThreadIdsAllocation(headerFile, 
-			programFile, initials, mappingConfig, pcubesConfig);
-        generateThreadStateImpl(headerFile, programFile, mappingConfig,
-                        partitionFnParamConfigs, lpuPartFnParamsConfigs);
+        //generateFnForThreadIdsAllocation(headerFile, 
+	//		programFile, initials, mappingConfig, pcubesConfig);
+        //generateThreadStateImpl(headerFile, programFile, mappingConfig,
+        //               partitionFnParamConfigs, lpuPartFnParamsConfigs);
 
 	// generate synchronization primitives and their initialization functions
 	syncManager = new SyncManager(taskDef, headerFile, programFile, initials);

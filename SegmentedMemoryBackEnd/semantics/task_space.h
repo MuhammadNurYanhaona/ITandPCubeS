@@ -211,6 +211,8 @@ class ArrayDataStructure : public DataStructure {
 	PartitionFunctionConfig *getPartitionSpecForDimension(int dimensionNo);	
 	bool isPartitioned() { return partitionSpecs != NULL && partitionSpecs->NumElements() > 0; }
 	bool isPartitionedAlongDimension(int dimensionNo);
+	bool isPartitionedEarlier();
+	bool isPartitionedAlongDimensionEarlier(int dimensionNo);
 	int getDimensionality();
 
 	// Since some partition functions results in reordering array dimensions if data is been copied down

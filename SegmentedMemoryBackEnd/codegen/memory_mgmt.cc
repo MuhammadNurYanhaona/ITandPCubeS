@@ -405,6 +405,7 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 	// generate an instance of data partition configuration map first within the function body
 	std::ostringstream functionBody;
 	functionBody << indent << "Hashtable<DataPartitionConfig*> *configMap = ";
+	functionBody << '\n' << indent << doubleIndent;
 	functionBody << "getDataPartitionConfigMap(metadata" << paramSeparator << "partition";
 	functionBody << paramSeparator << "ppuCounts)" << stmtSeparator;
 
@@ -433,7 +434,7 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 		functionBody << "genSpace" << lpsName << "Content(threads" << paramSeparator;
 		functionBody << "metadata" << paramSeparator << "partition" << paramSeparator;
 		functionBody << "configMap)" << stmtSeparator;
-		functionBody << "taskData->addLpsContent(\"" << lpsName << '"';
+		functionBody << indent << "taskData->addLpsContent(\"" << lpsName << '"';
 		functionBody << paramSeparator << "space" << lpsName << "Content)" << stmtSeparator;
 	}
 	

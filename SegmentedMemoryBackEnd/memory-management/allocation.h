@@ -47,6 +47,10 @@ class PartMetadata {
 	inline HyperplaneInterval *getCoreInterval() { return coreInterval; }
 	inline HyperplaneInterval *getPaddedInterval() { return paddedInterval; }
 	bool isMatchingId(List<int*> *candidateId);
+	
+	// this is the method to be used to populate the storage dimension information properly for a data part
+	// within an LPU
+	void updateStorageDimension(PartDimension *partDimension);
 };
 
 /* This class holds the metadata and actual memory allocation for a part of a data structure
