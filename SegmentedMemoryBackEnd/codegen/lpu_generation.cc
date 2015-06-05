@@ -166,22 +166,30 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 	// create a function header that takes three default arguments
 	const char *lpsName = lps->getName();
 	std::ostringstream functionHeader;
-	functionHeader << "getSpace" << lpsName << "Lpu(";
+	functionHeader << "generateSpace" << lpsName << "Lpu(";
+	functionHeader << "Space" << lpsName << "_LPU *lpu" << paramSeparator;
+	functionHeader << '\n' << indent << doubleIndent;	
 	functionHeader << "List<int*> *lpuIdList" << paramSeparator;
 	functionHeader << '\n' << indent << doubleIndent;	
 	functionHeader << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
 	functionHeader << '\n' <<  indent << doubleIndent;	
 	functionHeader << "TaskData *taskData)";
 
-	headerFile << "Space" << lpsName << "_LPU *" << functionHeader.str() << stmtSeparator;
+	headerFile << "void " << functionHeader.str() << stmtSeparator;
 	programFile << std::endl;
-	programFile << "Space" << lpsName << "_LPU *" << initials << "::";
-	programFile << functionHeader.str() << " {\n";
-	
-	// create an LPU pointer with appropriate type
-	programFile << indent << "Space" << lpsName << "_LPU *lpu = new ";
-	programFile << "Space" << lpsName << "_LPU()" << stmtSeparator;
+	programFile << "void " << initials << "::" << functionHeader.str() << " {\n";
 
+	if (lps->getDimensionCount() > 0) {
+		programFile << std::endl;
+		programFile << indent << "int *lpuId = lpuIdList->Nth(lpuIdList->NumElements() - 1)";
+		programFile << stmtSeparator;
+		for (int i = 0; i < lps->getDimensionCount(); i++) {
+			programFile << indent;
+			programFile << "lpu->lpuId[" << i << "] = lpuId[" << i << "]";
+			programFile << stmtSeparator;
+		}
+	}
+	
 	List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
 	for (int i = 0; i < localArrays->NumElements(); i++) {
 		ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(localArrays->Nth(i));
@@ -263,7 +271,6 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		}
 	}
 	
-	programFile << indent << "return lpu" << stmtSeparator;
 	programFile << "}\n";
 }
 

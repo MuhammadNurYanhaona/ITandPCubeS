@@ -9,5 +9,5 @@ class ThreadStateImpl : public ThreadState {
         void setRootLpu(LPU *rootLpu);
 	void initializeLPUs();
         int *computeLpuCounts(int lpsId);
-        LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId);
+        LPU *computeNextLpu(int lpsId);
 };

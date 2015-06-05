@@ -158,7 +158,7 @@ class ThreadState {
 	virtual void setRootLpu(LPU *rootLpu) = 0;
 	virtual void initializeLPUs() = 0;
 	virtual int *computeLpuCounts(int lpsId) = 0;
-	virtual LPU *computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId) = 0;
+	virtual LPU *computeNextLpu(int lpsId) = 0;
 
 	// The get-Next-Lpu management routine is at the heart of recursive LPU management for threads by
 	// the runtime library. It takes as input the ID of the LPS on which the thread is attempting to
@@ -182,6 +182,14 @@ class ThreadState {
 	// also the ids of its ancestor LPUs in upper LPSes. This is because, LPU ids are hierarchical and
 	// sizes of different data parts in a lower LPS varies depending on the size of their ancestor parts.
 	List<List<int*>*> *getAllLpuIds(int lpsId, int rootLpsId);
+
+	// function to be used at runtime to propel LPU creation from ID; this is a makeshift operation to
+	// reduce the amount of changes we need to make in our transition from multicore to segmented-memory
+	// backends; there should be some better way to generate the LPUs hierarchically from configurations
+	//
+	// Note that this function assumes that there is currently a valid LPU for the LPS represented by the
+	// first argument.
+	List<int*> *getLpuIdChain(int lpsId, int rootLpsId);
 
 	LPU *getCurrentLpu(int lpsId);
 	void removeIterationBound(int lpsId);

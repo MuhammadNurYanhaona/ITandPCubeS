@@ -509,9 +509,8 @@ List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, Mapp
         
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
         if (programFile.is_open()) {
-                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "Data structures for Array-Metadata and Environment-Links " << std::endl;
-                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+		const char *header = "Data structures for Array-Metadata and Environment-Links";
+		decorator::writeSectionHeader(programFile, header);	
 	} else {
 		std::cout << "Unable to open output program file";
 		std::exit(EXIT_FAILURE);
@@ -575,15 +574,14 @@ void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials
 
 	std::cout << "Generating function implementations for array metadata and environment links\n";
 	
-	std::string statementSeparator = ";\n";
-        std::string statementIndent = "\t";
+	std::string stmtSeparator = ";\n";
+        std::string indent = "\t";
 	std::ofstream programFile;
         
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
         if (programFile.is_open()) {
-                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "Functions for ArrayMetadata and EnvironmentLinks " << std::endl;
-                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+		const char *header = "Functions for ArrayMetadata and EnvironmentLinks";
+		decorator::writeSectionHeader(programFile, header);
 	} else {
 		std::cout << "Unable to open output program file";
 		std::exit(EXIT_FAILURE);
@@ -593,30 +591,28 @@ void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials
 
 	// generate constructor for array metadata 
 	programFile << std::endl << initials << "::ArrayMetadata::ArrayMetadata() : Metadata() {\n";
-	programFile << statementIndent << "setTaskName";
-	programFile << "(\"" << taskName << "\")" << statementSeparator;  
+	programFile << indent << "setTaskName";
+	programFile << "(\"" << taskName << "\")" << stmtSeparator;  
 	programFile << "}" << std::endl << std::endl;
 
 	// generate a print function for array metadata
 	programFile << "void " << initials << "::ArrayMetadata::" << "print(std::ofstream &stream) {\n";
-	programFile << statementIndent << "stream << \"Array Metadata\" << std::endl" << statementSeparator;
+	programFile << indent << "stream << \"Array Metadata\" << std::endl" << stmtSeparator;
 	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
 	for (int i = 0; i < localArrays->NumElements(); i++) {
 		const char *arrayName = localArrays->Nth(i);
-		programFile << statementIndent << "stream << \"Array: " << arrayName << "\"";
-		programFile << statementSeparator;
+		programFile << indent << "stream << \"Array: " << arrayName << "\"";
+		programFile << stmtSeparator;
 		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
 		int dimensions = array->getDimensionality();
 		for (int j = 0; j < dimensions; j++) {
-			programFile << statementIndent << "stream << ' '" << statementSeparator;
-			programFile << statementIndent;
-			programFile << arrayName << "Dims[" << j << "].print(stream)";
-			programFile << statementSeparator;
+			programFile << indent << "stream << ' '" << stmtSeparator;
+			programFile << indent << arrayName << "Dims[" << j << "].print(stream)";
+			programFile << stmtSeparator;
 		}
-		programFile << statementIndent << "stream << std::endl" << statementSeparator;
+		programFile << indent << "stream << std::endl" << stmtSeparator;
 	}
-	programFile << statementIndent << "stream.flush()" << statementSeparator;
-	programFile << "}" << std::endl << std::endl;
+	programFile << indent << "stream.flush()" << stmtSeparator << "}\n";
 	
 	programFile.close();
 }

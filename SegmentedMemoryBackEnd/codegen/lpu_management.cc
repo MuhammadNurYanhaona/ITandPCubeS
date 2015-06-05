@@ -209,9 +209,8 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		
 		// if next LPU is valid then just compute it, update LPS state and return the LPU to the caller
 		if (nextLpuId != INVALID_ID) {
-			int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
-			int *lpuCounts = counter->getLpuCounts();
-			LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
+			counter->setCurrentCompositeLpuId(nextLpuId);
+			LPU *lpu = computeNextLpu(lpsId);
 			
 			/*----------------------------------------- turned off
 			// log LPU execution
@@ -271,9 +270,8 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				}
 
 				// finally, compute next LPU to execute, save state, and return the LPU
-				int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
-				int *lpuCounts = counter->getLpuCounts();
-				LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
+				counter->setCurrentCompositeLpuId(nextLpuId);
+				LPU *lpu = computeNextLpu(lpsId);
 				
 				/*----------------------------------------- turned off
 				// log LPU execution
@@ -351,9 +349,8 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		// retrieve next LPU Id from the updated counter
 		nextLpuId = counter->getNextLpuId(INVALID_ID);
 	}	
-	int *compositeId = counter->setCurrentCompositeLpuId(nextLpuId);
-	int *lpuCounts = counter->getLpuCounts();
-	LPU *lpu = computeNextLpu(lpsId, lpuCounts, compositeId);
+	counter->setCurrentCompositeLpuId(nextLpuId);
+	LPU *lpu = computeNextLpu(lpsId);
 	
 	/*----------------------------------------- turned off
 	// log LPU execution
@@ -404,6 +401,30 @@ List<List<int*>*> *ThreadState::getAllLpuIds(int lpsId, int rootLpsId) {
 	}
 
 	return lpuIdList;
+}
+
+List<int*> *ThreadState::getLpuIdChain(int lpsId, int rootLpsId) {
+	
+	List<int*> *chain = new List<int*>;
+	
+	// determine the list of ancestor LPSes including the argument LPS whose LPU ids will be needed to
+	// make sense of an LPU id in the latter.
+	List<int> *relevantLpsIds = new List<int>;
+	relevantLpsIds->Append(lpsId);
+	int currentLpsId = lpsId;
+	while ((currentLpsId == lpsParentIndexMap[currentLpsId]) != rootLpsId) {
+		relevantLpsIds->Append(currentLpsId);
+	}
+
+	// enter LPU ids in the list from upper to lower LPS order to simplify future processing
+	for (int i = relevantLpsIds->NumElements() - 1; i >= 0; i--) {
+		currentLpsId = relevantLpsIds->Nth(i);
+		LpsState *state = lpsStates[currentLpsId];
+		LpuCounter *counter = state->getCounter();
+		chain->Append(counter->copyCompositeLpuId());
+	}
+
+	return chain;
 }
 
 void ThreadState::removeIterationBound(int lpsId) {

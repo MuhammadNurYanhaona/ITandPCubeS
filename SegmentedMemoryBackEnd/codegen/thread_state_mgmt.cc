@@ -267,27 +267,38 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 	programFile << std::endl << functionHeader.str() << " " << functionBody.str();
 }
 
-void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot, 
-                Hashtable<List<int>*> *lpuPartFunctionsArgsConfig) {
+void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
        
-	std::cout << "\tGenerating compute next LPU function" << std::endl; 
-	programFile << "// Implementation of task specific compute-Next-LPU function ";
+	std::cout << "\tGenerating compute next LPU function" << std::endl;
+
+	const char *header = "LPU Construction Function";
+	decorator::writeSubsectionHeader(programFile, header); 
 	
-	std::string statementSeparator = ";\n";
-        std::string singleIndent = "\t";
+	std::string stmtSeparator = ";\n";
+        std::string indent = "\t";
 	std::string doubleIndent = "\t\t";
 	std::string tripleIndent = "\t\t\t";
-	std::string parameterSeparator = ", ";
+	std::string paramSeparator = ", ";
 
 	// specify the signature of the compute-Next-Lpu function matching the virtual function in Thread-State class
 	std::ostringstream functionHeader;
-        functionHeader << "LPU *ThreadStateImpl::computeNextLpu(int lpsId, int *lpuCounts, int *nextLpuId)";
+        functionHeader << "LPU *ThreadStateImpl::computeNextLpu(int lpsId)";
         std::ostringstream functionBody;
 	functionBody << "{\n";
 
+	Space *rootLps = mappingRoot->mappingConfig->LPS; 
+
+	// get the list of LPU ids leading to the LPU of the current LPS
+	functionBody << indent << "List<int*> *lpuIdList = " << "getLpuIdChain(lpsId" << paramSeparator;
+	functionBody << "Space_" << rootLps->getName() << ")" << stmtSeparator;
+
+	// get the data partition config and task data objects to pass as default arguments to any LPU generation function
+	functionBody << indent << "Hashtable<DataPartitionConfig*> *partConfigMap = getPartConfigMap()" << stmtSeparator;
+	functionBody << indent << "TaskData *taskData = getTaskData()" << stmtSeparator;		
+
+	// we skip the mapping root and start iterating with its descendents because the LPU for the root space should not 
+	// change throughout the computation of the task
 	std::deque<MappingNode*> nodeQueue;
-	// we skip the mapping root and start iterating with its descendents because the LPU for the root space should
-	// not change throughout the computation of the task
         for (int i = 0; i < mappingRoot->children->NumElements(); i++) {
        		nodeQueue.push_back(mappingRoot->children->Nth(i));
         }
@@ -299,139 +310,33 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
                         nodeQueue.push_back(node->children->Nth(i));
                 }
 		Space *lps = node->mappingConfig->LPS;
-		functionBody << singleIndent << "if (lpsId == Space_" << lps->getName() << ") {\n";
-
-		// create a list of local variables from parent LPUs needed to compute the current LPU for current LPS
-		Hashtable<const char*> *parentLpus = new Hashtable<const char*>;
-		Hashtable<const char*> *arrayToParentLpus = new Hashtable<const char*>;
-		List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
-		for (int i = 0; i < localArrays->NumElements(); i++) {
-			const char *arrayName = localArrays->Nth(i);
-			DataStructure *structure = lps->getLocalStructure(arrayName);
-			Space *parentLps = structure->getSource()->getSpace();
-			// if the array is inherited from parent LPS by a subpartitioned LPS then correct parent reference
-			if (structure->getSpace() != lps) {
-				parentLps = structure->getSpace();
-			}
-			if (parentLpus->Lookup(parentLps->getName()) == NULL) {
-				std::ostringstream parentLpuStr;
-				functionBody << doubleIndent;
-				functionBody << "Space" << parentLps->getName() << "_LPU *";
-				parentLpuStr << "space" << parentLps->getName() << "Lpu";
-				functionBody << parentLpuStr.str() << std::endl;
-				functionBody << doubleIndent << doubleIndent;
-				functionBody << " = (Space" << parentLps->getName() << "_LPU*) ";
-				functionBody << "lpsStates[Space_" << parentLps->getName() << "]->lpu";
-				functionBody << statementSeparator;
-				arrayToParentLpus->Enter(arrayName, strdup(parentLpuStr.str().c_str()));
-				parentLpus->Enter(parentLps->getName(), strdup(parentLpuStr.str().c_str()));
-			} else {
-				arrayToParentLpus->Enter(arrayName, parentLpus->Lookup(parentLps->getName()));
-			}
-		}
+		functionBody << indent << "if (lpsId == Space_" << lps->getName() << ") {\n";
 
 		// get the reference of the current LPU for update
 		const char *lpsName = lps->getName();
 		functionBody << doubleIndent;
 		functionBody << "Space" << lpsName << "_LPU *currentLpu";
-		functionBody << std::endl << doubleIndent << doubleIndent;
 		functionBody << " = (Space" << lpsName << "_LPU*) ";
 		functionBody << "lpsStates[Space_" << lpsName << "]->lpu";
-		functionBody << statementSeparator;
+		functionBody << stmtSeparator;
 
-		// if the LPS is partitioned then copy queried LPU id to the lpuId static array of the created LPU
-		if (lps->getDimensionCount() > 0) {
-			for (int i = 0; i < lps->getDimensionCount(); i++) {
-				functionBody << doubleIndent;
-				functionBody << "currentLpu->lpuId[" << i << "] = nextLpuId[" << i << "]"; 
-				functionBody << statementSeparator;
-			}
-		}	
-
-		// if the LPS is unpartitioned then we need to create the new LPU by extracting elements from
-		// LPUs of ancestor LPSes for common data structures.
-		if (lps->getDimensionCount() == 0) {
-			for (int i = 0; i < localArrays->NumElements(); i++) {
-				const char *arrayName = localArrays->Nth(i);
-				const char *parentLpu = arrayToParentLpus->Lookup(arrayName);
-				functionBody << doubleIndent << "currentLpu->" << arrayName << " = ";
-				functionBody << "space" << lpsName << "Content." << arrayName;
-				functionBody << statementSeparator;
-				
-				ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(arrayName);
-				int dimensionCount = array->getDimensionality();
-				for (int j = 0; j < dimensionCount; j++) {
-					functionBody << doubleIndent << "currentLpu->" << arrayName;
-					functionBody << "PartDims" << '[' << j << "] = ";
-					functionBody << parentLpu << "->" << arrayName << "PartDims";
-					functionBody << '[' << j << "]" << statementSeparator;
-				}
-			}
-		// otherwise we need to call appropriate get-Part functions for invidual data structures of the LPU
-		} else {
-			for (int i = 0; i < localArrays->NumElements(); i++) {
-				const char *arrayName = localArrays->Nth(i);
-				ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(arrayName);
-				functionBody << doubleIndent << "currentLpu->" << arrayName << " = ";
-				functionBody << "space" << lpsName << "Content." << arrayName;
-				functionBody << statementSeparator;
-				
-				// if the structure is replicated then just copy its information from the parent
-				// NOTE the second condition is for arrays inherited by a subpartitioned LPS
-				if (!(array->isPartitioned() && array->getSpace() == lps)) {
-					const char *parentLpu = arrayToParentLpus->Lookup(arrayName);
-					int dimensionCount = array->getDimensionality();
-					for (int j = 0; j < dimensionCount; j++) {
-						functionBody << doubleIndent << "currentLpu->" << arrayName; 
-						functionBody << "PartDims[" << j << "] = ";
-						functionBody << parentLpu << "->" << arrayName << "PartDims";
-						functionBody << '[' << j << "]" << statementSeparator;
-					}
-				// otherwise get the array part for current LPU by calling appropriate function
-				} else {
-					functionBody << doubleIndent;
-					functionBody << "get" << arrayName << "PartForSpace" << lps->getName() << "Lpu(";
-					// pass current LPU's dimension parameter to be updated in the function
-					functionBody << "currentLpu->" << arrayName << "PartDims";
-					functionBody << parameterSeparator;
-
-					// pass the default parent dimension parameter to the function
-					const char *parentLpu = arrayToParentLpus->Lookup(arrayName);
-					functionBody << "\n" << doubleIndent << doubleIndent;
-					functionBody << parentLpu << "->" << arrayName << "PartDims";
-
-					// pass default LPU-Count and LPU-Id parameters to the function
-					functionBody << parameterSeparator << "lpuCounts";
-					functionBody << parameterSeparator << "nextLpuId";
-			
-					// then pass any additional partition arguments needed for computing part
-					// for current data structurre
-					std::ostringstream entryName;
-                        		entryName << lps->getName() << "_" << arrayName;
-					List<int> *argList =  lpuPartFunctionsArgsConfig->Lookup(entryName.str().c_str());
-					if (argList->NumElements() > 0) {
-						functionBody << parameterSeparator << "\n";	
-						functionBody << doubleIndent << doubleIndent;
-					}
-					for (int j = 0; j < argList->NumElements(); j++) {
-						if (j > 0) functionBody << parameterSeparator;	
-						functionBody << "partitionArgs[" << argList->Nth(j) << "]";
-					}
-					functionBody << ")";
-					functionBody << statementSeparator;
-				}
-			}
-		}
-		functionBody << doubleIndent << "currentLpu->setValidBit(true)" << statementSeparator;
-		functionBody << doubleIndent << "return currentLpu" << statementSeparator;
-		functionBody << singleIndent << "}\n";
+		// call appropriate LPU construction function to populate the fields of current LPU
+		functionBody << doubleIndent << "generateSpace" << lpsName << "Lpu(";
+		functionBody << "currentLpu" << paramSeparator;
+		functionBody << "lpuIdList" << paramSeparator;
+		functionBody << "partConfigMap" << paramSeparator;
+		functionBody << "taskData" << ')' << stmtSeparator;
+		
+		// flag the current LPU as valid
+		functionBody << doubleIndent << "currentLpu->setValidBit(true)" << stmtSeparator;
+		functionBody << doubleIndent << "return currentLpu" << stmtSeparator;
+		functionBody << indent << "}\n";
 	}
 	
-	functionBody << singleIndent << "return NULL" << statementSeparator;
+	functionBody << indent << "return NULL" << stmtSeparator;
 	functionBody << "}\n";
 	
 	programFile << std::endl << functionHeader.str() << " " << functionBody.str();
-	programFile << std::endl;
 }
 
 void generateThreadStateImpl(const char *headerFileName, 
@@ -480,7 +385,7 @@ void generateThreadStateImpl(const char *headerFileName,
 	// then call the compute-LPU-Count function generator method for class specific implementation
 	generateComputeLpuCountRoutine(programFile, mappingRoot, countFunctionsArgsConfig);
 	// then call the compute-Next-LPU function generator method for class specific implementation
-	//generateComputeNextLpuRoutine(programFile, mappingRoot, lpuPartFunctionsArgsConfig);
+	generateComputeNextLpuRoutine(programFile, mappingRoot);
 	//-------------------------------------------------------------------------------------------------------
  
 	programFile.close();
