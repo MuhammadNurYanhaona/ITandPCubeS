@@ -161,3 +161,28 @@ const char* string_utils::breakLongLine(int indent, std::string originalLine) {
 	}
 	return strdup(stream.str().c_str());
 }
+
+List<const char*> *string_utils::readAttributes(std::string &str) {
+	List<const char*> *attrList = new List<const char*>;
+	int attrStart = -1;
+	int position = 0;
+	while ((attrStart = str.find('<', position)) != std::string::npos) {
+		int attrEnd = str.find('>', attrStart);
+		if (attrEnd != std::string::npos) {
+			position = attrEnd;
+			int attrLength = attrEnd - attrStart - 1;
+			std::string attr = str.substr(attrStart + 1, attrLength);
+			string_utils::trim(attr);
+			attrList->Append(strdup(attr.c_str()));
+		} else break;
+	}
+	return attrList;
+}
+
+bool string_utils::contains(List<const char*> *list, const char *str) {
+	for (int i = 0; i < list->NumElements(); i++) {
+		const char *str2 = list->Nth(i);
+		if (strcmp(str, str2) == 0) return true;
+	}
+	return false;
+}

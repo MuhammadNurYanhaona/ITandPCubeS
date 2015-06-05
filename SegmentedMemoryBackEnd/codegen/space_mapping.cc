@@ -23,7 +23,8 @@ void PPS_Definition::print(int indentLevel) {
 	indent << '\t';
 	std::cout << indent.str() << "Units: " << units << '\n';
 	if (coreSpace) std::cout << indent.str() << "Computation Core\n";
-	if (segmented) std::cout << indent.str() << "Segmented Memory\n";
+	if (segmented) std::cout << indent.str() << "Segmented Memory\n";	
+	if (physicalUnit) std::cout << indent.str() << "Physical Unit\n";
 }
 
 List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
@@ -55,31 +56,16 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		std::string spaceNoStr = tokenList->Nth(0);
 		std::string spaceNameStr = tokenList->Nth(1);
 
-		// retrieve the space ID; also determine if current space represents CPU cores and if
-		// it has segmented memory
+		// retrieve the space ID; also read any additional attributes mentioned for the space
 		tokenList = string_utils::tokenizeString(spaceNoStr, separator2);
 		std::string spaceNo = tokenList->Nth(1);
 		int spaceId;
-		std::string markerStr1 = "^*";
-		std::string markerStr2 = "*^";
-		bool coreSpace = false;
-		bool segmented = false;
-		if (string_utils::endsWith(spaceNo, markerStr1) || string_utils::endsWith(spaceNo, markerStr2)) {
-			spaceNo = spaceNo.substr(0, spaceNo.length() - 2);
-			spaceId = atoi(spaceNo.c_str());
-			coreSpace = true;
-			segmented = true;	
-		} else if (string_utils::endsWith(spaceNo, '*')) {
-			spaceNo = spaceNo.substr(0, spaceNo.length() - 1);
-			spaceId = atoi(spaceNo.c_str());
-			coreSpace = true;
-		} else if (string_utils::endsWith(spaceNo, '^')) {
-			spaceNo = spaceNo.substr(0, spaceNo.length() - 1);
-			spaceId = atoi(spaceNo.c_str());
-			segmented = true;
-		} else {
-			spaceId = atoi(spaceNo.c_str());
-		}
+		List<const char*> *attrList = string_utils::readAttributes(spaceNo);
+		spaceNo = spaceNo.substr(0, 1);
+		spaceId = atoi(spaceNo.c_str());
+		bool coreSpace = string_utils::contains(attrList, "core");
+		bool segmented = string_utils::contains(attrList, "segment");
+		bool physicalUnit = string_utils::contains(attrList, "unit");
 
 		// retrieve space name and PPU count
 		tokenList = string_utils::tokenizeString(spaceNameStr, separator3);
@@ -95,6 +81,7 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		spaceDefinition->units = ppuCount;
 		spaceDefinition->coreSpace = coreSpace;
 		spaceDefinition->segmented = segmented;
+		spaceDefinition->physicalUnit = physicalUnit;
 			
 		// store the space definition in the list in top-down order
 		int i = 0;	

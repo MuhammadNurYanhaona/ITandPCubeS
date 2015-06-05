@@ -11,6 +11,7 @@ class PPS_Definition {
 	int id;
 	const char *name;
 	int units;
+
 	/* We need a variable that designate the PPS representing CPU cores. This is required to 
 	   manage thread affinity. For the sake of identification, the current requirement is 
 	   that in the PCubeS description file, the space correspond to CPU cores should be marked 
@@ -25,6 +26,12 @@ class PPS_Definition {
 	   The marker '^' after a PPS name indicates that it has segmented memory.	 	
 	*/
 	bool segmented;
+
+	/* We need a variable to identify where in the PCubeS hierarchy the separation of physical
+	   hardware happens. This information is needed to determine when to restart the processor
+	   numbering while assigning threads to processors.
+	*/
+	bool physicalUnit;
 
 	void print(int indentLevel);
 };

@@ -47,6 +47,13 @@ namespace string_utils {
 
 	// break a long line into multiple lines without compromising the content
 	const char *breakLongLine(int indent, std::string originalLine);
+
+	// generate a list of attributes from a text containing each attribute 
+	// in <attribute> format
+	List<const char*> *readAttributes(std::string &str);
+
+	// determine if a list of string contains a particular string
+	bool contains(List<const char*> *list, const char *str);
 }
 
 #endif
