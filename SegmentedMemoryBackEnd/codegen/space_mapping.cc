@@ -5,6 +5,7 @@
 #include "string.h"
 #include "../utils/string_utils.h"
 #include "../utils/hashtable.h"
+#include "../utils/decorator_utils.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 #include "../static-analysis/usage_statistic.h"
@@ -226,12 +227,13 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 }
 
 void generateLPSConstants(const char *outputFile, MappingNode *mappingRoot) {
+	std::string stmtSeparator = ";\n";
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (programFile.is_open()) {
-		programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-		programFile << "constants for LPSes" << std::endl;
-		programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+		const char *header = "constants for LPSes";
+		decorator::writeSectionHeader(programFile, header);
+		programFile << std::endl;
 		std::deque<MappingNode*> nodeQueue;
 		nodeQueue.push_back(mappingRoot);
 		int spaceCount = 0;
@@ -243,10 +245,9 @@ void generateLPSConstants(const char *outputFile, MappingNode *mappingRoot) {
 				nodeQueue.push_back(node->children->Nth(i));
 			}
 			programFile << "const int Space_" << node->mappingConfig->LPS->getName();
-			programFile << " = " << node->index << ';' << std::endl;	
+			programFile << " = " << node->index << stmtSeparator;	
 		}
-		programFile << "const int Space_Count = " << spaceCount << ';' << std::endl;
-		programFile << std::endl; 
+		programFile << "const int Space_Count = " << spaceCount << stmtSeparator;
     		programFile.close();
   	} else {
 		std::cout << "Unable to open output program file";
@@ -255,24 +256,24 @@ void generateLPSConstants(const char *outputFile, MappingNode *mappingRoot) {
 }
 
 void generatePPSCountConstants(const char *outputFile, List<PPS_Definition*> *pcubesConfig) {
+	std::string stmtSeparator = ";\n";
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (programFile.is_open()) {
-		programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-		programFile << "constants for PPS counts" << std::endl;
-		programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+		const char *header = "constants for PPS counts";
+		decorator::writeSectionHeader(programFile, header);
+		programFile << std::endl;
 		PPS_Definition *pps = pcubesConfig->Nth(0);
 		int prevSpaceId = pps->id;
 		programFile << "const int Space_" << pps->id << "_PPUs";
-		programFile << " = " << pps->units << ';' << std::endl;
+		programFile << " = " << pps->units << stmtSeparator;
 		for (int i = 1; i < pcubesConfig->NumElements(); i++) {
 			pps = pcubesConfig->Nth(i);
 			programFile << "const int Space_" << pps->id;
 			programFile << "_Par_" << prevSpaceId << "_PPUs";
-			programFile << " = " << pps->units << ';' << std::endl;
+			programFile << " = " << pps->units << stmtSeparator;
 			prevSpaceId = pps->id;
 		}
-		programFile << std::endl; 
     		programFile.close();
   	} else {
 		std::cout << "Unable to open output program file";
@@ -347,22 +348,23 @@ void generateProcessorOrderArray(const char *outputFile, const char *processorFi
 	}
 
 	// write the reordered list as a constant array in the output fille
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
 	std::ofstream headerFile;
 	headerFile.open (outputFile, std::ofstream::out | std::ofstream::app);
   	if (!headerFile.is_open()) {
 		std::cout << "Unable to open output header file to write processor order array";
 		std::exit(EXIT_FAILURE);
 	}
-	headerFile << "\n/*-----------------------------------------------------------------------------------\n";
-	headerFile << "processor ordering in the hardware\n";
-	headerFile << "------------------------------------------------------------------------------------*/\n";
+	const char *header = "processor ordering in the hardware";
+	decorator::writeSectionHeader(headerFile, header);
 	headerFile << std::endl;
 	headerFile << "const int Processor_Order[" << sortedProcessorIdList->NumElements() << "]";
 	headerFile << " = {";
 	int count = 0;
 	int remaining = sortedProcessorIdList->NumElements();
 	for (int i = 0; i < sortedProcessorIdList->NumElements(); i++) {
-		if (i > 0) headerFile << ", ";
+		if (i > 0) headerFile << paramSeparator;
 		headerFile << sortedProcessorIdList->Nth(i);
 		count++;
 		remaining--;
@@ -371,7 +373,6 @@ void generateProcessorOrderArray(const char *outputFile, const char *processorFi
 			count = 0;
 		}
 	}
-	headerFile << "};\n";
-	headerFile << std::endl;
+	headerFile << "}" << stmtSeparator;
 	headerFile.close();	
 }

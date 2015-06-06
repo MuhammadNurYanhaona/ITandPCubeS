@@ -71,15 +71,15 @@ void initializeOutputFiles(const char *headerFileName,
 	headerFile.close();
 }
 
-void generateThreadCountConstants(const char *outputFile,       
-                MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig) {
+void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig) {
 	
+	std::string stmtSeparator = ";\n";
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
         if (programFile.is_open()) {
-                programFile << "/*-----------------------------------------------------------------------------------" << std::endl;
-                programFile << "constants for total and par core thread counts" << std::endl;
-                programFile << "------------------------------------------------------------------------------------*/" << std::endl;
+		const char *header = "thread count constants";
+		decorator::writeSectionHeader(programFile, header);
+		programFile << std::endl;
 	} else {
 		std::cout << "Unable to open output program file";
 		std::exit(EXIT_FAILURE);
@@ -131,7 +131,7 @@ void generateThreadCountConstants(const char *outputFile,
 			}
 		}
 		programFile << "const int Space_" << lps->getName() << "_Threads = ";
-		programFile << threadCount << ";" << std::endl;
+		programFile << threadCount << stmtSeparator;
 	}	
 	
 	// compute the total number of threads that will participate in computing for the task
@@ -144,7 +144,30 @@ void generateThreadCountConstants(const char *outputFile,
 			if (pps->id == lowestPpsId) break;
 		}
 	}
-	programFile << "const int Total_Threads = " << totalThreads << ';' << std::endl;
+	programFile << "const int Total_Threads = " << totalThreads << stmtSeparator;
+
+	// determine how many threads can operate within each memory segment
+	int segmentedPpsIndex = 0;
+	bool segmentationFound = false;
+	while (true) {
+		if (segmentedPpsIndex >= pcubesConfig->NumElements()) break;
+		if (pcubesConfig->Nth(segmentedPpsIndex)->segmented == true) {
+			segmentationFound = true;
+			break;
+		}
+		segmentedPpsIndex++;
+	}
+	if (!segmentationFound) segmentedPpsIndex = 0;
+	int threadsPerSegment = 1;
+	if (highestUnpartitionedPpsId > lowestPpsId) {
+		for (int i = segmentedPpsIndex + 1; i < pcubesConfig->NumElements(); i++) {
+			PPS_Definition *pps = pcubesConfig->Nth(i);
+			if (pps->id >= highestUnpartitionedPpsId) continue;
+			threadsPerSegment *= pps->units;
+			if (pps->id == lowestPpsId) break;
+		}
+	}
+	programFile << "const int Threads_Per_Segment = " << threadsPerSegment << stmtSeparator;
 	
 	// determine the number of threads attached par core to understand how to do thread affinity management
 	int coreSpaceId = pcubesConfig->Nth(0)->id;
@@ -161,7 +184,24 @@ void generateThreadCountConstants(const char *outputFile,
 		PPS_Definition *pps = pcubesConfig->Nth(ppsCount - i);
 		threadsParCore *= pps->units;
 	}	
-	programFile << "const int Threads_Par_Core = " << threadsParCore << ';' << std::endl;
+	programFile << "const int Threads_Per_Core = " << threadsParCore << stmtSeparator;
+
+	// calculate where the hardware unit boundary lies in the PCubeS hierarchy so that processor numbering
+	// can be reset at proper interval
+	int processorsPerPhyUnit = 1;
+	bool phyUnitFound = false;
+	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
+		PPS_Definition *pps = pcubesConfig->Nth(i);
+		if (!phyUnitFound && !pps->physicalUnit) continue;
+		if (pps->physicalUnit) {
+			phyUnitFound = true;
+			continue;
+		}
+		processorsPerPhyUnit *= pps->units;
+	}
+	programFile << "const int Processors_Per_Phy_Unit = ";	
+	if (phyUnitFound) programFile << processorsPerPhyUnit << stmtSeparator;
+	else programFile << totalThreads << stmtSeparator;
 
 	// If the lowest LPS is mapped to a PPS above the core space then threads should be more apart than
 	// 1 core space processor. In that case we need to determine how far we should jump as we assign 
@@ -189,7 +229,7 @@ void generateThreadCountConstants(const char *outputFile,
 			if (pps->id == coreSpaceId) break;
 		}
 	}
-	programFile << "const int Core_Jump = " << coreJump << ';' << std::endl;
+	programFile << "const int Core_Jump = " << coreJump << stmtSeparator;
 
 	programFile.close();
 }

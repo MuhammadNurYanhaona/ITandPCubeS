@@ -15,7 +15,8 @@ class EnvironmentLink;
 void initializeOutputFiles(const char *headerFile, 
 		const char *programFile, const char *initials);
 
-/* function definition for generating constants for total number of threads and threads per core  */
+/* function definition for generating constants for total number of threads, threads per core,
+   threads per segment, processors per hardware unit, etc.  */
 void generateThreadCountConstants(const char *outputFile, 
 		MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig);
 
