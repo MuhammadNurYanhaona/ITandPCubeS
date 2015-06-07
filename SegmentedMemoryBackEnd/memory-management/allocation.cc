@@ -40,6 +40,12 @@ bool PartMetadata::isMatchingId(List<int*> *candidateId) {
 	return true;
 }
 
+void PartMetadata::updateStorageDimension(PartDimension *partDimension) {
+	for (int i = 0; i < dimensionality; i++) {
+		partDimension[i].storage = boundary[i];
+	}
+}
+
 //---------------------------------------------------------------- List Metadata ---------------------------------------------------------------/
 
 ListMetadata::ListMetadata(int dimensionality, Dimension *boundary) {

@@ -31,11 +31,15 @@ class TaskGenerator {
 	const char *initials;
 	MappingNode *mappingRoot;
 	SyncManager *syncManager;
+	
+	// parameter that indicates a main function needs to be generated for this task automatically
+	// as there are no controller program invoking and controlling tasks in the source code
+	bool isolatedTask;
   public:
 	TaskGenerator(TaskDef *taskDef, 
 		const char *outputDirectory, 
 		const char *mappingFile,
-		const char *processorFile);
+		const char *processorFile,bool isolatedTask);
 	const char *getHeaderFile() { return headerFile; }
 	const char *getProgramFile() { return programFile; }
 	TaskDef *getTaskDef() { return taskDef; }
@@ -73,6 +77,10 @@ class TaskGenerator {
 	// a supporting function for generating an array of thread-state objects, one for each thread,
 	// then initializing them	
 	void initiateThreadStates(std::ofstream &stream);
+	// a supporting function to groups threads into segments; a process will run only the threads
+	// of its own segment but it will needs to investigate other groups to determine where and 
+	// what data to communicate	
+	void performSegmentGrouping(std::ofstream &stream);
 	// a supporting function that starts threads once initialization is done for all necessary 
 	// data	structures
 	void startThreads(std::ofstream &stream);

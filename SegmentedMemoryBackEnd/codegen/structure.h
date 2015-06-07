@@ -5,6 +5,8 @@
 #include <fstream>
 #include <stdlib.h>
 
+#include "../utils/list.h"
+
 /* class definitions for built-in object types */
 
 class Range {
@@ -122,6 +124,7 @@ class ThreadIds {
 	void print(std::ofstream &stream);
 	inline int getPpuId(int lpsId) { return ppuIds[lpsId].id; }
 	inline int getPpuCount(int lpsId) { return ppuIds[lpsId].ppuCount; }
+	int *getAllPpuCounts();
 };
 
 /* a structure to group active LPUs of a dynamic space against corresponding PPUs */

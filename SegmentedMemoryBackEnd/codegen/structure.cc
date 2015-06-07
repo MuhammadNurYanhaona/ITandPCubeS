@@ -121,3 +121,9 @@ void ThreadIds::print(std::ofstream &stream) {
 	}
 	stream.flush();
 }
+
+int *ThreadIds::getAllPpuCounts() {
+	int *counts = new int[lpsCount];
+	for (int i = 0; i < lpsCount; i++) counts[i] = ppuIds[i].ppuCount;
+	return counts;
+}

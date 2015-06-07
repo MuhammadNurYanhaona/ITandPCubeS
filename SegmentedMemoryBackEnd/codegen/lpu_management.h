@@ -206,5 +206,25 @@ class ThreadState {
 	void closeLogFile();
 };
 
+/* This is the class to hold the PPU execution controllers (here threads) that shares a single memory segment */
+class SegmentState {
+  protected:
+	// logical Id of the segment
+	int segmentId;
+	// the id to be used to communicate between segments
+	int physicalId;
+	// state of the threads that are parts of a segment
+	List<ThreadState*> *participantList;
+  public:
+	SegmentState(int segmentId, int physicalId) {
+		this->segmentId = segmentId;
+		this->physicalId = physicalId;
+		this->participantList = new List<ThreadState*>;
+	}
+	int getSegmentId() { return segmentId; }
+	int getPhysicalId() { return physicalId; }
+	void addParticipant(ThreadState *thread) { participantList->Append(thread); }
+	List<ThreadState*> *getParticipantList() { return participantList; } 
+};
 
 #endif

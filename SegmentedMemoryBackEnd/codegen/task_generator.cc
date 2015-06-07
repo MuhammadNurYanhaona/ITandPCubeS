@@ -22,6 +22,7 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
+#include "../utils/decorator_utils.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_def.h"
 #include "../syntax/errors.h"
@@ -33,11 +34,12 @@
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
                 const char *outputDirectory,
                 const char *mappingFile,
-		const char *processorFile) {
+		const char *processorFile, bool isolatedTask) {
 
 	this->taskDef = taskDef;
 	this->mappingFile = mappingFile;
 	this->processorFile = processorFile;
+	this->isolatedTask = isolatedTask;
 
 	std::ostringstream headerFileStr;
 	headerFileStr << outputDirectory;
@@ -146,14 +148,16 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	syncManager->generateFnForThreadsSyncStructureInit();
 
 	// generate routines needed for supporting task invocation from the coordinator
-	std::cout << "Generating task invocation related routines\n";
-	generateFnToInitEnvLinksFromEnvironment(taskDef, 
-			initials, envLinkList, headerFile, programFile);
-	generateFnToInitTaskRootFromEnv(taskDef, initials, headerFile, programFile);
-	generateTaskExecutor(this);
+	if (!isolatedTask) {
+		std::cout << "Generating task invocation related routines\n";
+		generateFnToInitEnvLinksFromEnvironment(taskDef, 
+				initials, envLinkList, headerFile, programFile);
+		generateFnToInitTaskRootFromEnv(taskDef, initials, headerFile, programFile);
+		generateTaskExecutor(this);
+	}
 
-	// initialize the variable transformation map that would be used to translate
-	// the code inside initialize and compute blocks
+	// initialize the variable transformation map that would be used to translate the code 
+	// inside initialize and compute blocks
 	ntransform::NameTransformer::setTransformer(taskDef);	
 
 	// translate the initialize block of the task into a function
@@ -192,7 +196,7 @@ void TaskGenerator::generateTaskMain() {
 	std::string paramSeparator = ", ";
 
 	// write the function signature
-	stream << "\nint main() {\n\n";
+	stream << "\nint main(int argc, char *argv[]) {\n\n";
 	stream << indent << "std::cout << \"Starting " << taskDef->getName() << " Task\\n\"" << stmtSeparator;
 	stream << std::endl;
 		
@@ -237,14 +241,11 @@ void TaskGenerator::generateTaskMain() {
 	stream << indent << "arrayMetadata = *metadata" << stmtSeparator;
 	stream << indent << "metadata->print(logFile)" << stmtSeparator;	
 
-	// invoke functions to initialize array references in different LPSes
-	stream << std::endl << indent << "// allocating memories for data structures\n";
-	stream << indent << "std::cout << \"Allocating memories\\n\"" << stmtSeparator;
-	stream << indent << initials << "::initializeRootLPSContent(&envLinks, metadata)" << stmtSeparator;
-	stream << indent << initials << "::initializeLPSesContents(metadata)" << stmtSeparator;
-
 	// generate thread-state objects for the intended number of threads and initialize their root LPUs
 	initiateThreadStates(stream);
+
+	// group threads into segments
+	performSegmentGrouping(stream);
 
 	// start execution time monitoring timer
 	stream << std::endl << indent << "// starting execution timer clock\n";
@@ -265,7 +266,7 @@ void TaskGenerator::generateTaskMain() {
 	stream << stmtSeparator << std::endl;
 
 	// write all environment variables into files
-	writeResults(stream);
+	// writeResults(stream);
 	
 	// close the log file
 	stream << std::endl << indent << "logFile.close()" << stmtSeparator;
@@ -559,15 +560,19 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
         }
 	
 	// create an array of thread IDs and initiate them
-	stream << indent << "//std::cout << \"generating PPU Ids for threads\\n\"" << stmtSeparator;
 	stream << indent << "ThreadIds *threadIdsList[Total_Threads]" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	stream << indent << indent << "threadIdsList[i] = getPpuIdsForThread(i)" << stmtSeparator;
 	stream << indent << indent << "threadIdsList[i]->print(logFile)" << stmtSeparator;
 	stream << indent << "}\n";
 
+	// create a data partition configuration object
+	stream << indent << "int *ppuCounts = threadIdsList[0]->getAllPpuCounts()" << stmtSeparator;
+	stream << indent << "Hashtable<DataPartitionConfig*> *configMap = ";
+	stream << '\n' << indent << indent << indent;
+	stream << "getDataPartitionConfigMap(metadata, partition, ppuCounts)" << stmtSeparator;
+	
 	// finally create an array of Thread-State variables and initiate them	
-	stream << indent << "//std::cout << \"initiating thread-states\\n\"" << stmtSeparator;
 	stream << indent << "ThreadStateImpl *threadStateList[Total_Threads]" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	stream << indent << indent << "threadStateList[i] = new ThreadStateImpl(Space_Count, ";
@@ -576,8 +581,46 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	stream << indent << indent;
 	stream << "threadStateList[i]->initiateLogFile(\"" << initials << "\")" << stmtSeparator;	
 	stream << indent << indent << "threadStateList[i]->initializeLPUs()" << stmtSeparator;
-	stream << indent << indent << "threadStateList[i]->setLpsParentIndexMap()" << stmtSeparator;	
+	stream << indent << indent << "threadStateList[i]->setLpsParentIndexMap()" << stmtSeparator;
+	stream << indent << indent << "threadStateList[i]->setPartConfigMap(configMap)";	
+	stream << stmtSeparator<< indent << "}\n";
+}
+
+void TaskGenerator::performSegmentGrouping(std::ofstream &stream) {
+	
+	std::cout << "Grouping threads into segments\n";
+
+	std::string indent = "\t";
+	std::string doubleIndent = "\t\t";
+	std::string tripleIndent = "\t\t\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+
+	stream << std::endl << indent << "// grouping threads into segments\n";	
+	
+	// declare a list of segments to hold the threads
+	stream << indent << "List<SegmentState*> *segmentList = new List<SegmentState*>" << stmtSeparator;
+
+	// add threads in proper segments
+	stream << indent << "int segmentCount = Total_Threads / Threads_Per_Segment" << stmtSeparator;
+	stream << indent << "int threadIndex = 0" << stmtSeparator;
+	stream << indent << "for (int s = 0; s < segmentCount; s++) {\n";
+	stream << doubleIndent << "SegmentState *segment = new SegmentState(s, s)" << stmtSeparator;
+	stream << doubleIndent << "int participantCount = 0" << stmtSeparator;
+	stream << doubleIndent << "while (participantCount < Threads_Per_Segment) {\n";
+	stream << tripleIndent << "segment->addParticipant(threadStateList[threadIndex])" << stmtSeparator;
+	stream << tripleIndent << "threadIndex++" << stmtSeparator;
+	stream << tripleIndent << "participantCount++" << stmtSeparator;
+	stream << doubleIndent << "}\n";
+	stream << doubleIndent << "segmentList->Append(segment)" << stmtSeparator;
 	stream << indent << "}\n";
+
+	// determine the segment id of the current process and its participant range
+	stream << indent << "int segmentId = 0" << stmtSeparator;
+	stream << indent << "if (argc > 1) segmentId = std::atoi(argv[1])" << stmtSeparator;
+	stream << indent << "SegmentState *mySegment = segmentList->Nth(segmentId)" << stmtSeparator;
+	stream << indent << "int participantStart = segmentId * Threads_Per_Segment" << stmtSeparator;
+	stream << indent << "int participantEnd = participantStart + Threads_Per_Segment - 1" << stmtSeparator;
 }
 
 void TaskGenerator::startThreads(std::ofstream &stream) {
@@ -613,9 +656,10 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 
 	// then create the threads one by one
 	stream << indent << "int state" << stmtSeparator;
-	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";
 	// determine the cpu-id for the thread
-	stream << indent << indent << "int cpuId = i * Core_Jump / Threads_Par_Core" << stmtSeparator;
+	stream << indent << indent << "int cpuId = (i * Core_Jump / Threads_Per_Core) % Processors_Per_Phy_Unit";
+	stream << stmtSeparator;
 	stream << indent << indent << "int physicalId = Processor_Order[cpuId]" << stmtSeparator;
 	// then set the affinity attribute based on the CPU Id
 	stream << indent << indent << "CPU_ZERO(&cpus)" << stmtSeparator;
@@ -633,7 +677,7 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << "}\n";
 
 	// finally make the main thread wait till all other threads finish execution	
-	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
+	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";
 	stream << indent << indent << "pthread_join(threads[i], NULL)" << stmtSeparator;
 	stream << indent << "}\n\n";
 }

@@ -206,12 +206,12 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		
 		// retrieve the part Id of the array for current LPU
 		programFile << indent << "List<int*> *" << varName << "PartIdList = ";
-		programFile << varName << "Config->generatePartIdList(lpuIdList)" << stmtSeparator;
+		programFile << varName << "Config->generatePartId(lpuIdList)" << stmtSeparator;
 
 		// set up the partition dimension information of the array part within the LPU
 		programFile << indent << varName << "Config->updatePartDimensionInfo(";
 		programFile << varName << "PartIdList" << paramSeparator;
-		programFile << "&lpu->" << varName << "PartDims)" << stmtSeparator;
+		programFile << "lpu->" << varName << "PartDims)" << stmtSeparator;
 
 		// if the variable is not accessed in the LPS then there is no need for updating the underlying
 		// pointer reference to data
@@ -249,7 +249,7 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 
 		// populate storage dimension information into the LPU object from the part
 		programFile << indent << varName << "Part->getMetadata()->updateStorageDimension(";		 		 
-		programFile << "&lpu->" << varName << "PartDims)" << stmtSeparator;
+		programFile << "lpu->" << varName << "PartDims)" << stmtSeparator;
 
 		// copy data from the data part object to the LPU object
 		programFile << indent << "lpu->" << varName << " = ";
