@@ -244,8 +244,9 @@ void TaskGenerator::generateTaskMain() {
 	// generate thread-state objects for the intended number of threads and initialize their root LPUs
 	initiateThreadStates(stream);
 
-	// group threads into segments
+	// group threads into segments; then allocate and initialize the segment memory for current process
 	performSegmentGrouping(stream);
+	initializeSegmentMemory(stream);
 
 	// start execution time monitoring timer
 	stream << std::endl << indent << "// starting execution timer clock\n";
@@ -621,6 +622,27 @@ void TaskGenerator::performSegmentGrouping(std::ofstream &stream) {
 	stream << indent << "SegmentState *mySegment = segmentList->Nth(segmentId)" << stmtSeparator;
 	stream << indent << "int participantStart = segmentId * Threads_Per_Segment" << stmtSeparator;
 	stream << indent << "int participantEnd = participantStart + Threads_Per_Segment - 1" << stmtSeparator;
+}
+
+void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
+	
+	std::cout << "Generating code for initializing segment memory\n";
+	std::string indent = "\t";
+	std::string doubleIndent = "\t\t";
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+
+	stream << std::endl << indent << "// initializing segment memory\n";	
+	
+	// generate the task data object instance
+	stream << indent << "TaskData *taskData = initializeTaskData(mySegment->getParticipantList()" << paramSeparator;
+	stream << "\n" << indent << doubleIndent << "metadata" << paramSeparator;
+	stream  << "partition" << paramSeparator << "ppuCounts)" << stmtSeparator;
+
+	// set the task data property in each thread of the segment
+	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";
+	stream << doubleIndent << "threadStateList[i]->setTaskData(taskData)" << stmtSeparator;
+	stream << indent << "}\n";
 }
 
 void TaskGenerator::startThreads(std::ofstream &stream) {
