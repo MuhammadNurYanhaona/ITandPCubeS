@@ -217,6 +217,17 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// pointer reference to data
 		if (!array->getUsageStat()->isAccessed()) continue;
 
+		// TODO note that a segmented PPU may need to determine the LPU Ids of LPUs multiplexed to other 
+		// segmented PPUs for the sake of communication. Now the process of retrieving LPU ids involves
+		// generation of the LPUs -- only their metadata is needed though. Therefore, we can include a 
+		// checking in the LPU generation process regarding whether the full LPU with all the data parts
+		// references pointing to correct memory address is needed, as it will be for the LPUs that the
+		// concerned segmented PPU will execute later, or a metadata only version of the LPU is sufficient.
+		// For now, we are using the absense of a valid task-data reference as an indicator for metadata
+		// only LPUs. This process should be changed alongside an update to the LPU generation process
+		// that the future developers should investigate for optimization or even for a better design.
+		programFile << indent << "if (taskData != NULL) {\n";
+
 		// determine what LPS allocates the array
 		Space *allocatorLps = array->getAllocator();
 		bool allocatedElsewhere = (allocatorLps != lps);
@@ -230,29 +241,29 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 				steps++;
 			}
 			// find the partId list to locate the bigger data-part piece the current one is a part of
-			programFile << indent << "List<int*> *" << varName << "AllocPartIdList = ";
+			programFile << doubleIndent << "List<int*> *" << varName << "AllocPartIdList = ";
 			programFile << varName << "Config->generateSuperPartIdList(lpuIdList" << paramSeparator;
 			programFile << steps << ")" << stmtSeparator;
 		}
 
 		// retrieve the data items list
-		programFile << indent << "DataItems *" << varName << "Items = taskData->getDataItemsOfLps(";
+		programFile << doubleIndent << "DataItems *" << varName << "Items = taskData->getDataItemsOfLps(";
 		programFile << '"' << allocatorLps->getName() << '"' << paramSeparator;
 		programFile << '"' << varName << '"' << ")" << stmtSeparator;
 		
 		// then retrieves the appropriate part from the item list
-		programFile << indent << "DataPart *" << varName << "Part = ";
+		programFile << doubleIndent << "DataPart *" << varName << "Part = ";
 		programFile << varName << "Items->getDataPart(";
 		if (allocatedElsewhere) programFile << varName << "AllocPartIdList)";
 		else programFile << varName << "PartIdList)";
 		programFile << stmtSeparator;
 
 		// populate storage dimension information into the LPU object from the part
-		programFile << indent << varName << "Part->getMetadata()->updateStorageDimension(";		 		 
+		programFile << doubleIndent << varName << "Part->getMetadata()->updateStorageDimension(";		 		 
 		programFile << "lpu->" << varName << "PartDims)" << stmtSeparator;
 
 		// copy data from the data part object to the LPU object
-		programFile << indent << "lpu->" << varName << " = ";
+		programFile << doubleIndent << "lpu->" << varName << " = ";
 		programFile << "(" << elemType->getCType() << "*) " << varName << "Part->getData()";
 		programFile << stmtSeparator;
 
@@ -260,15 +271,17 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// in the LPU too
 		int versionCount = array->getLocalVersionCount();
 		for (int j = 1; j <= versionCount; j++) {
-			programFile << indent << varName << "Part = ";
+			programFile << doubleIndent << varName << "Part = ";
 			programFile << varName << "Items->getDataPart(";
 			if (allocatedElsewhere) programFile << varName << "AllocPartIdList";
 			else programFile << varName << "PartIdList";
 			programFile << paramSeparator << j << ")" << stmtSeparator;
-			programFile << indent << "lpu->" << varName << "_lag_" << j << " = ";
+			programFile << doubleIndent << "lpu->" << varName << "_lag_" << j << " = ";
 			programFile << "(" << elemType->getCType() << "*) ";
 			programFile << varName << "Part->getData()" << stmtSeparator;
 		}
+
+		programFile << indent << "}\n";
 	}
 	
 	programFile << "}\n";
