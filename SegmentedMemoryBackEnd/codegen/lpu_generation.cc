@@ -87,7 +87,7 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerF
 			functionBody << varName << "Config->getPartsCountAlongDimension(";
 			functionBody << arrayDim - 1;
 			if (dimPartitionedBefore) {
-				functionBody << paramSeparator << varName << dimensionParamName.str();
+				functionBody << paramSeparator << "&" << dimensionParamName.str();
 			}
 			functionBody << ")";	
 			functionBody << stmtSeparator;	
