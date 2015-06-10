@@ -178,11 +178,19 @@ class DataStructure {
 	// returns current structure if it has been marked allocated or gets the closest source reference that is
 	// marked allocated  
 	DataStructure *getClosestAllocation();
+
+	// This function is used to determine if configurations of a single data structure in two different LPSes
+	// have beendictated to use the same memory allocation. If the answer is YES then no communication is needed 
+	// to synchronize the LPSes regarding the concerned data structure; otherwise, there need to be a data 
+	// transfer of some form when there is a transition between these two LPSes and in between the structure has 
+	// been updated by some computation stage.
+	bool useSameAllocation(DataStructure *other);
 	
 	// functions for determining epoch dependencies
 	void updateVersionCount(int version);
 	int getLocalVersionCount() { return versionCount; }
 	int getVersionCount();
+
 	// returns the root reference of this data structure
 	DataStructure *getPrimarySource();
 };

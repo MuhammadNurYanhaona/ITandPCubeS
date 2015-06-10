@@ -6,6 +6,7 @@
 #include "../memory-management/part_management.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../utils/interval_utils.h"
 #include <fstream>
 
 /* Remember that there is a partial ordering of logical processing spaces (LPS). Thereby, the number of
@@ -215,16 +216,29 @@ class SegmentState {
 	int physicalId;
 	// state of the threads that are parts of a segment
 	List<ThreadState*> *participantList;
+	// This is a temporary variable to hold lists of lpu-ids of different LPSes that have been multiplexed
+	// to the participants of a segment. These Ids are needed to construct interval-description of data that
+	// may need to be exchanged with other segments. A map is maintained so that the same lpu ids are not 
+	// computed several times, which is a costly computation. The map and its content should be cleared once
+	// interval descriptions for all would be communicated data have been constructed    
+	Hashtable<List<List<int*>*>*> *lpuIdListMap;
+	// the partition configuration object to be used to generate interval descriptions for data from LPU ids
+	Hashtable<DataPartitionConfig*> *partConfigMap;
   public:
-	SegmentState(int segmentId, int physicalId) {
-		this->segmentId = segmentId;
-		this->physicalId = physicalId;
-		this->participantList = new List<ThreadState*>;
-	}
+	SegmentState(int segmentId, int physicalId);
 	int getSegmentId() { return segmentId; }
 	int getPhysicalId() { return physicalId; }
+	void setPartConfigMap(Hashtable<DataPartitionConfig*> *partConfigMap) { 
+		this->partConfigMap = partConfigMap; 
+	}
 	void addParticipant(ThreadState *thread) { participantList->Append(thread); }
-	List<ThreadState*> *getParticipantList() { return participantList; } 
+	List<ThreadState*> *getParticipantList() { return participantList; }
+	void clearlpuIdListMap();
+	IntervalSet *getDataIntervalDesc(const char *varName, 
+			const char *lpsName, int lpsId, int rootLpsId, bool includePadding);
+  private:
+	// an auxiliary variable to be used during cleaning up the lpuIdListMap
+	List<const char*> *lpuIdListMapKeys; 
 };
 
 #endif

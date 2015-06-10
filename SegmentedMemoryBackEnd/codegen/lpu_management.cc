@@ -3,11 +3,17 @@
 #include <fstream>
 #include <sstream>
 #include <pthread.h>
+#include <cstdlib>
 
 #include "lpu_management.h"
 #include "structure.h"
+#include "../utils/list.h"
+#include "../utils/hashtable.h"
+#include "../utils/interval_utils.h"
+#include "../memory-management/allocation.h"
+#include "../memory-management/part_generation.h"
 
-/********************************************  LPU Counter  ***********************************************/
+/*************************************************  LPU Counter  ****************************************************/
 
 LpuCounter::LpuCounter() {
 	lpsDimensions = 0;
@@ -134,7 +140,7 @@ void LpuCounter::logCompositeLpuId(std::ofstream &log, int indent) {
 	log << std::endl;
 }
 
-/***************************************** Mock Lpu Counter  **********************************************/
+/********************************************** Mock Lpu Counter  ***************************************************/
 
 MockLpuCounter::MockLpuCounter(PPU_Ids ppuIds) : LpuCounter() {
 	active = (ppuIds.groupId == 0); 
@@ -168,7 +174,7 @@ void MockLpuCounter::logCompositeLpuId(std::ofstream &log, int indent) {
 }
 
 
-/*********************************************  LPS State  ************************************************/
+/**************************************************  LPS State  *****************************************************/
 
 LpsState::LpsState(int lpsDimensions, PPU_Ids ppuIds) {
 	if (lpsDimensions == 0) {
@@ -186,7 +192,7 @@ LPU *LpsState::getCurrentLpu() {
 }
 
 
-/*******************************************  Thread State  ***********************************************/
+/************************************************  Thread State  ****************************************************/
 
 ThreadState::ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, ThreadIds *threadIds) {
 	this->lpsCount = lpsCount;
@@ -468,4 +474,87 @@ LPU *ThreadState::getCurrentLpu(int lpsId) {
 
 void ThreadState::closeLogFile() {
 	if (threadLog.is_open()) threadLog.close();
+}
+
+/***********************************************  Segment State  ****************************************************/
+
+SegmentState::SegmentState(int segmentId, int physicalId) {
+                this->segmentId = segmentId;
+                this->physicalId = physicalId;
+                this->participantList = new List<ThreadState*>;
+                this->partConfigMap = NULL;
+                this->lpuIdListMap = new Hashtable<List<List<int*>*>*>;
+		this->lpuIdListMapKeys = new List<const char*>;
+}
+
+void SegmentState::clearlpuIdListMap() {
+	for (int i = 0; i < lpuIdListMapKeys->NumElements(); i++) {
+		const char *key = lpuIdListMapKeys->Nth(i);
+		List<List<int*>*> *lpuIdList = lpuIdListMap->Lookup(key);
+		lpuIdListMap->Remove(key, lpuIdList);
+		while (lpuIdList->NumElements() > 0) {
+			List<int*> *lpuIds = lpuIdList->Nth(0);
+			lpuIdList->RemoveAt(0);
+			while (lpuIds->NumElements() > 0) {
+				int *lpuId = lpuIds->Nth(0);
+				lpuIds->RemoveAt(0);
+				delete[] lpuId;
+			}
+			delete lpuIds; 
+		}
+		delete lpuIdList;
+	}
+	while (lpuIdListMapKeys->NumElements() > 0) {
+		const char *key = lpuIdListMapKeys->Nth(0);
+		lpuIdListMapKeys->RemoveAt(0);
+		delete key;	
+	}
+	delete lpuIdListMap;
+	delete lpuIdListMapKeys;
+}
+
+IntervalSet *SegmentState::getDataIntervalDesc(const char *varName, const char *lpsName, 
+		int lpsId, int rootLpsId, bool includePadding) {
+	
+	std::ostringstream keyStr;
+	keyStr << varName << lpsName;
+	const char *key = keyStr.str().c_str(); 
+	List<List<int*>*> *lpuIdList = lpuIdListMap->Lookup(key);
+
+	// generate LPU ids through recursive get-next-LPU traversal process for all participants in the segment only
+	// if we haven't previously done it for the LPS under concern	
+	if (lpuIdList == NULL) {
+		lpuIdList = new List<List<int*>*>;
+		for (int i = 0; i < participantList->NumElements(); i++) {
+			ThreadState *participant = participantList->Nth(i);
+			List<List<int*>*> *participantsIdList = participant->getAllLpuIds(lpsId, rootLpsId);
+			if (participantsIdList != NULL) lpuIdList->AppendAll(participantsIdList);
+		}
+		lpuIdListMap->Enter(key, lpuIdList);
+		lpuIdListMapKeys->Append(strdup(key));
+	}
+	if (lpuIdList->NumElements() == 0) return NULL;
+
+	std::ostringstream configKeyStr;
+	configKeyStr << varName << "Space" << lpsName << "Config";
+	const char *configKey = configKeyStr.str().c_str();
+	DataPartitionConfig *config = partConfigMap->Lookup(configKey);
+	List<List<int*>*> *partIdList = config->generatePartIdList(lpuIdList);
+	ListMetadata *metadata = config->generatePartListMetadata(partIdList);
+	
+	// delete all part Ids to avoid wasting space
+	while (partIdList->NumElements() > 0) {
+		List<int*> *partId = partIdList->Nth(0);
+		partIdList->RemoveAt(0);
+		while (partId->NumElements() > 0) {
+			int *lpuLocalPartId = partId->Nth(0);
+			partId->RemoveAt(0);
+			delete[] lpuLocalPartId;
+		}
+		delete partId;
+	}
+	delete partIdList;
+
+	if (includePadding) return metadata->getPaddedIntervalSpec();
+	return metadata->getCoreIntervalSpec();	 
 }

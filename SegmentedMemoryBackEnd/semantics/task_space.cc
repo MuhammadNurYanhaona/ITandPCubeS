@@ -180,6 +180,12 @@ DataStructure *DataStructure::getClosestAllocation() {
 	return source->getClosestAllocation();
 }
 
+bool DataStructure::useSameAllocation(DataStructure *other) {
+	DataStructure *myAllocation = getClosestAllocation();
+	DataStructure *otherAllocation = other->getClosestAllocation();
+	return myAllocation == otherAllocation;
+}
+
 void DataStructure::updateVersionCount(int version) {
 	
 	int oldVersionCount = versionCount;

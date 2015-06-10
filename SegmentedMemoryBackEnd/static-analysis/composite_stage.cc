@@ -784,6 +784,15 @@ List<const char*> *CompositeStage::getAllOutgoingDependencyNamesAtNestingLevel(i
 	return arcNameList;
 }
 
+List<DependencyArc*> *CompositeStage::getAllTaskDependencies() {
+	List<DependencyArc*> *list = new List<DependencyArc*>;
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		list->AppendAll(stage->getAllTaskDependencies());
+	}
+	return list;
+}
+
 void CompositeStage::declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingIndex) {
 
 	std::string stmtSeparator = ";\n";
@@ -1054,6 +1063,12 @@ void RepeatCycle::calculateLPSUsageStatistics() {
 	// a repeat cycle will in most cases executes at least twice.
 	CompositeStage::calculateLPSUsageStatistics();
 	CompositeStage::calculateLPSUsageStatistics();
+}
+
+List<DependencyArc*> *RepeatCycle::getAllTaskDependencies() {
+	List<DependencyArc*> *list = CompositeStage::getAllTaskDependencies();
+	list->AppendAll(FlowStage::getAllTaskDependencies());
+	return list;
 }
 
 int RepeatCycle::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle) {

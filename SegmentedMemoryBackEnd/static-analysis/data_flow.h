@@ -155,6 +155,7 @@ class FlowStage {
 	StageSyncReqs *getAllSyncRequirements();
 	StageSyncDependencies *getAllSyncDependencies();
 	virtual void printSyncRequirements();
+
 	// this function indicates if there is any synchronization requirement between the execution of the current
 	// and the execution of the stage passed as argument
 	bool isDependentStage(FlowStage *suspectedDependent);
@@ -171,6 +172,11 @@ class FlowStage {
 	// an analysis to flag LPSes to indicate some computation has taken place within it; this is needed to 
 	// determine whether or not to generate LPUs for an LPS
 	virtual void setLpsExecutionFlags() {}
+
+	// a recursive routine to retrieve all data dependency relationships within a task; this is used for a later
+	// analysis during code generation regarding what data to exchange among PPU controllers; obviously, this is 
+	// only usable after dependency analysis has been done. 
+	virtual List<DependencyArc*> *getAllTaskDependencies();
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -287,6 +293,7 @@ class CompositeStage : public FlowStage {
 	bool isGroupEntry();
 	void setLpsExecutionFlags();
 	List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
+	virtual List<DependencyArc*> *getAllTaskDependencies();
 
 	// this function is used by only the first composite stage (that represents the entire computation) and
 	// repeat cycles to initiate the counters that are used to track if an updater of need-to-be synchronized
@@ -340,6 +347,7 @@ class RepeatCycle : public CompositeStage {
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void performEpochUsageAnalysis();
 	void calculateLPSUsageStatistics();
+	List<DependencyArc*> *getAllTaskDependencies();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 	void setLpsExecutionFlags();

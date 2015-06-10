@@ -315,6 +315,11 @@ void FlowStage::setReactivatorFlagsForSyncReqs() {
 	}
 }
 
+List<DependencyArc*> *FlowStage::getAllTaskDependencies() {
+	if (dataDependencies == NULL) return new List<DependencyArc*>;
+	return dataDependencies->getOutgoingArcs();
+}
+
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(0, space, NULL) {
