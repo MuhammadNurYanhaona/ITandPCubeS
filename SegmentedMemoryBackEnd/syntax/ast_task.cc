@@ -88,6 +88,7 @@ void TaskDef::attachScope(Scope *parentScope) {
 	
 	Identifier *envId = new Identifier(*GetLocation(), envTupleName);
 	envTuple = new TupleDef(envId, envDef);
+	envTuple->flagAsEnvironment();
 	envTuple->setSymbol(new TupleSymbol(envId, envTuple, envElementTypes));
 	envTuple->getSymbol()->setNestedScope(envScope);
 	parentScope->insert_symbol(envTuple->getSymbol()); 

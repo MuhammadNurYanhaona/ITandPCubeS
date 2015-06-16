@@ -41,6 +41,8 @@
 #include "../runtime/input_prompt.h"
 #include "../runtime/output_prompt.h"
 #include "../runtime/allocator.h"
+#include "../input-output/stream.h"
+#include "../input-output/environment_base.h"
 
 // for threading
 #include <pthread.h>

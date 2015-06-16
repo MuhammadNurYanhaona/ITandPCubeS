@@ -67,6 +67,12 @@ class ScalarDataItems : public DataItems {
 		for (int i = 0; i < items->epochCount; i++) {
 			type *version = new type;
 			items->variableList[i] = (void*) version;
+			// zero initialize the version
+			char *charVersion = reinterpret_cast<char*>(version);
+			int size = sizeof(type) / sizeof(char);
+			for (int i = 0; i < size; i++) {
+				charVersion[i] = 0;
+			}
 		}
 		items->ready = true;
 	}
@@ -76,8 +82,6 @@ class ScalarDataItems : public DataItems {
 	void *getVariable(int version);
 	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; };
 };
-
-
 
 /* This class holds LPU data parts of all variables correspond to a single LPS */
 class LpsContent {

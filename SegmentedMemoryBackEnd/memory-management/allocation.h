@@ -67,6 +67,11 @@ class DataPart {
 	template <class type> static void allocate(DataPart *dataPart) {
 		int size = dataPart->metadata->getSize();
 		dataPart->data = new type[size];
+                char *charData = reinterpret_cast<char*>(dataPart->data);
+                int charSize = size * sizeof(type) / sizeof(char);
+                for (int i = 0; i < charSize; i++) {
+                        charData[i] = 0;
+                }
 	}
 	inline PartMetadata *getMetadata() { return metadata; }
 	void *getData() { return data; }	
@@ -138,6 +143,7 @@ class DataPartsList {
 	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }
 	inline int getEpochCount() { return epochCount; }
 	inline List<DataPart*> *getCurrentList() { return partLists[epochHead]; }
+	inline ListMetadata *getMetadata() { return metadata; }
 };
 
 #endif

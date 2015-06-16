@@ -688,7 +688,10 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 
 	// include the PartDimension class from compiler library to store metadata information for environment
 	// references
-	headerFile << "#include \"../codegen/structure.h\"\n\n";        
+	headerFile << "#include \"../codegen/structure.h\"\n"; 
+	
+	// include the environment base class that stores input/output instructions for tasks' data structures       
+	headerFile << "#include \"../input-output/environment_base.h\"\n\n"; 
 
 	// first have a list of forward declarations for all tuples to avoid having errors during 
 	// compilation of individual classes
@@ -704,7 +707,11 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 		TupleDef *tupleDef = tupleDefList->Nth(i);
 		List<VariableDef*> *variables = tupleDef->getComponents();
 		// generate a new class and add the elements as public components
-		headerFile << "class " << tupleDef->getId()->getName() << " {\n";
+		headerFile << "class " << tupleDef->getId()->getName();
+		if (tupleDef->isEnvironment()) {
+			headerFile << " : public EnvironmentBase";
+		} 
+		headerFile << " {\n";
 		headerFile << "  public:\n";
 		for (int j = 0; j < variables->NumElements(); j++) {
 			headerFile << "\t";
@@ -724,7 +731,11 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 
 		}
 		// create a constructor for the class
-		headerFile << "\t" << tupleDef->getId()->getName() << "() {\n";
+		headerFile << "\t" << tupleDef->getId()->getName() << "()";
+		if (tupleDef->isEnvironment()) {
+			headerFile << " : EnvironmentBase()";
+		} 
+		headerFile << " {\n";
 		for (int j = 0; j < variables->NumElements(); j++) {
 			VariableDef *variable = variables->Nth(j);
 			Type *type = variable->getType();
