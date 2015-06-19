@@ -16,7 +16,14 @@ PartHandler::PartHandler(DataPartsList *partsList, const char *fileName) {
 	this->dataDimensions = metadata->getBoundary();
 }
 
+List<Dimension*> *PartHandler::getDimensionList() {
+	List<Dimension*> *dimensionList = new List<Dimension*>;
+	for (int i = 0; i < dataDimensionality; i++) dimensionList->Append(&dataDimensions[i]);
+	return dimensionList;
+}
+
 void PartHandler::processParts() {
+	begin();
 	for (int i = 0; i < dataParts->NumElements(); i++) {
 		DataPart *dataPart = dataParts->Nth(i);
 		this->currentPart = dataPart;
@@ -25,6 +32,7 @@ void PartHandler::processParts() {
 		List<int> *partIndexList = new List<int>;
 		processPart(partDimensions, 0, partIndexList);
 	}
+	terminate();
 }
 
 void PartHandler::processPart(Dimension *partDimensions, int currentDimNo, List<int> *partialIndex) {

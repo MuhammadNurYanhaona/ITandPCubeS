@@ -369,6 +369,8 @@ class Space {
 	// a helper routine for code generation that determines if any of the structures listed in the partition
 	// configuration of the LPS referred by this instance needs to be allocated a memory
 	bool allocateStructures();
+	// does the checking above for a specific data structure
+	bool allocateStructure(const char *structureName);
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy is 

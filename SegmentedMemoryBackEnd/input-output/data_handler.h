@@ -25,6 +25,8 @@ class PartHandler {
 	void *getCurrentPartData() { return currentPart->getData(); }
 	// returns one dimensional update index for an element from its, possibly, multidimensional part index 
 	int getStorageIndex(List<int> *partIndex, Dimension *partDimension);
+	// returns the data dimension in a list format
+	List<Dimension*> *getDimensionList();
 
 	// Task specific subclasses should provide implementation for this function that is needed to identify the 
 	// actual data index in the file for an element within a part. As a partitioning function can reorder the 

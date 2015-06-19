@@ -18,6 +18,7 @@
 #include "sync_mgmt.h"
 #include "task_invocation.h"
 #include "memory_mgmt.h"
+#include "file_io.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -85,6 +86,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         MappingNode *mappingConfig = parseMappingConfiguration(taskDef->getName(),
                         mappingFile, lpsHierarchy, pcubesConfig);
 	this->mappingRoot = mappingConfig;
+	Space *rootLps = lpsHierarchy->getRootSpace();
 
 	// determine where memory segmentation happens in the hardware
 	int segmentedPPS = 0;
@@ -122,12 +124,17 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         generateLpuDataStructures(headerFile, mappingConfig);
 	List<TaskGlobalScalar*> *globalScalars 
 			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
-	generateClassesForGlobalScalars(headerFile, globalScalars, lpsHierarchy->getRootSpace());
+	generateClassesForGlobalScalars(headerFile, globalScalars, rootLps);
 
 	// generate functions related to memory management
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
 	genRoutinesForTaskPartitionConfigs(headerFile, programFile, upperInitials, lpsHierarchy);
 	genTaskMemoryConfigRoutine(headerFile, programFile, upperInitials, lpsHierarchy);
+	
+	// generate functions and classes for I/O
+	generateReaderWriters(headerFile, programFile, initials, rootLps);
+	generateRoutineForDataInitialization(headerFile, programFile, taskDef);
+	generateRoutineForDataStorage(headerFile, programFile, taskDef);
 
 	// generate routines to contruct LPUs
 	Hashtable<List<PartitionParameterConfig*>*> *partParamConfigMap 

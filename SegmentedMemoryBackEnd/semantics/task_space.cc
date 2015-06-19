@@ -645,6 +645,12 @@ bool Space::allocateStructures() {
 	return false;
 }
 
+bool Space::allocateStructure(const char *structureName) {
+	DataStructure *structure = dataStructureList->Lookup(structureName);
+	if (structure == NULL) return false;
+	return structure->getUsageStat()->isAllocated();
+}
+
 //-------------------------------------------- Partition Hierarchy -------------------------------------------------/
 
 PartitionHierarchy::PartitionHierarchy() {

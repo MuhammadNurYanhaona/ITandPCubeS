@@ -6,6 +6,7 @@
 #include "../utils/hashtable.h"
 #include "../utils/decorator_utils.h"
 #include "../utils/string_utils.h"
+#include "../utils/code_constant.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 
@@ -20,11 +21,6 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
                 Space *lps,
                 ArrayDataStructure *array) {
 	
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-
 	std::ostringstream functionHeader;
 	functionHeader << "get" << array->getName() << "ConfigForSpace" << lps->getName();
 	functionHeader << "(ArrayMetadata *metadata" << paramSeparator;
@@ -159,13 +155,8 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
                 PartitionHierarchy *hierarchy) {
 
 	std::cout << "Generating routines to construct data partition configuration\n";
-	
-	std::string stmtSeparator = ";\n";
-        std::string indent = "\t";
-        std::string doubleIndent = "\t\t";
-	std::string paramSeparator = ", ";
-        std::ofstream programFile, headerFile;
-
+        
+	std::ofstream programFile, headerFile;
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         if (!programFile.is_open() || !headerFile.is_open()) {
@@ -263,11 +254,6 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
                 const char *initials,
                 Space *lps, Space *rootLps) {
 	
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-
 	std::ostringstream functionHeader;
 	functionHeader << "genSpace" << lps->getName() << "Content(";
 	functionHeader << "List<ThreadState*> *threads" << paramSeparator;
@@ -375,12 +361,7 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 	
 	std::cout << "Generating routines to construct and manage task's memory allocations\n";
 
-	std::string stmtSeparator = ";\n";
-        std::string indent = "\t";
-        std::string doubleIndent = "\t\t";
-	std::string paramSeparator = ", ";
         std::ofstream programFile, headerFile;
-
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         if (!programFile.is_open() || !headerFile.is_open()) {
