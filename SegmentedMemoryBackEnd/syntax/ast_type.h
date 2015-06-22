@@ -52,7 +52,9 @@ class NamedType : public Type {
 	// need this to do specialized operations needed by environment objects. For example, 
 	// we declare pointers for environment types as oppose to object instances done for other 
 	// named types.
-   	bool environmentType; 
+   	bool environmentType;
+	// The name of the task when this is an environment type for a task
+	const char *taskName;
   public:
     	NamedType(Identifier *i);
     	const char *GetPrintNameForNode() { return "NamedType"; }
@@ -61,6 +63,8 @@ class NamedType : public Type {
 	const char *getName() { return id->getName(); }
 	void flagAsEnvironmentType() { environmentType = true; }
 	bool isEnvironmentType() { return environmentType; }
+	void setTaskName(const char *taskName) { this->taskName = taskName; }
+	const char *getTaskName() { return taskName; }
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
 	bool isEqual(Type *other);
 	const char *getCType() { return id->getName(); }	

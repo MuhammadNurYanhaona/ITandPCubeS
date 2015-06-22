@@ -852,6 +852,7 @@ void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, S
 	stream << environment->getName();
 	if (initParamsPresent) stream << initParams.str();
 	stream << paramSeparator << "partition";
+	stream << paramSeparator << "segmentId";
 	stream << paramSeparator << "logFile)" << stmtSeparator;	
 
 	stream << indent.str() << "} // scope ends for task invocation\n";
@@ -948,6 +949,7 @@ void ObjectCreate::resolveType(Scope *scope, bool ignoreFailure) {
 						TaskDef *taskDef = (TaskDef*) task->getNode();
 						NamedType *envType = new NamedType(taskDef->getEnvTuple()->getId());
 						envType->flagAsEnvironmentType();
+						envType->setTaskName(str->getValue());
 						this->type = envType;
 					}
 				}

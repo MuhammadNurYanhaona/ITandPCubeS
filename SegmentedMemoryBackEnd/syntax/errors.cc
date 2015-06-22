@@ -209,6 +209,14 @@ void ReportError::ReductionOutsideForLoop(yyltype *loc, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, "Reduction expression must be within an encompassing loop statement");
 }
 
+void ReportError::NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "'%s' is not an environment type", type->getName());
+}
+
+void ReportError::NotAConstant(yyltype *loc, const char *constType, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "Expression should be a constant of type '%s'", constType);
+}
+
 void ReportError::SpaceNotFound(yyltype *loc, char spaceName) {
 	Formatted(loc, "No space with name '%c' found in the Partition section", spaceName);
 } 

@@ -159,7 +159,6 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 		std::cout << "Generating task invocation related routines\n";
 		generateFnToInitEnvLinksFromEnvironment(taskDef, 
 				initials, envLinkList, headerFile, programFile);
-		generateFnToInitTaskRootFromEnv(taskDef, initials, headerFile, programFile);
 		generateTaskExecutor(this);
 	}
 
@@ -503,7 +502,6 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream,
 
 	// Invoke the task initializer function if it is invocable or write a comment directing code modifications
 	stream << std::endl << indent << "// invoking the initializer function\n";
-	stream << indent << "//std::cout << \"invoking task initializer function\\n\"" << stmtSeparator;
 	if (!initFunctionInvocable) {	
 		stream << indent << "//TODO invoke the initializeTask function after making required changes\n";
 		stream << indent << "//";			
@@ -594,7 +592,7 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	stream << stmtSeparator<< indent << "}\n";
 }
 
-void TaskGenerator::performSegmentGrouping(std::ofstream &stream) {
+void TaskGenerator::performSegmentGrouping(std::ofstream &stream, bool segmentIdPassed) {
 	
 	std::cout << "Grouping threads into segments\n";
 
@@ -624,8 +622,10 @@ void TaskGenerator::performSegmentGrouping(std::ofstream &stream) {
 	stream << indent << "}\n";
 
 	// determine the segment id of the current process and its participant range
-	stream << indent << "int segmentId = 0" << stmtSeparator;
-	stream << indent << "if (argc > 1) segmentId = std::atoi(argv[1])" << stmtSeparator;
+	if (!segmentIdPassed) {
+		stream << indent << "int segmentId = 0" << stmtSeparator;
+		stream << indent << "if (argc > 1) segmentId = std::atoi(argv[1])" << stmtSeparator;
+	}
 	stream << indent << "SegmentState *mySegment = segmentList->Nth(segmentId)" << stmtSeparator;
 	stream << indent << "int participantStart = segmentId * Threads_Per_Segment" << stmtSeparator;
 	stream << indent << "int participantEnd = participantStart + Threads_Per_Segment - 1" << stmtSeparator;
@@ -661,7 +661,6 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	std::string paramSeparator = ", ";
 	
 	stream << std::endl << indent << "// starting threads\n";	
-	stream << indent << "//std::cout << \"starting threads\\n\"" << stmtSeparator;
 	
 	// declare an array of thread IDs and another array of thread arguments
 	stream << indent << "pthread_t threads[Total_Threads]" << stmtSeparator;

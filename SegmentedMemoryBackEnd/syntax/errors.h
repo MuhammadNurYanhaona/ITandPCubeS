@@ -1,11 +1,9 @@
-/* File: errors.h
- * --------------
- * This file defines an error-reporting class with a set of already
- * implemented static methods for reporting the standard IT errors.
- */
-
 #ifndef _H_errors
 #define _H_errors
+
+/*
+ * This file defines an error-reporting class with a set of already implemented static methods for reporting the standard IT errors.
+ */
 
 #include <string>
 #include "location.h"
@@ -45,7 +43,9 @@ class ReportError
 	static void UnknownIndexToArrayAssociation(Identifier *index, Identifier *array, bool suppressFailure);	
 	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	
 	static void CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure);	
-	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);	
+	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);
+	static void NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure);
+	static void NotAConstant(yyltype *loc, const char *constType, bool suppressFailure);
 	
 	// Errors with computation stage to space mappings
 	static void SpaceNotFound(yyltype *loc, char spaceName); 

@@ -80,7 +80,7 @@ class TaskGenerator {
 	// a supporting function to groups threads into segments; a process will run only the threads
 	// of its own segment but it will needs to investigate other groups to determine where and 
 	// what data to communicate	
-	void performSegmentGrouping(std::ofstream &stream);
+	void performSegmentGrouping(std::ofstream &stream, bool segmentIdPassed = false);
 	// a supporting function to initialize all data parts of different structures that will be 
 	// needed in computations carried by the threads of the segment managed by the current process 
 	void initializeSegmentMemory(std::ofstream &stream);

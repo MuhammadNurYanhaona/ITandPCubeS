@@ -34,10 +34,10 @@ class EnvironmentBase {
 	}
 
 	// a helper method to initialize array dimensions information when the data for the array come from a file	
-	inline void readDimensionInfo(const char *varName, Dimension *dimension) {
+	inline void readDimensionInfo(const char *varName, PartDimension *partDims) {
 		const char *inputFile = inputBindings->Lookup(varName);
 		TypedInputStream<char> *stream = new TypedInputStream<char>(inputFile);
-		stream->copyDimensionInfo(dimension);
+		stream->copyDimensionInfo(partDims);
 		delete stream;
 	}
 

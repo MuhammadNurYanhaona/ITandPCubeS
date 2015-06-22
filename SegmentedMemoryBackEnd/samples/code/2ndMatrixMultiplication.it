@@ -1,5 +1,11 @@
-// A single space matrix multiplication code that computes c as the result of multiplying
-// a and b in a block-by-block fasion.
+Program (args) { 
+        mmEnv = new TaskEnvironment(name: "Matrix Multiply")
+	bind_input(mmEnv, "a", args.input_file_1)
+	bind_input(mmEnv, "b", args.input_file_2)
+        bind_output(mmEnv, "c", args.output_file)
+        execute("Matrix Multiply"; mmEnv; Partition: args.k, args.l, args.q)
+}
+
 Task "Matrix Multiply":
 	Define:
 		a, b, c: 2D Array of Real double-precision

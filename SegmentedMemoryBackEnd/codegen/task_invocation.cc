@@ -10,6 +10,8 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/common_utils.h"
+#include "../utils/decorator_utils.h"
+#include "../utils/code_constant.h"
 #include "name_transformer.h"
 
 #include <sstream>
@@ -91,11 +93,7 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
                 std::exit(EXIT_FAILURE);
         }
 
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", "; 
 	std::ostringstream fnHeader;
-
 	std::ostringstream  comments;
         comments << "/*-----------------------------------------------------------------------------------\n";
         comments << "function for initializing program arguments\n";
@@ -159,11 +157,7 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
                 std::exit(EXIT_FAILURE);
         }
 
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", "; 
 	std::ostringstream fnHeader;
-
 	std::ostringstream  comments;
         comments << "/*-----------------------------------------------------------------------------------\n";
         comments << "function for initializing environment-links object\n";
@@ -236,118 +230,6 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
 	programFile.close();
 }
 
-void generateFnToInitTaskRootFromEnv(TaskDef *taskDef,
-                const char *initials,
-                const char *headerFileName,
-                const char *programFileName) {
-
-	std::cout << "\tGenerating routine to initiate thread's root LPU from Environment reference \n";
-	std::ofstream programFile, headerFile;
-        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
-        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
-        if (!programFile.is_open() || !headerFile.is_open()) {
-                std::cout << "Unable to open output header/program file";
-                std::exit(EXIT_FAILURE);
-        }
-
-	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", "; 
-	std::ostringstream fnHeader;
-
-	std::ostringstream  comments;
-        comments << "/*-----------------------------------------------------------------------------------\n";
-        comments << "function for initializing root LPU from environment\n";
-       	comments << "------------------------------------------------------------------------------------*/\n\n";
-	headerFile << comments.str();
-	programFile << comments.str();
-	
-	// write function signature in header and program files
-	programFile << "Space" << rootLps->getName() << "_LPU *" << initials << "::";
-	headerFile << "Space" << rootLps->getName() << "_LPU *";
-	fnHeader << "initiateRootLpu";
-	TupleDef *envTuple = taskDef->getEnvTuple();
-	fnHeader << "(" << envTuple->getId()->getName() << " *environment";
-	fnHeader << paramSeparator << "ArrayMetadata *metadata)";
-	programFile << fnHeader.str();
-	headerFile << fnHeader.str() << stmtSeparator << std::endl;
-
-	// open function definition
-	programFile << " {\n\n";
-
-	// allocate a pointer reference for the root LPU instance
-	programFile << indent;
-	programFile << "Space" << rootLps->getName() << "_LPU *rootLpu = ";
-	programFile << "new Space" << rootLps->getName() << "_LPU";
-	programFile << stmtSeparator;
-	
-	// get the names of objects that are part of the environment
-	List<VariableDef*> *propertyList = envTuple->getComponents();
-	List<const char*> *envProperties = new List<const char*>;
-	for (int i = 0; i < propertyList->NumElements(); i++) {
-		VariableDef *property = propertyList->Nth(i);
-		envProperties->Append(property->getId()->getName());
-	}	
-
-	// initialize each array present in the root LPU
-        List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
-        for (int i = 0; i < localArrays->NumElements(); i++) {
-                if (i > 0) programFile << std::endl;
-                const char* arrayName = localArrays->Nth(i);
-		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
-                int dimensionCount = array->getDimensionality();
-                
-		// copy the pointer reference to memory location from LPS content to the LPU
-		programFile << indent << "rootLpu->" << arrayName << " = " ;
-		programFile << "space" << rootLps->getName() << "Content.";
-		programFile << arrayName << stmtSeparator;
-
-		// check if the array is part of the environment
-		bool partOfEnv = common_utils::isStringInList(arrayName, envProperties);
-		// if it is part of the environment then try to initiate its metadata from the 
-		// environment reference first
-		std::string currentIndent = indent;
-		if (partOfEnv) {
-			programFile << indent << "if (environment->" << arrayName << " != NULL) {\n";
-			currentIndent = doubleIndent;
-			for (int d = 0; d < dimensionCount; d++) {
-				programFile << currentIndent << "rootLpu->" << arrayName;
-				programFile << "PartDims[" << d << "] = ";
-				programFile << "environment->" << arrayName;
-				programFile << "Dims[" << d << "]" << stmtSeparator;
-			}
-			programFile << indent << "} else {\n";
-		}
-		// if initialization from environment reference is unsuccessful or not applicable then
-		// initiate the metadata based on the array metadata object
-		std::ostringstream varName;
-                varName << "rootLpu->" << arrayName << "PartDims";
-                for (int j = 0; j < dimensionCount; j++) {
-                        programFile << currentIndent << varName.str() << "[" << j << "] = ";
-                        programFile << "PartDimension()" << stmtSeparator;
-                        programFile << currentIndent << varName.str() << "[" << j << "].partition = ";
-                        programFile << "metadata->" << arrayName << "Dims[" << j << "]";
-                        programFile << stmtSeparator;
-                        programFile << currentIndent << varName.str() << "[" << j << "].storage = ";
-                        programFile << "metadata->" << arrayName << "Dims[" << j;
-                        programFile << "].getNormalizedDimension()" << stmtSeparator;
-                }	 
-		
-		if (partOfEnv) programFile << indent << "}\n";
-	}
-
-	// return the root LPU reference
-	programFile << indent << "return rootLpu" << stmtSeparator;
-	
-	// close function definition
-	programFile << "}\n\n";
-	
-	headerFile.close();
-	programFile.close();
-}
-
 void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	
 	std::cout << "\tGenerating task execute routine \n";
@@ -361,18 +243,12 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 
 	TaskDef *taskDef = taskGenerator->getTaskDef();
 	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", "; 
 	std::ostringstream fnHeader;
-
-	std::ostringstream  comments;
-        comments << "/*-----------------------------------------------------------------------------------\n";
-        comments << "function for executing task\n";
-       	comments << "------------------------------------------------------------------------------------*/\n\n";
-	headerFile << comments.str();
-	programFile << comments.str();
+	const char *header = "task executor function";
+	decorator::writeSectionHeader(headerFile, header);
+	headerFile << std::endl;
+	decorator::writeSectionHeader(programFile, header);
+	programFile << std::endl;
 
 	// generate the function header
 	TupleDef *envTuple = taskDef->getEnvTuple();
@@ -394,6 +270,8 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	}
 	fnHeader << paramSeparator << std::endl << doubleIndent;
 	fnHeader << partitionTuple->getId()->getName() << " partition";
+	fnHeader << paramSeparator << std::endl << doubleIndent;
+	fnHeader << "int segmentId";
 	fnHeader << paramSeparator << std::endl << doubleIndent;
 	fnHeader << "std::ofstream &logFile";
 	fnHeader << ")";
@@ -438,18 +316,7 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	}
 	taskGenerator->inovokeTaskInitializer(programFile, externalEnvLinks, true);
 
-	// invoke functions to initialize array references in different LPSes
-        programFile << std::endl << indent << "// allocating memories for data structures\n";
-        programFile << indent << "initializeRootLPSContent(&envLinks, metadata)" << stmtSeparator;
-        programFile << indent << "initializeLPSesContents(metadata)" << stmtSeparator;
-
-	// initiate a root LPU reference based on the environment reference
-	programFile << std::endl << indent << "// initializing the root LPU reference\n";
-	programFile << indent << "Space" << rootLps->getName() << "_LPU *rootLpu = ";
-	programFile << "initiateRootLpu(environment, metadata)" << stmtSeparator;
-
-	// generate thread-state objects for the intended number of threads and initialize their 
-	// root LPUs
+	// generate thread-state objects for the intended number of threads and initialize their root LPUs
         taskGenerator->initiateThreadStates(programFile);
 
 	// set up the root LPU reference on each all thread's state variable
@@ -457,65 +324,30 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << "// setting up root LPU reference in each thread's state\n";
         programFile << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
         programFile << indent << indent;
-	programFile << "threadStateList[i]->setRootLpu(rootLpu)" << stmtSeparator;
+	programFile << "threadStateList[i]->setRootLpu(metadata)" << stmtSeparator;
         programFile << indent << "}\n";
+
+	// group threads into segments; then allocate and initialize the segment memory for current process
+        taskGenerator->performSegmentGrouping(programFile, true);
+        taskGenerator->initializeSegmentMemory(programFile);
+
+	// read data structures from files if instructed by the coordinator program
+	programFile << indent << "initializeEnvironment";
+	programFile << "(" << "environment" << paramSeparator;
+	programFile << "taskData" << paramSeparator;
+	programFile << "configMap" << ")" << stmtSeparator; 
 
 	// start threads and wait for them to finish execution of the task 
         taskGenerator->startThreads(programFile);
 
-	// copy updated environmental references from root-LPS content and task-global-scalar into
-	// the original environment reference	
-        programFile << indent << "// copying results of task execution into environment\n";
-	List<VariableDef*> *propertyList = envTuple->getComponents();
-	List<const char*> *propertyNames = new List<const char*>;
-	for (int i = 0; i < propertyList->NumElements(); i++) {
-		
-		VariableDef *property = propertyList->Nth(i);
-		Type *propertyType = property->getType();
-		const char *propertyName = property->getId()->getName();
-		propertyNames->Append(propertyName);	
-		
-		// if the data structure is a dynamic array, we copy it and its metadata from root LPS
-		ArrayType *array = dynamic_cast<ArrayType*>(propertyType);
-		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(propertyType);
-		if (array != NULL && staticArray == NULL) {
-			programFile << indent;
-			programFile << "environment->" << propertyName << " = ";
-			programFile << "rootLpu->" << propertyName;
-			programFile << stmtSeparator;
-			int dimensions = array->getDimensions();
-			for (int d = 0; d < dimensions; d++) {
-				programFile << indent;
-				programFile << "environment->" << propertyName;
-				programFile << "Dims[" << d << "] = ";
-				programFile << "rootLpu->" << propertyName << "PartDims[" << d << "]";
-				programFile << stmtSeparator;
-			}
-		// otherwise, copy the property from task-global object into the environment 
-		} else if (strcmp(propertyName, "name") != 0) {
-			programFile << indent;
-			programFile << "environment->" << propertyName << " = ";
-			programFile << "taskGlobals." << propertyName;
-			programFile << stmtSeparator;
-		}	
-	}	
-
-	// remove all arrays from the execution context that are not part of the environment
-        List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
-	bool removed = false;
-	for (int i = 0; i < localArrays->NumElements(); i++) {
-		const char *array = localArrays->Nth(i);
-		if (!common_utils::isStringInList(array, propertyNames)) {
-			if (!removed) {
-				programFile << std::endl << indent;
-				programFile << "// removing by-products of task execution\n";
-			}
-			removed = true;
-			programFile << indent;
-			programFile << "delete [] space" << rootLps->getName() << "Content." << array;
-			programFile << stmtSeparator;
-		}
-	}	
+	// write environmental data structures into output files if instructed by the coordinator program 
+	// through output bindings
+	programFile << indent << "// storing outputs in files\n"; 
+	programFile << indent << "storeEnvironment";
+	programFile << "(" << "environment" << paramSeparator;
+	programFile << "taskData" << paramSeparator;
+	programFile << "mySegment" << paramSeparator;
+	programFile << "configMap" << ")" << stmtSeparator; 
 	
 	// close function definition
 	programFile << "}\n\n";
@@ -533,18 +365,17 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
                 std::cout << "Unable to open output program file";
                 std::exit(EXIT_FAILURE);
         }
-
-        stream << "/*-----------------------------------------------------------------------------------\n";
-        stream << "main function\n";
-        stream << "------------------------------------------------------------------------------------*/\n";
+	decorator::writeSectionHeader(stream, "main function");
 
 	CoordinatorDef *coordDef = programDef->getProgramController();
-        std::string indent = "\t";
-        std::string stmtSeparator = ";\n";
-        std::string paramSeparator = ", ";
 
         // write the function signature
-        stream << "\nint main() {\n\n";
+        stream << "\nint main(int argc, char *argv[]) {\n\n";
+
+	// retrieve the segment id for the current process
+        stream << indent << "// retreiving segmentation identifier\n";
+	stream << indent << "int segmentId = 0" << stmtSeparator;
+        stream << indent << "if (argc > 1) segmentId = std::atoi(argv[1])" << stmtSeparator << std::endl;
 
 	// start execution time monitoring timer
         stream << indent << "// starting execution timer clock\n";

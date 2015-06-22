@@ -3,7 +3,10 @@
 #include "ast_type.h"
 #include "ast_library_fn.h"
 #include "../utils/list.h"
+#include "../utils/code_constant.h"
+#include "../utils/decorator_utils.h"
 #include "../semantics/scope.h"
+#include "../semantics/symbol.h"
 #include "errors.h"
 
 #include <iostream>
@@ -16,6 +19,8 @@ const char *LoadArray::Name = "load_array";
 const char *LoadListOfArrays::Name = "load_list_of_arrays";
 const char *StoreArray::Name = "store_array";
 const char *StoreListOfArrays::Name = "store_list_of_arrays";
+const char *BindInput::Name = "bind_input";
+const char *BindOutput::Name = "bind_output";
 
 //-------------------------------------------------------- Library Function -----------------------------------------------------/
 
@@ -37,7 +42,9 @@ bool LibraryFunction::isLibraryFunction(Identifier *id) {
 	return (strcmp(name, Root::Name) == 0 || strcmp(name, Random::Name) == 0
 		|| strcmp(name, LoadArray::Name) == 0 || strcmp(name, LoadListOfArrays::Name) == 0
 		|| strcmp(name, StoreArray::Name) == 0 
-		|| strcmp(name, StoreListOfArrays::Name) == 0);
+		|| strcmp(name, StoreListOfArrays::Name) == 0
+		|| strcmp(name, BindInput::Name) == 0
+		|| strcmp(name, BindOutput::Name) == 0);
 }
 
 void LibraryFunction::PrintChildren(int indentLevel) {
@@ -60,6 +67,7 @@ LibraryFunction *LibraryFunction::getFunctionExpr(Identifier *id, List<Expr*> *a
 	const char* name = id->getName();
 	LibraryFunction *function = NULL;
 
+	// note that there should never be a default 'else' block here; then the system will fail to find user defined functions
 	if (strcmp(name, Root::Name) == 0) {
 		function = new Root(id, arguments, loc);
 	} else if (strcmp(name, Random::Name) == 0) {
@@ -72,6 +80,10 @@ LibraryFunction *LibraryFunction::getFunctionExpr(Identifier *id, List<Expr*> *a
 		function = new StoreArray(id, arguments, loc);
 	} else if (strcmp(name, StoreListOfArrays::Name) == 0) {
 		function = new StoreListOfArrays(id, arguments, loc);
+	} else if (strcmp(name, BindInput::Name) == 0) {
+		function = new BindInput(id, arguments, loc);
+	} else if (strcmp(name, BindOutput::Name) == 0) {
+		function = new BindOutput(id, arguments, loc);
 	}
 
 	return function;	
@@ -160,69 +172,66 @@ void LoadArray::generateCode(std::ostringstream &stream, int indentLevel, Space 
 	Type *elemType = array->getTerminalElementType();
 	int dimensions = array->getDimensions();
 
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-	std::string doubleIndent = "\t\t";
-	std::ostringstream indent;
-	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentLevel; i++) indentStr << indent;
 
-	stream << indent.str() << "{ // scope starts for load-array operation\n";
+	stream << indentStr.str() << "{ // scope starts for load-array operation\n";
 	std::ostringstream arrayExpr;
 	
 	// get the translated C++ expression for the argument array
 	arg1->translate(arrayExpr, 0);
 	
 	// create a dimension array to hold metadata about the array
-	stream << indent.str() << "Dimension arrayDims[" << dimensions << "]" << stmtSeparator;
+	stream << indentStr.str() << "Dimension arrayDims[" << dimensions << "]" << stmtSeparator;
 
 	// generate a prompt to decide if to read the array from file or not
-	stream << indent.str() << "if (outprompt::getYesNoAnswer(\"Want to read array";
+	stream << indentStr.str() << "if (outprompt::getYesNoAnswer(\"Want to read array";
         stream << " \\\"" << arrayExpr.str() << "\\\" from a file?\"";
         stream << ")) {\n";
 
         // if the response is yes then generate a prompt for reading the array from a file 
-        stream << indent.str() << '\t';
+        stream << indentStr.str() << indent;
         stream << arrayExpr.str() << " = ";
 	stream << "inprompt::readArrayFromFile ";
 	stream << '<' << elemType->getName() << "> ";
 	stream << "(\"" << arrayExpr.str() << "\"" << paramSeparator;
-	stream << std::endl << indent.str() << doubleIndent;
+	stream << std::endl << indentStr.str() << doubleIndent;
 	stream << dimensions << paramSeparator;
 	stream << "arrayDims" << paramSeparator;
 	arg2->translate(stream, 0);
 	stream << ")" << stmtSeparator;
 
 	// otherwise, generate code for randomly initialize the array
-	stream << indent.str() << "} else {\n";
+	stream << indentStr.str() << "} else {\n";
 	// create a prompt to get the dimensions information for the variable under concern
-	stream << indent.str() << '\t';
+	stream << indentStr.str() << indent;
 	stream << "inprompt::readArrayDimensionInfo(\"" << arrayExpr.str() << "\"" << paramSeparator;
 	stream << dimensions << paramSeparator << "arrayDims)" << stmtSeparator;
 	// then allocate an array for the variable
-	stream << indent.str() << "\t";
+	stream << indentStr.str() << indent;
 	stream << arrayExpr.str() << " = allocate::allocateArray ";
 	stream << '<' << elemType->getName() << "> ";
 	stream << '(' << dimensions << paramSeparator;
 	stream << "arrayDims)" << stmtSeparator;
 	// finally randomly initialize the array
-	stream << indent.str() << "\t";
+	stream << indentStr.str() << indent;
 	stream << "allocate::randomFillPrimitiveArray ";
 	stream << '<' << elemType->getName() << "> ";
 	stream << "(" << arrayExpr.str() << paramSeparator;
-	stream << std::endl << indent.str() << doubleIndent;
+	stream << std::endl << indentStr.str() << doubleIndent;
 	stream << dimensions << paramSeparator;
 	stream << "arrayDims)" << stmtSeparator;
-	stream << indent.str() << "}\n";
+	stream << indentStr.str() << "}\n";
 	
 	// populate partition dimension objects of the array based on the dimension been updated by the library function
 	for (int d = 0; d < dimensions; d++) {
-		stream << indent.str() << arrayExpr.str() << "Dims[" << d << "].partition = "; 
+		stream << indentStr.str() << arrayExpr.str() << "Dims[" << d << "].partition = "; 
 		stream << "arrayDims[" << d << "]" << stmtSeparator; 
-		stream << indent.str() << arrayExpr.str() << "Dims[" << d << "].storage = "; 
+		stream << indentStr.str() << arrayExpr.str() << "Dims[" << d << "].storage = "; 
 		stream << "arrayDims[" << d << "].getNormalizedDimension()" << stmtSeparator; 
 	}
 
-	stream << indent.str() << "} // scope ends for load-array operation\n";
+	stream << indentStr.str() << "} // scope ends for load-array operation\n";
 }
 
 //------------------------------------------------------- Store Array -----------------------------------------------------/
@@ -235,37 +244,33 @@ void StoreArray::generateCode(std::ostringstream &stream, int indentLevel, Space
 	Type *elemType = array->getTerminalElementType();
 	int dimensions = array->getDimensions();
 
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-	std::string doubleIndent = "\t\t";
-	std::ostringstream indent;
-	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentLevel; i++) indentStr << indent;
 	
 	// get the translated C++ expression for the argument array
 	std::ostringstream arrayExpr;
 	arg1->translate(arrayExpr, 0);
 
 	// first generate a prompt that will ask the user if he wants to write this array to a file
-	stream << indent.str() << "if (outprompt::getYesNoAnswer(\"Want to save array";
+	stream << indentStr.str() << "if (outprompt::getYesNoAnswer(\"Want to save array";
 	stream << " \\\"" << arrayExpr.str() << "\\\" in a file?\"";
 	stream << ")) {\n";
 
-	// create a dimension object and copy storage information from array metadata object into 
-	// the former
-	stream << indent.str() << '\t';
+	// create a dimension object and copy storage information from array metadata object into the former
+	stream << indentStr.str() << indent;
 	stream << "Dimension arrayDims[" << dimensions << "]" << stmtSeparator;
 	for (int d = 0; d < dimensions; d++) {
-		stream << indent.str() << '\t'; 
+		stream << indentStr.str() << indent; 
 		stream << "arrayDims[" << d << "] = "; 
 		stream << arrayExpr.str() << "Dims[" << d << "].storage"; 
 		stream << stmtSeparator; 
 	}
 
 	// then generate the prompt for writing the array to the file specified by the user
-	stream << indent.str() << "\toutprompt::writeArrayToFile ";
+	stream << indentStr.str() << "\toutprompt::writeArrayToFile ";
 	stream << '<' << elemType->getName() << '>';
 	stream << " (\"" << arrayExpr.str() << "\"" << paramSeparator;
-	stream << std::endl << indent.str() << doubleIndent;
+	stream << std::endl << indentStr.str() << doubleIndent;
 	stream << arrayExpr.str() << paramSeparator;
 	stream << dimensions << paramSeparator;
 	stream << "arrayDims" << paramSeparator;
@@ -273,5 +278,109 @@ void StoreArray::generateCode(std::ostringstream &stream, int indentLevel, Space
 	stream << ")" << stmtSeparator;
 
 	// close the if block at the end        
-	stream << indent.str() << "}\n";
+	stream << indentStr.str() << "}\n";
+}
+
+//----------------------------------------------------- Bind Operation ----------------------------------------------------/
+
+void BindOperation::validateArguments(Scope *scope, bool ignoreFailure) {
+
+	NamedType *envType = NULL;	
+	Expr *arg1 = arguments->Nth(0);
+	arg1->resolveType(scope, ignoreFailure);
+	Type *arg1Type = arg1->getType();
+	if (arg1Type == NULL) {
+		ReportError::UnknownExpressionType(arg1, ignoreFailure);	
+	} else {
+		NamedType *objectType = dynamic_cast<NamedType*>(arg1Type);
+		if (objectType == NULL || !objectType->isEnvironmentType()) {
+			ReportError::NotAnEnvironment(arg1->GetLocation(), arg1Type, ignoreFailure);
+		} else {
+			envType = objectType;
+		}
+	}
+
+	
+	Expr *arg2 = arguments->Nth(1);
+	StringConstant *varName = dynamic_cast<StringConstant*>(arg2);
+	if (varName == NULL) {
+		ReportError::NotAConstant(arg2->GetLocation(), "string", ignoreFailure);
+	} else if (envType != NULL) {
+		const char *arrayName = varName->getValue();
+		Symbol *symbol = scope->lookup(envType->getTaskName());
+		TaskSymbol *task = dynamic_cast<TaskSymbol*>(symbol);
+		TaskDef *taskDef = (TaskDef*) task->getNode();
+                TupleDef *envTuple = taskDef->getEnvTuple();
+		if (envTuple->getComponent(arrayName) == NULL) {
+			ReportError::InvalidInitArg(arg2->GetLocation(), envType->getName(), arrayName, ignoreFailure);
+		}		
+	}
+
+	Expr *arg3 = arguments->Nth(2);
+	arg3->resolveType(scope, ignoreFailure);
+	Type *arg3Type = arg3->getType();
+	if (arg3Type == NULL) {
+		ReportError::UnknownExpressionType(arg3, ignoreFailure);	
+	} else if (arg3Type != Type::stringType && arg3Type != Type::errorType) {
+		ReportError::IncompatibleTypes(arg3->GetLocation(), arg3Type, Type::stringType, ignoreFailure);
+	}
+
+	this->type = Type::voidType;	
+}
+
+void BindOperation::inferType(Scope *scope, Type *type) {
+	if (arguments->NumElements() == 3) {
+		arguments->Nth(2)->inferType(scope, Type::stringType);
+		arguments->Nth(2)->resolveType(scope, false);
+	}
+}
+
+//------------------------------------------------------- Bind Input ------------------------------------------------------/
+
+void BindInput::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentLevel; i++) indentStr << indent;
+	
+	Expr *arg1 = arguments->Nth(0);
+	Expr *arg2 = arguments->Nth(1);
+	Expr *arg3 = arguments->Nth(2);
+	const char *array = ((StringConstant *) arg2)->getValue();
+
+	stream << indentStr.str();
+	arg1->translate(stream, indentLevel);
+	stream << "->bindInput(";
+	arg2->translate(stream, indentLevel);
+	stream << paramSeparator;
+	arg3->translate(stream, indentLevel);
+	stream << ")" << stmtSeparator;
+	
+	stream << indentStr.str();  
+	arg1->translate(stream, indentLevel);
+	stream << "->readDimensionInfo(";
+	arg2->translate(stream, indentLevel);
+	stream << paramSeparator;
+	arg1->translate(stream, indentLevel);
+	stream << "->" << array << "Dims";
+	stream << ")" << stmtSeparator;
+}
+
+//------------------------------------------------------- Bind Output -----------------------------------------------------/
+
+void BindOutput::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentLevel; i++) indentStr << indent;
+	
+	Expr *arg1 = arguments->Nth(0);
+	Expr *arg2 = arguments->Nth(1);
+	Expr *arg3 = arguments->Nth(2);
+
+	stream << indentStr.str();
+	arg1->translate(stream, indentLevel);
+	stream << "->bindOutput(";
+	arg2->translate(stream, indentLevel);
+	stream << paramSeparator;
+	arg3->translate(stream, indentLevel);
+	stream << ")" << stmtSeparator;
 }

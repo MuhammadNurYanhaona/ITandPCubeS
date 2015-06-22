@@ -68,6 +68,12 @@ template <class Type> class TypedInputStream {
 		}
 	}
 
+	void copyDimensionInfo(PartDimension *partDims) {
+		for (int i = 0; i < dimLengths->NumElements(); i++) {
+			partDims[i].partition = *(dimLengths->Nth(i));
+		}
+	}
+
   private:
 	void initialize() {
 

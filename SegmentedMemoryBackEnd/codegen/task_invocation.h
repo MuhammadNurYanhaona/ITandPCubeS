@@ -36,14 +36,6 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
 		const char *headerFile,
 		const char *programFile);
 
-// when there is a coordinator function to invoke task, the root of the partition hierarchy should
-// be populated based on the content of the environment object; this function generate the routine
-// for that operation
-void generateFnToInitTaskRootFromEnv(TaskDef *taskDef,
-		const char *initials, 
-		const char *headerFile, 
-		const char *programFile);
-
 // generate a function that serves as a task::main and handle initiation, execution, and after
 // processing of tasks.
 void generateTaskExecutor(TaskGenerator *taskGenerator);

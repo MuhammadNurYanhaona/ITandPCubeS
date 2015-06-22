@@ -138,7 +138,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <varList>		element_defs element_def definitions definition define input output
 %type <idList>		names arguments
 %type <expr>		expr field constant array_index function_call task_invocation create_obj 
-%type <expr>		step_expr restrictions repeat_loop activation_command
+%type <expr>		step_expr restrictions repeat_loop activation_command arg
 %type <exprList>	args
 %type <objInitArg>	obj_arg
 %type <objInitArgList>	obj_args	
@@ -406,10 +406,11 @@ function_call	: Variable_Name '(' args ')'			{
 										$$ = new FunctionCall(id, $3, Join(@1, @4));
 								  	} 
 								};
+arg		: String					{ $$ = new StringConstant(@1, $1); }
+		| expr						{ $$ = $1; };
 args		:						{ $$ = new List<Expr*>;} 
-		| String 					{ ($$ = new List<Expr*>)->Append(new StringConstant(@1, $1)); }
-		| expr 						{ ($$ = new List<Expr*>)->Append($1); }
-		| args ',' expr					{ ($$ = $1)->Append($3); };		
+		| arg 						{ ($$ = new List<Expr*>)->Append($1); }
+		| args ',' arg					{ ($$ = $1)->Append($3); };		
 epoch		: Variable_Name					{ $$ = new EpochValue(new Identifier(@1, $1), 0); } 
 		| Variable_Name '-' Integer			{ $$ = new EpochValue(new Identifier(@1, $1), $3); }; 
 id		: Variable_Name 				{ $$ = new Identifier(@1, $1); }
