@@ -772,7 +772,7 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 					|| reordered || lastAllocInaccessible) {
 				array->setAllocator(lps);
 				array->getUsageStat()->flagAllocated();
-			} 
+			}
 		}	
 	}
 
@@ -805,7 +805,7 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 			// forward reference to their own ancestor LPSes been set for structure 	
 			} else {
 				DataStructure *source = structure->getSource();
-				while (source != NULL && source->getAllocator() != NULL) {
+				while (source != NULL && source->getAllocator() == NULL) {
 					source->setAllocator(lps);
 					source = source->getSource();
 				}
