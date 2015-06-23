@@ -203,6 +203,7 @@ ThreadState::ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, T
 	lpsParentIndexMap = NULL;
 	this->partitionArgs = partitionArgs;
 	this->threadIds = threadIds;
+	this->lpuIdChain = new List<int*>;
 }
 
 LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
@@ -409,6 +410,12 @@ List<List<int*>*> *ThreadState::getAllLpuIds(int lpsId, int rootLpsId) {
 	return lpuIdList;
 }
 
+int *ThreadState::getCurrentLpuId(int lpsId) {
+	LpsState *state = lpsStates[lpsId];
+	LpuCounter *counter = state->getCounter();
+	return counter->getCompositeLpuId();
+}
+
 List<int*> *ThreadState::getLpuIdChain(int lpsId, int rootLpsId) {
 	
 	List<int*> *chain = new List<int*>;
@@ -431,6 +438,28 @@ List<int*> *ThreadState::getLpuIdChain(int lpsId, int rootLpsId) {
 	}
 
 	return chain;
+}
+
+List<int*> *ThreadState::getLpuIdChainWithoutCopy(int lpsId, int rootLpsId) {
+	// clear the current LPU Id chain
+	while (lpuIdChain->NumElements() > 0) {
+		lpuIdChain->RemoveAt(0);
+	}
+	// iterate over parent pointers and add LPU Ids in the chain
+	int currentLpsId = lpsId;
+	while (currentLpsId != rootLpsId) {
+		LpsState *state = lpsStates[currentLpsId];
+		LpuCounter *counter = state->getCounter();
+		lpuIdChain->InsertAt(counter->getCompositeLpuId(), 0);
+		currentLpsId == lpsParentIndexMap[currentLpsId];
+	}
+	return lpuIdChain;	
+}
+
+int *ThreadState::getLpuCounts(int lpsId) {
+	LpsState *state = lpsStates[lpsId];
+	LpuCounter *counter = state->getCounter();
+	return counter->getLpuCounts();
 }
 
 void ThreadState::removeIterationBound(int lpsId) {

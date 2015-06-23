@@ -6,7 +6,8 @@
 #include "string.h"
 #include "../utils/string_utils.h"
 #include "../utils/hashtable.h"
-#include "../utils/decorator_utils.h"	
+#include "../utils/decorator_utils.h"
+#include "../utils/code_constant.h"	
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 #include "../static-analysis/usage_statistic.h"
@@ -21,10 +22,6 @@
 List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerFile, 
                 std::ofstream &programFile, 
                 const char *initials, Space *space) {
-
-	std::string paramSeparator = ", ";
-	std::string stmtSeparator = ";\n";
-	std::string indent = "\t";
 
 	List<PartitionParameterConfig*> *paramConfigList = new List<PartitionParameterConfig*>;
 	CoordinateSystem *coordSys = space->getCoordinateSystem();
@@ -158,18 +155,11 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
                 std::ofstream &programFile, 
                 const char *initials, Space *lps) {
 
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-
 	// create a function header that takes three default arguments
 	const char *lpsName = lps->getName();
 	std::ostringstream functionHeader;
 	functionHeader << "generateSpace" << lpsName << "Lpu(";
-	functionHeader << "Space" << lpsName << "_LPU *lpu" << paramSeparator;
-	functionHeader << '\n' << indent << doubleIndent;	
-	functionHeader << "List<int*> *lpuIdList" << paramSeparator;
+	functionHeader << "ThreadState *threadState" << paramSeparator;
 	functionHeader << '\n' << indent << doubleIndent;	
 	functionHeader << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
 	functionHeader << '\n' <<  indent << doubleIndent;	
@@ -179,10 +169,25 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << functionHeader.str() << " {\n";
 
+	// retrieve the LPU correspond to the LPS under concern from the thread state; also retrieve its Id and
+	// and LPU count for LPS
+	programFile << std::endl;
+	programFile << indent << "int *lpuId = threadState->getCurrentLpuId(Space_";
+	programFile << lpsName << ")" << stmtSeparator;
+	programFile << indent << "int *lpuCounts = threadState->getLpuCounts(Space_";
+	programFile << lpsName << ")" << stmtSeparator;
+	programFile << indent << "Space" << lpsName << "_LPU *lpu = (Space" << lpsName << "_LPU*) ";
+        programFile << "threadState->getCurrentLpu(Space_" << lpsName << ")" << stmtSeparator;
+
+	// retrieve LPU Id chain that shows how the LPU for the current LPS has been reached hierarchically from its
+	// ancestor LPSes; this information will be needed to identify data parts of the LPU
+	programFile << indent << "List<int*> *lpuIdChain = threadState->getLpuIdChainWithoutCopy(";
+	programFile << "Space_" << lpsName << paramSeparator;
+	programFile << "Space_" << lps->getRoot()->getName() << ")" << stmtSeparator;  
+
+	// update LPU Id if the current LPS is partitioned 
 	if (lps->getDimensionCount() > 0) {
-		programFile << std::endl;
-		programFile << indent << "int *lpuId = lpuIdList->Nth(lpuIdList->NumElements() - 1)";
-		programFile << stmtSeparator;
+		programFile << std::endl;	
 		for (int i = 0; i < lps->getDimensionCount(); i++) {
 			programFile << indent;
 			programFile << "lpu->lpuId[" << i << "] = lpuId[" << i << "]";
@@ -190,12 +195,38 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		}
 	}
 	
+	// keep a list of LPS names for whose LPUs will be retrieved in the LPU generation proceess for current LPS
+	List<const char*> *parentLpsNames = new List<const char*>;
+	
 	List<const char*> *localArrays = lps->getLocallyUsedArrayNames();
 	for (int i = 0; i < localArrays->NumElements(); i++) {
 		ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(localArrays->Nth(i));
 		ArrayType *arrayType = (ArrayType*) array->getType();
 		Type *elemType = arrayType->getTerminalElementType();
 		const char *varName = array->getName();
+
+		// if the current LPS is a subpartition and the parent LPS is the holder of current array reference
+		// then just assign every information from the parent to the current LPU regarding this array
+		if (array->getSpace() != lps && lps->isSubpartitionSpace()) {
+			programFile << std::endl;
+			const char *parentLpsName = array->getSpace()->getName();
+			if (!string_utils::contains(parentLpsNames, parentLpsName)) {
+				parentLpsNames->Append(parentLpsName);
+				programFile << indent << "Space" << parentLpsName;
+				programFile << "_LPU *space" << parentLpsName << "Lpu = (Space" << parentLpsName; 
+				programFile << "_LPU*) threadState->getCurrentLpu(Space_";
+				programFile << parentLpsName << ")" << stmtSeparator;
+			}
+			programFile << indent << "lpu->" << varName << " = space" << parentLpsName;
+			programFile << "Lpu->" << varName << stmtSeparator;
+			int dimensionality = array->getDimensionality();
+			for (int d = 0; d < dimensionality; d++) {
+				programFile << indent << "lpu->" << varName << "PartDims[" << d;
+				programFile << "] = space" << parentLpsName;
+				programFile << "Lpu->" << varName << "PartDims[" << d << "]" << stmtSeparator;
+			}
+			continue;
+		}
 		
 		// retrieve the part configuration object for current array
 		programFile << std::endl;
@@ -203,15 +234,32 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		programFile << "partConfigMap->Lookup(";
 		programFile << '"' << varName << "Space" << lpsName << "Config" << '"' << ")";
 		programFile << stmtSeparator;
-		
-		// retrieve the part Id of the array for current LPU
-		programFile << indent << "List<int*> *" << varName << "PartIdList = ";
-		programFile << varName << "Config->generatePartId(lpuIdList)" << stmtSeparator;
+
+		// get the parent data structure reference holding LPS for the array; note that there is always a
+		// parent/source reference for any structure due to the presence of the root LPS 
+		DataStructure *source = array->getSource();
+		Space *parentLps = source->getSpace();
+		const char *parentLpsName = parentLps->getName();
+
+		// if the LPU correspond to the parent LPS has not been retrieved previously then retrieve it
+		if (!string_utils::contains(parentLpsNames, parentLpsName)) {
+			parentLpsNames->Append(parentLpsName);
+			programFile << indent << "Space" << parentLpsName;
+			programFile << "_LPU *space" << parentLpsName << "Lpu = (Space" << parentLpsName; 
+			programFile << "_LPU*) threadState->getCurrentLpu(Space_";
+			programFile << parentLpsName << ")" << stmtSeparator;
+		}
+	
+		// get the parent part dimension information
+		programFile << indent << "PartDimension *" << varName << "ParentPartDims = ";
+		programFile << "space" << parentLpsName << "Lpu->" << varName << "PartDims" << stmtSeparator; 	
 
 		// set up the partition dimension information of the array part within the LPU
 		programFile << indent << varName << "Config->updatePartDimensionInfo(";
-		programFile << varName << "PartIdList" << paramSeparator;
-		programFile << "lpu->" << varName << "PartDims)" << stmtSeparator;
+		programFile << "lpuId" << paramSeparator;
+		programFile << "lpuCounts" << paramSeparator;
+		programFile << "lpu->" << varName << "PartDims" << paramSeparator; 
+		programFile << varName << "ParentPartDims" << ")" << stmtSeparator;
 
 		// if the variable is not accessed in the LPS then there is no need for updating the underlying
 		// pointer reference to data
@@ -227,6 +275,11 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// only LPUs. This process should be changed alongside an update to the LPU generation process
 		// that the future developers should investigate for optimization or even for a better design.
 		programFile << indent << "if (taskData != NULL) {\n";
+
+		// retrieve the hierarchical part Id of the array for current LPU so that the storage instance can 
+		// be identified
+               	programFile << doubleIndent << "List<int*> *" << varName << "PartIdList = ";
+                programFile << varName << "Config->generatePartId(lpuIdChain)" << stmtSeparator;
 
 		// determine what LPS allocates the array
 		Space *allocatorLps = array->getAllocator();
@@ -308,11 +361,12 @@ void generateAllLpuConstructionFunctions(const char *headerFileName,
 	headerFile << std::endl;
 	decorator::writeSectionHeader(programFile, message);
 
-	// iterate over all LPSes and generate a function for each partitioned LPS
-	Hashtable<List<PartitionParameterConfig*>*> *paramTable 
-			= new Hashtable<List<PartitionParameterConfig*>*>;		
+	// iterate over all LPSes and generate a function for each LPS
+	Hashtable<List<PartitionParameterConfig*>*> *paramTable = new Hashtable<List<PartitionParameterConfig*>*>;		
 	std::deque<MappingNode*> nodeQueue;
-	nodeQueue.push_back(mappingRoot);
+	for (int i = 0; i < mappingRoot->children->NumElements(); i++) {
+		nodeQueue.push_back(mappingRoot->children->Nth(i));
+	}
 	while (!nodeQueue.empty()) {
 		MappingNode *node = nodeQueue.front();
 		nodeQueue.pop_front();

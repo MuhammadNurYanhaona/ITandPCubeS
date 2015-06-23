@@ -158,12 +158,11 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
         }
 
 	std::ostringstream fnHeader;
-	std::ostringstream  comments;
-        comments << "/*-----------------------------------------------------------------------------------\n";
-        comments << "function for initializing environment-links object\n";
-       	comments << "------------------------------------------------------------------------------------*/\n\n";
-	headerFile << comments.str();
-	programFile << comments.str();
+        const char *comments = "function for initializing environment-links object";
+	decorator::writeSectionHeader(headerFile, comments);
+	headerFile << std::endl;
+	decorator::writeSectionHeader(programFile, comments);
+	programFile << std::endl;
 
 	// write function signature in header and program files
 	programFile << "EnvironmentLinks " << initials << "::";
@@ -224,7 +223,7 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
 	programFile << indent << "return envLinks" << stmtSeparator;
 	
 	// close function definition
-	programFile << "}\n\n";
+	programFile << "}\n";
 	
 	headerFile.close();
 	programFile.close();

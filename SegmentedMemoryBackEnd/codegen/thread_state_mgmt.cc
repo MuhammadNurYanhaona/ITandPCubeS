@@ -4,6 +4,7 @@
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 #include "../utils/decorator_utils.h"
+#include "../utils/code_constant.h"
 #include "../syntax/ast_task.h"
 
 #include <cstdlib>
@@ -21,10 +22,8 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 	std::cout << "\tGenerating routine for root LPU calculation" << std::endl;
 	const char *header = "Root LPU Construction";
 	decorator::writeSubsectionHeader(programFile, header);
+	programFile << std::endl;
 
-	std::string statementSeparator = ";\n";
-        std::string singleIndent = "\t";
-	
 	// specify the signature of the set-root-LPU function matching the virtual function in Thread-State class
 	std::ostringstream functionHeader;
         functionHeader << "void ThreadStateImpl::setRootLpu(Metadata *metadata)";
@@ -32,17 +31,17 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 	functionBody << "{\n\n";
 
 	// first cast the generic metadata object into task specific array metadata object
-	functionBody << singleIndent;
+	functionBody << indent;
 	functionBody << "ArrayMetadata *arrayMetadata = (ArrayMetadata*) metadata";
-	functionBody << statementSeparator;
+	functionBody << stmtSeparator;
 	functionBody << std::endl;
 
 	// allocate an LPU for the root
 	Space *rootLps = mappingRoot->mappingConfig->LPS;
-	functionBody << singleIndent;
+	functionBody << indent;
 	functionBody << "Space" << rootLps->getName() << "_LPU *lpu = new Space";
 	functionBody  << rootLps->getName() << "_LPU";
-	functionBody << statementSeparator;
+	functionBody << stmtSeparator;
 
 	// initialize each array in the root LPU
 	List<const char*> *localArrays = rootLps->getLocallyUsedArrayNames();
@@ -51,34 +50,32 @@ void generateRootLpuComputeRoutine(std::ofstream &programFile, MappingNode *mapp
 		const char* arrayName = localArrays->Nth(i);
 		ArrayDataStructure *array = (ArrayDataStructure*) rootLps->getLocalStructure(arrayName);
 		int dimensionCount = array->getDimensionality();
-		functionBody << singleIndent << "lpu->" << arrayName << " = NULL" << statementSeparator;
+		functionBody << indent << "lpu->" << arrayName << " = NULL" << stmtSeparator;
 		std::ostringstream varName;
 		varName << "lpu->" << arrayName << "PartDims";
 		for (int j = 0; j < dimensionCount; j++) {
-			functionBody << singleIndent << varName.str() << "[" << j << "] = ";
-			functionBody << "PartDimension()" << statementSeparator;
-			functionBody << singleIndent << varName.str() << "[" << j << "].partition = ";
+			functionBody << indent << varName.str() << "[" << j << "] = ";
+			functionBody << "PartDimension()" << stmtSeparator;
+			functionBody << indent << varName.str() << "[" << j << "].partition = ";
 			functionBody << "arrayMetadata->" << arrayName << "Dims[" << j << "]";
-			functionBody << statementSeparator;			
-			functionBody << singleIndent << varName.str() << "[" << j << "].storage = ";
+			functionBody << stmtSeparator;			
+			functionBody << indent << varName.str() << "[" << j << "].storage = ";
 			functionBody << "arrayMetadata->" << arrayName << "Dims[" << j;
-			functionBody << "].getNormalizedDimension()" << statementSeparator;			
+			functionBody << "].getNormalizedDimension()" << stmtSeparator;			
 		}	
 	}
 	
 	// store the LPU in the proper LPS state
 	functionBody << std::endl;
-	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
-	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
-	functionBody << statementSeparator << "}\n";
+	functionBody << indent << "lpu->setValidBit(true)" << stmtSeparator;	
+	functionBody << indent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
+	functionBody << stmtSeparator << "}\n";
 	
 	programFile << functionHeader.str() << " " << functionBody.str();
 }
 
 void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot) {
 
-	std::string statementSeparator = ";\n";
-        std::string singleIndent = "\t";
 	Space *rootLps = mappingRoot->mappingConfig->LPS;
 	
 	// specify the signature of the set-root-LPU function matching the virtual function in Thread-State class
@@ -88,9 +85,9 @@ void generateSetRootLpuRoutine(std::ofstream &programFile, MappingNode *mappingR
 	functionBody << "{\n";
 
 	// store the LPU in the proper LPS state
-	functionBody << singleIndent << "lpu->setValidBit(true)" << statementSeparator;	
-	functionBody << singleIndent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
-	functionBody << statementSeparator << "}\n";
+	functionBody << indent << "lpu->setValidBit(true)" << stmtSeparator;	
+	functionBody << indent << "lpsStates[Space_" << rootLps->getName() << "]->lpu = lpu";
+	functionBody << stmtSeparator << "}\n";
 	
 	programFile << std::endl;
 	programFile << functionHeader.str() << " " << functionBody.str();
@@ -102,10 +99,8 @@ void generateInitializeLpusRoutine(std::ofstream &programFile, MappingNode *mapp
 
 	const char *header = "State Initialization";
 	decorator::writeSubsectionHeader(programFile, header);
+	programFile << std::endl;
 	
-	std::string statementSeparator = ";\n";
-        std::string singleIndent = "\t";
-
 	programFile << "void ThreadStateImpl::initializeLPUs() {\n";
 	
 	// Note that we skip the root LPU as it must be set correctly for computation to be able to make
@@ -121,13 +116,13 @@ void generateInitializeLpusRoutine(std::ofstream &programFile, MappingNode *mapp
                         nodeQueue.push_back(node->children->Nth(i));
                 }
 		Space *lps = node->mappingConfig->LPS;
-		programFile << singleIndent;
+		programFile << indent;
 		programFile << "lpsStates[Space_" << lps->getName() << "]->lpu = ";
 		programFile << "new Space" << lps->getName() << "_LPU";
-		programFile << statementSeparator;
-		programFile << singleIndent;
+		programFile << stmtSeparator;
+		programFile << indent;
 		programFile << "lpsStates[Space_" << lps->getName() << "]->lpu->setValidBit(false)";
-		programFile << statementSeparator;
+		programFile << stmtSeparator;
 	}
 
 	programFile << "}\n";
@@ -139,17 +134,16 @@ void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mapp
         
 	const char *header = "LPS Hierarchy Trace";
 	decorator::writeSubsectionHeader(programFile, header);
+	programFile << std::endl;
 	
-	std::string statementSeparator = ";\n";
-        std::string singleIndent = "\t";
 	std::ostringstream allocateStmt;
 	std::ostringstream initializeStmts;
 
-	allocateStmt << singleIndent << "lpsParentIndexMap = new int";
-	allocateStmt << "[Space_Count]" << statementSeparator;
-	initializeStmts << singleIndent << "lpsParentIndexMap[Space_";
+	allocateStmt << indent << "lpsParentIndexMap = new int";
+	allocateStmt << "[Space_Count]" << stmtSeparator;
+	initializeStmts << indent << "lpsParentIndexMap[Space_";
 	initializeStmts << mappingRoot->mappingConfig->LPS->getName();
-	initializeStmts << "] = INVALID_ID" << statementSeparator;
+	initializeStmts << "] = INVALID_ID" << stmtSeparator;
 
 	std::deque<MappingNode*> nodeQueue;
         for (int i = 0; i < mappingRoot->children->NumElements(); i++) {
@@ -162,10 +156,10 @@ void generateParentIndexMapRoutine(std::ofstream &programFile, MappingNode *mapp
                         nodeQueue.push_back(node->children->Nth(i));
                 }
 		Space *lps = node->mappingConfig->LPS;
-		initializeStmts << singleIndent;
+		initializeStmts << indent;
 		initializeStmts << "lpsParentIndexMap[Space_" << lps->getName() << "] = ";
 		initializeStmts << "Space_" << lps->getParent()->getName();
-		initializeStmts << statementSeparator;
+		initializeStmts << stmtSeparator;
 	}
 
 	programFile << "void ThreadStateImpl::setLpsParentIndexMap() {\n";
@@ -180,13 +174,8 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
         
 	const char *header = "LPU Count Function";
 	decorator::writeSubsectionHeader(programFile, header);
+	programFile << std::endl;
 	
-	std::string statementSeparator = ";\n";
-        std::string singleIndent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string tripleIndent = "\t\t\t";
-	std::string parameterSeparator = ", ";
-
 	// specify the signature of the compute-Next-Lpu function matching the virtual function in Thread-State class
 	std::ostringstream functionHeader;
         functionHeader << "int *ThreadStateImpl::computeLpuCounts(int lpsId)";
@@ -194,8 +183,8 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 	functionBody << "{\n";
 
 	// retrieve the data partition configuration map from thread state that will be used by LPS count functions
-	functionBody << singleIndent << "Hashtable<DataPartitionConfig*> *configMap = getPartConfigMap()";
-	functionBody << statementSeparator;
+	functionBody << indent << "Hashtable<DataPartitionConfig*> *configMap = getPartConfigMap()";
+	functionBody << stmtSeparator;
 
 	std::deque<MappingNode*> nodeQueue;
         nodeQueue.push_back(mappingRoot);
@@ -207,9 +196,9 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
                 }
 		Space *lps = node->mappingConfig->LPS;
 		// if the space is unpartitioned then we can return NULL as there is no need for a counter then
-		functionBody << singleIndent << "if (lpsId == Space_" << lps->getName() << ") {\n";
+		functionBody << indent << "if (lpsId == Space_" << lps->getName() << ") {\n";
 		if (lps->getDimensionCount() == 0) {
-			functionBody << doubleIndent << "return NULL" << statementSeparator;
+			functionBody << doubleIndent << "return NULL" << stmtSeparator;
 		// otherwise, we have to call the appropriate get-LPU-count function generated before 
 		} else {
 			// create local variables for ancestor LPUs that will be needed to determine the dimension
@@ -234,7 +223,7 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 					functionBody << doubleIndent << doubleIndent;
 					functionBody << " = (Space" << parentLps->getName() << "_LPU*) ";
 					functionBody << "lpsStates[Space_" << parentLps->getName() << "]->lpu";
-					functionBody << statementSeparator;
+					functionBody << stmtSeparator;
 					arrayToParentLpus->Enter(arrayName, strdup(parentLpuStr.str().c_str()));
 					parentLpus->Enter(parentLps->getName(), strdup(parentLpuStr.str().c_str()));
 				// otherwise just get the reference of the already created LPU
@@ -250,18 +239,18 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 				PartitionParameterConfig *currentConfig = paramConfigs->Nth(i);	 
 				const char *arrayName = currentConfig->arrayName;
 				if (arrayName != NULL) {
-					functionBody << parameterSeparator << "\n" << doubleIndent << doubleIndent;
+					functionBody << paramSeparator << "\n" << doubleIndent << doubleIndent;
 					functionBody << arrayToParentLpus->Lookup(arrayName) << "->" << arrayName;
 					functionBody << "PartDims[" << currentConfig->dimensionNo - 1;
 					functionBody << "].partition"; 
 				}
 			}
-			functionBody << ")" << statementSeparator; 
+			functionBody << ")" << stmtSeparator; 
 		}
-		functionBody << singleIndent << "}\n";
+		functionBody << indent << "}\n";
 	}
 	
-	functionBody << singleIndent << "return NULL" << statementSeparator;
+	functionBody << indent << "return NULL" << stmtSeparator;
 	functionBody << "}\n";
 	
 	programFile << std::endl << functionHeader.str() << " " << functionBody.str();
@@ -274,12 +263,6 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 	const char *header = "LPU Construction Function";
 	decorator::writeSubsectionHeader(programFile, header); 
 	
-	std::string stmtSeparator = ";\n";
-        std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string tripleIndent = "\t\t\t";
-	std::string paramSeparator = ", ";
-
 	// specify the signature of the compute-Next-Lpu function matching the virtual function in Thread-State class
 	std::ostringstream functionHeader;
         functionHeader << "LPU *ThreadStateImpl::computeNextLpu(int lpsId)";
@@ -287,10 +270,6 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 	functionBody << "{\n";
 
 	Space *rootLps = mappingRoot->mappingConfig->LPS; 
-
-	// get the list of LPU ids leading to the LPU of the current LPS
-	functionBody << indent << "List<int*> *lpuIdList = " << "getLpuIdChain(lpsId" << paramSeparator;
-	functionBody << "Space_" << rootLps->getName() << ")" << stmtSeparator;
 
 	// get the data partition config and task data objects to pass as default arguments to any LPU generation function
 	functionBody << indent << "Hashtable<DataPartitionConfig*> *partConfigMap = getPartConfigMap()" << stmtSeparator;
@@ -322,12 +301,11 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 
 		// call appropriate LPU construction function to populate the fields of current LPU
 		functionBody << doubleIndent << "generateSpace" << lpsName << "Lpu(";
-		functionBody << "currentLpu" << paramSeparator;
-		functionBody << "lpuIdList" << paramSeparator;
+		functionBody << "this" << paramSeparator;
 		functionBody << "partConfigMap" << paramSeparator;
 		functionBody << "taskData" << ')' << stmtSeparator;
 		
-		// flag the current LPU as valid
+		// flag the current LPU as valid and return it
 		functionBody << doubleIndent << "currentLpu->setValidBit(true)" << stmtSeparator;
 		functionBody << doubleIndent << "return currentLpu" << stmtSeparator;
 		functionBody << indent << "}\n";

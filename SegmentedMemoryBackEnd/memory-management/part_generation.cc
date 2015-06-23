@@ -545,7 +545,7 @@ int DataPartitionConfig::getPartsCountAlongDimension(int dimensionNo, Dimension 
 	}
 }
 
-void DataPartitionConfig::updatePartDimensionInfo(List<int*> *partIdList, PartDimension *partDimension) {
+void DataPartitionConfig::updatePartDimensionInfo(List<int*> *partIdList, int *lpuCounts, PartDimension *partDimension) {
 	for (int i = 0; i < dimensionCount; i++) {
 		List<int> *dimIdList = new List<int>;
 		for (int j = 0; j < partIdList->NumElements(); j++) {
@@ -555,6 +555,25 @@ void DataPartitionConfig::updatePartDimensionInfo(List<int*> *partIdList, PartDi
 		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
 		Dimension dimension = dimConfig->getPartDimension(dimIdList);
 		partDimension[i].partition = dimension;
+		partDimension[i].count = dimConfig->pickPartCount(lpuCounts);
+	}
+	int *lastPartId = partIdList->Nth(partIdList->NumElements() - 1);
+	for (int i = 0; i < dimensionCount; i++) {
+		partDimension[i].index = lastPartId[i];
+	}	
+}
+
+void DataPartitionConfig::updatePartDimensionInfo(int *lpuId, 
+		int *lpuCounts, PartDimension *partDims, PartDimension *parentPartDims) {	
+	
+	for (int i = 0; i < dimensionCount; i++) {
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
+		Dimension parentDim = parentPartDims[i].partition;
+		int partIdInDim = dimConfig->pickPartId(lpuId);
+		partDims[i].partition = dimConfig->getPartDimension(partIdInDim, parentDim);
+		partDims[i].parent = &(parentPartDims[i]);
+		partDims[i].count = dimConfig->pickPartCount(lpuCounts);
+		partDims[i].index = partIdInDim;
 	}
 }
 

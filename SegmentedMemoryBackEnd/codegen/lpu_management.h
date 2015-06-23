@@ -145,7 +145,8 @@ class ThreadState {
 	Hashtable<DataPartitionConfig*> *partConfigMap;
 	// a reference to the instance that holds all memory allocated for the task
 	TaskData *taskData;
-	
+	// an auxiliary variable used in LPU generation process
+	List<int*> *lpuIdChain;
   public:
 	ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, ThreadIds *threadIds);
 
@@ -188,9 +189,19 @@ class ThreadState {
 	// reduce the amount of changes we need to make in our transition from multicore to segmented-memory
 	// backends; there should be some better way to generate the LPUs hierarchically from configurations
 	//
-	// Note that this function assumes that there is currently a valid LPU for the LPS represented by the
+	// Note that these functions assume that there is currently a valid LPU for the LPS represented by the
 	// first argument.
+	int *getCurrentLpuId(int lpsId);
 	List<int*> *getLpuIdChain(int lpsId, int rootLpsId);
+	// it is just like the previous function but does not create in objects in the memory in the process;
+	// rather it just return a list formed by ids taken from different LPS counters; it should be used 
+	// with caution
+	List<int*> *getLpuIdChainWithoutCopy(int lpsId, int rootLpsId);
+	
+
+	// returns the current multidimensional LPU count stored in the state-counter of the LPS indicated by 
+	// the argument; note that this function assumes that the count has been computed already 
+	int *getLpuCounts(int lpsId);
 
 	LPU *getCurrentLpu(int lpsId);
 	void removeIterationBound(int lpsId);
