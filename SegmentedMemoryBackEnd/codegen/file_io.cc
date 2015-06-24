@@ -24,11 +24,9 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << std::endl << "class " << varName << "InSpace" << lpsName << "Reader ";
 	headerFile << ": public PartReader {\n";
 	
-	// a part writer class needs a typed stream to read its data and a part configuration object to do part index
-	// to file index transformation
+	// a part writer class needs a typed stream to read its data
 	headerFile << "  protected:\n";
 	headerFile << indent << "TypedInputStream<" << elementType->getCType() << "> *stream" << stmtSeparator;
-	headerFile << indent << "DataPartitionConfig *partConfig" << stmtSeparator;
 
 	// write the constructor for the class
 	headerFile << "  public:\n";
@@ -38,7 +36,7 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << "DataPartsList *partsList" << paramSeparator;
 	headerFile << "const char *fileName)\n" ;
 	headerFile << indent << doubleIndent << ": PartReader(";
-	headerFile << "partsList" << paramSeparator << "fileName) {\n" ;
+	headerFile << "partsList" << paramSeparator << "fileName" << paramSeparator << "partConfig) {\n";
 	headerFile << doubleIndent << "this->partConfig = partConfig" << stmtSeparator;
 	headerFile << doubleIndent << "this->stream = NULL" << stmtSeparator;
 	headerFile << indent << "}\n"; 
@@ -80,11 +78,9 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << std::endl << "class " << varName << "InSpace" << lpsName << "Writer ";
 	headerFile << ": public PartWriter {\n";
 	
-	// a part writer class needs a typed stream to write its data and a part configuration object to do part index
-	// to file index transformation
+	// a part writer class needs a typed stream to write its data
 	headerFile << "  protected:\n";
 	headerFile << indent << "TypedOutputStream<" << elementType->getCType() << "> *stream" << stmtSeparator;
-	headerFile << indent << "DataPartitionConfig *partConfig" << stmtSeparator;
 
 	// write the constructor for the class
 	headerFile << "  public:\n";
@@ -95,7 +91,7 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << "DataPartsList *partsList" << paramSeparator;
 	headerFile << "const char *fileName)\n" ;
 	headerFile << indent << doubleIndent << ": PartWriter(writerId" << paramSeparator;
-	headerFile << "partsList" << paramSeparator << "fileName) {\n" ;
+	headerFile << "partsList" << paramSeparator << "fileName" << paramSeparator << "partConfig) {\n";
 	headerFile << doubleIndent << "this->partConfig = partConfig" << stmtSeparator;
 	headerFile << doubleIndent << "this->stream = NULL" << stmtSeparator;
 	headerFile << indent << "}\n"; 

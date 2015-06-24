@@ -55,8 +55,8 @@ class DimPartitionConfig {
 	// by the current dimension configuration instance 
 	Dimension getDimensionFromParent(List<int> *partIdList, int position);
 	
-	// these two functions determine the actual amount of padding been applied to a particular part;
-	// the effective padding may differ from the configuration for parts at the boundary 
+	// these two functions determine the actual amount of padding been applied to a particular part; the 
+	// effective padding may differ from the configuration for parts at the boundary 
 	virtual int getEffectiveFrontPadding(int partId, Dimension parentDimension) { return paddings[0]; }		
 	virtual int getEffectiveRearPadding(int partId, Dimension parentDimension) {  return paddings[1]; }
 
@@ -70,12 +70,12 @@ class DimPartitionConfig {
 	Dimension getDataDimension() { return dataDimension; }
 	void setParentConfig(DimPartitionConfig *parentConfig) { this->parentConfig = parentConfig; }
 
-	// Four functions to determine the interval configuration for a data part. The first and third 
-	// ignores padding and the second and fourth do not. The last two are needed for index reordering 
-	// partition functions. As each data part is kept separate, data parts for functions like stride 
-	// and block-stride get their allocation holding non-consecutive indexes in shuffled into a 
-	// consecutive order. Maintaining an interval configuration for the storage format may sometimes 
-	// allow us to streamline the calculation of communication need.    
+	// Four functions to determine the interval configuration for a data part. The first and third ignores 
+	// padding and the second and fourth do not. The last two are needed for index reordering partition 
+	// functions. As each data part is kept separate, data parts for functions like stride and block-stride 
+	// get their allocation holding non-consecutive indexes in shuffled into a consecutive order. Maintaining 
+	// an interval configuration for the storage format may sometimes allow us to streamline the calculation 
+	// of communication need.    
 	virtual LineInterval *getCoreInterval(List<int> *partIdList) = 0;
 	virtual LineInterval *getInterval(List<int> *partIdList) = 0;
 	virtual LineInterval *getXformedCoreInterval(List<int> *partIdList);
@@ -92,6 +92,17 @@ class DimPartitionConfig {
 	// function to be used by data partition config to generate dimension metadata about a structure from
 	// just its hierarchical part Id
 	Dimension getPartDimension(List<int> *partIdList);
+
+	// This is a recursive process for determining how original data dimension has been repeatedly divided
+	// into smaller dimensions along the partition hierarchy of a task to reach a particular data part 
+	// identified by the last argument. Along the way this process also calculate the number of partitions
+	// in each point of divisioning. This function has been added to support file IO operation that needs
+	// a data part index to file location transformation in the absense of accurate interval description 
+	// of translated data. TODO once we figure out how to describe all hierarchical intervals, we wont need
+	// this function and associate mechanism of index transformation 
+	void getHierarchicalDimensionAndPartCountInfo(List<Dimension> *dimensionList, 
+			List<int> *partCountsList, 
+			int position, List<int> *partIdList);
 	
 	// determines the part dimension given a part Id; for reordering partition function it is the part 
 	// dimension after the indexes have been shuffled to have each part occupying a contiguous chunk along 
@@ -207,6 +218,7 @@ class DataPartitionConfig {
 		this->parent = NULL;
 	}
 	void setParent(DataPartitionConfig *parent);
+	DimPartitionConfig *getDimensionConfig(int dimNo) { return dimensionConfigs->Nth(dimNo); }
 	
 	// the function is to be used for generating metadata for subsequent use in generating a data part
 	PartMetadata *generatePartMetadata(List<int*> *partIdList);

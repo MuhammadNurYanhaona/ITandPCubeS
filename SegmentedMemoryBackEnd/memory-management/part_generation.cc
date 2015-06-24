@@ -70,6 +70,23 @@ Dimension DimPartitionConfig::getPartDimension(List<int> *partIdList) {
 	return getPartDimension(partId, parentDimension);	
 }
 
+void DimPartitionConfig::getHierarchicalDimensionAndPartCountInfo(List<Dimension> *dimensionList,
+		List<int> *partCountsList, 
+		int position, List<int> *partIdList) {
+
+	int partId = partIdList->Nth(position);
+	if (position == 0) {
+		dimensionList->Append(getPartDimension(partId, dataDimension));
+		partCountsList->Append(getPartsCount(dataDimension));
+	} else {
+		parentConfig->getHierarchicalDimensionAndPartCountInfo(dimensionList, 
+				partCountsList, position - 1, partIdList);
+		Dimension parentDimension = dimensionList->Nth(dimensionList->NumElements() - 1);
+		dimensionList->Append(getPartDimension(partId, parentDimension));
+		partCountsList->Append(getPartsCount(parentDimension));
+	}
+}
+
 //----------------------------------------------------------- Replication Config ----------------------------------------------------------/
 
 LineInterval *ReplicationConfig::getCoreInterval(List<int> *partIdList) {

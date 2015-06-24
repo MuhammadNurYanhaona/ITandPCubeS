@@ -5,22 +5,44 @@
 
 #include "stream.h"
 #include "../memory-management/allocation.h"
+#include "../memory-management/part_generation.h"
 #include "../utils/list.h"
 #include "../codegen/structure.h"
+	
+/* This is just a helper class to retain hierarchical information about a data part while IO is ongoing. Every element
+   here is a list of list because hierarchical information for individual dimensions is stored separately. Information
+   made available by this class is needed during part index to file location transformation. 	   
+*/
+class PartInfo {
+  public:
+	List<List<Dimension>*> *partDimensions;
+	List<List<int>*> *partCounts;
+	List<List<int>*> *partIdList;
+	PartInfo() {
+		partDimensions = new List<List<Dimension>*>;
+		partCounts = new List<List<int>*>;
+		partIdList = new List<List<int>*>;
+	}
+};
 
 /* common base class that embodies routines needed for both reading and writing data parts */
 class PartHandler {
   protected:
 	const char *fileName;	
 	List<DataPart*> *dataParts;
+	DataPartitionConfig *partConfig;
 	DataPart *currentPart;
+	PartInfo *currentPartInfo;
 	int dataDimensionality;
 	Dimension *dataDimensions;
   public:
-	PartHandler(DataPartsList *partsList, const char *fileName);
+	PartHandler(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig);
 	
 	// this routine iterates the data section of all parts one-by-one for reading/writing   
 	void processParts();
+	// function to be called immediately after a new part has been selected for processing and before anything else 
+	// has been done with it
+	void calculateCurrentPartInfo();
 	// functions to be used to identify the memory for the part that will receive/send updates in the I/O process
 	void *getCurrentPartData() { return currentPart->getData(); }
 	// returns one dimensional update index for an element from its, possibly, multidimensional part index 
@@ -50,7 +72,8 @@ class PartHandler {
 /* base class to be extended for the reading process */
 class PartReader : public PartHandler {
   public:
-	PartReader(DataPartsList *partsList, const char *fileName) : PartHandler(partsList, fileName) {}
+	PartReader(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig) 
+			: PartHandler(partsList, fileName, partConfig) {}
 
 	// the process element method just call the virtual read element function; this conversion is done to make it
 	// explicit the reading process. Task specific subclasses should implement the readElement() function
@@ -69,7 +92,8 @@ class PartWriter : public PartHandler {
 	// the process using it 
 	int writerId;
   public:
-	PartWriter(int writerId, DataPartsList *partsList, const char *fileName) : PartHandler(partsList, fileName) {
+	PartWriter(int writerId, DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig) 
+			: PartHandler(partsList, fileName, partConfig) {
 		this->writerId = writerId;
 	}
 
