@@ -6,6 +6,30 @@
 #include "../utils/list.h"
 #include "../codegen/structure.h"
 
+//--------------------------------------------------------------- Part Info --------------------------------------------------------------/
+
+void PartInfo::clear() {
+	while (partDimensions->NumElements() > 0) {
+
+		List<Dimension*> *dimensionInfo = partDimensions->Nth(0);
+		while (dimensionInfo->NumElements() > 0) {
+			Dimension *dimension = dimensionInfo->Nth(0);
+			dimensionInfo->RemoveAt(0);
+			delete dimension;
+		}
+		partDimensions->RemoveAt(0);
+		delete dimensionInfo;
+
+		List<int> *partCountInfo = partCounts->Nth(0);
+		partCounts->RemoveAt(0);
+		delete partCountInfo;
+		
+		List<int> *partIdListInfo = partIdList->Nth(0);
+		partIdList->RemoveAt(0);
+		delete partIdListInfo;
+	}
+}
+
 //------------------------------------------------------------- Part Handler -------------------------------------------------------------/
 
 PartHandler::PartHandler(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig) {
@@ -13,7 +37,8 @@ PartHandler::PartHandler(DataPartsList *partsList, const char *fileName, DataPar
 	this->dataParts = partsList->getCurrentList();
 	this->partConfig = partConfig;
 	this->currentPart = NULL;
-	this->currentPartInfo = NULL;
+	this->currentPartInfo = new PartInfo();
+	this->currentDataIndex = new List<int>;
 	ListMetadata *metadata = partsList->getMetadata();
 	this->dataDimensionality = metadata->getDimensions();
 	this->dataDimensions = metadata->getBoundary();
@@ -23,6 +48,26 @@ List<Dimension*> *PartHandler::getDimensionList() {
 	List<Dimension*> *dimensionList = new List<Dimension*>;
 	for (int i = 0; i < dataDimensionality; i++) dimensionList->Append(&dataDimensions[i]);
 	return dimensionList;
+}
+
+List<int> *PartHandler::getDataIndex(List<int> *partIndex) {
+	
+	while (currentDataIndex->NumElements() > 0) currentDataIndex->RemoveAt(0);
+        
+	int position = currentPart->getMetadata()->getIdList()->NumElements() - 1;
+	
+	for (int i = 0; i < dataDimensionality; i++) {
+		DimPartitionConfig *dimConfig = partConfig->getDimensionConfig(i);
+		int dimIndex = partIndex->Nth(i);
+		List<int> *partIdList = currentPartInfo->partIdList->Nth(i);
+		List<int> *partCounts = currentPartInfo->partCounts->Nth(i);
+		List<Dimension*> *partDimensions = currentPartInfo->partDimensions->Nth(i);
+		int originalDimIndex = dimConfig->getOriginalIndex(dimIndex, position, 
+				partIdList, partCounts, partDimensions);
+
+		currentDataIndex->Append(originalDimIndex);				
+	}
+	return currentDataIndex;
 }
 
 void PartHandler::processParts() {
@@ -44,14 +89,15 @@ void PartHandler::processParts() {
 void PartHandler::calculateCurrentPartInfo() {
 	
 	List<int*> *partIdList = currentPart->getMetadata()->getIdList();
-	currentPartInfo = new PartInfo();
+	currentPartInfo->clear();
+
 	for (int i = 0; i < dataDimensionality; i++) {
 		
 		List<int> *dimIdList = new List<int>;
 		for (int j = 0; j < partIdList->NumElements(); j++) {
 			dimIdList->Append(partIdList->Nth(j)[i]);
 		}
-		List<Dimension> *dimList = new List<Dimension>;
+		List<Dimension*> *dimList = new List<Dimension*>;
 		List<int> *dimCountList = new List<int>;
 		
 		int position = partIdList->NumElements() - 1;

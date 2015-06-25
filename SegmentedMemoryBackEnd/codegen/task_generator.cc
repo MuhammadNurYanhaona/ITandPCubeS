@@ -132,7 +132,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	genTaskMemoryConfigRoutine(headerFile, programFile, upperInitials, lpsHierarchy);
 	
 	// generate functions and classes for I/O
-	generateReaderWriters(headerFile, programFile, initials, rootLps);
+	generateReaderWriters(headerFile, initials, rootLps);
 	generateRoutineForDataInitialization(headerFile, programFile, taskDef);
 	generateRoutineForDataStorage(headerFile, programFile, taskDef);
 

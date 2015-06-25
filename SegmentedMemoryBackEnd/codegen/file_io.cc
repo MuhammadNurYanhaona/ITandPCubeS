@@ -41,7 +41,7 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << doubleIndent << "this->stream = NULL" << stmtSeparator;
 	headerFile << indent << "}\n"; 
 
-	// write implementations for the four functions needed to do structure specific reading
+	// write implementations for the three functions needed to do structure specific reading
 	headerFile << indent << "void begin() {\n";
 	headerFile << doubleIndent << "stream = new TypedInputStream<" << elementType->getCType() << ">";
 	headerFile << "(fileName)" << stmtSeparator;  
@@ -50,11 +50,7 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << indent << "void terminate() { stream->close()" << stmtTerminator << " }\n";
 	headerFile << indent << "List<int> *getDataIndex(List<int> *partIndex) {";
 	if (array->isReordered(lps->getRoot())) {
-		headerFile << "\n";
-		headerFile << doubleIndent << "return get" << varName << "Space" << lpsName << "DataIndex(";
-		headerFile << "partIndex" << paramSeparator << "partConfig"; 
-		headerFile << ")" << stmtSeparator;
-		headerFile << indent << "}\n";
+		headerFile << " return DataHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";
 	} else {
 		headerFile << " return partIndex" << stmtTerminator << " }\n";
 	}
@@ -106,11 +102,7 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << indent << "void terminate() { stream->close()" << stmtTerminator << " }\n";
 	headerFile << indent << "List<int> *getDataIndex(List<int> *partIndex) {";
 	if (array->isReordered(lps->getRoot())) {
-		headerFile << "\n";
-		headerFile << doubleIndent << "return get" << varName << "Space" << lpsName << "DataIndex(";
-		headerFile << "partIndex" << paramSeparator << "partConfig"; 
-		headerFile << ")" << stmtSeparator;
-		headerFile << indent << "}\n";
+		headerFile << " return DataHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";
 	} else {
 		headerFile << " return partIndex" << stmtTerminator << " }\n";
 	}
@@ -124,15 +116,12 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << "}" << stmtSeparator;
 }
 
-void generateReaderWriterForLpsStructures(std::ofstream &headerFile, 
-		std::ofstream &programFile, 
-		const char *initials, Space *lps) {
+void generateReaderWriterForLpsStructures(std::ofstream &headerFile, const char *initials, Space *lps) {
 	
 	std::ostringstream header;
 	const char *lpsName = lps->getName();
 	header << "Space " << lpsName;
 	decorator::writeSubsectionHeader(headerFile, header.str().c_str());
-	decorator::writeSubsectionHeader(programFile, header.str().c_str());
 
 	List<const char*> *localStructures = lps->getLocalDataStructureNames();
 	for (int i = 0; i < localStructures->NumElements(); i++) {
@@ -146,29 +135,22 @@ void generateReaderWriterForLpsStructures(std::ofstream &headerFile,
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		if (array == NULL) continue;
 
-		if(array->isReordered(lps->getRoot())) {
-			generateCodeForIndexTransformation(headerFile, programFile, initials, array);
-		}
 		generatePartReaderForStructure(headerFile, array);
 		generatePartWriterForStructure(headerFile, array);
 	}
 }
 
-void generateReaderWriters(const char *headerFileName, const char *programFileName, const char *initials, Space *rootLps) {
+void generateReaderWriters(const char *headerFileName, const char *initials, Space *rootLps) {
         
-	std::ofstream programFile;
 	std::ofstream headerFile;
-        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
-        if (!programFile.is_open() || !headerFile.is_open()) {
-                std::cout << "Unable to open header/program file";
+        if (!headerFile.is_open()) {
+                std::cout << "Unable to open header file";
                 std::exit(EXIT_FAILURE);
         }
 
-        const char *message1 = "data structure spacific part reader and writer subclasses";
-        decorator::writeSectionHeader(headerFile, message1);
-	const char *message2 = "helper functions for file I/O";
-        decorator::writeSectionHeader(programFile, message2);
+        const char *message = "data structure spacific part reader and writer subclasses";
+        decorator::writeSectionHeader(headerFile, message);
 
         std::deque<Space*> lpsQueue;
 	List<Space*> *childrenLpses = rootLps->getChildrenSpaces();
@@ -184,31 +166,11 @@ void generateReaderWriters(const char *headerFileName, const char *programFileNa
 		}
 		if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
 		if (lps->allocateStructures()) {
-			generateReaderWriterForLpsStructures(headerFile, programFile, initials, lps);
+			generateReaderWriterForLpsStructures(headerFile, initials, lps);
 		}
 	}
 
 	headerFile.close();
-	programFile.close();
-}
-
-void generateCodeForIndexTransformation(std::ofstream &headerFile, 
-		std::ofstream &programFile, 
-		const char *initials, ArrayDataStructure *array) {
-	
-	const char *varName = array->getName();
-	Space *lps = array->getSpace();
-	const char *lpsName = lps->getName();
-	
-	std::ostringstream fnHeader;
-	fnHeader << "get" << varName << "Space" << lpsName << "DataIndex";
-	fnHeader << "(List<int> *partIndex" << paramSeparator;
-	fnHeader << "DataPartitionConfig *partConfig)";
-	headerFile << std::endl << "List<int> *" << fnHeader.str() << stmtSeparator;
-
-	programFile << std::endl << "List<int> *" << initials << "::" << fnHeader.str() << "{\n";
-	programFile << indent << "return NULL" << stmtSeparator;	
-	programFile << "}\n";	
 }
 
 void generateRoutineForDataInitialization(const char *headerFileName, const char *programFileName, TaskDef *taskDef) {

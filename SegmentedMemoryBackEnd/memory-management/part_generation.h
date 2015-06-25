@@ -100,9 +100,20 @@ class DimPartitionConfig {
 	// a data part index to file location transformation in the absense of accurate interval description 
 	// of translated data. TODO once we figure out how to describe all hierarchical intervals, we wont need
 	// this function and associate mechanism of index transformation 
-	void getHierarchicalDimensionAndPartCountInfo(List<Dimension> *dimensionList, 
+	void getHierarchicalDimensionAndPartCountInfo(List<Dimension*> *dimensionList, 
 			List<int> *partCountsList, 
 			int position, List<int> *partIdList);
+
+	// Similar to the above, this function has been added to aid file I/O. It returns the original index of
+	// a data point along a dimension that might be reordered one or more time due to the use of reordering
+	// partition functions. The process of getting back the original index from a transformed one works 
+	// recursively backward from lower parts to upper parts. TODO once we figure out how to form accurate
+	// interval description for hierarchical partitions, we can do the mapping of data part index to file
+	// location much efficiently by investigating the interval description. At that time we may remove this
+	// function. Finally, only the reordering dim-partition-config subclasses need to override this method.
+	virtual int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
+			List<int> *partCountList, 
+			List<Dimension*> *partDimensionList);
 	
 	// determines the part dimension given a part Id; for reordering partition function it is the part 
 	// dimension after the indexes have been shuffled to have each part occupying a contiguous chunk along 
@@ -176,6 +187,9 @@ class StrideConfig : public DimPartitionConfig {
 	LineInterval *getXformedCoreInterval(List<int> *partIdList);
 	LineInterval *getXformedInterval(List<int> *partIdList) { return getXformedCoreInterval(partIdList); }
 	Dimension getPartDimension(int partId, Dimension parentDimension);
+	int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
+			List<int> *partCountList, 
+			List<Dimension*> *partDimensionList);
 };
 
 /* configuration subclass for 'block_stride' partition function that takes a 'block_size' parameter */
@@ -191,6 +205,9 @@ class BlockStrideConfig : public DimPartitionConfig {
 	LineInterval *getXformedCoreInterval(List<int> *partIdList);
 	LineInterval *getXformedInterval(List<int> *partIdList) { return getXformedCoreInterval(partIdList); }
 	Dimension getPartDimension(int partId, Dimension parentDimension);
+	int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
+			List<int> *partCountList, 
+			List<Dimension*> *partDimensionList);
 };
 
 /* This is the class that holds the partition configuration for different dimensions of a single data 

@@ -15,14 +15,15 @@
 */
 class PartInfo {
   public:
-	List<List<Dimension>*> *partDimensions;
+	List<List<Dimension*>*> *partDimensions;
 	List<List<int>*> *partCounts;
 	List<List<int>*> *partIdList;
 	PartInfo() {
-		partDimensions = new List<List<Dimension>*>;
+		partDimensions = new List<List<Dimension*>*>;
 		partCounts = new List<List<int>*>;
 		partIdList = new List<List<int>*>;
 	}
+	void clear();
 };
 
 /* common base class that embodies routines needed for both reading and writing data parts */
@@ -31,10 +32,14 @@ class PartHandler {
 	const char *fileName;	
 	List<DataPart*> *dataParts;
 	DataPartitionConfig *partConfig;
-	DataPart *currentPart;
-	PartInfo *currentPartInfo;
 	int dataDimensionality;
 	Dimension *dataDimensions;
+	// two supporting variables to keep track of what part is been currently under process and its metadata
+	DataPart *currentPart;
+	PartInfo *currentPartInfo;
+	// a supporting variable that is used to represent a file location (actual data index) of a particular element
+	// in a data part to avoid creating a new list each time we do a data part to file location transformation
+	List<int> *currentDataIndex; 
   public:
 	PartHandler(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig);
 	

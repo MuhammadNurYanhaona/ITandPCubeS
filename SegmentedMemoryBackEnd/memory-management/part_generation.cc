@@ -70,21 +70,35 @@ Dimension DimPartitionConfig::getPartDimension(List<int> *partIdList) {
 	return getPartDimension(partId, parentDimension);	
 }
 
-void DimPartitionConfig::getHierarchicalDimensionAndPartCountInfo(List<Dimension> *dimensionList,
+void DimPartitionConfig::getHierarchicalDimensionAndPartCountInfo(List<Dimension*> *dimensionList,
 		List<int> *partCountsList, 
 		int position, List<int> *partIdList) {
 
 	int partId = partIdList->Nth(position);
+	Dimension *dimension = new Dimension();
 	if (position == 0) {
-		dimensionList->Append(getPartDimension(partId, dataDimension));
+		*dimension = getPartDimension(partId, dataDimension);
+		dimensionList->Append(dimension);
 		partCountsList->Append(getPartsCount(dataDimension));
 	} else {
 		parentConfig->getHierarchicalDimensionAndPartCountInfo(dimensionList, 
 				partCountsList, position - 1, partIdList);
-		Dimension parentDimension = dimensionList->Nth(dimensionList->NumElements() - 1);
-		dimensionList->Append(getPartDimension(partId, parentDimension));
-		partCountsList->Append(getPartsCount(parentDimension));
+		Dimension *parentDimension = dimensionList->Nth(dimensionList->NumElements() - 1);
+		*dimension = getPartDimension(partId, *parentDimension);
+		dimensionList->Append(dimension);
+		partCountsList->Append(getPartsCount(*parentDimension));
 	}
+}
+
+int DimPartitionConfig::getOriginalIndex(int partIndex, int position, 
+		List<int> *partIdList,
+		List<int> *partCountList, 
+		List<Dimension*> *partDimensionList) {
+
+	if (position > 0) {
+		return parentConfig->getOriginalIndex(partIndex, position - 1, partIdList, 
+				partCountList, partDimensionList);
+	} else return partIndex;
 }
 
 //----------------------------------------------------------- Replication Config ----------------------------------------------------------/
@@ -356,6 +370,20 @@ Dimension StrideConfig::getPartDimension(int partId, Dimension parentDimension) 
 	return partDimension;
 }
 
+int StrideConfig::getOriginalIndex(int partIndex, int position, List<int> *partIdList,        
+		List<int> *partCountList,
+		List<Dimension*> *partDimensionList) {
+
+	int partId = partIdList->Nth(position);
+	int partCount = partCountList->Nth(position);
+	Dimension *partDimension = partDimensionList->Nth(position);
+	int zeroBasedIndex = partIndex - partDimension->range.min;
+	int originalIndex = partId + zeroBasedIndex * partCount;
+	
+	return DimPartitionConfig::getOriginalIndex(originalIndex, position, partIdList, 
+			partCountList, partDimensionList);
+}
+
 //----------------------------------------------------------- Block Stride Config ---------------------------------------------------------/
 
 int BlockStrideConfig::getPartsCount(Dimension parentDimension) {
@@ -440,6 +468,22 @@ Dimension BlockStrideConfig::getPartDimension(int partId, Dimension parentDimens
         partDimension.range.max = partDimension.range.min + myEntries - 1;
         partDimension.setLength();
         return partDimension;
+}
+
+int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *partIdList,
+		List<int> *partCountList,
+		List<Dimension*> *partDimensionList) {
+	
+	int partId = partIdList->Nth(position);
+	int partCount = partCountList->Nth(position);
+	int blockSize = partitionArgs[0];
+	Dimension *partDimension = partDimensionList->Nth(position);
+	int zeroBasedIndex = partIndex - partDimension->range.min;
+	int originalIndex = ((zeroBasedIndex / blockSize) * partCount + partId) * blockSize 
+			+ zeroBasedIndex % blockSize;
+	
+	return DimPartitionConfig::getOriginalIndex(originalIndex, position, partIdList, 
+			partCountList, partDimensionList);
 }
 
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/

@@ -17,21 +17,10 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructure *structure);
 
 /* function to generate all reader and writer subclasses for all arrays that an LPS allocates memory for */
-void generateReaderWriterForLpsStructures(std::ofstream &headerFile, 
-                std::ofstream &programFile, 
-                const char *initials, Space *lps);
+void generateReaderWriterForLpsStructures(std::ofstream &headerFile, const char *initials, Space *lps);
 
 /* this function calls the function above to generate classes for all LPSes */
-void generateReaderWriters(const char *headerFile, 
-		const char *programFile, 
-		const char *initials, Space *rootLps);
-
-/* this is a supporting routine that generates code for a part to actual data index in a file transformation
-   that is needed by both reader and writer classes of a data structure. The transformation is often not staight-
-   forward and we need a function for that due to the presence of data reordering partitions. */
-void generateCodeForIndexTransformation(std::ofstream &headerFile, 
-                std::ofstream &programFile, 
-                const char *initials, ArrayDataStructure *structure);
+void generateReaderWriters(const char *headerFile, const char *initials, Space *rootLps);
 
 /* function that generates a routine to initialize all parts of data structures in different LPSes of a task's 
    environment for which some input file has been specified during task invocation. */
