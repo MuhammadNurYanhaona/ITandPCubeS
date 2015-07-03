@@ -216,9 +216,8 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *
 		stream << " + ";
 	}
 	int dimensionCount = type->getDimensions();
-	// If the index access corresponds to some index of a parallel or sequential loop then it is readily
-	// available some pre-translated expression holder variable. So write the name of the variable in 
-	// the stream
+	// If the index access corresponds to some index of a parallel or sequential loop then it is readily available 
+	// some pre-translated expression holder variable. So write the name of the variable in the stream
 	FieldAccess *indexAccess = dynamic_cast<FieldAccess*>(index);
 	if (indexAccess != NULL && indexAccess->isIndex()) {
 		indexAccess->translateIndex(stream, array, dimension);
@@ -226,10 +225,7 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *
 	} else {
 		stream << '('; 
 		index->translate(stream, 0, 0, space);
-		// TODO The following line is commented out temporarily. It is needed for dimensions that start from
-		// nonzero index. We disable it so that code looks easy to reason with. We need to enable this later
-		// once we are done debugging.
-                //stream << " - " << array << "partDims[" << dimension << "].getPositiveRange().min";
+                stream << " - " << array << "StoreDims[" << dimension << "].range.min";
 		stream << ')';
 		std::ostringstream xform;
                 for (int i = dimensionCount - 1; i > dimension; i--) {

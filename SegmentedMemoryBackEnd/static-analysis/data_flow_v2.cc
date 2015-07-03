@@ -495,10 +495,10 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	// along with other default arguments
 	stream << '\n' << nextIndent.str() << "\t\tarrayMetadata,";
 	stream << '\n' << nextIndent.str() << "\t\ttaskGlobals,";
-	stream << '\n' << nextIndent.str() << "\t\tthreadLocals, partition);\n";
+	stream << '\n' << nextIndent.str() << "\t\tthreadLocals, partition,";
+	stream << '\n' << nextIndent.str() << "threadState->threadLog);\n";
 
-	// then update all synchronization counters that depend on the execution of this stage for their 
-	// activation
+	// then update all synchronization counters that depend on the execution of this stage for their activation
 	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncReqirements();
 	for (int i = 0; i < syncList->NumElements(); i++) {
 		stream << nextIndent.str() << syncList->Nth(i)->getDependencyArc()->getArcName();

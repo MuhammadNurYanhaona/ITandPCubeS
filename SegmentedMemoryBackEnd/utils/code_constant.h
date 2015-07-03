@@ -8,4 +8,8 @@ static const char *indent = "\t";
 static const char *doubleIndent = "\t\t";
 static const char *tripleIndent = "\t\t\t";
 
+static const char *paramIndent = "\n\t\t";
+static const char *stmtIndent = "\t";
+
+
 #endif

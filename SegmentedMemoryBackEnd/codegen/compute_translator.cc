@@ -2,6 +2,8 @@
 #include "space_mapping.h"
 #include "../utils/list.h"
 #include "../utils/string_utils.h"
+#include "../utils/decorator_utils.h"
+#include "../utils/code_constant.h"
 #include "../static-analysis/data_flow.h"
 #include "../static-analysis/array_assignment.h"
 #include "../semantics/scope.h"
@@ -21,11 +23,6 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
                 std::ofstream &programFile, 
 		int currentFnNo) {
 
-	std::string stmtIndent = "\t";
-	std::string paramSeparator = ", ";
-	std::string stmtSeparator = ";\n";
-	std::string paramIndent = "\n\t\t";
-
 	// set the context for code translation to task
 	codecntx::enterTaskContext();
 
@@ -44,7 +41,11 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		// if this is a sync stage then there is nothing to do here
 		ExecutionStage *execStage = dynamic_cast<ExecutionStage*>(currentStage);
 		if (execStage == NULL) return currentFnNo;
+
+		headerFile << std::endl;
+		programFile << std::endl;
 			
+		// each function returns an integer indicating if a successful invocation has taken place
 		headerFile << "int ";
 		programFile << "int " << initialsLower << "::";
 
@@ -81,6 +82,11 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		headerFile << paramSeparator << initialsUpper << "Partition partition";
 		programFile << paramSeparator << initialsUpper << "Partition partition";
 
+		// finally, add an output file stream for logging steps of the computation stage if needed
+		headerFile << paramSeparator << paramIndent << "std::ofstream &logFile";
+		programFile << paramSeparator << paramIndent << "std::ofstream &logFile";
+
+
 		// finish function declaration
 		headerFile << ");\n\n";
 		programFile << ") {\n";
@@ -108,12 +114,9 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFileName,
                 std::exit(EXIT_FAILURE);
         }
 
-        headerFile << "/*-----------------------------------------------------------------------------------\n";
-        headerFile << "functions for compute stages \n";
-        headerFile << "------------------------------------------------------------------------------------*/\n\n";
-        programFile << "/*-----------------------------------------------------------------------------------\n";
-        programFile << "functions for compute stages \n";
-        programFile << "------------------------------------------------------------------------------------*/\n\n";
+	const char *header = "functions for compute stages";
+	decorator::writeSectionHeader(headerFile, header);
+	decorator::writeSectionHeader(programFile, header);
 
 	CompositeStage *computation = taskDef->getComputation();
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
@@ -130,10 +133,6 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 
 	std::cout << "Generating the thread::run function for the task\n";
 	
-	std::string paramSeparator = ", ";
-	std::string paramIndent = "\n\t\t";
-	std::string stmtIndent = "\t";
-	std::string stmtSeparator = ";\n";
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
         
 	std::ofstream programFile, headerFile;
@@ -144,12 +143,11 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
                 std::exit(EXIT_FAILURE);
         }
 
-        headerFile << "\n/*-----------------------------------------------------------------------------------\n";
-        headerFile << "The run method for thread simulating the task flow \n";
-        headerFile << "------------------------------------------------------------------------------------*/\n\n";
-        programFile << "/*-----------------------------------------------------------------------------------\n";
-        programFile << "The run method for thread simulating the task flow \n";
-        programFile << "------------------------------------------------------------------------------------*/\n\n";
+	const char *header = "run method for thread simulating the task flow";
+	decorator::writeSectionHeader(headerFile, header);
+	headerFile << "\n";
+	decorator::writeSectionHeader(programFile, header);
+	programFile << "\n";
 
 	// create a stream for writing the arguments default to all thread run functions
 	std::ostringstream defaultArgs;

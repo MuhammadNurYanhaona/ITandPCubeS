@@ -11,7 +11,7 @@
 #include "structures.h"
 #include "fileUtility.h"
 
-int main() {
+int mainCGV() {
 	// read all arrays from file
 	// reading elements of the CSR sparse matrix
 	Dimension colDims[1];
