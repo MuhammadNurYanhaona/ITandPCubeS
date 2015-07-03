@@ -34,6 +34,7 @@ template <class Type> class TypedInputStream {
 		this->fileName = fileName;
 		seekStepSize = sizeof(Type);
 		initialize();
+		
 	}
 
 	void open() {
@@ -102,7 +103,7 @@ template <class Type> class TypedInputStream {
 		string str(dimInfoBuffer);
 		string delim = "*";
 		List<string> *tokenList = string_utils::tokenizeString(str, delim);
-		while (!tokenList->NumElements() > 0) {
+		while (tokenList->NumElements() > 0) {
 			string token = tokenList->Nth(0);
 			tokenList->RemoveAt(0);
 			istringstream str(token);

@@ -33,7 +33,7 @@ bool PartMetadata::isMatchingId(List<int*> *candidateId) {
 	for (int i = 0; i < idList->NumElements(); i++) {
 		int *lpsId1 = idList->Nth(i);
 		int *lpsId2 = candidateId->Nth(i); 
-		for (int j = 0; j < dimensionality; i++) {
+		for (int j = 0; j < dimensionality; j++) {
 			if (lpsId1[j] != lpsId2[j]) return false;
 		}
 	}
@@ -99,7 +99,8 @@ DataPart *DataPartsList::getPart(List<int*> *partId) {
 	List<DataPart*> *currentList = partLists[epochHead];
 	for (int i = 0; i < currentList->NumElements(); i++) {
 		DataPart *currentPart = currentList->Nth(i);
-		if (currentPart->getMetadata()->isMatchingId(partId)) return currentPart;
+		PartMetadata *metadata = currentPart->getMetadata();
+		if (metadata->isMatchingId(partId)) return currentPart;
 	}
 	return NULL;
 }
@@ -113,3 +114,4 @@ DataPart *DataPartsList::getPart(List<int*> *partId, int epoch) {
 	}
 	return NULL;
 }
+

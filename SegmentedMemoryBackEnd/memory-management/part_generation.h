@@ -229,7 +229,7 @@ class DataPartitionConfig {
 	// data structure
 	DataPartitionConfig *parent;
   public:
-	DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfig) {
+	DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfigs) {
 		this->dimensionCount = dimensionCount;
 		this->dimensionConfigs = dimensionConfigs;
 		this->parent = NULL;

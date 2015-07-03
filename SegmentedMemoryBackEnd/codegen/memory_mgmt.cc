@@ -307,7 +307,7 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 		if (!structure->getUsageStat()->isAllocated()) continue;
 		
 		Type *type = structure->getType();
-		int epochCount = structure->getVersionCount();
+		int epochCount = structure->getVersionCount() + 1;
 		const char *varName = structure->getName();
 	
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
@@ -341,7 +341,8 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 			programFile << '<' << elementType->getCType() << '>'; 
 			programFile << "(" << varName << "Config" << paramSeparator;
 			programFile << varName << "PartIds" << paramSeparator; 
-			programFile << epochCount << ")" << stmtSeparator;	
+			programFile << epochCount << ")" << stmtSeparator;
+			programFile << indent << varName << "->setPartsList(" << varName << "Parts)" << stmtSeparator;	
 		}
 
 		// add the data item in the LPS content

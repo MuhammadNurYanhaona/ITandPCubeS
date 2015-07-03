@@ -119,7 +119,7 @@ class LpsState {
 	void markAsIterationBound() { iterationBound = true; }
 	bool isIterationBound() { return iterationBound; }
 	void removeIterationBound() { iterationBound = false; }
-	LPU *getCurrentLpu();
+	LPU *getCurrentLpu(bool allowInvalid = false);
 	void invalidateCurrentLpu() { lpu->setValidBit(false); }
 	LpuCounter *getCounter() { return counter; }
 };
@@ -203,19 +203,21 @@ class ThreadState {
 	// the argument; note that this function assumes that the count has been computed already 
 	int *getLpuCounts(int lpsId);
 
-	LPU *getCurrentLpu(int lpsId);
+	LPU *getCurrentLpu(int lpsId, bool allowInvalid = false);
 	void removeIterationBound(int lpsId);
 	ThreadIds *getThreadIds() { return threadIds; }
 	bool isValidPpu(int lpsId);
-	void initiateLogFile(const char *fileNamePrefix);
 	int getThreadNo() { return threadIds->threadNo; }
 	virtual ~ThreadState() {}
 	
 	// a log file for diagnostics
 	std::ofstream threadLog;
+	bool loggingEnabled;
 	void logExecution(const char *stageName, int spaceId);
 	void logThreadAffinity();
 	void closeLogFile();
+	void enableLogging() { loggingEnabled = true; }
+	void initiateLogFile(const char *fileNamePrefix);
 };
 
 /* This is the class to hold the PPU execution controllers (here threads) that shares a single memory segment */

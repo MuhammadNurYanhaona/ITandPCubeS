@@ -24,6 +24,7 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/decorator_utils.h"
+#include "../utils/code_constant.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_def.h"
 #include "../syntax/errors.h"
@@ -197,10 +198,6 @@ void TaskGenerator::generateTaskMain() {
         stream << "main function\n";
         stream << "------------------------------------------------------------------------------------*/\n";
 	
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-
 	// write the function signature
 	stream << "\nint main(int argc, char *argv[]) {\n\n";
 	stream << indent << "std::cout << \"Starting " << taskDef->getName() << " Task\\n\"" << stmtSeparator;
@@ -293,10 +290,6 @@ List<const char*> *TaskGenerator::initiateEnvLinks(std::ofstream &stream) {
 	Space *rootLps = lpsHierarchy->getRootSpace();
 
 	List<const char*> *externalEnvLinks = new List<const char*>;
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
 	
 	stream << indent << "// initializing variables that are environmental links \n";
 	stream << indent << "std::cout << \"initializing environmental links\\n\"" << stmtSeparator;
@@ -403,9 +396,6 @@ void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
 	std::cout << "Generating code for taking input partition parameters\n";
 
 	List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
 	
 	stream << std::endl << indent << "// determining values of partition parameters\n";
 	stream << indent << "std::cout << \"determining partition parameters\\n\"" << stmtSeparator;
@@ -432,9 +422,6 @@ void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
 
 void TaskGenerator::copyPartitionParameters(std::ofstream &stream) {
 	List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
 	stream << std::endl << indent << "// copying partitioning parameters into an array\n";
 	stream << indent << "int *partitionArgs = NULL" << stmtSeparator;
 	int parameterCount = partitionArgs->NumElements();
@@ -462,9 +449,6 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream,
 		argumentTypes = initSection->getArgumentTypes();
 	}
 	
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";	
 	bool initFunctionInvocable = true;
 
 	// Argument initialization only needed when we automatically generate main function for the task; thus this 
@@ -535,10 +519,6 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	
 	std::cout << "Generating state variables for threads\n";
 
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-	
 	stream << std::endl << indent << "// declaring and initializing state variables for threads \n";	
 
 	// declare an array of task-locals so that each thread can have its own copy for this for independent 
@@ -584,23 +564,15 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	stream << indent << indent << "threadStateList[i] = new ThreadStateImpl(Space_Count, ";
 	stream << std::endl << indent << indent << indent << indent;
 	stream << "lpsDimensions, partitionArgs, threadIdsList[i])" << stmtSeparator;
-	stream << indent << indent;
-	stream << "threadStateList[i]->initiateLogFile(\"" << initials << "\")" << stmtSeparator;	
 	stream << indent << indent << "threadStateList[i]->initializeLPUs()" << stmtSeparator;
 	stream << indent << indent << "threadStateList[i]->setLpsParentIndexMap()" << stmtSeparator;
-	stream << indent << indent << "threadStateList[i]->setPartConfigMap(configMap)";	
-	stream << stmtSeparator<< indent << "}\n";
+	stream << indent << indent << "threadStateList[i]->setPartConfigMap(configMap)" << stmtSeparator;	
+	stream << indent << "}\n";
 }
 
 void TaskGenerator::performSegmentGrouping(std::ofstream &stream, bool segmentIdPassed) {
 	
 	std::cout << "Grouping threads into segments\n";
-
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string tripleIndent = "\t\t\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
 
 	stream << std::endl << indent << "// grouping threads into segments\n";	
 	
@@ -634,10 +606,6 @@ void TaskGenerator::performSegmentGrouping(std::ofstream &stream, bool segmentId
 void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	
 	std::cout << "Generating code for initializing segment memory\n";
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
 
 	stream << std::endl << indent << "// initializing segment memory\n";	
 	
@@ -649,6 +617,10 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	// set the task data property in each thread of the segment
 	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";
 	stream << doubleIndent << "threadStateList[i]->setTaskData(taskData)" << stmtSeparator;
+	
+	// enable logging for the participant threads
+	stream << doubleIndent << "threadStateList[i]->initiateLogFile(\"" << initials << "\")" << stmtSeparator;	
+	stream << doubleIndent << "threadStateList[i]->enableLogging()" << stmtSeparator;	
 	stream << indent << "}\n";
 }
 
@@ -656,10 +628,6 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	
 	std::cout << "Generating code for starting threads\n";
 
-	std::string indent = "\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
-	
 	stream << std::endl << indent << "// starting threads\n";	
 	
 	// declare an array of thread IDs and another array of thread arguments
@@ -716,10 +684,6 @@ void TaskGenerator::writeResults(std::ofstream &stream) {
 	Space *rootLps = lpsHierarchy->getRootSpace();
 
 	List<const char*> *externalEnvLinks = new List<const char*>;
-	std::string indent = "\t";
-	std::string doubleIndent = "\t\t";
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
 	
 	stream << indent << "// writing environment variables to files after task completion\n";
 	stream << indent << "std::cout << \"writing results to output files\\n\"" << stmtSeparator;

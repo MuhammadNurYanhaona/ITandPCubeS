@@ -4,6 +4,7 @@
 #include "../utils/interval_utils.h"
 #include "../codegen/structure.h"
 #include <algorithm>
+#include <iostream>
 
 //---------------------------------------------------------- Dim Partition Config ---------------------------------------------------------/
 
@@ -508,7 +509,7 @@ PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) 
 
 		List<int> *dimIdList = new List<int>;
 		for (int j = 0; j < partIdList->NumElements(); j++) {
-			int *partId = partIdList->Nth(i);
+			int *partId = partIdList->Nth(j);
 			dimIdList->Append(partId[i]);
 		}
 

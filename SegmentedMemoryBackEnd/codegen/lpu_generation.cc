@@ -177,7 +177,8 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 	programFile << indent << "int *lpuCounts = threadState->getLpuCounts(Space_";
 	programFile << lpsName << ")" << stmtSeparator;
 	programFile << indent << "Space" << lpsName << "_LPU *lpu = (Space" << lpsName << "_LPU*) ";
-        programFile << "threadState->getCurrentLpu(Space_" << lpsName << ")" << stmtSeparator;
+        programFile << "threadState->getCurrentLpu(Space_" << lpsName; 
+	programFile << paramSeparator <<  "true" << ")" << stmtSeparator;
 
 	// retrieve LPU Id chain that shows how the LPU for the current LPS has been reached hierarchically from its
 	// ancestor LPSes; this information will be needed to identify data parts of the LPU
