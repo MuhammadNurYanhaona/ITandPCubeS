@@ -139,10 +139,16 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
 	// config reference in the newly created config
 	DataStructure *source = array->getSource();
 	if (source != NULL && !source->getSpace()->isRoot()) {
-		Space *parentLps = source->getSpace();
+		Space *parentLpsForArray = source->getSpace();
+		Space *parentLps = lps->getParent();
+		int jumps = 1;
+		while (parentLps != parentLpsForArray) {
+			parentLps = parentLps->getParent();
+			jumps++;
+		}
 		programFile << indent << "config->setParent(configMap->Lookup(\"";
 		programFile << array->getName() << "Space" << parentLps->getName() << "Config";
-		programFile << "\"))" << stmtSeparator;
+		programFile << "\")" << paramSeparator << jumps << ")" << stmtSeparator;
 	}
 
 	programFile << indent << "return config" << stmtSeparator;

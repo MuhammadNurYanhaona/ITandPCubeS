@@ -62,7 +62,11 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
 	ArrayDataStructure *structure = (ArrayDataStructure*) space->getStructure(array);
 	int dimensionCount = structure->getDimensionality();
 	std::ostringstream xform;
-	xform << "(" << index << " - " << array << "StoreDims[" << dimensionNo << "].range.min" << ")";
+	xform << "(" << index;
+	if (structure->isDimensionReordered(dimensionNo + 1, space->getRoot())) {
+		xform << "Xformed";
+	}
+	xform << " - " << array << "StoreDims[" << dimensionNo << "].range.min" << ")";
 	bool firstEntry = true;
 	for (int i = dimensionCount - 1; i > dimensionNo; i--) {
 		if (!firstEntry) {

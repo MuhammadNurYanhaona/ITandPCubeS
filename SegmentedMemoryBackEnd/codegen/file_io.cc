@@ -50,7 +50,7 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << indent << "void terminate() { stream->close()" << stmtTerminator << " }\n";
 	headerFile << indent << "List<int> *getDataIndex(List<int> *partIndex) {";
 	if (array->isReordered(lps->getRoot())) {
-		headerFile << " return DataHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";
+		headerFile << " return PartHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";
 	} else {
 		headerFile << " return partIndex" << stmtTerminator << " }\n";
 	}
@@ -102,7 +102,7 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << indent << "void terminate() { stream->close()" << stmtTerminator << " }\n";
 	headerFile << indent << "List<int> *getDataIndex(List<int> *partIndex) {";
 	if (array->isReordered(lps->getRoot())) {
-		headerFile << " return DataHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";
+		headerFile << " return PartHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";
 	} else {
 		headerFile << " return partIndex" << stmtTerminator << " }\n";
 	}

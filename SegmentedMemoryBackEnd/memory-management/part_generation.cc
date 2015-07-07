@@ -368,7 +368,7 @@ Dimension StrideConfig::getPartDimension(int partId, Dimension parentDimension) 
         partDimension.range.min = parentDimension.range.min + perStrideEntries * partId + extra;
         partDimension.range.max = partDimension.range.min + myEntries - 1;
         partDimension.setLength();
-	return partDimension;
+	return partDimension.getNormalizedDimension();
 }
 
 int StrideConfig::getOriginalIndex(int partIndex, int position, List<int> *partIdList,        
@@ -377,9 +377,7 @@ int StrideConfig::getOriginalIndex(int partIndex, int position, List<int> *partI
 
 	int partId = partIdList->Nth(position);
 	int partCount = partCountList->Nth(position);
-	Dimension *partDimension = partDimensionList->Nth(position);
-	int zeroBasedIndex = partIndex - partDimension->range.min;
-	int originalIndex = partId + zeroBasedIndex * partCount;
+	int originalIndex = partId + partIndex * partCount;
 	
 	return DimPartitionConfig::getOriginalIndex(originalIndex, position, partIdList, 
 			partCountList, partDimensionList);
@@ -468,7 +466,7 @@ Dimension BlockStrideConfig::getPartDimension(int partId, Dimension parentDimens
 			+ partId * strideCount * strideLength + extraEntriesBefore;
         partDimension.range.max = partDimension.range.min + myEntries - 1;
         partDimension.setLength();
-        return partDimension;
+        return partDimension.getNormalizedDimension();
 }
 
 int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *partIdList,
@@ -478,10 +476,8 @@ int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *
 	int partId = partIdList->Nth(position);
 	int partCount = partCountList->Nth(position);
 	int blockSize = partitionArgs[0];
-	Dimension *partDimension = partDimensionList->Nth(position);
-	int zeroBasedIndex = partIndex - partDimension->range.min;
-	int originalIndex = ((zeroBasedIndex / blockSize) * partCount + partId) * blockSize 
-			+ zeroBasedIndex % blockSize;
+	int originalIndex = ((partIndex / blockSize) * partCount + partId) * blockSize 
+			+ partIndex % blockSize;
 	
 	return DimPartitionConfig::getOriginalIndex(originalIndex, position, partIdList, 
 			partCountList, partDimensionList);
@@ -489,13 +485,14 @@ int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *
 
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
 
-void DataPartitionConfig::setParent(DataPartitionConfig *parent) { 
+void DataPartitionConfig::setParent(DataPartitionConfig *parent, int parentJump) { 
 	this->parent = parent; 
 	for (int i = 0; i < dimensionCount; i++) {
 		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
 		DimPartitionConfig *parentConfig = parent->dimensionConfigs->Nth(i);
 		dimConfig->setParentConfig(parentConfig);
 	}
+	this->parentJump = parentJump;
 }
 
 PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) {
@@ -543,10 +540,11 @@ List<int*> *DataPartitionConfig::generatePartId(List<int*> *lpuIds) {
 
 List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int backsteps) {
 	List<int*> *partId = new List<int*>;
-	int position = lpuIds->NumElements() - 1 - backsteps;
+	int position = lpuIds->NumElements() - 1;
 	int steps = 0;
 	DataPartitionConfig *lastConfig = this;
 	while (steps < backsteps) {
+		position -= lastConfig->parentJump;
 		lastConfig = lastConfig->parent;
 		steps++;
 	}
@@ -556,7 +554,7 @@ List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int
 
 void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, List<int*> *partId) {
 	if (parent != NULL) {
-		parent->generatePartId(lpuIds, position - 1, partId);
+		parent->generatePartId(lpuIds, position - parentJump, partId);
 	}
 	int *lpuId = lpuIds->Nth(position);
 	int *partIdForLpu = new int[dimensionCount];

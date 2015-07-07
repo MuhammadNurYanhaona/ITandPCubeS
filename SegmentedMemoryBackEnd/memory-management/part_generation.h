@@ -228,13 +228,20 @@ class DataPartitionConfig {
 	// A reference to the parition configuration of immediate ancestor LPS cantaining the underlying 
 	// data structure
 	DataPartitionConfig *parent;
+	// In the partition hierarchy the parent part specification for a data structure not necessarily
+	// recides in the parent of the current LPS. Rather the parent part specification may lies further
+	// up in the ancestry. This need to be taken into account when generating part Ids from LPU ids.
+	// The following property keeps track of the number of parent links for an LPU needs to be skipped
+	// to get to the next level. TODO we should try to make the part Id calculation process more 
+	// robust in the future.
+	int parentJump;
   public:
 	DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfigs) {
 		this->dimensionCount = dimensionCount;
 		this->dimensionConfigs = dimensionConfigs;
 		this->parent = NULL;
 	}
-	void setParent(DataPartitionConfig *parent);
+	void setParent(DataPartitionConfig *parent, int parentJump);
 	DimPartitionConfig *getDimensionConfig(int dimNo) { return dimensionConfigs->Nth(dimNo); }
 	
 	// the function is to be used for generating metadata for subsequent use in generating a data part
