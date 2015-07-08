@@ -379,6 +379,13 @@ int StrideConfig::getOriginalIndex(int partIndex, int position, List<int> *partI
 	int partCount = partCountList->Nth(position);
 	int originalIndex = partId + partIndex * partCount;
 	
+	if (position > 0) {
+		Dimension *parentDimension = partDimensionList->Nth(position - 1);
+		originalIndex += parentDimension->range.min;
+	} else {
+		originalIndex += dataDimension.range.min;
+	}
+	
 	return DimPartitionConfig::getOriginalIndex(originalIndex, position, partIdList, 
 			partCountList, partDimensionList);
 }
@@ -478,6 +485,13 @@ int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *
 	int blockSize = partitionArgs[0];
 	int originalIndex = ((partIndex / blockSize) * partCount + partId) * blockSize 
 			+ partIndex % blockSize;
+	
+	if (position > 0) {
+		Dimension *parentDimension = partDimensionList->Nth(position - 1);
+		originalIndex += parentDimension->range.min;
+	} else {
+		originalIndex += dataDimension.range.min;
+	}
 	
 	return DimPartitionConfig::getOriginalIndex(originalIndex, position, partIdList, 
 			partCountList, partDimensionList);

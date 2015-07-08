@@ -1,0 +1,5 @@
+"Reorder Assignment Test" {
+	// syntax LPS ':' PPS
+	Space A: 3	// CPU
+	Space B: 2	// Core
+}

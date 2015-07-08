@@ -534,9 +534,17 @@ class ArrayAccess : public Expr {
 	//----------------------------------------------------------------------------------------for code generation
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	Expr *getEndpointOfArrayAccess();
-	void generate1DIndexAccess(std::ostringstream &stream, 
+	void generate1DIndexAccess(std::ostringstream &stream, int indentLevel,
 			const char *array, ArrayType *type, Space *space);
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+
+	// For segmented memory systems, array accesses like 'array[i + 1]' where the corresponding 
+	// dimension has been reordered by one or more partition functions need to be given especial 
+	// attention. The expression 'i + 1' should be transformed into an appropriate reordered 
+	// index before memory is accessed. This function does that transformation.
+	void generateXformedIndex(std::ostringstream &stream, int indentLevel,
+			const char *indexExpr, 
+			const char *arrayName, int dimensionNo, Space *space);
 };
 
 class FunctionCall : public Expr {
