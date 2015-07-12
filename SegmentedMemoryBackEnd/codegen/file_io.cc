@@ -264,6 +264,7 @@ void generateRoutineForDataInitialization(const char *headerFileName, const char
 		}
 		programFile << indent << "}\n";
 	}
+	programFile << indent << "env->resetInputBindings()" << stmtSeparator;
 	programFile << "}\n";
 
 	headerFile.close();
@@ -302,6 +303,16 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 	headerFile << "void " << fnHeader.str() << stmtSeparator;
 	programFile << "void " << string_utils::toLower(initials) << "::" << fnHeader.str();
 	programFile << " {\n\n";
+
+	// for now assume the number of segment is equal to the number of MPI processes in the system and get the MPI rank
+	// and count to ready current process for serialized output
+	programFile << indent << "int segmentId" << stmtSeparator;
+	programFile << indent << "int segmentCount" << stmtSeparator;
+	programFile << indent << "MPI_Comm_rank(MPI_COMM_WORLD, &segmentId)" << stmtSeparator;
+	programFile << indent << "MPI_Comm_size(MPI_COMM_WORLD, &segmentCount)" << stmtSeparator;
+	programFile << indent << "env->getReadyForOutput(";
+	programFile << "segmentId" << paramSeparator << "segmentCount" << paramSeparator;
+	programFile << "MPI_COMM_WORLD)" << stmtSeparator << '\n';
 	
 	// unlike in the case of the initializer we consider all linked and created environment objects (though the present
 	// implementation is limited to arrays only) while writing
@@ -363,6 +374,14 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 		}
 		programFile << indent << "}\n";
 	}
+
+	// once writing has been done for all data structures, signal the next segment to start its output
+	programFile << '\n' << indent << "env->signalOutputCompletion(";
+	programFile << "segmentId" << paramSeparator << "segmentCount" << paramSeparator;
+	programFile << "MPI_COMM_WORLD)" << stmtSeparator;
+
+	// finaly reset all output binding instructions so that if the environment is been used again there is no IO overwrite
+	programFile << indent << "env->resetOutputBindings()" << stmtSeparator;
 	programFile << "}\n";
 
 	headerFile.close();

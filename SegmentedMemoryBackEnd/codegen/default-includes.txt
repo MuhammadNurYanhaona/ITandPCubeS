@@ -48,6 +48,9 @@
 // for threading
 #include <pthread.h>
 
+// for MPI
+#include <mpi.h>
+
 // for synchronization
 #include "../runtime/sync.h"
 

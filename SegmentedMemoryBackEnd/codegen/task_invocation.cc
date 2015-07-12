@@ -37,24 +37,23 @@ void initiateProgramHeaders(const char *headerFileName, const char *programFileN
         }
 
         headerFile << "#ifndef _H_coordinator\n";
-        headerFile << "#define _H_coordinator\n\n";
+        headerFile << "#define _H_coordinator\n";
 
 	// include the header file for coordinator program in its program file
         int programHeaderIndex = string_utils::getLastIndexOf(headerFileName, '/') + 1;
         char *programHeader = string_utils::substr(headerFileName, 
 			programHeaderIndex, strlen(headerFileName));
-        programFile << "/*-----------------------------------------------------------------------------------\n";
-        programFile << "header file for the coordinator program" << std::endl;
-        programFile << "------------------------------------------------------------------------------------*/\n\n";
-        programFile << "#include \"" << programHeader  << '"' << std::endl << std::endl;
+	const char *message1 = "header file for the coordinator program";
+	decorator::writeSectionHeader(programFile, message1);
+        programFile << std::endl << "#include \"" << programHeader  << '"' << std::endl;
 
 	// prepare an stream to write all header that should be included in both files
 	std::ostringstream commonHeaders;
 
 	// retrieve the list of default libraries from an external file
-        commonHeaders << "/*-----------------------------------------------------------------------------------\n";
-        commonHeaders << "header files included for different purposes" << std::endl;
-       	commonHeaders << "------------------------------------------------------------------------------------*/\n\n";
+	const char *message2 = "header files included for different purposes";
+	decorator::writeSectionHeader(commonHeaders, message2);
+	commonHeaders << std::endl;
 	if (commIncludeFile.is_open()) {
                 while (std::getline(commIncludeFile, line)) {
                         commonHeaders << line << std::endl;
@@ -66,15 +65,14 @@ void initiateProgramHeaders(const char *headerFileName, const char *programFileN
 	headerFile << commonHeaders.str();
 
 	// include headers for all tasks in the library list;
-        commonHeaders << "/*-----------------------------------------------------------------------------------\n";
-        commonHeaders << "header files for tasks" << std::endl;
-       	commonHeaders << "------------------------------------------------------------------------------------*/\n\n";
+	const char *message3 = "header files for tasks";
+	decorator::writeSectionHeader(commonHeaders, message3);
+	commonHeaders << std::endl;
 	List<TaskDef*> *taskList = programDef->getTasks();
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		commonHeaders << "#include \"";
 		commonHeaders << TaskGenerator::getHeaderFileName(taskList->Nth(i)) << "\"\n";
 	}
-	commonHeaders << std::endl;
 	programFile << commonHeaders.str();
 
 	commIncludeFile.close();
@@ -94,12 +92,11 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
         }
 
 	std::ostringstream fnHeader;
-	std::ostringstream  comments;
-        comments << "/*-----------------------------------------------------------------------------------\n";
-        comments << "function for initializing program arguments\n";
-       	comments << "------------------------------------------------------------------------------------*/\n\n";
-	headerFile << comments.str();
-	programFile << comments.str();
+        const char *comments = "function for initializing program arguments";
+	decorator::writeSectionHeader(headerFile, comments);
+	headerFile << std::endl;
+	decorator::writeSectionHeader(programFile, comments);
+	programFile << std::endl;
 
 	// write function signature in header and program files
 	const char *tupleName = programArg->getId()->getName();
@@ -136,7 +133,7 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 	programFile << indent << "return programArgs" << stmtSeparator;
 
 	// close function definition;
-	programFile << "}\n\n";
+	programFile << "}\n";
 
 	headerFile.close();
 	programFile.close();
@@ -371,10 +368,13 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         // write the function signature
         stream << "\nint main(int argc, char *argv[]) {\n\n";
 
+	// do MPI initialization
+	stream << indent << "MPI_Init(&argc, &argv)" << stmtSeparator << std::endl;
+
 	// retrieve the segment id for the current process
         stream << indent << "// retreiving segmentation identifier\n";
 	stream << indent << "int segmentId = 0" << stmtSeparator;
-        stream << indent << "if (argc > 1) segmentId = std::atoi(argv[1])" << stmtSeparator << std::endl;
+        stream << indent << "MPI_Comm_rank(MPI_COMM_WORLD, &segmentId)" << stmtSeparator << std::endl;
 
 	// start execution time monitoring timer
         stream << indent << "// starting execution timer clock\n";
@@ -421,6 +421,8 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         // display the running time on console
         stream << indent << "std::cout << \"Parallel Execution Time: \" << runningTime <<";
         stream << " \" Seconds\" << std::endl" << stmtSeparator;
+	// release MPI resources
+	stream << indent << "MPI_Finalize()" << stmtSeparator;
 	// then exit the function
         stream << indent << "return 0" << stmtSeparator;
         stream << "}\n";

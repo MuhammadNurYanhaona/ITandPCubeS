@@ -28,8 +28,8 @@ JUNK =  *.o */*.o lex.yy.c dpp.yy.c y.tab.c y.tab.h *.core core $(COMPILER).puri
 BUILD_LOGS = ./bin/*.log 
 
 # Define the tools we are going to use
-CC= g++
-LD = g++
+CC= mpic++
+LD = mpic++
 LEX = flex
 YACC = bison
 

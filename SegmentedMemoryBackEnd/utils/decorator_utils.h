@@ -7,6 +7,7 @@
 namespace decorator {
 
 	void writeSectionHeader(std::ofstream &stream, const char *message);
+	void writeSectionHeader(std::ostringstream &stream, const char *message);
 	void writeSubsectionHeader(std::ofstream &stream, const char *message);
 }
 

@@ -10,6 +10,12 @@ void decorator::writeSectionHeader(std::ofstream &stream, const char *message) {
         stream <<   "----------------------------------------------------------------------------------------------------*/\n";
 }
 
+void decorator::writeSectionHeader(std::ostringstream &stream, const char *message) {
+	stream << "\n/*----------------------------------------------------------------------------------------------------\n";
+        stream << message << '\n';
+        stream <<   "----------------------------------------------------------------------------------------------------*/\n";
+}
+
 void decorator::writeSubsectionHeader(std::ofstream &stream, const char *message) {
 	int messageLength = strlen(message);
 	int defaultLength = 100;
