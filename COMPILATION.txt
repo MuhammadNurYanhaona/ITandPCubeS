@@ -14,7 +14,9 @@ Note that to generate executables from IT source codes you have to take the foll
 4. Fourth, write a mapping description file depicting how LPSes (logical processing spaces) 
    of IT source are mapped to PPSes (physical processing spaces) of the target machine.
 
-Examples of all these are available in MultiCoreBackEnd/samples directory.
+Examples of all these are available in MultiCoreBackEnd/samples directory. You can also use 
+the pcubes_info_collect.sh script available in the current directory to get most information
+needed to generate a PCubeS model of your target hardware.
 
 Once you have all of the above you have to compile and generate the executable using the 
 following steps.
