@@ -100,12 +100,20 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 
 	// write function signature in header and program files
 	const char *tupleName = programArg->getId()->getName();
-	fnHeader << tupleName << " getProgramArgs()";
+	fnHeader << tupleName << " getProgramArgs(char *fileName" << paramSeparator << "std::ofstream &logFile)";
 	headerFile << fnHeader.str() << stmtSeparator;
 	programFile << fnHeader.str();
 
 	// start function definition
 	programFile << " {\n";
+
+	// try to open the file
+	programFile << indent << "std::ifstream argFile(fileName)" << stmtSeparator;
+	programFile << indent << "if (!argFile.is_open()) {\n";
+	programFile << doubleIndent << "logFile << \"could not open input arguments file\\n\"" << stmtSeparator;
+	programFile << doubleIndent << "logFile.flush()" << stmtSeparator;
+	programFile << doubleIndent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
+	programFile << indent << "}\n";
 	
 	// create a new instance of the program argument object
 	programFile << indent << tupleName << " programArgs = " << tupleName << "()" << stmtSeparator;
@@ -115,18 +123,16 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 	for (int i = 0; i < propertyList->NumElements(); i++) {
 		VariableDef *property = propertyList->Nth(i);
 		const char *propertyName = property->getId()->getName();
-		programFile << indent << "programArgs." << propertyName << " = ";	
 		Type *propertyType = property->getType();
 		if (propertyType == Type::stringType) {
-			programFile << "inprompt::readString";	
-		} else if (propertyType == Type::boolType) {
-			programFile << "inprompt::readBoolean";	
+			programFile << indent << "std::string " << propertyName << "Str" << stmtSeparator;
+			programFile << indent << "std::getline(argFile" << paramSeparator;
+			programFile << propertyName << "Str)" << stmtSeparator;	
+			programFile << indent << "programArgs." << propertyName << " = strdup(";
+			programFile << propertyName << "Str.c_str())" << stmtSeparator;	
 		} else {
-			programFile << "inprompt::readPrimitive ";	
-			programFile << "<" << propertyType->getCType() << "> ";
+			programFile << indent <<  "argFile >> programArgs." << propertyName << stmtSeparator;
 		}
-		programFile << "(\"" << propertyName << "\")" ;
-		programFile << stmtSeparator;
 	}
 	
 	// return the initialized argument object
@@ -395,28 +401,20 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << indent << "std::ofstream logFile" << stmtSeparator;
         stream << indent << "logFile.open(logFileName.str().c_str())" << stmtSeparator << std::endl;
 
-	// get all command line arguments as input from the user in the first segment then communicate that to
-	// all other segments
+	// get all command line arguments as input from an input file
 	const char *argName = coordDef->getArgumentName();
 	stream << indent << "// getting command line inputs\n";
 	stream << indent << "ProgramArgs " << argName << stmtSeparator;
-	stream << indent << "char *argBuffer = reinterpret_cast<char*>(&" << argName << ")" << stmtSeparator;
-	stream << indent << "int argSize = sizeof(ProgramArgs) / sizeof(char)" << stmtSeparator;
-	stream << indent << "if (segmentId == 0) {\n";
-	stream << doubleIndent << argName << " = getProgramArgs()" << stmtSeparator;
-	stream << doubleIndent << "MPI_Bcast(argBuffer" << paramSeparator << "argSize" << paramSeparator;
-	stream << "MPI_CHAR" << paramSeparator << 0 << paramSeparator << "MPI_COMM_WORLD)" << stmtSeparator;
-	stream << indent << "} else {\n";
-	stream << doubleIndent << "MPI_Status status" << stmtSeparator;
-	stream << doubleIndent << "MPI_Recv(argBuffer" << paramSeparator << "argSize" << paramSeparator;
-	stream << "MPI_CHAR" << paramSeparator << 0 << paramSeparator << 0 << paramSeparator; 
-	stream << "MPI_COMM_WORLD" << paramSeparator << "&status)" << stmtSeparator;
+	stream << indent << "if (argc > 1) {\n";
+	stream << doubleIndent << "char *argFileName = argv[1]" << stmtSeparator;
+	stream << doubleIndent << argName << " = getProgramArgs(argFileName"; 
+	stream << paramSeparator << "logFile)" << stmtSeparator;
+	stream << doubleIndent << "logFile << \"read program arguments\\n\"" << stmtSeparator;
+	stream << doubleIndent << "logFile.flush()" << stmtSeparator;
 	stream << indent << "}\n";
-	stream << indent << "logFile << \"read program arguments\\n\"" << stmtSeparator;
-	stream << indent << "logFile.flush()" << stmtSeparator << std::endl;
 
 	// declare all local variables found in scope
-	stream << indent << "// declaring local variables\n";
+	stream << std::endl << indent << "// declaring local variables\n";
 	std::ostringstream declStream;
 	coordDef->declareVariablesInScope(declStream, 1);
 	stream << declStream.str() << std::endl;
