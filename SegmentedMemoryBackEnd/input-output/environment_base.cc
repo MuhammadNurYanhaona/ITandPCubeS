@@ -15,8 +15,8 @@ void EnvironmentBase::getReadyForOutput(int segmentId, int segmentCount, MPI_Com
 	// it has to wait for the previous segment to finish writing
 	if (segmentId != 0 && hasBinding) {
 		int predecessorDone = 0;
-		MPI_Recv(&predecessorDone, 1, MPI_INT, segmentId - 1, 
-				MPI_ANY_TAG, communicator, MPI_STATUS_IGNORE);
+		MPI_Status status;
+		MPI_Recv(&predecessorDone, 1, MPI_INT, segmentId - 1, 0, communicator, &status);
 	} 
 }
 
@@ -29,6 +29,6 @@ void EnvironmentBase::signalOutputCompletion(int segmentId, int segmentCount, MP
 	// if the current segment is not the last one, it has to signal the next segment
 	if (segmentId != segmentCount - 1 && hasBinding) {
 		int writingDone = 1;
-		MPI_Send(&writingDone, 1, MPI_INT, segmentId + 1, MPI_ANY_TAG, communicator);
+		MPI_Send(&writingDone, 1, MPI_INT, segmentId + 1, 0, communicator);
 	} 
 }

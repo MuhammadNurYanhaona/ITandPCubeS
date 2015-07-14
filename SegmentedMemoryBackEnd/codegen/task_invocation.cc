@@ -333,6 +333,7 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << "taskData" << paramSeparator;
 	programFile << "configMap" << ")" << stmtSeparator; 
 	programFile << indent << "logFile << \"\\tenvironment initialization is complete\\n\"" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator;
 
 	// start threads and wait for them to finish execution of the task 
         taskGenerator->startThreads(programFile);
@@ -340,11 +341,15 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	// write environmental data structures into output files if instructed by the coordinator program 
 	// through output bindings
 	programFile << indent << "// storing outputs in files\n"; 
+	programFile << indent << "logFile << \"\\tgoing to write output to files\\n\"" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator;
 	programFile << indent << "storeEnvironment";
 	programFile << "(" << "environment" << paramSeparator;
 	programFile << "taskData" << paramSeparator;
 	programFile << "mySegment" << paramSeparator;
 	programFile << "configMap" << ")" << stmtSeparator; 
+	programFile << indent << "logFile << \"\\tfile output is complete\\n\"" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator;
 	
 	// close function definition
 	programFile << "}\n\n";
@@ -393,7 +398,8 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
 	stream << indent << "// getting command line inputs\n";
 	stream << indent << "ProgramArgs " << coordDef->getArgumentName();
 	stream << " = getProgramArgs()" << stmtSeparator;
-	stream << indent << "logFile << \"read program arguments\\n\"" << stmtSeparator << std::endl;
+	stream << indent << "logFile << \"read program arguments\\n\"" << stmtSeparator;
+	stream << indent << "logFile.flush()" << stmtSeparator << std::endl;
 
 	// declare all local variables found in scope
 	stream << indent << "// declaring local variables\n";
@@ -417,7 +423,8 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << std::endl << indent << indent << indent;
         stream << "- (start.tv_sec + start.tv_usec / 1000000.0))" << stmtSeparator;
         stream << indent << "logFile << \"Execution Time: \" << runningTime << \" Seconds\" << std::endl";
-        stream << stmtSeparator << std::endl;
+        stream << stmtSeparator;
+	stream << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	
 	// close the log file
         stream << indent << "logFile.close()" << stmtSeparator;

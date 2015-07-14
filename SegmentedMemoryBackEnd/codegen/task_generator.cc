@@ -514,6 +514,7 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream,
 		}
         }
 	stream << indent << "logFile << \"\\ttask initialization is complete\\n\"" << stmtSeparator;
+	stream << indent << "logFile.flush()" << stmtSeparator;
 }
 
 void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
@@ -603,6 +604,7 @@ void TaskGenerator::performSegmentGrouping(std::ofstream &stream, bool segmentId
 	stream << indent << "int participantStart = segmentId * Threads_Per_Segment" << stmtSeparator;
 	stream << indent << "int participantEnd = participantStart + Threads_Per_Segment - 1" << stmtSeparator;
 	stream << indent << "logFile << \"\\tsegment grouping of threads is complete\\n\"" << stmtSeparator;
+	stream << indent << "logFile.flush()" << stmtSeparator;
 }
 
 void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
@@ -625,6 +627,7 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	stream << doubleIndent << "threadStateList[i]->enableLogging()" << stmtSeparator;	
 	stream << indent << "}\n";
 	stream << indent << "logFile << \"\\tmemory allocation is complete\\n\"" << stmtSeparator;
+	stream << indent << "logFile.flush()" << stmtSeparator;
 }
 
 void TaskGenerator::startThreads(std::ofstream &stream) {
@@ -633,6 +636,7 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 
 	stream << std::endl << indent << "// starting threads\n";
 	stream << indent << "logFile << \"\\tlaunching threads\\n\"" << stmtSeparator;	
+	stream << indent << "logFile.flush()" << stmtSeparator;
 	
 	// declare an array of thread IDs and another array of thread arguments
 	stream << indent << "pthread_t threads[Total_Threads]" << stmtSeparator;
@@ -675,6 +679,7 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << indent << indent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
 	stream << indent << indent << "} else {\n";
 	stream << tripleIndent << "logFile << \"\\t\\tlaunched thread #\" << i << \"\\n\"" << stmtSeparator;
+	stream << tripleIndent << "logFile.flush()" << stmtSeparator;
 	stream << doubleIndent << "}\n";
 	stream << indent << "}\n";
 
