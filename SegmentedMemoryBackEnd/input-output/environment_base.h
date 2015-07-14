@@ -8,7 +8,8 @@
 #include "../codegen/structure.h"
 #include "stream.h" 
 
-#include <mpi.h>	
+#include <mpi.h>
+#include <fstream>	
 
 class EnvironmentBase {
   protected:
@@ -39,10 +40,14 @@ class EnvironmentBase {
 	// serialized writes. The segments will write their portions of data one after another in their original
 	// ordering. For that to work properly, there need to be a signaling from the earlier segment to the later
 	// segment for the latter to begin its writing. This function does the signal and wait interaction for that.   
-	void getReadyForOutput(int segmentId, int segmentCount, MPI_Comm communicator);
+	void getReadyForOutput(int segmentId, 
+			int segmentCount, 
+			MPI_Comm communicator, std::ofstream &logFile);
 	
 	// This is the counter-part of the above to indicate that the next segment can start writing its structures. 
-	void signalOutputCompletion(int segmentId, int segmentCount, MPI_Comm communicator);
+	void signalOutputCompletion(int segmentId, 
+			int segmentCount, 
+			MPI_Comm communicator, std::ofstream &logFile);
 
 	// a helper method to initialize array dimensions information when the data for the array come from a file	
 	inline void readDimensionInfo(const char *varName, PartDimension *partDims) {

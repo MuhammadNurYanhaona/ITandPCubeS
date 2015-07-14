@@ -347,7 +347,8 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << "(" << "environment" << paramSeparator;
 	programFile << "taskData" << paramSeparator;
 	programFile << "mySegment" << paramSeparator;
-	programFile << "configMap" << ")" << stmtSeparator; 
+	programFile << "configMap" << paramSeparator; 
+	programFile << "logFile" << ")" << stmtSeparator; 
 	programFile << indent << "logFile << \"\\tfile output is complete\\n\"" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator;
 	

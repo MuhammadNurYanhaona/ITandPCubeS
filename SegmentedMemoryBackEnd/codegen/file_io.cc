@@ -298,7 +298,9 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 	fnHeader << "storeEnvironment(" << initials << "Environment *env" << paramSeparator;
 	fnHeader << std::endl << indent << doubleIndent << "TaskData *taskData" << paramSeparator;
 	fnHeader << std::endl << indent << doubleIndent << "SegmentState *segment" << paramSeparator;
-	fnHeader << std::endl << indent << doubleIndent << "Hashtable<DataPartitionConfig*> *partConfigMap)";
+	fnHeader << std::endl << indent << doubleIndent;
+	fnHeader  << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
+	fnHeader << std::endl << indent << doubleIndent << "std::ofstream &logFile)";
 
 	headerFile << "void " << fnHeader.str() << stmtSeparator;
 	programFile << "void " << string_utils::toLower(initials) << "::" << fnHeader.str();
@@ -312,7 +314,7 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 	programFile << indent << "MPI_Comm_size(MPI_COMM_WORLD, &segmentCount)" << stmtSeparator;
 	programFile << indent << "env->getReadyForOutput(";
 	programFile << "segmentId" << paramSeparator << "segmentCount" << paramSeparator;
-	programFile << "MPI_COMM_WORLD)" << stmtSeparator << '\n';
+	programFile << "MPI_COMM_WORLD" << paramSeparator << "logFile)" << stmtSeparator << '\n';
 	
 	// unlike in the case of the initializer we consider all linked and created environment objects (though the present
 	// implementation is limited to arrays only) while writing
@@ -378,7 +380,7 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 	// once writing has been done for all data structures, signal the next segment to start its output
 	programFile << '\n' << indent << "env->signalOutputCompletion(";
 	programFile << "segmentId" << paramSeparator << "segmentCount" << paramSeparator;
-	programFile << "MPI_COMM_WORLD)" << stmtSeparator;
+	programFile << "MPI_COMM_WORLD" << paramSeparator << "logFile)" << stmtSeparator;
 
 	// finaly reset all output binding instructions so that if the environment is been used again there is no IO overwrite
 	programFile << indent << "env->resetOutputBindings()" << stmtSeparator;
