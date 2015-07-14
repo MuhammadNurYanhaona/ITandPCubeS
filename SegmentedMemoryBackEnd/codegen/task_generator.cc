@@ -550,7 +550,7 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	stream << indent << "ThreadIds *threadIdsList[Total_Threads]" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	stream << indent << indent << "threadIdsList[i] = getPpuIdsForThread(i)" << stmtSeparator;
-	stream << indent << indent << "threadIdsList[i]->print(logFile)" << stmtSeparator;
+	//stream << indent << indent << "threadIdsList[i]->print(logFile)" << stmtSeparator;
 	stream << indent << "}\n";
 
 	// create a data partition configuration object
@@ -602,6 +602,7 @@ void TaskGenerator::performSegmentGrouping(std::ofstream &stream, bool segmentId
 	stream << indent << "SegmentState *mySegment = segmentList->Nth(segmentId)" << stmtSeparator;
 	stream << indent << "int participantStart = segmentId * Threads_Per_Segment" << stmtSeparator;
 	stream << indent << "int participantEnd = participantStart + Threads_Per_Segment - 1" << stmtSeparator;
+	stream << indent << "logFile << \"\\tsegment grouping of threads is complete\\n\"" << stmtSeparator;
 }
 
 void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
