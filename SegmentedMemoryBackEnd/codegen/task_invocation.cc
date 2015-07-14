@@ -332,6 +332,7 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << "(" << "environment" << paramSeparator;
 	programFile << "taskData" << paramSeparator;
 	programFile << "configMap" << ")" << stmtSeparator; 
+	programFile << indent << "logFile << \"\\tenvironment initialization is complete\\n\"" << stmtSeparator;
 
 	// start threads and wait for them to finish execution of the task 
         taskGenerator->startThreads(programFile);
@@ -383,14 +384,16 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
 
 	// create a log file for overall program log printing
         stream << std::endl << indent << "// creating a program log file\n";
-        stream << indent << "std::cout << \"Creating diagnostic log: it-program.log\\n\"" << stmtSeparator;
+	stream << indent << "std::ostringstream logFileName" << stmtSeparator;
+	stream << indent << "logFileName << " << "\"segment_\" << segmentId << \".log\"" << stmtSeparator;
         stream << indent << "std::ofstream logFile" << stmtSeparator;
-        stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator << std::endl;
+        stream << indent << "logFile.open(logFileName.str().c_str())" << stmtSeparator << std::endl;
 
 	// get all command line arguments as input from the user
 	stream << indent << "// getting command line inputs\n";
 	stream << indent << "ProgramArgs " << coordDef->getArgumentName();
-	stream << " = getProgramArgs()" << stmtSeparator << std::endl;
+	stream << " = getProgramArgs()" << stmtSeparator;
+	stream << indent << "logFile << \"read program arguments\\n\"" << stmtSeparator << std::endl;
 
 	// declare all local variables found in scope
 	stream << indent << "// declaring local variables\n";

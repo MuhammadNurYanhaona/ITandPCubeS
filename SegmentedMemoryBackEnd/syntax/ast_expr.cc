@@ -816,6 +816,8 @@ void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, S
         for (int i = 0; i < indentLevel; i++) indent << '\t';
 
         stream << indent.str() << "{ // scope starts for invoking: " << taskName->getName() << "\n";
+	stream << indent.str() << "logFile << \"going to execute task: " << taskName->getName();
+	stream << "\\n\"" << stmtSeparator;
         
 	// first create a partition object for the task
 	stream << indent.str() << partitionTuple->getId()->getName() << " partition" << stmtSeparator;

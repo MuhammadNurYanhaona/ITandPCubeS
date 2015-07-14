@@ -513,6 +513,7 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream,
                 	stream << stmtSeparator;
 		}
         }
+	stream << indent << "logFile << \"\\ttask initialization is complete\\n\"" << stmtSeparator;
 }
 
 void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
@@ -622,13 +623,15 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	stream << doubleIndent << "threadStateList[i]->initiateLogFile(\"" << initials << "\")" << stmtSeparator;	
 	stream << doubleIndent << "threadStateList[i]->enableLogging()" << stmtSeparator;	
 	stream << indent << "}\n";
+	stream << indent << "logFile << \"\\tmemory allocation is complete\\n\"" << stmtSeparator;
 }
 
 void TaskGenerator::startThreads(std::ofstream &stream) {
 	
 	std::cout << "Generating code for starting threads\n";
 
-	stream << std::endl << indent << "// starting threads\n";	
+	stream << std::endl << indent << "// starting threads\n";
+	stream << indent << "logFile << \"\\tlaunching threads\\n\"" << stmtSeparator;	
 	
 	// declare an array of thread IDs and another array of thread arguments
 	stream << indent << "pthread_t threads[Total_Threads]" << stmtSeparator;
@@ -669,7 +672,9 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << indent << indent << "std::cout << \"Could not start some PThread\" << std::endl";
 	stream << stmtSeparator;
 	stream << indent << indent << indent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
-	stream << indent << indent << "}\n";
+	stream << indent << indent << "} else {\n";
+	stream << tripleIndent << "logFile << \"\\t\\tlaunched thread #\" << i << \"\\n\"" << stmtSeparator;
+	stream << doubleIndent << "}\n";
 	stream << indent << "}\n";
 
 	// finally make the main thread wait till all other threads finish execution	
