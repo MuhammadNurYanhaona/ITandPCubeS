@@ -395,10 +395,23 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << indent << "std::ofstream logFile" << stmtSeparator;
         stream << indent << "logFile.open(logFileName.str().c_str())" << stmtSeparator << std::endl;
 
-	// get all command line arguments as input from the user
+	// get all command line arguments as input from the user in the first segment then communicate that to
+	// all other segments
+	const char *argName = coordDef->getArgumentName();
 	stream << indent << "// getting command line inputs\n";
-	stream << indent << "ProgramArgs " << coordDef->getArgumentName();
-	stream << " = getProgramArgs()" << stmtSeparator;
+	stream << indent << "ProgramArgs " << argName << stmtSeparator;
+	stream << indent << "char *argBuffer = reinterpret_cast<char*>(&" << argName << ")" << stmtSeparator;
+	stream << indent << "int argSize = sizeof(ProgramArgs) / sizeof(char)" << stmtSeparator;
+	stream << indent << "if (segmentId == 0) {\n";
+	stream << doubleIndent << argName << " = getProgramArgs()" << stmtSeparator;
+	stream << doubleIndent << "MPI_Bcast(argBuffer" << paramSeparator << "argSize" << paramSeparator;
+	stream << "MPI_CHAR" << paramSeparator << 0 << paramSeparator << "MPI_COMM_WORLD)" << stmtSeparator;
+	stream << indent << "} else {\n";
+	stream << doubleIndent << "MPI_Status status" << stmtSeparator;
+	stream << doubleIndent << "MPI_Recv(argBuffer" << paramSeparator << "argSize" << paramSeparator;
+	stream << "MPI_CHAR" << paramSeparator << 0 << paramSeparator << 0 << paramSeparator; 
+	stream << "MPI_COMM_WORLD" << paramSeparator << "&status)" << stmtSeparator;
+	stream << indent << "}\n";
 	stream << indent << "logFile << \"read program arguments\\n\"" << stmtSeparator;
 	stream << indent << "logFile.flush()" << stmtSeparator << std::endl;
 
