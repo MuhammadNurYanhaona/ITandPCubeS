@@ -126,8 +126,9 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 		Type *propertyType = property->getType();
 		if (propertyType == Type::stringType) {
 			programFile << indent << "std::string " << propertyName << "Str" << stmtSeparator;
-			programFile << indent << "std::getline(argFile" << paramSeparator;
-			programFile << propertyName << "Str)" << stmtSeparator;	
+			programFile << indent << "outprompt::readNonEmptyLine(";
+			programFile << propertyName << "Str" << paramSeparator;
+			programFile << "argFile" << ")" << stmtSeparator;	
 			programFile << indent << "programArgs." << propertyName << " = strdup(";
 			programFile << propertyName << "Str.c_str())" << stmtSeparator;	
 		} else {

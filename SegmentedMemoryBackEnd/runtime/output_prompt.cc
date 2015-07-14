@@ -20,6 +20,14 @@ void outprompt::readNonEmptyLine(std::string &line) {
 	}
 }
 
+void outprompt::readNonEmptyLine(std::string &line, std::ifstream &file) {
+	while (true) {
+		std::getline(file, line);
+		string_utils::trim(line);
+		if (line.length() > 0) break;
+	}
+}
+
 bool outprompt::getYesNoAnswer(const char *prompt) {
 	std::cout << prompt << std::endl;
 	std::cout << "Type 'Y' for yes or 'N' for no\n";

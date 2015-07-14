@@ -622,9 +622,12 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";
 	stream << doubleIndent << "threadStateList[i]->setTaskData(taskData)" << stmtSeparator;
 	
+	/*
 	// enable logging for the participant threads
 	stream << doubleIndent << "threadStateList[i]->initiateLogFile(\"" << initials << "\")" << stmtSeparator;	
-	stream << doubleIndent << "threadStateList[i]->enableLogging()" << stmtSeparator;	
+	stream << doubleIndent << "threadStateList[i]->enableLogging()" << stmtSeparator;
+	*/
+
 	stream << indent << "}\n";
 	stream << indent << "logFile << \"\\tmemory allocation is complete\\n\"" << stmtSeparator;
 	stream << indent << "logFile.flush()" << stmtSeparator;

@@ -20,6 +20,9 @@ namespace outprompt {
 	// read a nonempty line from the console
         void readNonEmptyLine(std::string &line);
 
+	// read a nonempty line from a file
+        void readNonEmptyLine(std::string &line, std::ifstream &file);
+	
 	// write a prompt to determine if the user want to do something or not
 	bool getYesNoAnswer(const char *prompt);
 
