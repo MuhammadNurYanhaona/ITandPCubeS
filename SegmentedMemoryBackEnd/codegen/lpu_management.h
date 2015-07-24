@@ -2,6 +2,7 @@
 #define _H_lpu_management
 
 #include "structure.h"
+#include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"
 #include "../utils/list.h"
@@ -145,6 +146,8 @@ class ThreadState {
 	Hashtable<DataPartitionConfig*> *partConfigMap;
 	// a reference to the instance that holds all memory allocated for the task
 	TaskData *taskData;
+	// a map of iterators that will be needed to identifiy data parts for LPUs
+	Hashtable<PartIterator*> *partIteratorMap;
 	// an auxiliary variable used in LPU generation process
 	List<int*> *lpuIdChain;
   public:
@@ -154,6 +157,8 @@ class ThreadState {
 	Hashtable<DataPartitionConfig*> *getPartConfigMap() { return partConfigMap; }
 	void setTaskData(TaskData *taskData) { this->taskData = taskData; }
 	TaskData *getTaskData() { return taskData; }
+	void setPartIteratorMap(Hashtable<PartIterator*> *map) { this->partIteratorMap = map; }
+	PartIterator *getIterator(int lpsId, const char *varName);
 		
 	virtual void setLpsParentIndexMap() = 0;
 	virtual void setRootLpu(Metadata *metadata) = 0;
@@ -172,7 +177,7 @@ class ThreadState {
 	// LPUs after LPUs. It returns NULL when the recursive process has no more LPUs to return.	
 	LPU *getNextLpu(int lpsId, int containerLpsId, int currentLpuId);
 
-	// Following two routines are added to aid memory management in segmented memory system. The idea here 
+	// The following routine is added to aid memory management in segmented memory system. The idea here 
 	// is to get the Ids of all LPUs that are multiplexed to a thread before it begin executions. A 
 	// segmented-PPU controller then accumulates all these Ids and passes them as a part of initialization 
 	// arguments to the memory management module. Once memory has been allocated for all data structure 
@@ -180,10 +185,6 @@ class ThreadState {
 	// launch its threads. Then each thread will proceed just like it does in the case of multicore CPU 
 	// backends.
 	int getNextLpuId(int lpsId, int containerLpsId, int currentLpuId);
-	// Note that for each LPU, we need to return not only the -- possibly multidimensional -- LPU id but
-	// also the ids of its ancestor LPUs in upper LPSes. This is because, LPU ids are hierarchical and
-	// sizes of different data parts in a lower LPS varies depending on the size of their ancestor parts.
-	List<List<int*>*> *getAllLpuIds(int lpsId, int rootLpsId);
 
 	// function to be used at runtime to propel LPU creation from ID; this is a makeshift operation to
 	// reduce the amount of changes we need to make in our transition from multicore to segmented-memory
@@ -192,6 +193,9 @@ class ThreadState {
 	// Note that these functions assume that there is currently a valid LPU for the LPS represented by the
 	// first argument.
 	int *getCurrentLpuId(int lpsId);
+	// Note that for each LPU, we need to return not only the -- possibly multidimensional -- LPU id but
+	// also the ids of its ancestor LPUs in upper LPSes. This is because, LPU ids are hierarchical and
+	// sizes of different data parts in a lower LPS varies depending on the size of their ancestor parts.
 	List<int*> *getLpuIdChain(int lpsId, int rootLpsId);
 	// it is just like the previous function but does not create in objects in the memory in the process;
 	// rather it just return a list formed by ids taken from different LPS counters; it should be used 
@@ -229,12 +233,6 @@ class SegmentState {
 	int physicalId;
 	// state of the threads that are parts of a segment
 	List<ThreadState*> *participantList;
-	// This is a temporary variable to hold lists of lpu-ids of different LPSes that have been multiplexed
-	// to the participants of a segment. These Ids are needed to construct interval-description of data that
-	// may need to be exchanged with other segments. A map is maintained so that the same lpu ids are not 
-	// computed several times, which is a costly computation. The map and its content should be cleared once
-	// interval descriptions for all would be communicated data have been constructed    
-	Hashtable<List<List<int*>*>*> *lpuIdListMap;
 	// the partition configuration object to be used to generate interval descriptions for data from LPU ids
 	Hashtable<DataPartitionConfig*> *partConfigMap;
   public:
@@ -246,12 +244,6 @@ class SegmentState {
 	}
 	void addParticipant(ThreadState *thread) { participantList->Append(thread); }
 	List<ThreadState*> *getParticipantList() { return participantList; }
-	void clearlpuIdListMap();
-	IntervalSet *getDataIntervalDesc(const char *varName, 
-			const char *lpsName, int lpsId, int rootLpsId, bool includePadding);
-  private:
-	// an auxiliary variable to be used during cleaning up the lpuIdListMap
-	List<const char*> *lpuIdListMapKeys; 
 };
 
 #endif

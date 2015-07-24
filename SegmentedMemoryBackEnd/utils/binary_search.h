@@ -6,7 +6,12 @@
 static const int KEY_NOT_FOUND = -1;
 
 namespace binsearch {
-	int locateKey(std::vector<int> array, int key) {
+
+	// Note that: sometimes inline keyword for long library functions, such as in this case, are needed so that the
+	// linker does not complain about 'multiple definitions found' problem due to the header's inclusion in multiple
+	// dependent libraries.
+
+	inline int locateKey(std::vector<int> array, int key) {
 		
 		int minIndex = 0;
 		int maxIndex = array.size() - 1;
@@ -23,7 +28,7 @@ namespace binsearch {
 		return KEY_NOT_FOUND;
 	}
 
-	int locatePointOfInsert(std::vector<int> array, int key) {
+	inline int locatePointOfInsert(std::vector<int> array, int key) {
 
 		if (array.empty()) return 0;
 		int minIndex = 0;

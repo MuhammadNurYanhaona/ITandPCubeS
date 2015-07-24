@@ -11,6 +11,7 @@
 #include "../utils/hashtable.h"
 #include "../utils/interval_utils.h"
 #include "../memory-management/allocation.h"
+#include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 
 /*************************************************  LPU Counter  ****************************************************/
@@ -208,7 +209,25 @@ ThreadState::ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, T
 	this->threadIds = threadIds;
 	this->lpuIdChain = new List<int*>;
 	this->taskData = NULL;
+	this->partConfigMap = NULL;
+	this->partIteratorMap = NULL;
 	this->loggingEnabled = false;
+}
+
+PartIterator *ThreadState::getIterator(int lpsId, const char *varName) {
+	if (partIteratorMap == NULL) {
+		std::cout << "Data-part iterator map has not been set in thread-state\n";
+		std::exit(EXIT_FAILURE);
+	}
+	std::ostringstream key;
+	key << "Space_" << lpsId << "_Var_" << varName;
+	PartIterator *iterator = partIteratorMap->Lookup(key.str().c_str());
+	if (iterator == NULL) {
+		std::cout << "Part iterator has not been found for Space #" << lpsId;
+		std::cout << " variable '" << varName << "\n";
+		std::exit(EXIT_FAILURE);
+	}
+	return iterator;
 }
 
 LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
@@ -386,39 +405,6 @@ int ThreadState::getNextLpuId(int lpsId, int containerLpsId, int currentLpuId) {
 	else return lpu->id;
 }
 
-List<List<int*>*> *ThreadState::getAllLpuIds(int lpsId, int rootLpsId) {
-	
-	// return an empty list if the current thread is not a handling any computation from concerned LPS
-	List<List<int*>*> *lpuIdList = new List<List<int*>*>;
-	if (!isValidPpu(lpsId)) return lpuIdList;
-	
-	// determine the list of ancestor LPSes including the argument LPS whose LPU ids will be needed to
-	// make sense of an LPU id in the latter.
-	List<int> *relevantLpsIds = new List<int>;
-	relevantLpsIds->Append(lpsId);
-	int currentLpsId = lpsId;
-	while ((currentLpsId = lpsParentIndexMap[currentLpsId]) != rootLpsId) {
-		relevantLpsIds->Append(currentLpsId);
-	}
-
-	// recursively get all LPU ids and process them	
-	int currentLpuId = INVALID_ID;
-	while ((currentLpuId = getNextLpuId(lpsId, rootLpsId, currentLpuId)) != INVALID_ID) {
-		List<int*> *idList = new List<int*>;
-		// enter LPU ids in the list from upper to lower LPS order to simplify future processing
-		for (int i = relevantLpsIds->NumElements() - 1; i >= 0; i--) {
-			currentLpsId = relevantLpsIds->Nth(i);
-			LpsState *state = lpsStates[currentLpsId];
-        		LpuCounter *counter = state->getCounter();
-			idList->Append(counter->copyCompositeLpuId());
-		}
-		lpuIdList->Append(idList);
-	}
-
-	delete relevantLpsIds;
-	return lpuIdList;
-}
-
 int *ThreadState::getCurrentLpuId(int lpsId) {
 	LpsState *state = lpsStates[lpsId];
 	LpuCounter *counter = state->getCounter();
@@ -521,80 +507,4 @@ SegmentState::SegmentState(int segmentId, int physicalId) {
                 this->physicalId = physicalId;
                 this->participantList = new List<ThreadState*>;
                 this->partConfigMap = NULL;
-                this->lpuIdListMap = new Hashtable<List<List<int*>*>*>;
-		this->lpuIdListMapKeys = new List<const char*>;
-}
-
-void SegmentState::clearlpuIdListMap() {
-	for (int i = 0; i < lpuIdListMapKeys->NumElements(); i++) {
-		const char *key = lpuIdListMapKeys->Nth(i);
-		List<List<int*>*> *lpuIdList = lpuIdListMap->Lookup(key);
-		lpuIdListMap->Remove(key, lpuIdList);
-		while (lpuIdList->NumElements() > 0) {
-			List<int*> *lpuIds = lpuIdList->Nth(0);
-			lpuIdList->RemoveAt(0);
-			while (lpuIds->NumElements() > 0) {
-				int *lpuId = lpuIds->Nth(0);
-				lpuIds->RemoveAt(0);
-				delete[] lpuId;
-			}
-			delete lpuIds; 
-		}
-		delete lpuIdList;
-	}
-	while (lpuIdListMapKeys->NumElements() > 0) {
-		const char *key = lpuIdListMapKeys->Nth(0);
-		lpuIdListMapKeys->RemoveAt(0);
-		delete key;	
-	}
-	delete lpuIdListMap;
-	delete lpuIdListMapKeys;
-}
-
-IntervalSet *SegmentState::getDataIntervalDesc(const char *varName, const char *lpsName, 
-		int lpsId, int rootLpsId, bool includePadding) {
-	/*	
-	std::ostringstream keyStr;
-	keyStr << varName << lpsName;
-	const char *key = keyStr.str().c_str(); 
-	List<List<int*>*> *lpuIdList = lpuIdListMap->Lookup(key);
-
-	// generate LPU ids through recursive get-next-LPU traversal process for all participants in the segment only
-	// if we haven't previously done it for the LPS under concern	
-	if (lpuIdList == NULL) {
-		lpuIdList = new List<List<int*>*>;
-		for (int i = 0; i < participantList->NumElements(); i++) {
-			ThreadState *participant = participantList->Nth(i);
-			List<List<int*>*> *participantsIdList = participant->getAllLpuIds(lpsId, rootLpsId);
-			if (participantsIdList != NULL) lpuIdList->AppendAll(participantsIdList);
-		}
-		lpuIdListMap->Enter(key, lpuIdList);
-		lpuIdListMapKeys->Append(strdup(key));
-	}
-	if (lpuIdList->NumElements() == 0) return NULL;
-
-	std::ostringstream configKeyStr;
-	configKeyStr << varName << "Space" << lpsName << "Config";
-	const char *configKey = configKeyStr.str().c_str();
-	DataPartitionConfig *config = partConfigMap->Lookup(configKey);
-	List<List<int*>*> *partIdList = config->generatePartIdList(lpuIdList);
-	ListMetadata *metadata = config->generatePartListMetadata(partIdList);
-	
-	// delete all part Ids to avoid wasting space
-	while (partIdList->NumElements() > 0) {
-		List<int*> *partId = partIdList->Nth(0);
-		partIdList->RemoveAt(0);
-		while (partId->NumElements() > 0) {
-			int *lpuLocalPartId = partId->Nth(0);
-			partId->RemoveAt(0);
-			delete[] lpuLocalPartId;
-		}
-		delete partId;
-	}
-	delete partIdList;
-
-	if (includePadding) return metadata->getPaddedIntervalSpec();
-	return metadata->getCoreIntervalSpec();
-	*/
-	return NULL;	 
 }

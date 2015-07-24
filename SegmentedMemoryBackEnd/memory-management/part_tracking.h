@@ -127,11 +127,16 @@ class PartIterator {
 	std::vector<PartIdContainer*> containerStack;
 	std::vector<int> indexStack;
 	unsigned int partIdSteps;
+	// a reference instance to be used by each PPU-controller when generating a Id for a structure part from an
+	// LPU Id; this avoids allocating and deallocating small memories for Ids repeatedly during task execution
+	List<int*> *partIdTemplate;
   public:
 	PartIterator(int partIdSteps);
 	SuperPart *getCurrentPart();
 	void replaceCurrentPart(SuperPart *replacement);
 	void initiate(PartIdContainer *topContainer);
+	void initiatePartIdTemplate(int dataDimensions, int idLevels);
+	List<int*> *getPartIdTemplate() { return partIdTemplate; }
 	// move a step ahead in the part-container hierarchy; return false if further forward progress is infeasible
 	bool advance() { return advance(partIdSteps - 1); }
 	// two functions used during the part-search process to move the iterator to a new location

@@ -11,12 +11,15 @@
    at the beginning of a task launch. After the task determines the sizes of different data structure it and
    know what LPUs have been allocated to it then it invokes library methods in configuration instances to 
    generate all the unique data parts corresponding to its LPUs.  
-*/	
+*/
+
+#include <vector>	
 
 #include "../utils/list.h"
 #include "../utils/interval_utils.h"
 #include "../codegen/structure.h"
 
+class DimConfig;
 class PartMetadata;
 class ListMetadata;
 class DataPartsList;
@@ -78,6 +81,7 @@ class DimPartitionConfig {
 	bool hasPadding() { return paddings[0] > 0 || paddings[1] > 0; }
 	Dimension getDataDimension() { return dataDimension; }
 	void setParentConfig(DimPartitionConfig *parentConfig) { this->parentConfig = parentConfig; }
+	int getLpsAlignment() { return lpsAlignment; }
 
 	// Four functions to determine the interval configuration for a data part. The first and third ignores 
 	// padding and the second and fourth do not. The last two are needed for index reordering partition 
@@ -140,7 +144,7 @@ class ReplicationConfig : public DimPartitionConfig {
 	int getEffectiveFrontPadding(int partId, Dimension parentDimension) { return 0; } 		
 	int getEffectiveRearPadding(int partId, Dimension parentDimension) { return 0;  }		
   public:
-	ReplicationConfig(Dimension dimension) : DimPartitionConfig(dimension, NULL, 0, 0) {}
+	ReplicationConfig(Dimension dimension) : DimPartitionConfig(dimension, NULL, 0, -1) {}
 	
 	LineInterval *getCoreInterval(List<int> *partIdList);
 	LineInterval *getInterval(List<int> *partIdList);
@@ -246,17 +250,26 @@ class DataPartitionConfig {
 	// a flag that indicates if interval descriptions should be generated when generating the metadata
 	// for a part or for an entire part list
 	bool needIntervalDesc;
+	// a configuration instance that is needed to construct the part-container (check part_tracking.h)
+	// instance for the underlying data structure
+	std::vector<DimConfig> *dimensionOrder;
   public:
 	DataPartitionConfig(int dimensionCount, 
 			List<DimPartitionConfig*> *dimensionConfigs, 
 			bool needIntervalDesc = false);
 	void setParent(DataPartitionConfig *parent, int parentJump);
 	DimPartitionConfig *getDimensionConfig(int dimNo) { return dimensionConfigs->Nth(dimNo); }
+	void configureDimensionOrder();
+	std::vector<DimConfig> *getDimensionOrder();
 	
 	// the function is to be used for generating metadata for subsequent use in generating a data part
 	PartMetadata *generatePartMetadata(List<int*> *partIdList);
 	// generates a data part Id for an LPU from the LPU Id
 	List<int*> *generatePartId(List<int*> *lpuIds);
+	// updates fields of an existing part Id to create the new part Id
+	void generatePartId(List<int*> *lpuIds, List<int*> *partId);
+	// returns the number of elements there should be in a valid part Id constructed for a data part
+	int getPartIdLevels();
 
 	// function to set up the metadata regarding the partition dimensions of the underlying object 
 	// within an LPU
@@ -289,7 +302,9 @@ class DataPartitionConfig {
 
   private:
 	// a recursive helper routine for the generatePartId(List<int*> lpuIds) function
-	void generatePartId(List<int*> *lpuIds, int position, List<int*> *partIdUnderConstr);
+	void generatePartId(List<int*> *lpuIds, int position, 
+		List<int*> *partIdUnderConstr, 
+		bool updateExistingPartId = false, int updatePoint = 0);
 };
 
 #endif

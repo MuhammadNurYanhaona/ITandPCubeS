@@ -206,6 +206,7 @@ PartIterator::PartIterator(int partIdSteps) {
 	this->partIdSteps = partIdSteps;
 	containerStack.reserve(partIdSteps);
 	indexStack.reserve(partIdSteps);
+	this->partIdTemplate = NULL;
 }
 
 SuperPart *PartIterator::getCurrentPart() {
@@ -233,6 +234,13 @@ void PartIterator::initiate(PartIdContainer *topContainer) {
 		indexStack.push_back(0);
 		accessPoint++;
 		container = nextContainer;
+	}
+}
+
+void PartIterator::initiatePartIdTemplate(int dataDimensions, int idLevels) {
+	partIdTemplate = new List<int*>(idLevels);
+	for (int i = 0; i < idLevels; i++) {
+		partIdTemplate->Append(new int[dataDimensions]);
 	}
 }
 

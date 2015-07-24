@@ -1,9 +1,12 @@
 #include "part_generation.h"
-#include "part_tracking.h"
 #include "allocation.h"
+#include "part_tracking.h"
 #include "../utils/list.h"
 #include "../utils/interval_utils.h"
+#include "../utils/binary_search.h"
 #include "../codegen/structure.h"
+
+#include <vector>
 #include <algorithm>
 #include <iostream>
 
@@ -510,6 +513,7 @@ DataPartitionConfig::DataPartitionConfig(int dimensionCount,
 	this->dimensionConfigs = dimensionConfigs;
 	this->parent = NULL;
 	this->needIntervalDesc = needIntervalDesc;
+	this->dimensionOrder = NULL;
 }
 
 void DataPartitionConfig::setParent(DataPartitionConfig *parent, int parentJump) { 
@@ -520,6 +524,41 @@ void DataPartitionConfig::setParent(DataPartitionConfig *parent, int parentJump)
 		dimConfig->setParentConfig(parentConfig);
 	}
 	this->parentJump = parentJump;
+}
+
+void DataPartitionConfig::configureDimensionOrder() {
+	
+	this->dimensionOrder = new std::vector<DimConfig>;
+	if (parent != NULL) {
+		std::vector<DimConfig> *parentOrder = parent->getDimensionOrder();
+		for (int i = 0; i < parentOrder->size(); i++) {
+			this->dimensionOrder->push_back(parentOrder->at(i));
+		}
+	}
+
+	int level = getPartIdLevels() - 1;
+	std::vector<DimPartitionConfig*> dimConfigOrdering;
+	std::vector<int> ordering;
+	for (int d = 0; d < dimensionCount; d++) {
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
+		int alignment = dimConfig->getLpsAlignment();
+		if (alignment != -1) {
+			int position = binsearch::locatePointOfInsert(ordering, alignment);
+			ordering.insert(ordering.begin() + position, alignment);
+			dimConfigOrdering.insert(dimConfigOrdering.begin() + position, dimConfig);
+		}
+	}
+	
+	for (int i = 0; i < dimConfigOrdering.size(); i++) {
+		this->dimensionOrder->push_back(DimConfig(level, dimConfigOrdering[i]->getLpsAlignment()));
+	}
+}
+        
+std::vector<DimConfig> *DataPartitionConfig::getDimensionOrder() {
+	if (dimensionOrder == NULL) {
+		configureDimensionOrder();
+	}
+	return dimensionOrder;
 }
 
 PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) {
@@ -576,6 +615,22 @@ List<int*> *DataPartitionConfig::generatePartId(List<int*> *lpuIds) {
 	return partId;
 }
 
+void DataPartitionConfig::generatePartId(List<int*> *lpuIds, List<int*> *partId) {
+	int partIdSteps = partId->NumElements();
+	int position = lpuIds->NumElements() - 1;
+	generatePartId(lpuIds, position, partId, true, partIdSteps - 1);
+}
+
+int DataPartitionConfig::getPartIdLevels() {
+	int levels = 1;
+	DataPartitionConfig *lastLink = this;
+	while ((lastLink->parent != NULL)) {
+		levels++;
+		lastLink = lastLink->parent;		
+	}
+	return levels;
+}
+
 List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int backsteps) {
 	List<int*> *partId = new List<int*>;
 	int position = lpuIds->NumElements() - 1;
@@ -604,17 +659,26 @@ DataPartsList *DataPartitionConfig::generatePartList(DataPartitionConfig *config
 	return dataPartsList;
 }
 
-void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, List<int*> *partId) {
+void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, 
+		List<int*> *partId, 
+		bool updateExistingPartId, int updatePoint) {
 	if (parent != NULL) {
-		parent->generatePartId(lpuIds, position - parentJump, partId);
+		parent->generatePartId(lpuIds, position - parentJump, partId, updateExistingPartId, updatePoint - 1);
 	}
 	int *lpuId = lpuIds->Nth(position);
-	int *partIdForLpu = new int[dimensionCount];
+	int *partIdForLpu = NULL;
+	if (!updateExistingPartId) {
+		partIdForLpu = new int[dimensionCount];
+	} else {
+		partIdForLpu = partId->Nth(updatePoint);
+	}
 	for (int d = 0; d < dimensionCount; d++) {
 		DimPartitionConfig *dimensionConfig = dimensionConfigs->Nth(d);
 		partIdForLpu[d] = dimensionConfig->pickPartId(lpuId);
 	}
-	partId->Append(partIdForLpu);
+	if (!updateExistingPartId) {
+		partId->Append(partIdForLpu);
+	}
 }
 
 int DataPartitionConfig::getPartsCountAlongDimension(int dimensionNo, Dimension *parentDimension) {

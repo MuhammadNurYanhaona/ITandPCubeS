@@ -37,6 +37,8 @@ class DataItems {
 	bool ready;
   public:
 	DataItems(const char *name, int dimensionality, int epochCount);
+	const char *getName() { return name; }
+	int getDimensions() { return dimensionality; }
 	void addDimPartitionConfig(int dimensionId, DimPartitionConfig *dimConfig);
 	void generatePartitionConfig();
 	void setPartitionConfig(DataPartitionConfig *partitionConfig);
@@ -102,6 +104,7 @@ class LpsContent {
 	}
 	inline DataItems *getDataItems(const char *varName) { return dataItemsMap->Lookup(varName); }
 	void advanceItemEpoch(const char *varName);
+	void addPartIterators(Hashtable<PartIterator*> *partIteratorMap);
 };
 
 /* This class holds all data structure informations and references regarding different LPSes of a task */
@@ -113,6 +116,11 @@ class TaskData {
 	void addLpsContent(const char *lpsId, LpsContent *content);
 	DataItems *getDataItemsOfLps(const char *lpsId, const char *varName);		
 	void advanceItemEpoch(const char *lpsId, const char *varName);
+
+	// each PPU-controller (currently a thread) within a segment should get its own set of iterators
+	// that it will use to efficiently identify data-parts for its LPUs and to avoid unnecessary
+	// memory allocation/de-allocation during part generation and identification processes.
+	Hashtable<PartIterator*> *generatePartIteratorMap();
 };
 
 #endif

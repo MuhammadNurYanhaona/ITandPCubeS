@@ -7,6 +7,9 @@
 #include "part_generation.h"
 #include "allocation.h"
 
+#include <cstdlib>
+#include <sstream>
+
 //--------------------------------------------------------------- Data Items ---------------------------------------------------------------/
 
 DataItems::DataItems(const char *name, int dimensionality, int epochCount) {
@@ -94,6 +97,20 @@ void LpsContent::advanceItemEpoch(const char *varName) {
 	}
 }
 
+void LpsContent::addPartIterators(Hashtable<PartIterator*> *partIteratorMap) {
+	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
+	DataItems *items = NULL;
+	while ((items = iterator.GetNextValue()) != NULL) {
+		PartIterator *iterator = items->createIterator();
+		int dimensions = items->getDimensions();
+		int partIdLevels = items->getPartitionConfig()->getPartIdLevels();
+		iterator->initiatePartIdTemplate(dimensions, partIdLevels);
+		std::ostringstream key;
+		key << "Space_" << id << "_Var_" << items->getName();
+		partIteratorMap->Enter(strdup(key.str().c_str()), iterator);
+	}
+}
+
 //------------------------------------------------------------- Task Data ----------------------------------------------------------------/
 
 TaskData::TaskData() { lpsContentMap = new Hashtable<LpsContent*>; }
@@ -113,6 +130,16 @@ DataItems *TaskData::getDataItemsOfLps(const char *lpsId, const char *varName) {
 void TaskData::advanceItemEpoch(const char *lpsId, const char *varName) {
 	LpsContent *lpsContent = lpsContentMap->Lookup(lpsId);
 	lpsContent->advanceItemEpoch(varName);
+}
+
+Hashtable<PartIterator*> *TaskData::generatePartIteratorMap() {
+	Hashtable<PartIterator*> *map = new Hashtable<PartIterator*>;
+	Iterator<LpsContent*> iterator = lpsContentMap->GetIterator();
+	LpsContent *lpsContent = NULL;
+	while ((lpsContent = iterator.GetNextValue()) != NULL) {
+		lpsContent->addPartIterators(map);
+	}
+	return map;
 }
 
 
