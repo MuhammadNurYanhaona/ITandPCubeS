@@ -23,6 +23,7 @@ class PartInfo {
 		partCounts = new List<List<int>*>;
 		partIdList = new List<List<int>*>;
 	}
+	~PartInfo() { clear(); }
 	void clear();
 };
 

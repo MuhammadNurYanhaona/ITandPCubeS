@@ -10,6 +10,8 @@
    same data piece multiple times. 
 */
 
+#include "part_tracking.h"
+#include "part_generation.h"
 #include "../utils/list.h"
 #include "../utils/interval_utils.h"
 #include "../codegen/structure.h"
@@ -53,6 +55,25 @@ class PartMetadata {
 	void updateStorageDimension(PartDimension *partDimension);
 };
 
+/* This is an extension to the SuperPart construction within part-tracking library for linking list of data part
+   allocations with their faster searching mechanism. This class can be avoided if the data part-list directly
+   operates on the part container instead of using it as a mechanism to determine what part to return. We adopt
+   this current strategy as the list based part allocation mechanism was developed earlier and the efficient search 
+   mechanism has been developed after we faced severe performance and memory problems in straightforward process.
+   We did not want to change all the dependencies of the data-part-list construct; rather we only wanted to 
+   eliminate those problems.
+*/
+class PartLocator : public SuperPart {
+  protected:
+	int partListIndex;
+  public:
+	PartLocator(List<int*> *partId, int dataDimensions, int partListIndex) 
+			: SuperPart(partId, dataDimensions) {
+		this->partListIndex = partListIndex;
+	}
+	inline int getPartListIndex() { return partListIndex; }
+};
+
 /* This class holds the metadata and actual memory allocation for a part of a data structure
 */
 class DataPart {
@@ -60,8 +81,9 @@ class DataPart {
 	PartMetadata *metadata;
 	void *data;
   public:
+	static long spaceConsumed;
 	DataPart(PartMetadata *metadata) { 
-		this->metadata = metadata;
+		this->metadata = NULL;
 		this->data = NULL; 
 	}
 	template <class type> static void allocate(DataPart *dataPart) {
@@ -72,6 +94,7 @@ class DataPart {
                 for (int i = 0; i < charSize; i++) {
                         charData[i] = 0;
                 }
+		spaceConsumed += size * sizeof(type);
 	}
 	inline PartMetadata *getMetadata() { return metadata; }
 	void *getData() { return data; }	
@@ -117,6 +140,8 @@ class ListMetadata {
 */
 class DataPartsList {
   protected:
+	// part-id-tracking container to be used for quick identification of data parts by part-ids
+	PartIdContainer *partContainer;
 	ListMetadata *metadata;	  
 	// Epoch dependent data structures will have multiple copies, one per epoch, of each part stored within a 
 	// PPU. So the epoch count is needed, which is by default set to 1.
@@ -127,18 +152,42 @@ class DataPartsList {
 	int epochHead;
   public:
 	DataPartsList(ListMetadata *metadata, int epochCount);
+	
+	// because this is a templated function, its implementation needs to be in the header file
 	template <class type> static void allocate(DataPartsList *dataPartsList, 
-			List<PartMetadata*> *partMetadataList) {
-		for (int i = 0; i < partMetadataList->NumElements(); i++) {
-			PartMetadata *partMetadata = partMetadataList->Nth(i);
-			for (int t = 0; t < dataPartsList->epochCount; t++) {
-				dataPartsList->partLists[t]->Append(new DataPart(partMetadata));
-				DataPart::allocate<type>(dataPartsList->partLists[t]->Nth(i));
+			DataPartitionConfig *partConfig, 
+			PartIdContainer *partContainer) {
+		
+		dataPartsList->partContainer = partContainer;
+		int partCount = partContainer->getPartCount();
+		dataPartsList->allocateLists(partCount);
+
+		PartIterator *iterator = partContainer->getIterator();
+		int dimensions = dataPartsList->metadata->getDimensions();
+		int epochCount = dataPartsList->epochCount;
+		SuperPart *part = NULL;
+		int listIndex = 0;
+		while ((part = iterator->getCurrentPart()) != NULL) {
+			List<int*> *partId = part->getPartId();
+			PartLocator *partLocator = new PartLocator(partId, dimensions, listIndex);
+			iterator->replaceCurrentPart(partLocator);
+			for (int t = 0; t < epochCount; t++) {
+				DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId));
+				DataPart::allocate<type>(dataPart);
+				dataPartsList->partLists[t]->Append(dataPart);
 			}
+			listIndex++;
+			iterator->advance();
 		}
 	}
-	DataPart *getPart(List<int*> *partId);
-	DataPart *getPart(List<int*> *partId, int epoch);	
+
+	// allocate all part lists for different epoch versions
+	void allocateLists(int capacity);
+	// each PPU-controller within a segment should get an iterator for each data part list that to be used 
+	// later for part searching
+	PartIterator *createIterator() { return partContainer->getIterator(); }
+	DataPart *getPart(List<int*> *partId, PartIterator *iterator);
+	DataPart *getPart(List<int*> *partId, int epoch, PartIterator *iterator);	
 	// moves the head of the circular array one step ahead
 	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }
 	inline int getEpochCount() { return epochCount; }

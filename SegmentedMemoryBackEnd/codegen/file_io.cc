@@ -47,7 +47,10 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << "(fileName)" << stmtSeparator;  
 	headerFile << doubleIndent << "stream->open()" << stmtSeparator;
 	headerFile << indent << "}\n";
-	headerFile << indent << "void terminate() { stream->close()" << stmtTerminator << " }\n";
+	headerFile << indent << "void terminate() {\n";
+	headerFile << doubleIndent << "stream->close()" << stmtSeparator;
+	headerFile << doubleIndent << "delete stream" << stmtSeparator;
+	headerFile << indent << "}\n";
 	headerFile << indent << "List<int> *getDataIndex(List<int> *partIndex) {";
 	if (array->isReordered(lps->getRoot())) {
 		headerFile << " return PartHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";
@@ -99,7 +102,10 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << "writerId == 0)" << stmtSeparator;  
 	headerFile << doubleIndent << "stream->open()" << stmtSeparator;
 	headerFile << indent << "}\n";
-	headerFile << indent << "void terminate() { stream->close()" << stmtTerminator << " }\n";
+	headerFile << indent << "void terminate() {\n";
+	headerFile << doubleIndent << "stream->close()" << stmtSeparator;
+	headerFile << doubleIndent << "delete stream" << stmtSeparator;
+	headerFile << indent << "}\n";
 	headerFile << indent << "List<int> *getDataIndex(List<int> *partIndex) {";
 	if (array->isReordered(lps->getRoot())) {
 		headerFile << " return PartHandler::getDataIndex(partIndex)" << stmtTerminator << " }\n";

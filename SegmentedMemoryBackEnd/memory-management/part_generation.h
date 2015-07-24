@@ -13,16 +13,25 @@
    generate all the unique data parts corresponding to its LPUs.  
 */	
 
-#include "allocation.h"
 #include "../utils/list.h"
 #include "../utils/interval_utils.h"
 #include "../codegen/structure.h"
 
-/* This is just a helper class to hold the results of different configuration functions of Dim Parition 
-   Config class as needed for data parts construction. 
+class PartMetadata;
+class ListMetadata;
+class DataPartsList;
+
+/* This is just a helper class to hold the results of different configuration functions of Dim Parition Config 
+   class as needed for data parts construction. 
 */
 class DimensionMetadata {
   public:
+	DimensionMetadata() {
+		coreInterval = NULL;
+		interval = NULL;
+		paddings[0] = 0;
+		paddings[1] = 0;
+	}	
 	LineInterval *coreInterval;
 	LineInterval *interval;
 	Dimension partDimension;
@@ -87,7 +96,7 @@ class DimPartitionConfig {
 	virtual int pickPartCount(int *lpuCount) { return lpuCount[lpsAlignment]; }
 
 	// an accumulator function that returns results of different dimension configuration utilies above 
-	DimensionMetadata *generateDimMetadata(List<int> *partIdList);
+	DimensionMetadata *generateDimMetadata(List<int> *partIdList, bool needIntervalDesc);
 
 	// function to be used by data partition config to generate dimension metadata about a structure from
 	// just its hierarchical part Id
@@ -210,14 +219,13 @@ class BlockStrideConfig : public DimPartitionConfig {
 			List<Dimension*> *partDimensionList);
 };
 
-/* This is the class that holds the partition configuration for different dimensions of a single data 
-   structure within an LPS. An instance of this class needs to be instantiated based on the instructions
-   about partitions and once the length of different dimensions are known. Know that will be one dim-
-   PartitionConfig instance per dimension of the structure. That is the configuration is independent of
-   the dimensionality of the LPS itself. Any dimension not been partitioned by the LPS should have a 
-   replication-config for it. This strategy enables us to readily compare parts of one LPS with parts of
-   other LPSes as the dimensionality of the parts remain the same regardless of the dimensionality of the
-   LPSes they are mean for. 
+/* This is the class that holds the partition configuration for different dimensions of a single data structure 
+   within an LPS. An instance of this class needs to be instantiated based on the instructions about partitions 
+   and once the length of different dimensions are known. Know that will be one dimPartitionConfig instance per 
+   dimension of the structure. That is the configuration is independent of the dimensionality of the LPS itself. 
+   Any dimension not been partitioned by the LPS should have a replication-config for it. This strategy enables 
+   us to readily compare parts of one LPS with parts of other LPSes as the dimensionality of the parts remain 
+   the same regardless of the dimensionality of the LPSes they are mean for. 
 */
 class DataPartitionConfig {
   protected:
@@ -235,22 +243,20 @@ class DataPartitionConfig {
 	// to get to the next level. TODO we should try to make the part Id calculation process more 
 	// robust in the future.
 	int parentJump;
+	// a flag that indicates if interval descriptions should be generated when generating the metadata
+	// for a part or for an entire part list
+	bool needIntervalDesc;
   public:
-	DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfigs) {
-		this->dimensionCount = dimensionCount;
-		this->dimensionConfigs = dimensionConfigs;
-		this->parent = NULL;
-	}
+	DataPartitionConfig(int dimensionCount, 
+			List<DimPartitionConfig*> *dimensionConfigs, 
+			bool needIntervalDesc = false);
 	void setParent(DataPartitionConfig *parent, int parentJump);
 	DimPartitionConfig *getDimensionConfig(int dimNo) { return dimensionConfigs->Nth(dimNo); }
 	
 	// the function is to be used for generating metadata for subsequent use in generating a data part
 	PartMetadata *generatePartMetadata(List<int*> *partIdList);
-
 	// generates a data part Id for an LPU from the LPU Id
 	List<int*> *generatePartId(List<int*> *lpuIds);
-	// function to generate a list of unique part Ids from LPU Ids list
-	List<List<int*>*> *generatePartIdList(List<List<int*>*> *lpuIdList);
 
 	// function to set up the metadata regarding the partition dimensions of the underlying object 
 	// within an LPU
@@ -272,28 +278,10 @@ class DataPartitionConfig {
 	// the rear to reach the desired ancestor.
 	List<int*> *generateSuperPartIdList(List<int*> *lpuIds, int backsteps);  
 
-	// function to generate the list of data parts (see allocation.h) from the partition configuration
-	template <class type> static DataPartsList *generatePartList(DataPartitionConfig *config, 
-			List<List<int*>*> *localPartIds, int epochCount) {
-		List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
-		for (int i = 0; i < localPartIds->NumElements(); i++) {
-			List<int*> *partIdList = localPartIds->Nth(i);
-			partMetadataList->Append(config->generatePartMetadata(partIdList));
-		}
-		Dimension *dataDimensions = new Dimension[config->dimensionCount];
-		bool hasPadding = false;
-		for (int d = 0; d < config->dimensionCount; d++) {
-			DimPartitionConfig *dimConfig = config->dimensionConfigs->Nth(d);
-			dataDimensions[d] = dimConfig->getDataDimension();
-			hasPadding = hasPadding || dimConfig->hasPadding();
-		}
-		ListMetadata *listMetadata = new ListMetadata(config->dimensionCount, dataDimensions);
-		listMetadata->setPadding(hasPadding);
-		listMetadata->generateIntervalSpec(partMetadataList);
-		DataPartsList *dataPartsList = new DataPartsList(listMetadata, epochCount);
-		DataPartsList::allocate<type>(dataPartsList, partMetadataList);
-        	return dataPartsList;
-	}
+	// function to generate the list of data parts (see allocation.h) from the partition configuration;
+	// note that the data parts list returned by this function is unusable until memory allocations has
+	// been done 
+	DataPartsList *generatePartList(DataPartitionConfig *config, int epochCount);
 
 	// this function is used to determine the data-parts content of PPUs other than the current one so 
 	// that decision about the nature and content of communication for shared data can be made.

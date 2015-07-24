@@ -125,6 +125,12 @@ class IntervalSet {
 	List<HyperplaneInterval*> *intervals;
   public:
 	IntervalSet() { intervals = new List<HyperplaneInterval*>; }
+	~IntervalSet() {
+		while (intervals->NumElements() > 0) {
+			intervals->RemoveAt(0);
+		}
+		delete intervals;
+	}
 	// checks if the argument interval is within the set
 	bool contains(HyperplaneInterval *interval);
 	// adds the argument interval if it is not already in the set
@@ -141,13 +147,13 @@ class IntervalSet {
 	// need to be taken into consideration and should be removed so that the new set has no element appearing
 	// more than once. Finally, note that the returned set is a new interval set instance. The current set
 	// remains unchanged after the function call. 
-	IntervalSet *getUnion(IntervalSet *other) { return NULL; }
+	IntervalSet *getUnion(IntervalSet *other) { return this; }
 	// This computes the intersection of current interval set with the argument interval set. If the two sets
 	// do not overlap then it should return NULL
-	IntervalSet *getIntersection(IntervalSet *other) { return NULL; }
+	IntervalSet *getIntersection(IntervalSet *other) { return this; }
 	// Subtract the interval sequences found in the argument interval set from the current one. If the two 
 	// sets are the same then return NULL
-	IntervalSet *getSubtraction(IntervalSet *other) { return NULL; }
+	IntervalSet *getSubtraction(IntervalSet *other) { return this; }
 };
 
 #endif

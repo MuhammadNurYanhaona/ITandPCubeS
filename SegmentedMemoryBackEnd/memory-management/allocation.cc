@@ -1,4 +1,5 @@
 #include "allocation.h"
+#include "part_tracking.h"
 #include "../utils/utility.h"
 #include "../utils/list.h"
 #include "../utils/interval_utils.h"
@@ -46,6 +47,8 @@ void PartMetadata::updateStorageDimension(PartDimension *partDimension) {
 	}
 }
 
+long DataPart::spaceConsumed = 0;
+
 //---------------------------------------------------------------- List Metadata ---------------------------------------------------------------/
 
 ListMetadata::ListMetadata(int dimensionality, Dimension *boundary) {
@@ -64,7 +67,6 @@ void ListMetadata::generateIntervalSpec(List<PartMetadata*> *partList) {
 		IntervalSet *currentSpec = intervalSpec;
 		dataSpec->add(partList->Nth(i)->getCoreInterval());
 		intervalSpec = currentSpec->getUnion(dataSpec);
-		delete currentSpec;
 		delete dataSpec;
 	}
 	if (!hasPadding) {
@@ -77,7 +79,6 @@ void ListMetadata::generateIntervalSpec(List<PartMetadata*> *partList) {
 			IntervalSet *currentSpec = paddedIntervalSpec;
 			dataSpec->add(partList->Nth(i)->getPaddedInterval());
 			paddedIntervalSpec = currentSpec->getUnion(dataSpec);
-			delete currentSpec;
 			delete dataSpec;
 		}
 	}
@@ -86,32 +87,36 @@ void ListMetadata::generateIntervalSpec(List<PartMetadata*> *partList) {
 //---------------------------------------------------------------- Data Parts List -------------------------------------------------------------/
 
 DataPartsList::DataPartsList(ListMetadata *metadata, int epochCount) {
+	this->partContainer = NULL;
 	this->metadata = metadata;
 	this->epochCount = epochCount;
 	this->partLists = new List<DataPart*>*[epochCount];
 	for (int i = 0; i < epochCount; i++) {
-		partLists[i] = new List<DataPart*>;
+		partLists[i] = NULL;
 	}
 	this->epochHead = 0;
 }
 
-DataPart *DataPartsList::getPart(List<int*> *partId) {
-	List<DataPart*> *currentList = partLists[epochHead];
-	for (int i = 0; i < currentList->NumElements(); i++) {
-		DataPart *currentPart = currentList->Nth(i);
-		PartMetadata *metadata = currentPart->getMetadata();
-		if (metadata->isMatchingId(partId)) return currentPart;
+void DataPartsList::allocateLists(int capacity) {
+	for (int i = 0; i < epochCount; i++) {
+		partLists[i] = new List<DataPart*>(capacity);
 	}
-	return NULL;
 }
 
-DataPart *DataPartsList::getPart(List<int*> *partId, int epoch) {
+DataPart *DataPartsList::getPart(List<int*> *partId, PartIterator *iterator) {
+	SuperPart *part = partContainer->getPart(partId, iterator, metadata->getDimensions());	
+	List<DataPart*> *currentList = partLists[epochHead];
+	PartLocator *partLocator = reinterpret_cast<PartLocator*>(part);
+	int index = partLocator->getPartListIndex();
+	return currentList->Nth(index);
+}
+
+DataPart *DataPartsList::getPart(List<int*> *partId, int epoch, PartIterator *iterator) {
 	int epochVersion = (epochHead - epoch) % epochCount;
 	List<DataPart*> *currentList = partLists[epochVersion];
-	for (int i = 0; i < currentList->NumElements(); i++) {
-		DataPart *currentPart = currentList->Nth(i);
-		if (currentPart->getMetadata()->isMatchingId(partId)) return currentPart;
-	}
-	return NULL;
+	SuperPart *part = partContainer->getPart(partId, iterator, metadata->getDimensions());	
+	PartLocator *partLocator = reinterpret_cast<PartLocator*>(part);
+	int index = partLocator->getPartListIndex();
+	return currentList->Nth(index);
 }
 

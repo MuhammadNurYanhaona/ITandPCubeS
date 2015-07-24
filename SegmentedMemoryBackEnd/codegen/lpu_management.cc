@@ -269,6 +269,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 					// that current thread needs to execute should also be renewed
 					int *newLpuCounts = computeLpuCounts(lpsId);
 					counter->setLpuCounts(newLpuCounts);
+					delete[] newLpuCounts;
 					counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 	
 					// log counter update
@@ -319,6 +320,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	LpuCounter *counter = state->getCounter();
 	int *newLpuCounts = computeLpuCounts(lpsId);
 	counter->setLpuCounts(newLpuCounts);
+	delete[] newLpuCounts;
 	counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 			
 	// log counter update
@@ -350,6 +352,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		// that current thread needs to execute should also be renewed
 		int *newLpuCounts = computeLpuCounts(lpsId);
 		counter->setLpuCounts(newLpuCounts);
+		delete[] newLpuCounts;
 		counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 
 		// log counter update
@@ -412,6 +415,7 @@ List<List<int*>*> *ThreadState::getAllLpuIds(int lpsId, int rootLpsId) {
 		lpuIdList->Append(idList);
 	}
 
+	delete relevantLpsIds;
 	return lpuIdList;
 }
 
@@ -549,7 +553,7 @@ void SegmentState::clearlpuIdListMap() {
 
 IntervalSet *SegmentState::getDataIntervalDesc(const char *varName, const char *lpsName, 
 		int lpsId, int rootLpsId, bool includePadding) {
-	
+	/*	
 	std::ostringstream keyStr;
 	keyStr << varName << lpsName;
 	const char *key = keyStr.str().c_str(); 
@@ -590,5 +594,7 @@ IntervalSet *SegmentState::getDataIntervalDesc(const char *varName, const char *
 	delete partIdList;
 
 	if (includePadding) return metadata->getPaddedIntervalSpec();
-	return metadata->getCoreIntervalSpec();	 
+	return metadata->getCoreIntervalSpec();
+	*/
+	return NULL;	 
 }

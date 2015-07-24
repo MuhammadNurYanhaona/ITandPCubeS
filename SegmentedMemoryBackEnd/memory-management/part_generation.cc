@@ -1,4 +1,5 @@
 #include "part_generation.h"
+#include "part_tracking.h"
 #include "allocation.h"
 #include "../utils/list.h"
 #include "../utils/interval_utils.h"
@@ -44,16 +45,20 @@ LineInterval *DimPartitionConfig::getXformedInterval(List<int> *partIdList) {
 	return getInterval(partIdList); 
 }
 
-DimensionMetadata *DimPartitionConfig::generateDimMetadata(List<int> *partIdList) {
+DimensionMetadata *DimPartitionConfig::generateDimMetadata(List<int> *partIdList, bool needIntervalDesc) {
 
 	int position = partIdList->NumElements() - 1;
 	int partId = partIdList->Nth(position);
 	Dimension parentDimension = getDimensionFromParent(partIdList, position);
 
 	DimensionMetadata *metadata = new DimensionMetadata();
-	metadata->coreInterval = getCoreInterval(partIdList);
-	if (hasPadding()) metadata->interval = getInterval(partIdList);
-	else metadata->interval = metadata->coreInterval;
+	
+	if (needIntervalDesc) {
+		metadata->coreInterval = getCoreInterval(partIdList);
+		if (hasPadding()) metadata->interval = getInterval(partIdList);
+		else metadata->interval = metadata->coreInterval;
+	}
+
 	metadata->partDimension = getPartDimension(partId, parentDimension);
 	
 	metadata->paddings[0] = 0;
@@ -499,6 +504,14 @@ int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *
 
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
 
+DataPartitionConfig::DataPartitionConfig(int dimensionCount, 
+		List<DimPartitionConfig*> *dimensionConfigs, bool needIntervalDesc) {
+	this->dimensionCount = dimensionCount;
+	this->dimensionConfigs = dimensionConfigs;
+	this->parent = NULL;
+	this->needIntervalDesc = needIntervalDesc;
+}
+
 void DataPartitionConfig::setParent(DataPartitionConfig *parent, int parentJump) { 
 	this->parent = parent; 
 	for (int i = 0; i < dimensionCount; i++) {
@@ -512,8 +525,13 @@ void DataPartitionConfig::setParent(DataPartitionConfig *parent, int parentJump)
 PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) {
 	
 	Dimension *partDimensions = new Dimension[dimensionCount];
-	List<LineInterval*> *linearIntervals = new List<LineInterval*>;
-	List<LineInterval*> *paddedIntervals = new List<LineInterval*>;
+	List<LineInterval*> *linearIntervals = NULL;
+	List<LineInterval*> *paddedIntervals = NULL;
+	if (needIntervalDesc) {
+		linearIntervals = new List<LineInterval*>;
+		paddedIntervals = new List<LineInterval*>;
+	}	
+
 	int *padding = new int[dimensionCount * 2];
 
 	for (int i = 0; i < dimensionCount; i++) {
@@ -525,22 +543,28 @@ PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) 
 		}
 
 		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
-		DimensionMetadata *dimMetadata = dimConfig->generateDimMetadata(dimIdList);
+		DimensionMetadata *dimMetadata = dimConfig->generateDimMetadata(dimIdList, needIntervalDesc);
 		
-		linearIntervals->Append(dimMetadata->coreInterval);
-		paddedIntervals->Append(dimMetadata->interval);
+		if (needIntervalDesc) {
+			linearIntervals->Append(dimMetadata->coreInterval);
+			paddedIntervals->Append(dimMetadata->interval);
+		}	
 		partDimensions[i] = dimMetadata->partDimension;
-
 		padding[2 * i] = dimMetadata->paddings[0];
 		padding[2 * i + 1] = dimMetadata->paddings[1];
+
+		delete dimIdList;
+		delete dimMetadata;
 	}
 
-	HyperplaneInterval *coreInterval = new HyperplaneInterval(
-			dimensionCount, linearIntervals);
-	HyperplaneInterval *paddedInterval = new HyperplaneInterval(
-			dimensionCount, paddedIntervals);
 	PartMetadata *metadata = new PartMetadata(dimensionCount, partIdList, partDimensions, padding);
-	metadata->setIntervals(coreInterval, paddedInterval);
+	if (needIntervalDesc) {
+		HyperplaneInterval *coreInterval = new HyperplaneInterval(
+				dimensionCount, linearIntervals);
+		HyperplaneInterval *paddedInterval = new HyperplaneInterval(
+				dimensionCount, paddedIntervals);
+		metadata->setIntervals(coreInterval, paddedInterval);
+	}
 
 	return metadata;
 }
@@ -566,6 +590,20 @@ List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int
 	return partId;
 }
 
+DataPartsList *DataPartitionConfig::generatePartList(DataPartitionConfig *config, int epochCount) {
+	Dimension *dataDimensions = new Dimension[config->dimensionCount];
+	bool hasPadding = false;
+	for (int d = 0; d < config->dimensionCount; d++) {
+		DimPartitionConfig *dimConfig = config->dimensionConfigs->Nth(d);
+		dataDimensions[d] = dimConfig->getDataDimension();
+		hasPadding = hasPadding || dimConfig->hasPadding();
+	}
+	ListMetadata *listMetadata = new ListMetadata(config->dimensionCount, dataDimensions);
+	listMetadata->setPadding(hasPadding);
+	DataPartsList *dataPartsList = new DataPartsList(listMetadata, epochCount);
+	return dataPartsList;
+}
+
 void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, List<int*> *partId) {
 	if (parent != NULL) {
 		parent->generatePartId(lpuIds, position - parentJump, partId);
@@ -577,36 +615,6 @@ void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position, List<
 		partIdForLpu[d] = dimensionConfig->pickPartId(lpuId);
 	}
 	partId->Append(partIdForLpu);
-}
-
-List<List<int*>*> *DataPartitionConfig::generatePartIdList(List<List<int*>*> *lpuIdList) {
-	List<List<int*>*> *partIdList = new List<List<int*>*>;
-	for (int i = 0; i < lpuIdList->NumElements(); i++) {
-		List<int*> *lpuIds = lpuIdList->Nth(i);
-		List<int*> *partId = generatePartId(lpuIds);
-		bool partFound = false;
-		for (int j = 0; j < partIdList->NumElements(); j++) {
-			List<int*> *currentPartId = partIdList->Nth(j);
-			bool mismatchFound = false;
-			for (int k = 0; k < partId->NumElements(); k++) {
-				int *part1IdForLpu = partId->Nth(k);
-				int *part2IdForLpu = currentPartId->Nth(k);
-				for (int d = 0; d < dimensionCount; d++) {
-					if (part1IdForLpu[d] != part2IdForLpu[d]) {
-						mismatchFound = true;
-						break;
-					}
-				}
-				if (mismatchFound) break;
-			}
-			if (!mismatchFound) {
-				partFound = true;
-				break;
-			}
-		}
-		if (!partFound) partIdList->Append(partId);
-	}
-	return partIdList;
 }
 
 int DataPartitionConfig::getPartsCountAlongDimension(int dimensionNo, Dimension *parentDimension) {
@@ -669,4 +677,3 @@ ListMetadata *DataPartitionConfig::generatePartListMetadata(List<List<int*>*> *p
 	listMetadata->generateIntervalSpec(partMetadataList);
 	return listMetadata;
 }
-

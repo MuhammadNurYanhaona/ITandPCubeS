@@ -1,4 +1,5 @@
 #include "part_management.h"
+#include "part_tracking.h"
 #include "../utils/utility.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -41,14 +42,19 @@ DataPartitionConfig *DataItems::getPartitionConfig() {
 	return partitionConfig; 
 }
 
-DataPart *DataItems::getDataPart(List<int*> *partIdList) {
+PartIterator *DataItems::createIterator() {
 	Assert(partsList != NULL);
-	return partsList->getPart(partIdList);
+	return partsList->createIterator();
 }
 
-DataPart *DataItems::getDataPart(List<int*> *partIdList, int epoch) {
+DataPart *DataItems::getDataPart(List<int*> *partIdList, PartIterator *iterator) {
 	Assert(partsList != NULL);
-	return partsList->getPart(partIdList, epoch);
+	return partsList->getPart(partIdList, iterator);
+}
+
+DataPart *DataItems::getDataPart(List<int*> *partIdList, int epoch, PartIterator *iterator) {
+	Assert(partsList != NULL);
+	return partsList->getPart(partIdList, epoch, iterator);
 }
         
 List<DataPart*> *DataItems::getAllDataParts() {

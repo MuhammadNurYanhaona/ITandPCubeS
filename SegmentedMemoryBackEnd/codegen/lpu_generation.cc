@@ -335,6 +335,15 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 			programFile << varName << "Part->getData()" << stmtSeparator;
 		}
 
+		// finally clean up the memory consumed by the part Id list
+		programFile << doubleIndent << "while (" << varName << "PartIdList->NumElements() > 0) {\n";
+		programFile << tripleIndent << "int *partId = " << varName;
+		programFile << "PartIdList->Nth(0)" << stmtSeparator;
+		programFile << tripleIndent << varName << "PartIdList->RemoveAt(0)" << stmtSeparator;
+		programFile << tripleIndent << "delete[] partId" << stmtSeparator;
+		programFile << doubleIndent << "}\n";
+		programFile << doubleIndent << "delete " << varName << "PartIdList" << stmtSeparator;
+
 		programFile << indent << "}\n";
 	}
 	

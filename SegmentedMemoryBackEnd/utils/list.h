@@ -39,8 +39,11 @@ template<class Element> class List {
     std::deque<Element> elems;
 
  public:
-           // Create a new empty list
+    // Create a new empty list
     List() {}
+    ~List() { elems.clear(); }
+	// create a list with an initial capacity (need to be properly implemented later during list refactoring)	
+	List(int capacity) {}
 
            // Returns count of elements currently in list
     int NumElements() const

@@ -128,6 +128,11 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
 			programFile << "ppuCount";
 			programFile << paramSeparator << matchingDim;
 			programFile << "))" << stmtSeparator;
+			
+			// reclaim the storage for padding configuration if applicable
+			if (paddingSupported) {
+				programFile << indent << "delete[] dim" << i << "Paddings" << stmtSeparator;
+			}
 		}
 	}
 
@@ -294,6 +299,7 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 	programFile << "Space_" << rootLps->getName();	
 	programFile << ")" << stmtSeparator;
 	programFile << doubleIndent << "lpuIdList->AppendAll(threadLpuIds)" << stmtSeparator;
+	programFile << doubleIndent << "delete threadLpuIds" << stmtSeparator;
 	programFile << indent << "}\n";
 
 	// if the lpuIdList is empty then return NULL as there will be no need of data allocations for 
@@ -356,6 +362,19 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 		programFile << '"' << varName << '"' << paramSeparator;
 		programFile << varName << ")" << stmtSeparator;
 	}
+
+	// reclaim the storage corresponding to LPU Id list
+	programFile << std::endl << indent << "while (lpuIdList->NumElements() > 0) {\n";
+	programFile << doubleIndent << "List<int*> *lpuId = lpuIdList->Nth(0)" << stmtSeparator;
+	programFile << doubleIndent << "lpuIdList->RemoveAt(0)" << stmtSeparator;
+	programFile << doubleIndent << "while (lpuId->NumElements() > 0) {\n";
+	programFile << tripleIndent << "int *lpuIdPart = lpuId->Nth(0)" << stmtSeparator;
+	programFile << tripleIndent << "lpuId->RemoveAt(0)" << stmtSeparator;
+	programFile << tripleIndent << "delete[] lpuIdPart" << stmtSeparator;
+	programFile << doubleIndent << "}\n";
+	programFile << doubleIndent << "delete lpuId" << stmtSeparator;
+	programFile << indent << "}\n";
+	programFile << indent << "delete lpuIdList" << stmtSeparator << std::endl;
 
 	programFile << indent << "return space" << lpsName << "Content" << stmtSeparator;		
 	programFile << "}\n";	

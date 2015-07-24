@@ -36,6 +36,15 @@ template <class Type> class TypedInputStream {
 		initialize();
 		
 	}
+	~TypedInputStream() {
+		while (dimLengths->NumElements() > 0) {
+			Dimension *dimension = dimLengths->Nth(0);
+			dimLengths->RemoveAt(0);
+			delete dimension;
+		} 
+		delete dimLengths;
+		delete dimMultiplier; 
+	}
 
 	void open() {
 		stream.open(fileName, ios_base::binary);
@@ -87,7 +96,7 @@ template <class Type> class TypedInputStream {
 
 		// read dimension information from the beginning of the file
 		List<char> *dimInfo = new List<char>;
-		char *ch = new char;
+		char *ch = new char[8];
 		do {
 			stream.read(ch, sizeof(char));
 			dimInfo->Append(*ch);
@@ -96,7 +105,8 @@ template <class Type> class TypedInputStream {
 		for (int i = 0; i < dimInfo->NumElements() - 1; i++) {
 			dimInfoBuffer[i] = dimInfo->Nth(i);
 		}
-		dimInfoBuffer[dimInfo->NumElements()] = '\0';
+		dimInfoBuffer[dimInfo->NumElements() - 1] = '\0';
+		delete dimInfo;
 
 		// get the individual dimensions from the dimension information string
 		dimLengths = new List<Dimension*>;
@@ -115,6 +125,8 @@ template <class Type> class TypedInputStream {
 			dim->setLength();
 			dimLengths->Append(dim);
 		}
+		delete[] dimInfoBuffer;
+		delete tokenList;
 
 		// set the beginning of data section pointer appropriately to be used later when reading elements
 		dataBegins = stream.tellg();
@@ -128,6 +140,7 @@ template <class Type> class TypedInputStream {
 		}
 
 		stream.close();
+		delete[] ch;
 	}
 
 	long int getSeekPosition(List<int> *elementIndex) {
@@ -155,6 +168,10 @@ template <class Type> class TypedOutputStream {
 		seekStepSize = sizeof(Type);
 		if (initFile) initializeFile();
 		initialize();
+	}
+	~TypedOutputStream() {
+		delete dimLengths;
+		delete dimMultiplier; 
 	}
 
 	void open() {

@@ -14,8 +14,9 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../codegen/structure.h"
-#include "part_generation.h"
 #include "allocation.h"
+#include "part_tracking.h"
+#include "part_generation.h"
 
 /* This class holds the configuration and content of a data structure of a single LPS  handled by a PPU */
 class DataItems {
@@ -42,10 +43,13 @@ class DataItems {
 	DataPartitionConfig *getPartitionConfig();
 	void setPartsList(DataPartsList *partsList) { this->partsList = partsList; }
 	DataPartsList *getPartsList() { return partsList; }
+	// an iterator should be maintained by each PPU controller for each data structure for efficient 
+	// search of data parts by ids.
+	PartIterator *createIterator();
 	// function to get the most uptodate version of a part of the structure
-	DataPart *getDataPart(List<int*> *partIdList);
+	DataPart *getDataPart(List<int*> *partIdList, PartIterator *iterator);
 	// function to get an older epoch version of a part
-	DataPart *getDataPart(List<int*> *partidList, int epoch);
+	DataPart *getDataPart(List<int*> *partidList, int epoch, PartIterator *iterator);
 	List<DataPart*> *getAllDataParts();
 	virtual void advanceEpoch() { partsList->advanceEpoch(); }
 };

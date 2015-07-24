@@ -37,7 +37,7 @@ PartHandler::PartHandler(DataPartsList *partsList, const char *fileName, DataPar
 	this->dataParts = partsList->getCurrentList();
 	this->partConfig = partConfig;
 	this->currentPart = NULL;
-	this->currentPartInfo = new PartInfo();
+	this->currentPartInfo = NULL;
 	this->currentDataIndex = new List<int>;
 	ListMetadata *metadata = partsList->getMetadata();
 	this->dataDimensionality = metadata->getDimensions();
@@ -72,6 +72,7 @@ List<int> *PartHandler::getDataIndex(List<int> *partIndex) {
 
 void PartHandler::processParts() {
 	begin();
+	currentPartInfo = new PartInfo();
 	for (int i = 0; i < dataParts->NumElements(); i++) {
 		
 		DataPart *dataPart = dataParts->Nth(i);
@@ -82,7 +83,9 @@ void PartHandler::processParts() {
 		Dimension *partDimensions = metadata->getBoundary();
 		List<int> *partIndexList = new List<int>;
 		processPart(partDimensions, 0, partIndexList);
+		delete partIndexList;
 	}
+	delete currentPartInfo;
 	terminate();
 }
 
