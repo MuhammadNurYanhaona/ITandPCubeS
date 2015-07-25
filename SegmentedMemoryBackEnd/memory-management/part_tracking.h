@@ -75,11 +75,15 @@ class PartIdContainer {
 	// two functions to be implemented by sub-classes for container construction and later use for part retrieval
 	virtual bool insertPartId(List<int*> *partId,
 			int dataDimensions,
-			const std::vector<DimConfig> dimOrder, unsigned int position) = 0;
+			std::vector<DimConfig> dimOrder, unsigned int position) = 0;
 	virtual SuperPart *getPart(List<int*> *partId, PartIterator *iterator) = 0;
 	// This is very expensive operation. It constructs and iterator and does a full traversal of the part-container
 	// hierarchy to retrieves the part count. Therefore it should be used with great care.
 	int getPartCount();
+	// function to be used by generated code to insert potential new part-Ids in the container
+	bool insertPartId(List<int*> *partId, int dataDimensions, std::vector<DimConfig> dimOrder) {
+		return insertPartId(partId, dataDimensions, dimOrder, 0);
+	}
 };
 
 // this is the leaf level container that holds the actual parts of a data structure
@@ -91,7 +95,7 @@ class PartContainer : public PartIdContainer {
 	~PartContainer();
 	bool insertPartId(List<int*> *partId,
 			int dataDimensions,
-			const std::vector<DimConfig> dimOrder, unsigned int position);
+			std::vector<DimConfig> dimOrder, unsigned int position);
 	void postProcess();
 	SuperPart *getPartAtIndex(int index) { return dataPartList[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
@@ -110,7 +114,7 @@ class PartListContainer : public PartIdContainer {
 	~PartListContainer();
 	bool insertPartId(List<int*> *partId,
 			int dataDimensions,
-			const std::vector<DimConfig> dimOrder, unsigned int position);
+			std::vector<DimConfig> dimOrder, unsigned int position);
 	void postProcess();
 	void print(int indentLevel, std::ostream &stream);
 	PartIdContainer *getNestedContainerAtIndex(int index) { return nextLevelContainers[index]; }

@@ -270,6 +270,8 @@ class DataPartitionConfig {
 	void generatePartId(List<int*> *lpuIds, List<int*> *partId);
 	// returns the number of elements there should be in a valid part Id constructed for a data part
 	int getPartIdLevels();
+	// generate a blank part-Id template to be used over and over where applicable
+	List<int*> *generatePartIdTemplate();
 
 	// function to set up the metadata regarding the partition dimensions of the underlying object 
 	// within an LPU
@@ -294,7 +296,7 @@ class DataPartitionConfig {
 	// function to generate the list of data parts (see allocation.h) from the partition configuration;
 	// note that the data parts list returned by this function is unusable until memory allocations has
 	// been done 
-	DataPartsList *generatePartList(DataPartitionConfig *config, int epochCount);
+	DataPartsList *generatePartList(int epochCount);
 
 	// this function is used to determine the data-parts content of PPUs other than the current one so 
 	// that decision about the nature and content of communication for shared data can be made.

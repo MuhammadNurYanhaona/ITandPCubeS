@@ -156,6 +156,10 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
 		programFile << "\")" << paramSeparator << jumps << ")" << stmtSeparator;
 	}
 
+	// finally configure a dimension-config vector reference to be used to generate a part container for
+	// holding all data-structure parts for the underlying data structure for current LPS for the segment
+	programFile << indent << "config->configureDimensionOrder()" << stmtSeparator; 
+
 	programFile << indent << "return config" << stmtSeparator;
 	programFile << "}\n";
 }
@@ -260,10 +264,8 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
 	programFile.close();
 }
 	
-void genRoutineForLpsContent(std::ofstream &headerFile,
-                std::ofstream &programFile,
-                const char *initials,
-                Space *lps, Space *rootLps) {
+void genRoutineForLpsContent(std::ofstream &headerFile, 
+		std::ofstream &programFile, const char *initials, Space *lps, Space *rootLps) {
 	
 	std::ostringstream functionHeader;
 	functionHeader << "genSpace" << lps->getName() << "Content(";
@@ -279,45 +281,22 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 	programFile << functionHeader.str() << " {\n";
 
 	// write a checking for non-empty thread list; if the list is empty then return NULL
-	programFile << indent << "if(threads->NumElements() == 0) return NULL" << stmtSeparator;
-
-	// investigate the first thread in the list to determine the number of PPUs that will participate
-	// in the computations assigned to the current LPS
-	programFile << indent << "int ppuCount = threads->Nth(0)->getThreadIds()->getPpuCount";
-	programFile << "(Space_" << lps->getName() << ")" << stmtSeparator;
-
-	// generate a list to hold all lpu-ids of different threads in the group; note that this is a 
-	// list of lists as to identify an LPU in a lower LPS its ancestor LPUs in higher LPSes need to 
-	// be mentioned too.
-	programFile << indent << "List<List<int*>*> *lpuIdList = new List<List<int*>*>" << stmtSeparator;
-
-	// iterate over the threads and get their lpu-ids for the LPS under concern
-	programFile << indent << "for (int i = 0; i < threads->NumElements(); i++) {\n";
-	programFile << doubleIndent << "ThreadState *thread = threads->Nth(i)" << stmtSeparator;
-	programFile << doubleIndent << "List<List<int*>*> *threadLpuIds = thread->getAllLpuIds(";
-	programFile << "Space_" << lps->getName() << paramSeparator;
-	programFile << "Space_" << rootLps->getName();	
-	programFile << ")" << stmtSeparator;
-	programFile << doubleIndent << "lpuIdList->AppendAll(threadLpuIds)" << stmtSeparator;
-	programFile << doubleIndent << "delete threadLpuIds" << stmtSeparator;
-	programFile << indent << "}\n";
-
-	// if the lpuIdList is empty then return NULL as there will be no need of data allocations for 
-	// current LPS for the thread group
-	programFile << indent << "if (lpuIdList->NumElements() == 0) return NULL" << stmtSeparator;
+	programFile << std::endl << indent;
+	programFile << "if(threads->NumElements() == 0) return NULL" << stmtSeparator;
 
 	// create an LPS content object
 	const char *lpsName = lps->getName();
 	programFile << indent << "LpsContent *space" << lpsName << "Content = new LpsContent(";
 	programFile << "Space_" << lpsName << ")" << stmtSeparator;
 
-	// iterate over the data structures of this LPS and create data items for those that are flagged
-	// to be allocated in it.
+	// iterate over the data structures of this LPS and create data items for those that are flagged to be 
+	// allocated in it.
 	List<const char*> *structureList = lps->getLocalDataStructureNames();
 	for (int i = 0; i < structureList->NumElements(); i++) {
 		DataStructure *structure = lps->getLocalStructure(structureList->Nth(i));
 		if (!structure->getUsageStat()->isAllocated()) continue;
-		
+	
+		programFile << std::endl;
 		Type *type = structure->getType();
 		int epochCount = structure->getVersionCount() + 1;
 		const char *varName = structure->getName();
@@ -336,6 +315,7 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 			programFile << dimensionCount << paramSeparator;
 			programFile << epochCount << ")" << stmtSeparator;
 
+			// retrieve the partition config object
 			programFile << indent << "DataPartitionConfig *" << varName << "Config = ";
 			programFile << "partConfigMap->Lookup(";
 			programFile << '"' << varName << "Space" << lpsName << "Config" << '"' << ")";
@@ -343,18 +323,31 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 			programFile << indent << varName << "->setPartitionConfig(" << varName;
 			programFile << "Config" << ")" << stmtSeparator;
 
-			programFile << indent << "List<List<int*>*> *" << varName << "PartIds = ";
-			programFile << varName << "Config->generatePartIdList(lpuIdList)" << stmtSeparator;
-		
+			// create an uninitialized data-parts-list object
 			programFile << indent << "DataPartsList *" << varName << "Parts = ";
-			programFile << "DataPartitionConfig::generatePartList";
-			ArrayType *arrayType = dynamic_cast<ArrayType*>(type);
-			Type *elementType = arrayType->getTerminalElementType();
-			programFile << '<' << elementType->getCType() << '>'; 
-			programFile << "(" << varName << "Config" << paramSeparator;
-			programFile << varName << "PartIds" << paramSeparator; 
-			programFile << epochCount << ")" << stmtSeparator;
-			programFile << indent << varName << "->setPartsList(" << varName << "Parts)" << stmtSeparator;	
+			programFile << varName << "Config->generatePartList(" << epochCount;
+			programFile << ")" << stmtSeparator;
+			programFile << indent << varName << "->setPartsList(";
+			programFile << varName << "Parts)" << stmtSeparator; 
+
+			// retrieve the dimension order instance for data parts from the configuration object
+			programFile << indent << "std::vector<DimConfig> " << varName << "DimOrder = *(";
+			programFile << varName << "Config->getDimensionOrder())" << stmtSeparator;
+
+			// create a part-container that will aid the data-parts-list in parts searching and 
+			// management
+			programFile << indent << "PartIdContainer *" << varName << "Container = NULL";
+			programFile << stmtSeparator;
+			programFile << indent << "if (" << varName << "DimOrder.size() == 1) " << varName;
+			programFile << "Container = new PartContainer(";
+			programFile << varName << "DimOrder[0])" << stmtSeparator; 
+			programFile << indent << "else " << varName;
+			programFile << "Container = new PartListContainer(";
+			programFile << varName << "DimOrder[0])" << stmtSeparator; 
+		
+			// create a blank part Id template reference
+			programFile << indent << "List<int*> *" << varName << "PartId = ";
+			programFile << varName << "Config->generatePartIdTemplate()" << stmtSeparator;
 		}
 
 		// add the data item in the LPS content
@@ -363,20 +356,55 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 		programFile << varName << ")" << stmtSeparator;
 	}
 
-	// reclaim the storage corresponding to LPU Id list
-	programFile << std::endl << indent << "while (lpuIdList->NumElements() > 0) {\n";
-	programFile << doubleIndent << "List<int*> *lpuId = lpuIdList->Nth(0)" << stmtSeparator;
-	programFile << doubleIndent << "lpuIdList->RemoveAt(0)" << stmtSeparator;
-	programFile << doubleIndent << "while (lpuId->NumElements() > 0) {\n";
-	programFile << tripleIndent << "int *lpuIdPart = lpuId->Nth(0)" << stmtSeparator;
-	programFile << tripleIndent << "lpuId->RemoveAt(0)" << stmtSeparator;
-	programFile << tripleIndent << "delete[] lpuIdPart" << stmtSeparator;
-	programFile << doubleIndent << "}\n";
-	programFile << doubleIndent << "delete lpuId" << stmtSeparator;
-	programFile << indent << "}\n";
-	programFile << indent << "delete lpuIdList" << stmtSeparator << std::endl;
+	// iterate over the threads of the segment and try to initialize the parts of each allocated data structures
+	programFile << std::endl << indent << "for (int i = 0; i < threads->NumElements(); i++) {\n";
+	programFile << doubleIndent << "ThreadState *thread = threads->Nth(i)" << stmtSeparator;
+	programFile << doubleIndent << "int lpuId = INVALID_ID" << stmtSeparator;
+	programFile << doubleIndent << "while((lpuId = thread->getNextLpuId(";
+	programFile << "Space_" << lpsName << paramSeparator;
+	programFile << "Space_" << rootLps->getName() << paramSeparator;
+	programFile << "lpuId)) != INVALID_ID) {\n";
+	programFile << tripleIndent << "List<int*> *lpuIdChain = thread->getLpuIdChainWithoutCopy(";
+	programFile << std::endl << tripleIndent << doubleIndent;
+	programFile << "Space_" << lpsName << paramSeparator;
+	programFile << "Space_" << rootLps->getName() << ")" << stmtSeparator;
+	
+	// this time consider only arrays that are allocated within this LPS as partitioning is done for arrays only
+	for (int i = 0; i < structureList->NumElements(); i++) {
+		DataStructure *structure = lps->getLocalStructure(structureList->Nth(i));
+		if (!structure->getUsageStat()->isAllocated()) continue;
+		const char *varName = structure->getName();
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array == NULL) continue;
+		
+		programFile << tripleIndent << varName << "Config->generatePartId(lpuIdChain" << paramSeparator;
+		programFile << varName << "PartId)"  << stmtSeparator;
+		programFile << tripleIndent << varName << "Container->insertPartId(";
+		programFile << varName << "PartId" << paramSeparator;
+		programFile << array->getDimensionality() << paramSeparator;
+		programFile << varName << "DimOrder)" << stmtSeparator;
+	}
 
-	programFile << indent << "return space" << lpsName << "Content" << stmtSeparator;		
+	programFile << doubleIndent << "}\n";	
+	programFile << indent << "}\n";
+
+	// allocate memory for all data parts in their corresponding data parts list
+	for (int i = 0; i < structureList->NumElements(); i++) {
+		DataStructure *structure = lps->getLocalStructure(structureList->Nth(i));
+		if (!structure->getUsageStat()->isAllocated()) continue;
+		const char *varName = structure->getName();
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array == NULL) continue;
+		programFile << indent << "DataPartsList::allocate ";
+		Type *type = structure->getType();
+		ArrayType *arrayType = reinterpret_cast<ArrayType*>(type);
+		programFile << "<" << arrayType->getTerminalElementType()->getCType() << ">(";
+		programFile << varName << "Parts" << paramSeparator;
+		programFile << varName << "Config" << paramSeparator;
+		programFile << varName << "Container)" << stmtSeparator;
+	}	
+	
+	programFile << std::endl << indent << "return space" << lpsName << "Content" << stmtSeparator;		
 	programFile << "}\n";	
 }
 

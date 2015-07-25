@@ -34,6 +34,7 @@
 // for memory management
 #include "../memory-management/allocation.h"
 #include "../memory-management/communication.h"
+#include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"
 

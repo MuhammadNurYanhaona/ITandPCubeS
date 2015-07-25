@@ -621,6 +621,10 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	// set the task data property in each thread of the segment
 	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";
 	stream << doubleIndent << "threadStateList[i]->setTaskData(taskData)" << stmtSeparator;
+
+	// set up the part-iterator map whose elements will be used to search data-part Ids for LPUs
+	stream << doubleIndent << "threadStateList[i]->setPartIteratorMap(";
+	stream << "taskData->generatePartIteratorMap())" << stmtSeparator;
 	
 	// enable logging for the participant threads
 	stream << doubleIndent << "threadStateList[i]->initiateLogFile(\"" << initials << "\")" << stmtSeparator;	

@@ -113,7 +113,7 @@ PartContainer::~PartContainer() {
         
 bool PartContainer::insertPartId(List<int*> *partId,
                 int dataDimensions,
-		const vector<DimConfig> dimOrder, unsigned int position) {
+		vector<DimConfig> dimOrder, unsigned int position) {
 	int index = getCurrentLevelPartIndex(partId);
 	if (index != KEY_NOT_FOUND) return false;
 	int currentId = partId->Nth(level)[dimNo];
@@ -151,7 +151,7 @@ PartListContainer::~PartListContainer() {
         
 bool PartListContainer::insertPartId(List<int*> *partId,
                 int dataDimensions,
-		const vector<DimConfig> dimOrder, unsigned int position) {
+		vector<DimConfig> dimOrder, unsigned int position) {
 	
 	int index = getCurrentLevelPartIndex(partId);
 	position++;

@@ -631,6 +631,15 @@ int DataPartitionConfig::getPartIdLevels() {
 	return levels;
 }
 
+List<int*> *DataPartitionConfig::generatePartIdTemplate() {
+	int levels = getPartIdLevels();
+	List<int*> *templateId = new List<int*>(levels);
+	for (int i = 0; i < levels; i++) {
+		templateId->Append(new int[dimensionCount]);
+	}
+	return templateId;
+}
+
 List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int backsteps) {
 	List<int*> *partId = new List<int*>;
 	int position = lpuIds->NumElements() - 1;
@@ -645,15 +654,15 @@ List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int
 	return partId;
 }
 
-DataPartsList *DataPartitionConfig::generatePartList(DataPartitionConfig *config, int epochCount) {
-	Dimension *dataDimensions = new Dimension[config->dimensionCount];
+DataPartsList *DataPartitionConfig::generatePartList(int epochCount) {
+	Dimension *dataDimensions = new Dimension[dimensionCount];
 	bool hasPadding = false;
-	for (int d = 0; d < config->dimensionCount; d++) {
-		DimPartitionConfig *dimConfig = config->dimensionConfigs->Nth(d);
+	for (int d = 0; d < dimensionCount; d++) {
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
 		dataDimensions[d] = dimConfig->getDataDimension();
 		hasPadding = hasPadding || dimConfig->hasPadding();
 	}
-	ListMetadata *listMetadata = new ListMetadata(config->dimensionCount, dataDimensions);
+	ListMetadata *listMetadata = new ListMetadata(dimensionCount, dataDimensions);
 	listMetadata->setPadding(hasPadding);
 	DataPartsList *dataPartsList = new DataPartsList(listMetadata, epochCount);
 	return dataPartsList;

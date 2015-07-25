@@ -277,40 +277,38 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// that the future developers should investigate for optimization or even for a better design.
 		programFile << indent << "if (taskData != NULL) {\n";
 
-		// retrieve the hierarchical part Id of the array for current LPU so that the storage instance can 
-		// be identified
-               	programFile << doubleIndent << "List<int*> *" << varName << "PartIdList = ";
-                programFile << varName << "Config->generatePartId(lpuIdChain)" << stmtSeparator;
-
-		// determine what LPS allocates the array
+		// determine what LPS allocates the array; if it is different than the current LPS then get the
+		// LPU-Id-chain for that LPS
 		Space *allocatorLps = array->getAllocator();
+		const char *allocatorLpsName = allocatorLps->getName();	
 		bool allocatedElsewhere = (allocatorLps != lps);
 		if (allocatedElsewhere) {
-			// find how many step needs to be backtraced to reach the allocating LPS starting from 
-			// the current LPS
-			int steps = 0;
-			Space *currentLps = lps;
-			while (currentLps != allocatorLps) {
-				currentLps = currentLps->getParent();
-				steps++;
-			}
-			// find the partId list to locate the bigger data-part piece the current one is a part of
-			programFile << doubleIndent << "List<int*> *" << varName << "AllocPartIdList = ";
-			programFile << varName << "Config->generateSuperPartIdList(lpuIdList" << paramSeparator;
-			programFile << steps << ")" << stmtSeparator;
+			programFile << indent << "List<int*> *lpuIdChain = threadState->getLpuIdChainWithoutCopy(";
+			programFile << "Space_" << allocatorLpsName << paramSeparator;
+			programFile << "Space_" << lps->getRoot()->getName() << ")" << stmtSeparator;  
 		}
+		
+		// retrieve the iterator reference for the part and from it a template part-Id object
+		programFile << doubleIndent << "PartIterator *iterator = ";
+		programFile << "threadState->getIterator(Space_" << allocatorLpsName << paramSeparator;
+		programFile << "\"" << varName << "\")" << stmtSeparator;
+		programFile << doubleIndent << "List<int*> *partId = ";
+		programFile << "iterator->getPartIdTemplate()" << stmtSeparator;
+
+		// retrieve the hierarchical part Id of the array for current LPU so that the storage instance can 
+		// be identified
+               	programFile << doubleIndent << varName << "Config->generatePartId(lpuIdChain" << paramSeparator;
+		programFile << "partId)" << stmtSeparator; 
 
 		// retrieve the data items list
 		programFile << doubleIndent << "DataItems *" << varName << "Items = taskData->getDataItemsOfLps(";
-		programFile << '"' << allocatorLps->getName() << '"' << paramSeparator;
+		programFile << '"' << allocatorLpsName << '"' << paramSeparator;
 		programFile << '"' << varName << '"' << ")" << stmtSeparator;
 		
 		// then retrieves the appropriate part from the item list
 		programFile << doubleIndent << "DataPart *" << varName << "Part = ";
-		programFile << varName << "Items->getDataPart(";
-		if (allocatedElsewhere) programFile << varName << "AllocPartIdList)";
-		else programFile << varName << "PartIdList)";
-		programFile << stmtSeparator;
+		programFile << varName << "Items->getDataPart(partId" << paramSeparator;
+		programFile << "iterator)" << stmtSeparator;
 
 		// populate storage dimension information into the LPU object from the part
 		programFile << doubleIndent << varName << "Part->getMetadata()->updateStorageDimension(";		 		 
@@ -326,24 +324,13 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		int versionCount = array->getLocalVersionCount();
 		for (int j = 1; j <= versionCount; j++) {
 			programFile << doubleIndent << varName << "Part = ";
-			programFile << varName << "Items->getDataPart(";
-			if (allocatedElsewhere) programFile << varName << "AllocPartIdList";
-			else programFile << varName << "PartIdList";
-			programFile << paramSeparator << j << ")" << stmtSeparator;
+			programFile << varName << "Items->getDataPart(partId" << paramSeparator;
+			programFile << j << paramSeparator;
+			programFile << "iterator)" << stmtSeparator;
 			programFile << doubleIndent << "lpu->" << varName << "_lag_" << j << " = ";
 			programFile << "(" << elemType->getCType() << "*) ";
 			programFile << varName << "Part->getData()" << stmtSeparator;
 		}
-
-		// finally clean up the memory consumed by the part Id list
-		programFile << doubleIndent << "while (" << varName << "PartIdList->NumElements() > 0) {\n";
-		programFile << tripleIndent << "int *partId = " << varName;
-		programFile << "PartIdList->Nth(0)" << stmtSeparator;
-		programFile << tripleIndent << varName << "PartIdList->RemoveAt(0)" << stmtSeparator;
-		programFile << tripleIndent << "delete[] partId" << stmtSeparator;
-		programFile << doubleIndent << "}\n";
-		programFile << doubleIndent << "delete " << varName << "PartIdList" << stmtSeparator;
-
 		programFile << indent << "}\n";
 	}
 	
