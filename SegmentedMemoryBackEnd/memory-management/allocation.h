@@ -83,7 +83,7 @@ class DataPart {
   public:
 	static long spaceConsumed;
 	DataPart(PartMetadata *metadata) { 
-		this->metadata = NULL;
+		this->metadata = metadata;
 		this->data = NULL; 
 	}
 	template <class type> static void allocate(DataPart *dataPart) {

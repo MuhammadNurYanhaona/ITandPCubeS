@@ -242,7 +242,8 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		if (nextLpuId != INVALID_ID) {
 			counter->setCurrentCompositeLpuId(nextLpuId);
 			LPU *lpu = computeNextLpu(lpsId);
-			
+		
+			/*---------------------- Disabled	
 			// log LPU execution
 			if(loggingEnabled) {
 				for (int i = 0; i < lpsId; i++) threadLog << '\t';
@@ -250,6 +251,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				counter->logCompositeLpuId(threadLog, lpsId);
 				lpu->print(threadLog, lpsId + 1);
 			}
+			-------------------------------*/
 		
 			// set the LPU Id so that recursion can advance to the next LPU in next call 
 			lpu->setId(nextLpuId);	
@@ -291,11 +293,13 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 					delete[] newLpuCounts;
 					counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 	
+					/*---------------------- Disabled	
 					// log counter update
 					if (loggingEnabled) {
 						counter->logLpuCount(threadLog, lpsId);
 						counter->logLpuRange(threadLog, lpsId);
 					}
+					-------------------------------*/
 					
 					// retrieve next LPU Id from the updated counter
 					nextLpuId = counter->getNextLpuId(INVALID_ID);
@@ -305,6 +309,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 				counter->setCurrentCompositeLpuId(nextLpuId);
 				LPU *lpu = computeNextLpu(lpsId);
 				
+				/*---------------------- Disabled	
 				// log LPU execution
 				if (loggingEnabled) {
 					for (int i = 0; i < lpsId; i++) threadLog << '\t';
@@ -312,6 +317,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 					counter->logCompositeLpuId(threadLog, lpsId);
 					lpu->print(threadLog, lpsId + 1);
 				}
+				-------------------------------*/
 	
 				// set the LPU Id so that recursion can advance to the next LPU in next call 
 				lpu->setId(nextLpuId);	
@@ -342,11 +348,13 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	delete[] newLpuCounts;
 	counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 			
+	/*---------------------- Disabled	
 	// log counter update
 	if (loggingEnabled) {	
 		counter->logLpuCount(threadLog, lpsId);
 		counter->logLpuRange(threadLog, lpsId);
 	}	
+	-------------------------------*/
 	
 	// compute the next LPU for the current LPS using a recursive procedure
 	int nextLpuId = counter->getNextLpuId(INVALID_ID);
@@ -374,11 +382,13 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		delete[] newLpuCounts;
 		counter->setCurrentRange(threadIds->ppuIds[lpsId]);
 
+		/*---------------------- Disabled	
 		// log counter update
 		if (loggingEnabled) {
 			counter->logLpuCount(threadLog, lpsId);
 			counter->logLpuRange(threadLog, lpsId);
 		}
+		-------------------------------*/
 		
 		// retrieve next LPU Id from the updated counter
 		nextLpuId = counter->getNextLpuId(INVALID_ID);
@@ -386,6 +396,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 	counter->setCurrentCompositeLpuId(nextLpuId);
 	LPU *lpu = computeNextLpu(lpsId);
 	
+	/*---------------------- Disabled	
 	// log LPU execution
 	if (loggingEnabled) {
 		for (int i = 0; i < lpsId; i++) threadLog << '\t';
@@ -393,6 +404,7 @@ LPU *ThreadState::getNextLpu(int lpsId, int containerLpsId, int currentLpuId) {
 		counter->logCompositeLpuId(threadLog, lpsId);
 		lpu->print(threadLog, lpsId + 1);
 	}
+	-------------------------------*/
 	
 	// set the LPU Id so that recursion can advance to the next LPU in next call 
 	lpu->setId(nextLpuId);	
@@ -498,6 +510,16 @@ LPU *ThreadState::getCurrentLpu(int lpsId, bool allowInvalid) {
 
 void ThreadState::closeLogFile() {
 	if (threadLog.is_open()) threadLog.close();
+}
+
+void ThreadState::logIteratorStatistics() {
+	if (loggingEnabled) {
+		Iterator<PartIterator*> iterator = partIteratorMap->GetIterator();
+		PartIterator *partIterator = NULL;
+		while ((partIterator = iterator.GetNextValue()) != NULL) {
+			partIterator->printStats(threadLog, 0);
+		}
+	}
 }
 
 /***********************************************  Segment State  ****************************************************/

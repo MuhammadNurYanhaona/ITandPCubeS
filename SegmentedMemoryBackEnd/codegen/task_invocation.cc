@@ -383,7 +383,7 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << "\nint main(int argc, char *argv[]) {\n\n";
 
 	// do MPI initialization
-	stream << indent << "MPI_Init(&argc, &argv)" << stmtSeparator << std::endl;
+	//stream << indent << "MPI_Init(&argc, &argv)" << stmtSeparator << std::endl;
 
 	// retrieve the segment id for the current process
         stream << indent << "// retreiving segmentation identifier\n";

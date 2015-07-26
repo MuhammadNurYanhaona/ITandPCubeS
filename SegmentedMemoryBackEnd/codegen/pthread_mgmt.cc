@@ -65,19 +65,11 @@ void generatePThreadRunFn(const char *headerFileName, const char *programFileNam
 	
 	programFile << stmtIndent << "PThreadArg *pthreadArg = (PThreadArg *) argument" << stmtSeparator;
 	programFile << stmtIndent << "ThreadStateImpl *threadState = pthreadArg->threadState" << stmtSeparator;
-	programFile << stmtIndent << "//std::cout << \"Thread \" << threadState->getThreadNo() << \" has started\"";
-	programFile << stmtSeparator;
-	programFile << stmtIndent << "//std::cout << \" executing task: \" << pthreadArg->taskName << std::endl";
-	programFile << stmtSeparator;
 	programFile << stmtIndent << "run(pthreadArg->metadata, \n";
 	programFile << stmtIndent << stmtIndent << stmtIndent << "pthreadArg->taskGlobals, \n";		
 	programFile << stmtIndent << stmtIndent << stmtIndent << "pthreadArg->threadLocals, \n";		
 	programFile << stmtIndent << stmtIndent << stmtIndent << "pthreadArg->partition, \n";		
-	programFile << stmtIndent << stmtIndent << stmtIndent << "threadState)";
-	programFile << stmtSeparator;
-	programFile << stmtIndent;
-	programFile << "//std::cout << \"Thread \" << threadState->getThreadNo() << \" has ended\" << std::endl";
-	programFile << stmtSeparator;
+	programFile << stmtIndent << stmtIndent << stmtIndent << "threadState)" << stmtSeparator;
 	
 	programFile << stmtIndent << "pthread_exit(NULL)" << stmtSeparator;
 			

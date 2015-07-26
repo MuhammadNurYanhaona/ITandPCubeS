@@ -66,12 +66,19 @@ PartIterator *PartIdContainer::getIterator() {
 
 SuperPart *PartIdContainer::getPart(List<int*> *partId, PartIterator *iterator, int dataDimension) {
 	SuperPart *part = iterator->getCurrentPart();
-	if (part != NULL && part->isMatchingId(dataDimension, partId)) return part;
+	if (part != NULL && part->isMatchingId(dataDimension, partId)) {
+		iterator->recordDirectAccess();
+		return part;
+	}
 	if (iterator->advance()) {
 		part = iterator->getCurrentPart();
-		if (part != NULL && part->isMatchingId(dataDimension, partId)) return part;
+		if (part != NULL && part->isMatchingId(dataDimension, partId)) {
+			iterator->recordOneStepAdvance();
+			return part;
+		}
 	}
 	iterator->reset();
+	iterator->recordMove();
 	return getPart(partId, iterator);
 }
 
@@ -202,11 +209,25 @@ SuperPart *PartListContainer::getPart(List<int*> *partId, PartIterator *iterator
 
 //---------------------------------------------------------- Part Iterator --------------------------------------------------------------/
 
+void IteratorStatistics::print(std::ostream &stream, int indent) {
+	std::ostringstream indentStr;
+	for (int i = 0; i < indent; i++) indentStr << '\t';
+	stream << indentStr.str() << "Iterator Statistics:\n";
+	indentStr << '\t';
+	stream << indentStr.str() << "#times current position is the searched position  (direct return): ";
+	stream << directAccess << '\n';
+	stream << indentStr.str() << "#times next position is the searched position  (one step advance): ";
+	stream << oneStepAdvance << '\n';
+	stream << indentStr.str() << "#times iterator has been put to a new location (container search): ";
+	stream << nonAdjacentMoves << '\n';
+}
+
 PartIterator::PartIterator(int partIdSteps) {
 	this->partIdSteps = partIdSteps;
 	containerStack.reserve(partIdSteps);
 	indexStack.reserve(partIdSteps);
 	this->partIdTemplate = NULL;
+	this->stats = IteratorStatistics();
 }
 
 SuperPart *PartIterator::getCurrentPart() {

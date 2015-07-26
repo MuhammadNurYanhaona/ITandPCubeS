@@ -537,20 +537,20 @@ void DataPartitionConfig::configureDimensionOrder() {
 	}
 
 	int level = getPartIdLevels() - 1;
-	std::vector<DimPartitionConfig*> dimConfigOrdering;
-	std::vector<int> ordering;
+	std::vector<int> lpsOrdering;
+	std::vector<int> configOrdering;
 	for (int d = 0; d < dimensionCount; d++) {
 		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
 		int alignment = dimConfig->getLpsAlignment();
 		if (alignment != -1) {
-			int position = binsearch::locatePointOfInsert(ordering, alignment);
-			ordering.insert(ordering.begin() + position, alignment);
-			dimConfigOrdering.insert(dimConfigOrdering.begin() + position, dimConfig);
+			int position = binsearch::locatePointOfInsert(lpsOrdering, alignment);
+			configOrdering.insert(configOrdering.begin() + position, d);
+			lpsOrdering.insert(lpsOrdering.begin() + position, alignment);
 		}
 	}
 	
-	for (int i = 0; i < dimConfigOrdering.size(); i++) {
-		this->dimensionOrder->push_back(DimConfig(level, dimConfigOrdering[i]->getLpsAlignment()));
+	for (int i = 0; i < configOrdering.size(); i++) {
+		this->dimensionOrder->push_back(DimConfig(level, configOrdering[i]));
 	}
 }
         

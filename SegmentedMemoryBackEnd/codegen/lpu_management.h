@@ -214,7 +214,7 @@ class ThreadState {
 	int getThreadNo() { return threadIds->threadNo; }
 	virtual ~ThreadState() {}
 	
-	// a log file for diagnostics
+	// a log file for diagnostics and corresponding methods
 	std::ofstream threadLog;
 	bool loggingEnabled;
 	void logExecution(const char *stageName, int spaceId);
@@ -222,6 +222,7 @@ class ThreadState {
 	void closeLogFile();
 	void enableLogging() { loggingEnabled = true; }
 	void initiateLogFile(const char *fileNamePrefix);
+	void logIteratorStatistics();
 };
 
 /* This is the class to hold the PPU execution controllers (here threads) that shares a single memory segment */

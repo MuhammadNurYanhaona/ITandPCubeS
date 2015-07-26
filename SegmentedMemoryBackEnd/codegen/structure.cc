@@ -50,7 +50,7 @@ Dimension Dimension::getNormalizedDimension() {
 	return normalDimension;	
 }
 
-void Dimension::print(std::ofstream &stream) {
+void Dimension::print(std::ostream &stream) {
 	stream << range.min << "--" << range.max;
 }
 

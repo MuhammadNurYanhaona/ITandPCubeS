@@ -198,6 +198,10 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	CompositeStage *computation = taskDef->getComputation();
 	computation->generateInvocationCode(programFile, 1, rootLps);
 
+	// log iterator usage statistics to check the efficiency of part searching process
+	programFile << "\n\t// logging iterators' efficiency\n";
+	programFile << "\tthreadState->logIteratorStatistics();\n";
+
 	// close the thread log file
 	programFile << "\n\t// close thread's log file\n";
 	programFile << "\tthreadState->closeLogFile();\n";

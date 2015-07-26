@@ -121,6 +121,20 @@ class PartListContainer : public PartIdContainer {
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
 };
 
+// an supplimentary class to gather information about Part-Iterator's (look at below) efficiency in locating objects 
+class IteratorStatistics {
+  public:
+	int directAccess;
+	int oneStepAdvance;
+	int nonAdjacentMoves;
+	IteratorStatistics() {
+		directAccess = 0;
+		oneStepAdvance = 0;
+		nonAdjacentMoves = 0;
+	}
+	void print(std::ostream &stream, int indent);	
+};
+
 // Note that the part-iterator is an essential component of efficient part identification process. Most of the time
 // the part to be returned during an LPU construction should be found in the current or the next location of the
 // iterator -- cutting down the search cost altogether. This logic to work, each independent execution unit within
@@ -134,6 +148,7 @@ class PartIterator {
 	// a reference instance to be used by each PPU-controller when generating a Id for a structure part from an
 	// LPU Id; this avoids allocating and deallocating small memories for Ids repeatedly during task execution
 	List<int*> *partIdTemplate;
+	IteratorStatistics stats;
   public:
 	PartIterator(int partIdSteps);
 	SuperPart *getCurrentPart();
@@ -146,6 +161,11 @@ class PartIterator {
 	// two functions used during the part-search process to move the iterator to a new location
 	void reset();
 	void addStep(PartIdContainer *container, int index);
+	// three usage tracking and one usage loging functions
+	void recordDirectAccess() { stats.directAccess++; }
+	void recordOneStepAdvance() { stats.oneStepAdvance++; }
+	void recordMove() { stats.nonAdjacentMoves++; }
+	void printStats(std::ostream &stream, int indent) { stats.print(stream, indent); }
   private:
 	bool advance(int lastAccessPoint);
 };

@@ -29,7 +29,7 @@ class Dimension {
 	Range getPositiveRange();
 	Range adjustPositiveSubRange(Range positiveSubRange);
 	Dimension getNormalizedDimension();
-	void print(std::ofstream &stream);
+	void print(std::ostream &stream);
 };
 
 class Epoch {
