@@ -297,6 +297,12 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
         programFile << indent << "ThreadLocals threadLocals" << stmtSeparator;
         programFile << indent << "ArrayMetadata *metadata = new ArrayMetadata" << stmtSeparator;
 
+	// create a start timer to record running time of different parts of the task
+	programFile << std::endl;
+	programFile << indent << "// declaring and initiating segment execution timer\n";
+	programFile << indent << "struct timeval start" << stmtSeparator;
+	programFile << indent << "gettimeofday(&start, NULL)" << stmtSeparator;
+
 	// copy partition parameters into an array to later make them accessible for thread-state management
 	taskGenerator->copyPartitionParameters(programFile); 
 
@@ -334,6 +340,18 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
         taskGenerator->performSegmentGrouping(programFile, true);
         taskGenerator->initializeSegmentMemory(programFile);
 
+	// log time spent on memory allocation
+	programFile << std::endl;
+	programFile << indent << "// calculating memory and threads preparation time\n";
+	programFile << indent << "struct timeval end" << stmtSeparator;
+	programFile << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
+        programFile << indent << "double allocationTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
+        programFile << std::endl << indent << indent << indent;
+        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0))" << stmtSeparator;
+        programFile << indent << "logFile << \"Memory preparation time: \" << allocationTime";
+	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+
 	// read data structures from files if instructed by the coordinator program
 	programFile << indent << "initializeEnvironment";
 	programFile << "(" << "environment" << paramSeparator;
@@ -342,9 +360,34 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << indent << "logFile << \"\\tenvironment initialization is complete\\n\"" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator;
 
+	// log time spent on reading data from files
+	programFile << std::endl;
+	programFile << indent << "// calculating file reading time\n";
+	programFile << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
+        programFile << indent << "double readingTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
+        programFile << std::endl << indent << indent << indent;
+        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0)) - allocationTime" << stmtSeparator;
+        programFile << indent << "logFile << \"Data reading time: \" << readingTime";
+	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+	
+
 	// start threads and wait for them to finish execution of the task 
         taskGenerator->startThreads(programFile);
 
+	// log time spent on task's computation
+	programFile << std::endl;
+	programFile << indent << "// calculating computation time\n";
+	programFile << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
+        programFile << indent << "double computationTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
+        programFile << std::endl << indent << indent << indent;
+        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0))";
+        programFile << std::endl << indent << indent << indent;
+	programFile << "- allocationTime - readingTime"; 
+	programFile << stmtSeparator << indent << "logFile << \"Computation time: \" << computationTime";
+	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+	
 	// write environmental data structures into output files if instructed by the coordinator program 
 	// through output bindings
 	programFile << indent << "// storing outputs in files\n"; 
