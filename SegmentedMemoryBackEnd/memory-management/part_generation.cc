@@ -464,13 +464,13 @@ Dimension BlockStrideConfig::getPartDimension(int partId, Dimension parentDimens
         int extraEntriesBefore = partialStrideElements;
 
         // if extra entries fill up a complete new block in the stride of the current LPU then its number of 
-	// entries should increase by the size parameter and extra preceeding entries should equal to 
-	// block_size * preceeding strides count
+	// entries should increase by the size parameter and extra preceding entries should equal to 
+	// block_size * preceding strides count
         if (blockCount > partId) {
                 myEntries += blockSize;
                 extraEntriesBefore = partId * blockSize;
         // If the extra entries does not fill a complete block for the current one then it should have whatever 
-	// remains after filling up preceeding blocks
+	// remains after filling up preceding blocks
         } else if (blockCount == partId) {
                 myEntries += extraEntriesBefore - partId * blockSize;
                 extraEntriesBefore = partId * blockSize;

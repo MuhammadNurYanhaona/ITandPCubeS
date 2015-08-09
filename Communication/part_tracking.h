@@ -4,7 +4,8 @@
 // This is the library that hosts all data structures and mechanism for quickly locating a data structure part given
 // its Id.
 
-#include "../utils/list.h"
+#include "list.h"
+#include "part_folding.h"
 
 #include <iostream>
 #include <vector>
@@ -84,6 +85,9 @@ class PartIdContainer {
 	bool insertPartId(List<int*> *partId, int dataDimensions, std::vector<DimConfig> dimOrder) {
 		return insertPartId(partId, dataDimensions, dimOrder, 0);
 	}
+	// function to be implemented by sub-classes so that a concrete description of the parts content of a segment
+	// can be generated
+	virtual void foldContainer(List<PartFolding*> *fold) = 0;
 };
 
 // this is the leaf level container that holds the actual parts of a data structure
@@ -99,6 +103,7 @@ class PartContainer : public PartIdContainer {
 	void postProcess();
 	SuperPart *getPartAtIndex(int index) { return dataPartList[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
+	void foldContainer(List<PartFolding*> *fold);
 	// function to be used to set up an actual part as the replacement for the place-holder SuperPart after a
 	// valid data part has been created and initialized based on the nature of the data structure under concern 
 	void replacePartAtIndex(SuperPart *repacement, int index);
@@ -119,9 +124,10 @@ class PartListContainer : public PartIdContainer {
 	void print(int indentLevel, std::ostream &stream);
 	PartIdContainer *getNestedContainerAtIndex(int index) { return nextLevelContainers[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
+	void foldContainer(List<PartFolding*> *fold);
 };
 
-// an supplementary class to gather information about Part-Iterator's (look at below) efficiency in locating objects 
+// a supplementary class to gather information about Part-Iterator's (look at below) efficiency in locating objects
 class IteratorStatistics {
   public:
 	int directAccess;
@@ -166,6 +172,7 @@ class PartIterator {
 	void recordOneStepAdvance() { stats.oneStepAdvance++; }
 	void recordMove() { stats.nonAdjacentMoves++; }
 	void printStats(std::ostream &stream, int indent) { stats.print(stream, indent); }
+	void resetStats() {	this->stats = IteratorStatistics(); }
   private:
 	bool advance(int lastAccessPoint);
 };

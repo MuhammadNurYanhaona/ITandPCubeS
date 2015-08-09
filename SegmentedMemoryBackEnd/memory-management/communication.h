@@ -5,7 +5,7 @@
    implementation of communication will be dealt elsewhere and kept separate to support different 
    communication technologies. Management of communication buffers involves their allocation, update 
    tracking, and copying data to (and from) operating memory (the memory accessed and modified as a PPU
-   executes its LPUs) out of (an into) those buffers.  
+   executes its LPUs) out of (and into) those buffers.  
 */
 
 #include "../utils/list.h"
@@ -42,8 +42,8 @@ class CommGroup {
 */
 class CommBuffer {
   protected:
-	// the group of PPUs that will participate in the communication to update the buffer or to any 
-        // receive any update done on the buffer by current PPU
+	// the group of PPUs that will participate in the communication to update the buffer or to receive 
+	// any update done on the buffer by current PPU
 	CommGroup *group;
 	// the interval description for the data been exchanged
 	IntervalSet *bufferConfig;
@@ -72,7 +72,7 @@ class CommBuffer {
 	inline int getPartCount() { return intervalSeqCount; }
 	inline CommGroup *getGroup() { return group; }
 	inline IntervalSet *getBufferConfig() { return bufferConfig; }
-	// an simplified interface for updating the whole buffer all at once; note that in such cases the
+	// a simplified interface for updating the whole buffer all at once; note that in such cases the
 	// data buffer can be used directly to receive/send uptodate content
 	void update() { uptodateElements = intervalSeqCount; }
 	// interface for updating only a part (i.e., one interval sequence) of the buffer; the second
@@ -92,11 +92,11 @@ class CommBuffer {
 };
 
 /* A class for holding all buffers related to a single data synchronization operation in an IT task. Once
-   all of its buffers are updated, communication for the synchronization is done and execution -- if there 
+   all of its buffers are updated, communication for the synchronization is done and computation -- if there 
    are no more synchronization to be resolved -- can resume again. Copying data from communication buffers
    to the operating memory can be done when individual buffers get updated or all at once after the entire
-   list is updated. The design is flexible. Whatever the policy for copying may be in used, after syncing
-   is done the list need to be reset to make it usable for the next iteration.	   
+   list is updated. The design is flexible. Whatever the policy for copying may be in use, after syncing is 
+   done the list need to be reset to make it usable for the next iteration.	   
 */
 class CommBufferList {
   protected:

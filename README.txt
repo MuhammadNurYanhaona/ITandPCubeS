@@ -9,14 +9,19 @@ Back Ends
 	1. Multi-core Backend
 	2. Segmented-memory Backend 
 
-We made changes as needed along the development process. So always look at the last phase 
-to get most up-to-date status of the language syntax and its features.
+There are some auxiliary projects also included in the repository that we created to examine
+features of the compiler and validity of its generated codes. These projects are
+	1. Validation
+	2. Communication
+ 
+We made changes as needed along the development process. So always look at the last phase to 
+get most up-to-date status of the language syntax and its features.
 
 Install the following tools to be able to generate the front end compiler
 	1. bison
 	2. flex
 	3. g++
 
-The Validation directory contains an eclipse project that we use to check the correctness
-of generated code by running equivalent hand-written C++ program against the same inputs
-as been used during running the generated code and comparing the two outputs. 
+The Validation directory contains an eclipse project that we use to check the correctness of 
+generated code by running equivalent hand-written C++ program against the same inputs as been 
+used during running the generated code and comparing the two outputs. 
