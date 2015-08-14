@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include "list.h"
-#include "structure.h"
+#include "../structure.h"
 #include "interval.h"
 
 using namespace std;
@@ -26,7 +26,7 @@ void DrawingLine::setIndexToOne(int index) {
 }
 
 void DrawingLine::draw() {
-	cout << "\n";
+	cout << "\nA bar represents a 1 and a flat line represents a 0\n\n";
 	for (int i = 0; i < dim.length; i++) {
 		cout << line->Nth(i);
 	}

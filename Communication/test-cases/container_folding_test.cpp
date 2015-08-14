@@ -7,8 +7,8 @@
  * Change the three static constants' values to vary the structure of the part container
  **/
 
-#include "../part_folding.h"
-#include "../part_tracking.h"
+#include "../part-management/part_folding.h"
+#include "../part-management/part_tracking.h"
 #include <vector>
 #include <iostream>
 #include <cstdlib>

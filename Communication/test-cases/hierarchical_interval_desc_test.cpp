@@ -1,13 +1,18 @@
+/* This test case verifies if we can generate accurate interval descriptions for hierarchical partitions
+ * involving one or more index reordering. It embodies several scenarios of partitioning with reordering
+ * and generates figures for the one been activated for visual validation.
+ **/
+
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
 #include <algorithm>
-#include "list.h"
-#include "structure.h"
-#include "interval.h"
-#include "partition.h"
+#include "../utils/list.h"
+#include "../structure.h"
+#include "../utils/interval.h"
+#include "../utils/partition.h"
 
-int mainT() {
+int mainHIDT() {
 
 	Dimension dim;
 	dim.length = 101;

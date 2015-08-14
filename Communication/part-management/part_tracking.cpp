@@ -1,6 +1,6 @@
 #include "part_tracking.h"
-#include "list.h"
-#include "binary_search.h"
+#include "../utils/list.h"
+#include "../utils/binary_search.h"
 #include "part_folding.h"
 
 #include <vector>

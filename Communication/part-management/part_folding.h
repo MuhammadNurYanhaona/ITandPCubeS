@@ -1,11 +1,13 @@
 #ifndef PART_FOLDING_H_
 #define PART_FOLDING_H_
 
-#include "list.h"
-#include "structure.h"
+#include "../utils/list.h"
+#include "../structure.h"
 #include <cstdlib>
 #include <iostream>
 
+/* This class represents a folding of part IDs from a part-container for any data structure. The folding can
+ * subsequently be used to construct a compact interval set representation of the entire container without. */
 class PartFolding {
 protected:
 	int dimNo;
@@ -48,6 +50,7 @@ public:
 		}
 		return true;
 	}
+	// coalesce should only be done if two sub-foldings have the same content
 	void coalesce(Range otherIdRange) {
 		this->idRange.max = otherIdRange.max;
 	}

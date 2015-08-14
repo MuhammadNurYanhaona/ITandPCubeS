@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <algorithm>
 #include "list.h"
-#include "structure.h"
+#include "../structure.h"
 
 static const char INCLUSION_CHAR = '|';
 static const char EXCLUSION_CHAR = '_';

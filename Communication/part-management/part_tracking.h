@@ -4,7 +4,7 @@
 // This is the library that hosts all data structures and mechanism for quickly locating a data structure part given
 // its Id.
 
-#include "list.h"
+#include "../utils/list.h"
 #include "part_folding.h"
 
 #include <iostream>

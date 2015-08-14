@@ -31,7 +31,7 @@ public:
         	range = Range();
         }
         void setLength() {
-        	length = range.max - range.min;
+        	length = range.max - range.min + 1;
         }
 };
 
