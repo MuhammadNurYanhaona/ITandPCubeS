@@ -70,9 +70,18 @@ int mainCFT() {
 
 	List<PartFolding*> *fold = new List<PartFolding*>;
 	partIdContainer->foldContainer(fold);
-	cout << "\n\nFold description:-----------------------------------";
+	cout << "\n\nFold description:------------------------------------";
 	for (int i = 0; i < fold->NumElements(); i++) {
 		fold->Nth(i)->print(cout, 0);
+	}
+
+	cout << "\n\nFold strains:----------------------------------------";
+	for (int i = 0; i < fold->NumElements(); i++) {
+		PartFolding *folding = fold->Nth(i);
+		List<FoldStrain*> *foldStrains = folding->extractStrains();
+		for (int j = 0; j < foldStrains->NumElements(); j++) {
+			foldStrains->Nth(j)->print(cout);
+		}
 	}
 
 	return 0;
