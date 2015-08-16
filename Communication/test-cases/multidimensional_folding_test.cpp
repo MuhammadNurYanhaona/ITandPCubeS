@@ -12,7 +12,7 @@
 
 using namespace std;
 
-int main() {
+int mainMDFT() {
 	vector<DimConfig> dimOrder;
 	dimOrder.push_back(DimConfig(0, 0));
 	dimOrder.push_back(DimConfig(0, 1));

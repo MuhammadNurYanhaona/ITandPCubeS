@@ -85,18 +85,26 @@ int mainIRT() {
 //	rangeList->Append(Range(1, 2));
 //	blockCount.getIntervalDescForRangeHierarchy(rangeList, intervalList);
 
-	// scenario #3
-	BlockStrideInstr blockStride = BlockStrideInstr(bigDim, 0, 10, 8);
-	rangeList->Append(Range(0, 1));
-	Dimension nextDimension = blockStride.getDimension();
-	BlockSizeInstr blockSize = BlockSizeInstr(nextDimension, 1, 25);
-	rangeList->Append(Range(1, 2));
-	blockSize.setPrevInstr(&blockStride);
-	StrideInstr stride = StrideInstr(blockSize.getDimension(), 0, 5);
-	stride.setPrevInstr(&blockSize);
-	rangeList->Append(Range(3, 4));
-	stride.getIntervalDescForRangeHierarchy(rangeList, intervalList);
+//	// scenario #3
+//	BlockStrideInstr blockStride = BlockStrideInstr(bigDim, 0, 10, 8);
+//	rangeList->Append(Range(0, 1));
+//	Dimension nextDimension = blockStride.getDimension();
+//	BlockSizeInstr blockSize = BlockSizeInstr(nextDimension, 1, 25);
+//	rangeList->Append(Range(1, 2));
+//	blockSize.setPrevInstr(&blockStride);
+//	StrideInstr stride = StrideInstr(blockSize.getDimension(), 3, 5);
+//	stride.setPrevInstr(&blockSize);
+//	rangeList->Append(Range(3, 4));
+//	stride.getIntervalDescForRangeHierarchy(rangeList, intervalList);
 
+	// scenario #4
+	BlockSizeInstr blockSize = BlockSizeInstr(bigDim, 1, 25);
+	rangeList->Append(Range(1, 3));
+	Dimension nextDimension = blockSize.getDimension();
+	BlockStrideInstr blockStride = BlockStrideInstr(nextDimension, 0, 3, 5);
+	blockStride.setPrevInstr(&blockSize);
+	rangeList->Append(Range(0, 1));
+	blockStride.getIntervalDescForRangeHierarchy(rangeList, intervalList);
 
 	//----------------------------------------------------------------------------- Drawing of the result
 

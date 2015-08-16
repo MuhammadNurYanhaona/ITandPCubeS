@@ -29,6 +29,7 @@ List<IntervalSeq*> *PartitionInstr::getTrueIntervalDesc() {
 void PartitionInstr::drawTrueIntervalDesc(Dimension dimension, int labelGap) {
 	DrawingLine *drawingLine = new DrawingLine(dimension, labelGap);
 	List<IntervalSeq*> *intervals = getTrueIntervalDesc();
+	cout << "number of interval sequences: " << intervals->NumElements() << "\n";
 	for (int i = 0; i < intervals->NumElements(); i++) {
 		intervals->Nth(i)->draw(drawingLine);
 	}
@@ -131,7 +132,7 @@ void BlockSizeInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, Li
 		List<IntervalSeq*> *myIntervalList = getIntervalDescForRange(idRange);
 		descInConstruct->AppendAll(myIntervalList);
 		delete myIntervalList;
-	} else {
+	} else if (idRange.max > idRange.min) {
 		List<IntervalSeq*> *updatedList = new List<IntervalSeq*>;
 		int iterationCount = idRange.max - idRange.min + 1;
 		int partId = this->partId;
@@ -224,7 +225,7 @@ void BlockCountInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, L
 		List<IntervalSeq*> *myIntervalList = getIntervalDescForRange(idRange);
 		descInConstruct->AppendAll(myIntervalList);
 		delete myIntervalList;
-	} else {
+	} else if (idRange.max > idRange.min) {
 		List<IntervalSeq*> *updatedList = new List<IntervalSeq*>;
 		int iterationCount = idRange.max - idRange.min + 1;
 		int partId = this->partId;

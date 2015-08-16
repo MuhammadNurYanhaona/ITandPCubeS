@@ -67,6 +67,30 @@ void IntervalSeq::draw(DrawingLine *drawingLine) {
 }
 
 List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) {
+
+	// optimization for a common special case
+	if (subInterval->count == 1) {
+		int fullIterations = subInterval->length / this->length;
+		int extraEntries = subInterval->length % this->length;
+		List<IntervalSeq*> *intervalList = new List<IntervalSeq*>;
+		if (fullIterations > 0) {
+			int pieceBegin = this->begin + (subInterval->begin / this->length) * this->period
+					+ subInterval->begin % this->length;
+			IntervalSeq *fullIterationSequence = new IntervalSeq(pieceBegin,
+					this->length, this->period, fullIterations);
+			intervalList->Append(fullIterationSequence);
+		}
+		if (extraEntries > 0) {
+			int extraEntryStart = subInterval->begin + fullIterations * this->length;
+			int pieceBegin = this->begin + (extraEntryStart / this->length) * this->period
+					+ extraEntryStart % this->length;
+			IntervalSeq *partialIteration =
+					new IntervalSeq(pieceBegin, extraEntries, extraEntries, 1);
+			intervalList->Append(partialIteration);
+		}
+		return intervalList;
+	}
+
 	List<Range> *uniqueRangeList = new List<Range>;
 	List<int> *uniqueIntervalBeginnings = new List<int>;
 
@@ -116,8 +140,7 @@ List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) 
 	List<IntervalSeq*> *intervalList = new List<IntervalSeq*>;
 	for (int i = 0; i < uniqueRangeList->NumElements(); i++) {
 		Range range = uniqueRangeList->Nth(i);
-		int pieceBegin = this->begin
-				+ (range.min / this->length) * this->period
+		int pieceBegin = this->begin + (range.min / this->length) * this->period
 				+ range.min % this->length;
 		int pieceCount = ((subIntervalEndingIndex - pieceBegin + 1)
 				+ piecePeriod - 1) / piecePeriod;
