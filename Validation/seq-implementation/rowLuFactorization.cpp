@@ -9,9 +9,9 @@
 #include <deque>
 #include <sys/time.h>
 #include <time.h>
-#include "utils.h"
-#include "structures.h"
-#include "fileUtility.h"
+#include "../utils.h"
+#include "../structures.h"
+#include "../fileUtility.h"
 
 int mainLUFR() {
 

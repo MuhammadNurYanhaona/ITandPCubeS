@@ -7,11 +7,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <deque>
-#include "utils.h"
-#include "structures.h"
-#include "fileUtility.h"
+#include "../utils.h"
+#include "../structures.h"
+#include "../fileUtility.h"
 
-int mainLUFV() {
+int mainRLUFV() {
 
 	// read all arrays from file
 	Dimension aDims[2];
@@ -105,6 +105,7 @@ int mainLUFV() {
 			int row = i / uDims[1].length;
 			int cols = i - row * uDims[1].length;
 			std::cout << "Computed U did not match at index [" << row << "][" << cols << "]\n";
+			std::cout << "Value computed: " << nU[i] << " value found: " << u[i] << "\n";
 			valid = false;
 		}
 	}
@@ -113,6 +114,7 @@ int mainLUFV() {
 			int row = i / lDims[1].length;
 			int cols = i - row * lDims[1].length;
 			std::cout << "Computed L did not match at index [" << row << "][" << cols << "]\n";
+			std::cout << "Value computed: " << nL[i] << " value found: " << l[i] << "\n";
 			valid = false;
 		}
 	}

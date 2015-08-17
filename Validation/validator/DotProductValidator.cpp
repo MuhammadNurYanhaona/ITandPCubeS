@@ -7,9 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <deque>
-#include "utils.h"
-#include "structures.h"
-#include "fileUtility.h"
+#include "../utils.h"
+#include "../structures.h"
+#include "../fileUtility.h"
 
 int mainDPV() {
 	Dimension uDims[1];

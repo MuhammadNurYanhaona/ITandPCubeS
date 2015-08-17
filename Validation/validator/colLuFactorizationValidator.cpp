@@ -7,21 +7,21 @@
 #include <stdlib.h>
 #include <string.h>
 #include <deque>
-#include <sys/time.h>
-#include <time.h>
-#include "utils.h"
-#include "structures.h"
-#include "fileUtility.h"
+#include "../utils.h"
+#include "../structures.h"
+#include "../fileUtility.h"
 
-int mainLUFC() {
+int mainLUFVC() {
 
+	// read all arrays from file
 	Dimension aDims[2];
 	double *a = readArrayFromFile <double> ("a", 2, aDims);
 	Dimension uDims[2];
+	double *u = readArrayFromFile <double> ("u", 2, uDims);
 	Dimension lDims[2];
+	double *l = readArrayFromFile <double> ("l", 2, lDims);
 	Dimension pDims[1];
-	pDims[0] = uDims[0] = lDims[0] = aDims[0];
-	uDims[1] = lDims[1] = aDims[1];
+	int *p = readArrayFromFile <int> ("p", 1, pDims);
 
 	// declare new arrays for computation and initialize them
 	int uSize = uDims[0].length * uDims[1].length;
@@ -32,10 +32,6 @@ int mainLUFC() {
 	for (int i = 0; i < lSize; i++) nL[i] = 0;
 	int *nP = new int[pDims[0].length];
 	for (int i = 0; i < pDims[0].length; i++) nP[i] = 0;
-
-	// starting execution timer clock
-	struct timeval start;
-	gettimeofday(&start, NULL);
 
 	//-------------------------------- execute LU factorization sequentially on new arrays
 	// prepare step
@@ -88,14 +84,34 @@ int mainLUFC() {
 		}
 	}
 
-	//-------------------------------- calculate running time
-	struct timeval end;
-	gettimeofday(&end, NULL);
-	double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)
-			- (start.tv_sec + start.tv_usec / 1000000.0));
-	std::cout << "Sequential Execution Time: " << runningTime << " Seconds" << std::endl;
-}
+	//------------------------------------------------- finally, check if all arrays match
+	bool valid = true;
+	for (int i = 0; i < pDims[0].length; i++) {
+		if (nP[i] != p[i]) {
+			std::cout << "Computed P did not match at index [" << i << "]\n";
+			valid = false;
+		}
+	}
+	for (int i = 0; i < uSize; i++) {
+		if (abs(u[i] - nU[i]) > 0.1) {
+			int row = i / uDims[1].length;
+			int cols = i - row * uDims[1].length;
+			std::cout << "Computed U did not match at index [" << row << "][" << cols << "]\n";
+			valid = false;
+		}
+	}
+	for (int i = 0; i < lSize; i++) {
+		if (abs(l[i] - nL[i]) > 0.1) {
+			int row = i / lDims[1].length;
+			int cols = i - row * lDims[1].length;
+			std::cout << "Computed L did not match at index [" << row << "][" << cols << "]\n";
+			valid = false;
+		}
+	}
+	if (valid) std::cout << "validation successful\n";
 
+	return 0;
+}
 
 
 
