@@ -38,7 +38,11 @@ YACC = bison
 # We want debugging and most warnings, but lex/yacc generate some
 # static symbols we don't use, so turn off unused warnings to avoid clutter
 # STL has some signed/unsigned comparisons we want to suppress
-CFLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O2
+
+# settings for development and debugging
+#CFLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
+# settings for optimized code generation
+CFLAGS = -O3 -mtune=native -march=native -mfpmath=sse
 
 # We need flag to enable the POSIX thread library during compiling generated code
 RFLAG = -pthread
