@@ -24,7 +24,7 @@ int mainBMMM(int argc, const char *argv[]) {
 	cDims[0] = aDims[0]; cDims[1] = bDims[1];
 
 	// read the block size from command line
-	int blockSize = 24;
+	int blockSize = 32;
 	if (argc > 1) blockSize = atoi(argv[1]);
 
 	// starting execution timer clock
@@ -45,14 +45,14 @@ int mainBMMM(int argc, const char *argv[]) {
 			int cStart = jB;
 			int cEnd = cStart + blockSize - 1;
 			if (cEnd >= bDims[1].length) cEnd = bDims[1].length - 1;
-			for (int i = rStart; i <= rEnd; i++) {
-				int aRowIndex = i * aDims[1].length;
-				int cRowIndex = i * cDims[1].length;
-				for (int j = cStart; j <= cEnd; j++) {
-					for (int kB = 0; kB < aDims[1].length; kB += blockSize) {
-						int startIndex = kB;
-						int endIndex = startIndex + blockSize - 1;
-						if (endIndex >= aDims[1].length) endIndex = aDims[1].length - 1;
+			for (int kB = 0; kB < aDims[1].length; kB += blockSize) {
+				int startIndex = kB;
+				int endIndex = startIndex + blockSize - 1;
+				if (endIndex >= aDims[1].length) endIndex = aDims[1].length - 1;
+				for (int i = rStart; i <= rEnd; i++) {
+					int aRowIndex = i * aDims[1].length;
+					int cRowIndex = i * cDims[1].length;
+					for (int j = cStart; j <= cEnd; j++) {
 						for (int k = startIndex; k <= endIndex; k++) {
 							int bRowIndex = k * bDims[1].length;
 							c[cRowIndex + j] += a[aRowIndex + k] * b[bRowIndex + j];
