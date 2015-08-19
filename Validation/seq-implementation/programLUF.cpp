@@ -7,21 +7,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <deque>
+#include <sys/time.h>
+#include <time.h>
 #include "../utils.h"
 #include "../structures.h"
 #include "../fileUtility.h"
 
-int mainPLUFV() {
+int mainPLUF() {
 
 	// read all arrays from file
 	Dimension aDims[2];
 	double *a = readArrayFromFile <double> ("a", 2, aDims);
 	Dimension uDims[2];
-	double *u = readArrayFromFile <double> ("u", 2, uDims);
 	Dimension lDims[2];
-	double *l = readArrayFromFile <double> ("l", 2, lDims);
 	Dimension pDims[1];
-	int *p = readArrayFromFile <int> ("p", 1, pDims);
+	pDims[0] = uDims[0] = lDims[0] = aDims[0];
+	uDims[1] = lDims[1] = aDims[1];
 
 	int blockSize = 32;
 
@@ -36,6 +37,10 @@ int mainPLUFV() {
 	for (int i = 0; i < pDims[0].length; i++) nP[i] = 0;
 	double *p_column = new double[uDims[0].length];
 	for (int i = 0; i < uDims[0].length; i++) p_column[i] = 0;
+
+	// starting execution timer clock
+	struct timeval start;
+	gettimeofday(&start, NULL);
 
 	// Execute code equivalent to Initialize LU task
 	for (int i = 0; i < aDims[0].length; i++) {
@@ -153,33 +158,12 @@ int mainPLUFV() {
 		}
 	}
 
-	//------------------------------------------------- finally, check if all arrays match
-	bool valid = true;
-	int invalid = 0;
-	for (int i = 0; i < pDims[0].length; i++) {
-		if (nP[i] != p[i]) {
-			invalid++;
-			valid = false;
-		}
-	}
-	if (!valid) std::cout << "P does not match " << invalid << " times\n";
-	invalid = 0;
-	for (int i = 0; i < uSize; i++) {
-		if (abs(u[i] - nU[i]) > 0.1) {
-			invalid++;
-			valid = false;
-		}
-	}
-	if (!valid) std::cout << "u does not match " << invalid << " times\n";
-	invalid = 0;
-	for (int i = 0; i < lSize; i++) {
-		if (abs(l[i] - nL[i]) > 0.1) {
-			invalid++;
-			valid = false;
-		}
-	}
-	if (!valid) std::cout << "l does not match " << invalid << " times\n";
-	if (valid) std::cout << "validation successful\n";
+	//-------------------------------- calculate running time
+	struct timeval end;
+	gettimeofday(&end, NULL);
+	double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)
+			- (start.tv_sec + start.tv_usec / 1000000.0));
+	std::cout << "Sequential Execution Time: " << runningTime << " Seconds" << std::endl;
 
 	return 0;
 }
