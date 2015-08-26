@@ -36,6 +36,7 @@ public:
 	}
 	void draw(DrawingLine *drawingLine);
 	List<IntervalSeq*> *transformSubInterval(IntervalSeq *subInterval);
+	List<IntervalSeq*> *computeIntersection(IntervalSeq *other);
 };
 
 #endif /* INTERVAL_H_ */

@@ -11,7 +11,7 @@
 
 using namespace std;
 
-int mainIRT() {
+int mainIFRT() {
 
 	//------------------------------------------------------------ Non hierarchical partition range tests
 
