@@ -17,12 +17,12 @@ int mainIIT() {
 	dim.range.max = 990;
 
 	// scenario #1
-//	IntervalSeq *interval1 = new IntervalSeq(10, 5, 20, 4);
-//	IntervalSeq *interval2 = new IntervalSeq(0, 2, 10, 5);
+	//IntervalSeq *interval1 = new IntervalSeq(10, 5, 20, 4);
+	//IntervalSeq *interval2 = new IntervalSeq(0, 2, 10, 5);
 
 	// scenario #2
-//	 IntervalSeq *interval1 = new IntervalSeq(15, 30, 30, 1);
-//	 IntervalSeq *interval2 = new IntervalSeq(2, 4, 10, 5);
+	IntervalSeq *interval1 = new IntervalSeq(15, 30, 30, 1);
+	IntervalSeq *interval2 = new IntervalSeq(2, 4, 10, 5);
 
 	// scenario #3
 	// IntervalSeq *interval1 = new IntervalSeq(28, 6, 6, 1);
@@ -41,20 +41,20 @@ int mainIIT() {
 	//IntervalSeq *interval2 = new IntervalSeq(2, 2, 10, 10);
 
 	// scenario #7
-	IntervalSeq *interval1 = new IntervalSeq(45, 20, 30, 4);
-	IntervalSeq *interval2 = new IntervalSeq(2, 4, 10, 15);
+	//IntervalSeq *interval1 = new IntervalSeq(45, 20, 30, 4);
+	//IntervalSeq *interval2 = new IntervalSeq(2, 4, 10, 15);
 
 	List<IntervalSeq*> *intersection = interval1->computeIntersection(interval2);
 	DrawingLine *drawLine = new DrawingLine(dim, 10);
-	cout << "First interval Sequence: \n";
+	cout << "First interval Sequence:";
 	interval1->draw(drawLine);
 	drawLine->draw();
 	drawLine->reset();
-	cout << "Second Interval Sequence: \n";
+	cout << "Second Interval Sequence:";
 	interval2->draw(drawLine);
 	drawLine->draw();
 	drawLine->reset();
-	cout << "Intersection:\n";
+	cout << "Intersection:";
 	if (intersection != NULL) {
 		for (int i = 0; i < intersection->NumElements(); i++) {
 			intersection->Nth(i)->draw(drawLine);

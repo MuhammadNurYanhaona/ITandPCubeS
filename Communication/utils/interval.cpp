@@ -9,6 +9,8 @@
 
 using namespace std;
 
+//------------------------------------------------------------- Drawing Line ------------------------------------------------------------/
+
 DrawingLine::DrawingLine(Dimension dim, int labelGap) {
 	this->dim = dim; this->labelGap = labelGap;
 	line = new List<char>;
@@ -49,6 +51,8 @@ void DrawingLine::draw() {
 	}
 	cout << "\n";
 }
+
+//--------------------------------------------------------- 1D Interval Sequence --------------------------------------------------------/
 
 IntervalSeq::IntervalSeq(int b, int l, int p, int c) {
 	begin = b;
@@ -156,6 +160,13 @@ List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) 
 List<IntervalSeq*> *IntervalSeq::computeIntersection(IntervalSeq *other) {
 
 	List<IntervalSeq*> *intersect = new List<IntervalSeq*>;
+
+	// check for equality fist and return the current interval if the two are the same
+	if (this->isEqual(other)) {
+		intersect->Append(this);
+		return intersect;
+	}
+
 	IntervalSeq *first = this;
 	IntervalSeq *second = other;
 	if (other->count == 1) { first = other; second = this; }
@@ -287,3 +298,101 @@ List<IntervalSeq*> *IntervalSeq::computeIntersection(IntervalSeq *other) {
 	return intersect;
 }
 
+bool IntervalSeq::isEqual(IntervalSeq *other) {
+	return (this->begin == other->begin
+			&& this->length == other->length
+			&& this->period == other->period
+			&& this->count 	== other->count);
+}
+
+//-------------------------------------------------- Multidimensional Interval Sequence  ------------------------------------------------/
+
+MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
+	this->dimensionality = dimensionality;
+	intervals = vector<IntervalSeq*>();
+	intervals.reserve(dimensionality);
+	for (int i = 0; i < dimensionality; i++) {
+		intervals[i] = NULL;
+	}
+}
+
+void MultidimensionalIntervalSeq::copyIntervals(vector<IntervalSeq*> *templateVector) {
+	intervals = vector<IntervalSeq*>(*templateVector);
+}
+
+void MultidimensionalIntervalSeq::setIntervalForDim(int dimensionNo, IntervalSeq *intervalSeq) {
+	intervals[dimensionNo] = intervalSeq;
+}
+
+IntervalSeq *MultidimensionalIntervalSeq::getIntervalForDim(int dimensionNo) {
+	return intervals[dimensionNo];
+}
+
+bool MultidimensionalIntervalSeq::isEqual(MultidimensionalIntervalSeq *other) {
+	for (int i = 0; i < dimensionality; i++) {
+		if (!intervals[i]->isEqual(other->intervals[i])) return false;
+	}
+	return true;
+}
+
+List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::computeIntersection(MultidimensionalIntervalSeq *other) {
+	List<List<IntervalSeq*>*> *dimensionalIntersects = new List<List<IntervalSeq*>*>;
+	for (int i = 0; i < dimensionality; i++) {
+		List<IntervalSeq*> *intersect = intervals[i]->computeIntersection(other->intervals[i]);
+		if (intersect == NULL || intersect->NumElements() == 0) {
+			while (dimensionalIntersects->NumElements() > 0) {
+				List<IntervalSeq*> *subIntersect = dimensionalIntersects->Nth(0);
+				delete subIntersect;
+			}
+			delete dimensionalIntersects;
+			return NULL;
+		}
+		dimensionalIntersects->Append(intersect);
+	}
+	vector<IntervalSeq*> *constructionVector = new vector<IntervalSeq*>;
+	List<MultidimensionalIntervalSeq*> *intersect = generateIntervalsFromList(dimensionalIntersects, constructionVector);
+	delete constructionVector;
+	delete dimensionalIntersects;
+	return intersect;
+}
+
+List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::generateIntervalsFromList(
+		List<List<IntervalSeq*>*> *intervalSeqLists,
+		std::vector<IntervalSeq*> *constructionInProgress) {
+
+	int position = constructionInProgress->size();
+	List<IntervalSeq*> *myList = intervalSeqLists->Nth(position);
+	List<MultidimensionalIntervalSeq*> *result = new List<MultidimensionalIntervalSeq*>;
+	for (int i = 0; i < myList->NumElements(); i++) {
+		IntervalSeq *sequence = myList->Nth(i);
+		constructionInProgress->push_back(sequence);
+		if (position < dimensionality - 1) {
+			List<MultidimensionalIntervalSeq*> *resultPart =
+					generateIntervalsFromList(intervalSeqLists, constructionInProgress);
+			result->AppendAll(resultPart);
+			delete resultPart;
+		} else {
+			MultidimensionalIntervalSeq *multIntervalSeq = new MultidimensionalIntervalSeq(dimensionality);
+			multIntervalSeq->copyIntervals(constructionInProgress);
+			result->Append(multIntervalSeq);
+		}
+		constructionInProgress->erase(constructionInProgress->begin() + position);
+	}
+	return result;
+}
+
+void MultidimensionalIntervalSeq::draw() {
+	for (int i = 0; i < dimensionality; i++) {
+		IntervalSeq *interval = intervals[i];
+		int begin = 0;
+		int end = interval->begin + interval->period * interval->count;
+		Dimension dim = Dimension();
+		dim.range.min = begin;
+		dim.range.max = end;
+		dim.length = end - begin + 1;
+		DrawingLine drawLine = DrawingLine(dim, 10);
+		interval->draw(&drawLine);
+		cout << "Dimension No: " << i + 1;
+		drawLine.draw();
+	}
+}

@@ -5,6 +5,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <algorithm>
+#include <vector>
 #include "list.h"
 #include "../structure.h"
 
@@ -37,6 +38,28 @@ public:
 	void draw(DrawingLine *drawingLine);
 	List<IntervalSeq*> *transformSubInterval(IntervalSeq *subInterval);
 	List<IntervalSeq*> *computeIntersection(IntervalSeq *other);
+	bool isEqual(IntervalSeq *other);
+};
+
+class MultidimensionalIntervalSeq {
+protected:
+	int dimensionality;
+	std::vector<IntervalSeq*> intervals;
+public:
+	MultidimensionalIntervalSeq(int dimensionality);
+	// function to initialize intervals of the current sequence all at once from a template interval vector
+	void copyIntervals(std::vector<IntervalSeq*> *templateVector);
+	void setIntervalForDim(int dimensionNo, IntervalSeq *intervalSeq);
+	IntervalSeq *getIntervalForDim(int dimensionNo);
+	List<MultidimensionalIntervalSeq*> *computeIntersection(MultidimensionalIntervalSeq *other);
+	bool isEqual(MultidimensionalIntervalSeq *other);
+	void draw();
+private:
+	// a recursive helper routine used by the computeIntersection() function to generate multidimensional
+	// interval sequences for intersecting regions
+	List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(
+			List<List<IntervalSeq*>*> *intervalSeqLists,
+			std::vector<IntervalSeq*> *constructionInProgress);
 };
 
 #endif /* INTERVAL_H_ */
