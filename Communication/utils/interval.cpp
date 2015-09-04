@@ -350,13 +350,24 @@ List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::computeIntersec
 		dimensionalIntersects->Append(intersect);
 	}
 	vector<IntervalSeq*> *constructionVector = new vector<IntervalSeq*>;
-	List<MultidimensionalIntervalSeq*> *intersect = generateIntervalsFromList(dimensionalIntersects, constructionVector);
+	List<MultidimensionalIntervalSeq*> *intersect =
+			MultidimensionalIntervalSeq::generateIntervalsFromList(dimensionality,
+					dimensionalIntersects, constructionVector);
 	delete constructionVector;
 	delete dimensionalIntersects;
 	return intersect;
 }
 
-List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::generateIntervalsFromList(
+List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::generateIntervalSeqs(int dimensionality,
+		List<List<IntervalSeq*>*> *intervalSeqLists) {
+	vector<IntervalSeq*> *constructionVector = new vector<IntervalSeq*>;
+	List<MultidimensionalIntervalSeq*> *mdIntervalSeqList =
+			generateIntervalsFromList(dimensionality, intervalSeqLists, constructionVector);
+	delete constructionVector;
+	return mdIntervalSeqList;
+}
+
+List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::generateIntervalsFromList(int dimensionality,
 		List<List<IntervalSeq*>*> *intervalSeqLists,
 		std::vector<IntervalSeq*> *constructionInProgress) {
 
@@ -368,7 +379,7 @@ List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::generateInterva
 		constructionInProgress->push_back(sequence);
 		if (position < dimensionality - 1) {
 			List<MultidimensionalIntervalSeq*> *resultPart =
-					generateIntervalsFromList(intervalSeqLists, constructionInProgress);
+					generateIntervalsFromList(dimensionality, intervalSeqLists, constructionInProgress);
 			result->AppendAll(resultPart);
 			delete resultPart;
 		} else {

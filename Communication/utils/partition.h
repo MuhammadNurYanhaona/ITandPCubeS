@@ -17,15 +17,29 @@ protected:
 	int partsCount;
 	PartitionInstr *prevInstr;
 	bool reorderIndex;
+	bool hasPadding;
+	// an attribute to use at runtime to enable/disable padding when calculating the interval description for a range
+	// hierarchy representing a folding of parts in a part-container.
+	bool excludePaddingInIntervalCalculation;
 public:
 	PartitionInstr(const char *n, Dimension pd, int id, int count, bool r);
 	virtual ~PartitionInstr() {}
 	void setPrevInstr(PartitionInstr *prevInstr) { this->prevInstr = prevInstr; }
 	void setPartId(int partId) { this->partId = partId; }
 	bool doesReorderIndex() { return reorderIndex; }
+	void setExcludePaddingFlag(bool stat) { excludePaddingInIntervalCalculation = stat; }
+	PartitionInstr *getPreviousInstr() { return prevInstr; }
+	int getPartsCount() { return partsCount; }
+
 	void drawIntervals();
 	List<IntervalSeq*> *getTrueIntervalDesc();
 	void drawTrueIntervalDesc(Dimension dimension, int labelGap);
+
+	// two functions to determine if an interval range completely consumes all indices of the parent's dimension this
+	// partition function subdivides
+	bool isFilledDimension(Range idRange);
+	bool isFilledDimension(Range idRange, Dimension dimension);
+
 	virtual Dimension getDimension() = 0;
 	virtual List<IntervalSeq*> *getIntervalDesc() = 0;
 	virtual void getIntervalDesc(List<IntervalSeq*> *descInConstruct);
@@ -37,24 +51,32 @@ public:
 class BlockSizeInstr : public PartitionInstr {
 protected:
 	int size;
+	int frontPadding;
+	int rearPadding;
 public:
 	BlockSizeInstr(Dimension pd, int id, int size);
 	Dimension getDimension();
 	List<IntervalSeq*> *getIntervalDesc();
+	void setPadding(int frontPadding, int rearPadding);
 	int calculatePartsCount(Dimension dimension, bool updateProperties);
 	List<IntervalSeq*> *getIntervalDescForRange(Range idRange);
+	IntervalSeq *getPaddinglessIntervalForRange(Range idRange);
 	void getIntervalDescForRangeHierarchy(List<Range> *rangeList, List<IntervalSeq*> *descInConstruct);
 };
 
 class BlockCountInstr : public PartitionInstr {
 protected:
 	int count;
+	int frontPadding;
+	int rearPadding;
 public:
 	BlockCountInstr(Dimension pd, int id, int count);
 	Dimension getDimension();
 	List<IntervalSeq*> *getIntervalDesc();
+	void setPadding(int frontPadding, int rearPadding);
 	int calculatePartsCount(Dimension dimension, bool updateProperties);
 	List<IntervalSeq*> *getIntervalDescForRange(Range idRange);
+	IntervalSeq *getPaddinglessIntervalForRange(Range idRange);
 	void getIntervalDescForRangeHierarchy(List<Range> *rangeList, List<IntervalSeq*> *descInConstruct);
 };
 

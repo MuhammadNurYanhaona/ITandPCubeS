@@ -18,6 +18,8 @@ PartitionInstr::PartitionInstr(const char *n, Dimension pd, int id, int count, b
 	partsCount = count;
 	reorderIndex = r;
 	prevInstr = NULL;
+	hasPadding = false;
+	excludePaddingInIntervalCalculation = false;
 }
 
 List<IntervalSeq*> *PartitionInstr::getTrueIntervalDesc() {
@@ -68,6 +70,15 @@ void PartitionInstr::drawIntervals() {
 	drawingLine->draw();
 }
 
+bool PartitionInstr::isFilledDimension(Range idRange) {
+	return partsCount == (idRange.max - idRange.min + 1);
+}
+
+bool PartitionInstr::isFilledDimension(Range idRange, Dimension dimension) {
+	int count = calculatePartsCount(dimension, false);
+	return count == (idRange.max - idRange.min + 1);
+}
+
 //------------------------------------------------------ Block Size ------------------------------------------------------
 
 BlockSizeInstr::BlockSizeInstr(Dimension pd, int id, int size)
@@ -75,6 +86,16 @@ BlockSizeInstr::BlockSizeInstr(Dimension pd, int id, int size)
 	int dimLength = pd.length;
 	this->partsCount = (dimLength + size - 1) / size;
 	this->size = size;
+	frontPadding = 0;
+	rearPadding = 0;
+}
+
+void BlockSizeInstr::setPadding(int frontPadding, int rearPadding) {
+	this->frontPadding = frontPadding;
+	this->rearPadding = rearPadding;
+	if (frontPadding > 0 || rearPadding > 0) {
+		hasPadding = true;
+	}
 }
 
 Dimension BlockSizeInstr::getDimension() {
@@ -82,9 +103,10 @@ Dimension BlockSizeInstr::getDimension() {
 	int remaining = parentDim.range.max - begin + 1;
 	int intervalLength = (remaining >= size) ? size : remaining;
 	Dimension partDimension;
-	partDimension.range.min = begin;
-	partDimension.range.max = begin + intervalLength - 1;
-	partDimension.length = intervalLength;
+	partDimension.range.min = max(begin - frontPadding, parentDim.range.min);
+	int end = begin + intervalLength - 1;
+	partDimension.range.max = min(end + rearPadding, parentDim.range.max);
+	partDimension.setLength();
 	return partDimension;
 }
 
@@ -126,37 +148,73 @@ List<IntervalSeq*> *BlockSizeInstr::getIntervalDescForRange(Range idRange) {
 	return list;
 }
 
+IntervalSeq *BlockSizeInstr::getPaddinglessIntervalForRange(Range idRange) {
+	int begin = parentDim.range.min + idRange.min * size;
+	int supposedLength = (idRange.max - idRange.min + 1) * size;
+	int remaining = parentDim.range.max - begin + 1;
+	int intervalLength = (remaining >= supposedLength) ? supposedLength : remaining;
+	return new IntervalSeq(begin, intervalLength, intervalLength, 1);
+}
+
 void BlockSizeInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, List<IntervalSeq*> *descInConstruct) {
 	Range idRange = rangeList->Nth(rangeList->NumElements() - 1);
 	if (descInConstruct->NumElements() == 0) {
-		List<IntervalSeq*> *myIntervalList = getIntervalDescForRange(idRange);
-		descInConstruct->AppendAll(myIntervalList);
-		delete myIntervalList;
-	} else if (idRange.max > idRange.min) {
-		List<IntervalSeq*> *updatedList = new List<IntervalSeq*>;
-		int iterationCount = idRange.max - idRange.min + 1;
-		int partId = this->partId;
-		this->partId = idRange.min;
-		int period = getDimension().length;
-		for (int i = 0; i < descInConstruct->NumElements(); i++) {
-			IntervalSeq *subInterval = descInConstruct->Nth(i);
-			if (subInterval->count == 1) {
-				subInterval->count = iterationCount;
-				subInterval->period = period;
-				updatedList->Append(subInterval);
-			} else {
-				for (int j = 0; j < subInterval->count; j++) {
-					int newBegin = subInterval->begin + subInterval->period * j;
-					IntervalSeq *newInterval = new IntervalSeq(newBegin, subInterval->length, period, iterationCount);
-					updatedList->Append(newInterval);
+		if (excludePaddingInIntervalCalculation) {
+			descInConstruct->Append(getPaddinglessIntervalForRange(idRange));
+		} else {
+			List<IntervalSeq*> *myIntervalList = getIntervalDescForRange(idRange);
+			descInConstruct->AppendAll(myIntervalList);
+			delete myIntervalList;
+		}
+	} else {
+		// the lower level interval description can directly be used if the id range at this level contains a single entry
+		if (idRange.max > idRange.min) {
+			List<IntervalSeq*> *updatedList = new List<IntervalSeq*>;
+			int iterationCount = idRange.max - idRange.min + 1;
+			int partId = this->partId;
+			this->partId = idRange.min;
+			int period = getDimension().length;
+			for (int i = 0; i < descInConstruct->NumElements(); i++) {
+				IntervalSeq *subInterval = descInConstruct->Nth(i);
+				// updating the existing sub-interval to iterate multiple times
+				if (subInterval->count == 1) {
+					subInterval->count = iterationCount;
+					subInterval->period = period;
+					updatedList->Append(subInterval);
+				// generating new smaller intervals for each iteration of the sub-interval
+				} else {
+					for (int j = 0; j < subInterval->count; j++) {
+						int newBegin = subInterval->begin + subInterval->period * j;
+						IntervalSeq *newInterval = new IntervalSeq(newBegin, subInterval->length, period, iterationCount);
+						updatedList->Append(newInterval);
+					}
+				}
+			}
+			this->partId = partId;
+			descInConstruct->clear();
+			descInConstruct->AppendAll(updatedList);
+			delete updatedList;
+		}
+
+		// If this partition instruction involves paddings and directions have been given to exclude its padding during
+		// interval description for range calculation then a simple way to eliminate padding is to intersect the padding-
+		// less interval sequence at this level with the descriptions received from lower levels. Any unwanted padding
+		// region included in the lower level calculation will then be chopped off by the intersection.
+		if (hasPadding && excludePaddingInIntervalCalculation) {
+			IntervalSeq *myInterval = getPaddinglessIntervalForRange(idRange);
+			List<IntervalSeq*> *originalList = new List<IntervalSeq*>;
+			originalList->AppendAll(descInConstruct);
+			descInConstruct->clear();
+			for (int i = 0; i < originalList->NumElements(); i++) {
+				IntervalSeq *seq = originalList->Nth(i);
+				List<IntervalSeq*> *intersect = myInterval->computeIntersection(seq);
+				if (intersect != NULL) {
+					descInConstruct->AppendAll(intersect);
 				}
 			}
 		}
-		this->partId = partId;
-		descInConstruct->clear();
-		descInConstruct->AppendAll(updatedList);
-		delete updatedList;
 	}
+
 	rangeList->RemoveAt(rangeList->NumElements() - 1);
 	if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
 }
@@ -168,6 +226,16 @@ BlockCountInstr::BlockCountInstr(Dimension pd, int id, int count)
 	int length = pd.length;
 	this->partsCount = max(1, min(count, length));
 	this->count = count;
+	frontPadding = 0;
+	rearPadding = 0;
+}
+
+void BlockCountInstr::setPadding(int frontPadding, int rearPadding) {
+	this->frontPadding = frontPadding;
+	this->rearPadding = rearPadding;
+	if (frontPadding > 0 || rearPadding > 0) {
+		hasPadding = true;
+	}
 }
 
 Dimension BlockCountInstr::getDimension() {
@@ -175,9 +243,10 @@ Dimension BlockCountInstr::getDimension() {
 	int begin = partId * size;
 	int length = (partId < count - 1) ? size : parentDim.range.max - begin + 1;
 	Dimension partDimension;
-	partDimension.range.min = begin;
-	partDimension.range.max = begin + length - 1;
-	partDimension.length = length;
+	partDimension.range.min = max(begin - frontPadding, parentDim.range.min);
+	int end = begin + length - 1;
+	partDimension.range.max = min(end + rearPadding, parentDim.range.max);
+	partDimension.setLength();
 	return partDimension;
 }
 
@@ -219,39 +288,73 @@ List<IntervalSeq*> *BlockCountInstr::getIntervalDescForRange(Range idRange) {
 	return list;
 }
 
+IntervalSeq *BlockCountInstr::getPaddinglessIntervalForRange(Range idRange) {
+	int size = parentDim.length / count;
+	int begin = idRange.min * size;
+	int length = (idRange.max < count - 1)
+			? size * (idRange.max - idRange.min + 1) : parentDim.range.max - begin + 1;
+	return new IntervalSeq(begin, length, length, 1);
+}
+
 void BlockCountInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, List<IntervalSeq*> *descInConstruct) {
 	Range idRange = rangeList->Nth(rangeList->NumElements() - 1);
 	if (descInConstruct->NumElements() == 0) {
-		List<IntervalSeq*> *myIntervalList = getIntervalDescForRange(idRange);
-		descInConstruct->AppendAll(myIntervalList);
-		delete myIntervalList;
-	} else if (idRange.max > idRange.min) {
-		List<IntervalSeq*> *updatedList = new List<IntervalSeq*>;
-		int iterationCount = idRange.max - idRange.min + 1;
-		int partId = this->partId;
-		this->partId = idRange.min;
-		int period = getDimension().length;
-		this->partId = partId;
-		for (int i = 0; i < descInConstruct->NumElements(); i++) {
-			IntervalSeq *subInterval = descInConstruct->Nth(i);
-			// updating the existing sub-interval to iterate multiple times
-			if (subInterval->count == 1) {
-				subInterval->count = iterationCount;
-				subInterval->period = period;
-				updatedList->Append(subInterval);
-			// generating new smaller intervals for each iteration of the sub-interval
-			} else {
-				for (int j = 0; j < subInterval->count; j++) {
-					int newBegin = subInterval->begin + subInterval->period * j;
-					IntervalSeq *newInterval = new IntervalSeq(newBegin, subInterval->length, period, iterationCount);
-					updatedList->Append(newInterval);
+		if (excludePaddingInIntervalCalculation) {
+			descInConstruct->Append(getPaddinglessIntervalForRange(idRange));
+		} else {
+			List<IntervalSeq*> *myIntervalList = getIntervalDescForRange(idRange);
+			descInConstruct->AppendAll(myIntervalList);
+			delete myIntervalList;
+		}
+	} else {
+		// the lower level interval description can directly be used if the id range at this level contains a single entry
+		if (idRange.max > idRange.min) {
+			List<IntervalSeq*> *updatedList = new List<IntervalSeq*>;
+			int iterationCount = idRange.max - idRange.min + 1;
+			int partId = this->partId;
+			this->partId = idRange.min;
+			int period = getDimension().length;
+			this->partId = partId;
+			for (int i = 0; i < descInConstruct->NumElements(); i++) {
+				IntervalSeq *subInterval = descInConstruct->Nth(i);
+				// updating the existing sub-interval to iterate multiple times
+				if (subInterval->count == 1) {
+					subInterval->count = iterationCount;
+					subInterval->period = period;
+					updatedList->Append(subInterval);
+					// generating new smaller intervals for each iteration of the sub-interval
+				} else {
+					for (int j = 0; j < subInterval->count; j++) {
+						int newBegin = subInterval->begin + subInterval->period * j;
+						IntervalSeq *newInterval = new IntervalSeq(newBegin, subInterval->length, period, iterationCount);
+						updatedList->Append(newInterval);
+					}
+				}
+			}
+			descInConstruct->clear();
+			descInConstruct->AppendAll(updatedList);
+			delete updatedList;
+		}
+
+		// If this partition instruction involves paddings and directions have been given to exclude its padding during
+		// interval description for range calculation then a simple way to eliminate padding is to intersect the padding-
+		// less interval sequence at this level with the descriptions received from lower levels. Any unwanted padding
+		// region included in the lower level calculation will then be chopped off by the intersection.
+		if (hasPadding && excludePaddingInIntervalCalculation) {
+			IntervalSeq *myInterval = getPaddinglessIntervalForRange(idRange);
+			List<IntervalSeq*> *originalList = new List<IntervalSeq*>;
+			originalList->AppendAll(descInConstruct);
+			descInConstruct->clear();
+			for (int i = 0; i < originalList->NumElements(); i++) {
+				IntervalSeq *seq = originalList->Nth(i);
+				List<IntervalSeq*> *intersect = myInterval->computeIntersection(seq);
+				if (intersect != NULL) {
+					descInConstruct->AppendAll(intersect);
 				}
 			}
 		}
-		descInConstruct->clear();
-		descInConstruct->AppendAll(updatedList);
-		delete updatedList;
 	}
+
 	rangeList->RemoveAt(rangeList->NumElements() - 1);
 	if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
 }

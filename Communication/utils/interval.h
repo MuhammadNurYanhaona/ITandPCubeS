@@ -54,10 +54,13 @@ public:
 	List<MultidimensionalIntervalSeq*> *computeIntersection(MultidimensionalIntervalSeq *other);
 	bool isEqual(MultidimensionalIntervalSeq *other);
 	void draw();
+	// function to generate a list of multidimensional interval sequences as a cross-product of lists of
+	// one-dimensional interval sequences
+	static List<MultidimensionalIntervalSeq*> *generateIntervalSeqs(int dimensionality,
+			List<List<IntervalSeq*>*> *intervalSeqLists);
 private:
-	// a recursive helper routine used by the computeIntersection() function to generate multidimensional
-	// interval sequences for intersecting regions
-	List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(
+	// a recursive helper routine to generate multidimensional interval sequences
+	static List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(int dimensionality,
 			List<List<IntervalSeq*>*> *intervalSeqLists,
 			std::vector<IntervalSeq*> *constructionInProgress);
 };
