@@ -21,7 +21,7 @@ class PartIterator;
 // class to retain the data-dimension to LPS-dimension alignment information, and store data parts in that order, to 
 // counter that problem.  
 class DimConfig {
-  private:
+  protected:
 	int level;
 	int dimNo;
   public:
