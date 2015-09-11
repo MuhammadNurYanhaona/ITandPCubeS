@@ -110,6 +110,41 @@ void PartIdContainer::print(int indentLevel, std::ostream &stream) {
 	}
 }
 
+List<List<int*>*> *PartIdContainer::getAllPartIdsAtLevel(int levelNo,
+		int dataDimensions, List<int*> *partIdUnderConstruct, int previousLevel) {
+
+	if (levelNo != level) return NULL;
+	if (level != previousLevel) {
+		partIdUnderConstruct->Append(new int[dataDimensions]);
+	}
+
+	List<List<int*>*> *partIdList = new List<List<int*>*>;
+	int *lastLevelId = partIdUnderConstruct->Nth(partIdUnderConstruct->NumElements() - 1);
+	for (unsigned int i = 0; i < partArray.size(); i++) {
+		lastLevelId[dimNo] = partArray.at(i);
+
+		// note that here new part Ids have been generated afresh as the recursive process corrupts the
+		// partIdUnderConstruct list as it jumps from branch to branch in the part-hierarchy
+		List<int*> *partId = new List<int*>;
+		for (int l = 0; l < partIdUnderConstruct->NumElements(); l++) {
+			int *idAtLevel = partIdUnderConstruct->Nth(l);
+			int *newIdAtLevel = new int[dataDimensions];
+			for (int d = 0; d < dataDimensions; d++) {
+				newIdAtLevel[d] = idAtLevel[d];
+			}
+			partId->Append(newIdAtLevel);
+		}
+		partIdList->Append(partId);
+	}
+
+	if (level != previousLevel) {
+		delete[] lastLevelId;
+		partIdUnderConstruct->RemoveAt(partIdUnderConstruct->NumElements() - 1);
+	}
+
+	return partIdList;
+}
+
 //----------------------------------------------------------- Part Container ------------------------------------------------------------/
 
 PartContainer::~PartContainer() {
@@ -250,6 +285,44 @@ void PartListContainer::foldContainer(List<PartFolding*> *fold) {
 			fold->Append(contentFold);
 		}
 	}
+}
+
+List<List<int*>*> *PartListContainer::getAllPartIdsAtLevel(int levelNo, int dataDimensions,
+		List<int*> *partIdUnderConstruct, int previousLevel) {
+
+	List<List<int*>*> *partIdList = new List<List<int*>*>;
+	if (level == levelNo) {
+		PartIdContainer *sampleChild = nextLevelContainers.at(0);
+		if (sampleChild->getLevel() != levelNo) {
+			delete partIdList;
+			return PartIdContainer::getAllPartIdsAtLevel(levelNo, dataDimensions, partIdUnderConstruct, previousLevel);
+		}
+	}
+
+	if (level != previousLevel) {
+		partIdUnderConstruct->Append(new int[dataDimensions]);
+	}
+	int *lastIdLevel = partIdUnderConstruct->Nth(partIdUnderConstruct->NumElements() - 1);
+	for (unsigned int i = 0; i < partArray.size(); i++) {
+		lastIdLevel[dimNo] = partArray.at(i);
+		PartIdContainer *nextContainer = nextLevelContainers.at(i);
+		List<List<int*>*> *subList = nextContainer->getAllPartIdsAtLevel(levelNo,
+				dataDimensions, partIdUnderConstruct, level);
+		if (subList != NULL) {
+			partIdList->AppendAll(subList);
+			delete subList;
+		}
+	}
+	if (level != previousLevel) {
+		partIdUnderConstruct->RemoveAt(partIdUnderConstruct->NumElements() - 1);
+		delete[] lastIdLevel;
+	}
+
+	if (partIdList->NumElements() == 0) {
+		delete partIdList;
+		return NULL;
+	}
+	return partIdList;
 }
 
 //---------------------------------------------------------- Part Iterator --------------------------------------------------------------/

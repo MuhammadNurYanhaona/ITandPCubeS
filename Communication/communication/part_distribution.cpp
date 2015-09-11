@@ -8,6 +8,24 @@
 
 using namespace std;
 
+//--------------------------------------------- LPS Dimension Configuration --------------------------------------------------/
+
+LpsDimConfig::LpsDimConfig(int level, int dimNo, int lpsId) {
+	this->level = level;
+	this->dimNo = dimNo;
+	this->lpsId = lpsId;
+}
+
+bool LpsDimConfig::isEqual(LpsDimConfig other) {
+	return this->level == other.level
+			&& this->dimNo == other.dimNo
+			&& this->lpsId == other.lpsId;
+}
+
+void LpsDimConfig::print(int indentLevel, std::ostream &stream) {
+	stream << "LPS: " << lpsId << " Level: " << level << " Dimension: " << dimNo << "\n";
+}
+
 //------------------------------------------------------- Container ----------------------------------------------------------/
 
 Container::Container(int id, LpsDimConfig config) {
@@ -73,6 +91,17 @@ bool Container::hasSegmentTag(int tag) {
 	return (location != KEY_NOT_FOUND);
 }
 
+void Container::print(int indentLevel, std::ostream &stream) {
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "Container ID: " << id << "\n";
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "Segment Tags: ";
+	for (unsigned int i = 0; i < segmentTags.size(); i++) {
+		stream << segmentTags.at(i) << ", ";
+	}
+	stream << "\n";
+}
+
 PartFolding *Container::foldContainerForSegment(int segmentTag, std::vector<LpsDimConfig> dimOrder, bool foldBack) {
 	if (!hasSegmentTag(segmentTag)) return NULL;
 	if (foldBack) return foldBackContainer(NULL);
@@ -98,7 +127,7 @@ Branch::Branch(LpsDimConfig branchConfig, Container *firstEntry) {
 	this->branchConfig = branchConfig;
 	descendants = vector<Container*>();
 	descendants.push_back(firstEntry);
-	descendentIds.push_back(firstEntry->getId());
+	descendantIds.push_back(firstEntry->getId());
 }
 
 Branch::~Branch() {
@@ -111,13 +140,13 @@ Branch::~Branch() {
 
 void Branch::addEntry(Container *descendant) {
 	int key = descendant->getId();
-	int location = binsearch::locatePointOfInsert(descendentIds, key);
+	int location = binsearch::locatePointOfInsert(descendantIds, key);
 	descendants.insert(descendants.begin() + location, descendant);
-	descendentIds.insert(descendentIds.begin() + location, key);
+	descendantIds.insert(descendantIds.begin() + location, key);
 }
 
 Container *Branch::getEntry(int id) {
-	int location = binsearch::locateKey(descendentIds, id);
+	int location = binsearch::locateKey(descendantIds, id);
 	if (location != KEY_NOT_FOUND) {
 		return descendants.at(location);
 	}
@@ -137,9 +166,24 @@ List<Container*> *Branch::getContainersForSegment(int segmentTag) {
 
 void Branch::replaceDescendant(Container *descendant) {
 	int descendantId = descendant->getId();
-	int location = binsearch::locateKey(descendentIds, descendantId);
+	int location = binsearch::locateKey(descendantIds, descendantId);
 	descendants.erase(descendants.begin() + location);
 	descendants.insert(descendants.begin() + location, descendant);
+}
+
+void Branch::print(int indentLevel, std::ostream &stream) {
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "Branch Configuration: ";
+	branchConfig.print(0, stream);
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "Containers on Branch: ";
+	for (unsigned int i = 0; i < descendantIds.size(); i++) {
+		stream << descendantIds.at(i) << ", ";
+	}
+	stream << "\n";
+	for (unsigned int i = 0; i < descendants.size(); i++) {
+		descendants.at(i)->print(indentLevel + 1, stream);
+	}
 }
 
 //--------------------------------------------------- Branching Container ----------------------------------------------------/
@@ -161,6 +205,13 @@ Branch *BranchingContainer::getBranch(int lpsId) {
 		}
 	}
 	return NULL;
+}
+
+void BranchingContainer::print(int indentLevel, std::ostream &stream) {
+	Container::print(indentLevel, stream);
+	for (int i = 0; i < branches->NumElements(); i++) {
+		branches->Nth(i)->print(indentLevel + 1, stream);
+	}
 }
 
 void BranchingContainer::insertPart(vector<LpsDimConfig> dimOrder, int segmentTag, List<int*> *partId, int position) {
@@ -317,6 +368,25 @@ void BranchingContainer::foldContainer(int segmentTag,
 }
 
 //----------------------------------------------- Hybrid Branching Container -------------------------------------------------/
+
+HybridBranchingContainer::HybridBranchingContainer(BranchingContainer *branch, Container *leaf)
+	: BranchingContainer(branch->getId(), branch->getConfig()) {
+	this->leaf = leaf;
+	this->segmentTags = branch->getSegmentTags();
+	this->parent = branch->getParent();
+	this->branches = branch->getBranches();
+}
+
+void HybridBranchingContainer::print(int indentLevel, std::ostream &stream) {
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "Hybrid Container:\n";
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "Leaf Configuration:\n";
+	leaf->print(indentLevel + 1, stream);
+	for (int i = 0; i < indentLevel; i++) stream << '\t';
+	stream << "Intermediate Configuration:\n";
+	BranchingContainer::print(indentLevel + 1, stream);
+}
 
 HybridBranchingContainer *HybridBranchingContainer::convertLeaf(Container *leafContainer, int branchSegmentTag) {
 

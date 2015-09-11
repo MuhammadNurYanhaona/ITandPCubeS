@@ -15,6 +15,7 @@
 #include "../part-management/part_folding.h"
 #include <vector>
 #include <cstdlib>
+#include <iostream>
 
 /* The dim-configuration class used to tag each part-container level in the part-tracking hierarchy is not sufficient when
  * we have a graph combining parts from independent hierarchies. So this extension is provided to include the LPS ID along
@@ -26,22 +27,13 @@ protected:
 	int dimNo;
 	int lpsId;
 public:
-	LpsDimConfig() {
-		level = dimNo = lpsId = -1;
-	}
-	LpsDimConfig(int level, int dimNo, int lpsId) {
-		this->level = level;
-		this->dimNo = dimNo;
-		this->lpsId = lpsId;
-	}
+	LpsDimConfig() { level = dimNo = lpsId = -1; }
+	LpsDimConfig(int level, int dimNo, int lpsId);
 	inline int getLevel() { return level; }
 	inline int getDimNo() { return dimNo; }
 	inline int getLpsId() { return lpsId; }
-	bool isEqual(LpsDimConfig other) {
-		return this->level == other.level
-				&& this->dimNo == other.dimNo
-				&& this->lpsId == other.lpsId;
-	}
+	bool isEqual(LpsDimConfig other);
+	void print(int indentLevel, std::ostream &stream);
 };
 
 /* A container represents a leaf level entry or a part that may belong to one or more segments. The part ID at the position
@@ -70,6 +62,7 @@ public:
 	int getId() { return id; }
 	LpsDimConfig getConfig() { return config; }
 	bool hasSegmentTag(int tag);
+	virtual void print(int indentLevel, std::ostream &stream);
 
 	// recreates the (possibly multidimensional) hierarchical ID of the part represented by this container
 	std::vector<int*> *getPartId(int dataDimensions);
@@ -94,12 +87,14 @@ protected:
 	// list of next level containers along a particular LPS branch
 	std::vector<Container*> descendants;
 	// the IDs of the descendants are maintained in an ordered manner to quickly search and identify a particular descendant
-	std::vector<int> descendentIds;
+	std::vector<int> descendantIds;
 public:
 	Branch(LpsDimConfig branchConfig, Container *firstEntry);
 	~Branch();
 	LpsDimConfig getConfig() { return branchConfig; }
 	void addEntry(Container *descendant);
+	void print(int indentLevel, std::ostream &stream);
+
 	// returns the container with an specific Id on the branch if exists; otherwise returns NULL
 	Container *getEntry(int id);
 	// returns all containers that have a particular segment tag
@@ -120,6 +115,7 @@ public:
 	virtual ~BranchingContainer();
 	Branch *getBranch(int lpsId);
 	List<Branch*> *getBranches() { return branches;}
+	virtual void print(int indentLevel, std::ostream &stream);
 
 	// This is the interface to use to populate the branching hierarchy for a data parts; it creates new branches as needed,
 	// deposits new segment token in already created containers along a part's path, and create a new leaf level container to
@@ -171,13 +167,8 @@ protected:
 	// the container to represent leaf level instance a.k.a a part
 	Container *leaf;
 public:
-	HybridBranchingContainer(BranchingContainer *branch, Container *leaf)
-		: BranchingContainer(branch->getId(), branch->getConfig()) {
-		this->leaf = leaf;
-		this->segmentTags = branch->getSegmentTags();
-		this->parent = branch->getParent();
-		this->branches = branch->getBranches();
-	}
+	HybridBranchingContainer(BranchingContainer *branch, Container *leaf);
+	void print(int indentLevel, std::ostream &stream);
 
 	// During the part hierarchy construction process a hybrid-branching-container will always be created from an existing leaf
 	// level container or an intermediate branching container. So two static functions have been provided for the conversion and

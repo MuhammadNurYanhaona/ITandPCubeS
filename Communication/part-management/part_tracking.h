@@ -58,6 +58,7 @@ class PartIdContainer {
   public:
 	PartIdContainer(DimConfig dimConfig);
 	virtual ~PartIdContainer() {}
+	int getLevel() { return level; }
 	// returns the index within the part array where the next container/data-part for a certain part Id may be 
 	// found; returns key-not-found if the part-id does not match
 	int getCurrentLevelPartIndex(List<int*> *partId);
@@ -88,6 +89,14 @@ class PartIdContainer {
 	// function to be implemented by sub-classes so that a concrete description of the parts content of a segment
 	// can be generated
 	virtual void foldContainer(List<PartFolding*> *fold) = 0;
+
+	// generates the part-IDs that lead to all containers that the part-hierarchy contains at a particular level,
+	// which corresponds to some intermediate LPS or the terminal LPS the parts of this hierarchy elements of; this
+	// will be used to locate the confinement groups of communication (each partId represents a separate confinement
+	// group) that will be later used in the part-distribution library for determining the details of communication.
+	// The last two parameters here are used to control the recursive part generation process.
+	virtual List<List<int*>*> *getAllPartIdsAtLevel(int levelNo,
+			int dataDimensions, List<int*> *partIdUnderConstruct = new List<int*>, int previousLevel = -1);
 };
 
 // this is the leaf level container that holds the actual parts of a data structure
@@ -125,6 +134,8 @@ class PartListContainer : public PartIdContainer {
 	PartIdContainer *getNestedContainerAtIndex(int index) { return nextLevelContainers[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
 	void foldContainer(List<PartFolding*> *fold);
+	List<List<int*>*> *getAllPartIdsAtLevel(int levelNo, int dataDimensions,
+			List<int*> *partIdUnderConstruct = new List<int*>, int previousLevel = -1);
 };
 
 // a supplementary class to gather information about Part-Iterator's (look at below) efficiency in locating objects
