@@ -40,7 +40,7 @@ public:
 	bool isFilledDimension(Range idRange);
 	bool isFilledDimension(Range idRange, Dimension dimension);
 
-	virtual Dimension getDimension() = 0;
+	virtual Dimension getDimension(bool includePadding=true) = 0;
 	virtual List<IntervalSeq*> *getIntervalDesc() = 0;
 	virtual void getIntervalDesc(List<IntervalSeq*> *descInConstruct);
 	virtual int calculatePartsCount(Dimension dimension, bool updateProperties) = 0;
@@ -55,7 +55,7 @@ protected:
 	int rearPadding;
 public:
 	BlockSizeInstr(Dimension pd, int id, int size);
-	Dimension getDimension();
+	Dimension getDimension(bool includePadding=true);
 	List<IntervalSeq*> *getIntervalDesc();
 	void setPadding(int frontPadding, int rearPadding);
 	int calculatePartsCount(Dimension dimension, bool updateProperties);
@@ -71,7 +71,7 @@ protected:
 	int rearPadding;
 public:
 	BlockCountInstr(Dimension pd, int id, int count);
-	Dimension getDimension();
+	Dimension getDimension(bool includePadding=true);
 	List<IntervalSeq*> *getIntervalDesc();
 	void setPadding(int frontPadding, int rearPadding);
 	int calculatePartsCount(Dimension dimension, bool updateProperties);
@@ -85,7 +85,7 @@ private:
 	int ppuCount;
 public:
 	StrideInstr(Dimension pd, int id, int ppuCount);
-	Dimension getDimension();
+	Dimension getDimension(bool includePadding=true);
 	List<IntervalSeq*> *getIntervalDesc();
 	void getIntervalDesc(List<IntervalSeq*> *descInConstruct);
 	int calculatePartsCount(Dimension dimension, bool updateProperties);
@@ -99,7 +99,7 @@ private:
 	int ppuCount;
 public:
 	BlockStrideInstr(Dimension pd, int id, int ppuCount, int size);
-	Dimension getDimension();
+	Dimension getDimension(bool includePadding=true);
 	List<IntervalSeq*> *getIntervalDesc();
 	void getIntervalDesc(List<IntervalSeq*> *descInConstruct);
 	int calculatePartsCount(Dimension dimension, bool updateProperties);

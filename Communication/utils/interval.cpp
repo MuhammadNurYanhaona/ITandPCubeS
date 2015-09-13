@@ -2,6 +2,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <algorithm>
+#include <math.h>
 #include "list.h"
 #include "../structure.h"
 #include "interval.h"
@@ -203,16 +204,17 @@ List<IntervalSeq*> *IntervalSeq::computeIntersection(IntervalSeq *other) {
 
 	// take care of the common terminal case where one of the interval sequences iterates just once
 	if (c1 == 1) {
+
 		// describe the partial overlapping between the two interval beginnings, if exists
 		if (bi2 < bi1 && bi2 + l2 > bi1) {
-			int overlapLength = bi2 + l2 - bi1;
+			int overlapLength = min(bi2 + l2, bi1 + l1) - bi1;
 			IntervalSeq *startingOverlap = new IntervalSeq(bi1, overlapLength, overlapLength, 1);
 			intersect->Append(startingOverlap);
 		}
 
-		// describe iterations the second sequence that complete within the confinement of the first
+		// describe iterations of the second sequence that complete within the confinement of the first
 		int fullIntervalStart = (bi2 >= bi1) ? i2 : i2 + 1;
-		int fullIntervalEnd = min((e1 - (b2 + l2 - 1)) / p2, c2 - 1);
+		int fullIntervalEnd = min((int) floor((e1 - (b2 + l2 - 1)) * 1.0 / p2), c2 - 1);
 		int intervalCount = max(fullIntervalEnd - fullIntervalStart + 1, 0);
 		if (intervalCount > 0) {
 			int begin = fullIntervalStart * p2 + b2;
