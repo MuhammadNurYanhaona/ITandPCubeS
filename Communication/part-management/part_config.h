@@ -5,15 +5,20 @@
 #include "../utils/partition.h"
 #include "../structure.h"
 
+class LpsDimConfig;
+
 // the class that represents the partition configuration for a data structure on a single LPS
 class PartitionConfig {
 private:
 	int dimensions;
 	std::vector<PartitionInstr*> instructions;
+	int lpsId;
 public:
 	PartitionConfig(int dimensions);
 	void setInstruction(int dimNo, PartitionInstr *instruction);
 	PartitionInstr *getInstruction(int dimNo);
+	void setLpsId(int lpsId) { this->lpsId = lpsId; }
+	int getLpsId() { return lpsId; }
 };
 
 // the class that represents the hierarchical partition configuration that leads to the data parts for any LPS
@@ -30,6 +35,9 @@ public:
 	void setPartitionInstr(int levelNo, int dimNo, PartitionInstr *instruction);
 	PartitionInstr *getInstruction(int levelNo, int dimNo);
 	int getDimensionality() { return dimensions; }
+	void setLpsIdOfLevel(int levelNo, int lpsId) { partitionConfigs[levelNo]->setLpsId(lpsId); }
+	int getLevels() { return levels; }
+	PartitionConfig *getConfigForLevel(int levelNo) { return partitionConfigs.at(levelNo); }
 
 	// parent links should be set appropriately in all partition instructions to be able to generate proper interval
 	// descriptions for data parts; this is also important to determine the dimension boundaries at any level in the
@@ -43,6 +51,11 @@ public:
 	// be done correctly in any descendant level.
 	void adjustDimensionAndPartsCountAtLevel(int levelNo, int dimNo);
 	void setPartIdAtLevel(int levelNo, int dimNo, int partId);
+
+	// To be able to traverse part-distribution-tree (a construct used for communication) we need to know how the
+	// partitioned dimensions of a data structure have been ordered in that tree. This function generates the order
+	// vector that is followed when constructing that tree.
+	std::vector<LpsDimConfig> *generateDimOrderVector();
 };
 
 #endif /* PART_CONFIG_H_ */

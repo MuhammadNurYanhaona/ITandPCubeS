@@ -1,5 +1,7 @@
 #include "part_config.h"
 #include "../utils/partition.h"
+#include "../utils/binary_search.h"
+#include "../communication/part_distribution.h"
 #include "../structure.h"
 #include <iostream>
 #include <vector>
@@ -15,6 +17,7 @@ PartitionConfig::PartitionConfig(int dimensions) {
 	for (int i = 0; i < dimensions; i++) {
 		instructions.push_back(NULL);
 	}
+	lpsId = -1;
 }
 
 void PartitionConfig::setInstruction(int dimNo, PartitionInstr *instruction) {
@@ -86,4 +89,23 @@ void DataItemConfig::setPartIdAtLevel(int levelNo, int dimNo, int partId) {
 	PartitionConfig *currentConfig = partitionConfigs[levelNo];
 	PartitionInstr *instr = currentConfig->getInstruction(dimNo);
 	instr->setPartId(partId);
+}
+
+vector<LpsDimConfig> *DataItemConfig::generateDimOrderVector() {
+	vector<LpsDimConfig> *dimOrderVector = new vector<LpsDimConfig>;
+	for (int levelNo = 0; levelNo < levels; levelNo++) {
+		PartitionConfig *currentConfig = partitionConfigs[levelNo];
+		vector<int> instrOrder;
+		int dimensionality = dataDimensions.size();
+		for (int dimNo = 0; dimNo < dimensionality; dimNo++) {
+			PartitionInstr *instr = currentConfig->getInstruction(dimNo);
+			int priority = instr->getPriorityOrder();
+			int location = binsearch::locatePointOfInsert(instrOrder, priority);
+			instrOrder.insert(instrOrder.begin() + location, priority);
+			int configLocation = levelNo * dimensionality + location;
+			dimOrderVector->insert(dimOrderVector->begin() + configLocation,
+					LpsDimConfig(levelNo, dimNo, currentConfig->getLpsId()));
+		}
+	}
+	return dimOrderVector;
 }

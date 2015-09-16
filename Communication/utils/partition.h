@@ -18,9 +18,14 @@ protected:
 	PartitionInstr *prevInstr;
 	bool reorderIndex;
 	bool hasPadding;
+
 	// an attribute to use at runtime to enable/disable padding when calculating the interval description for a range
 	// hierarchy representing a folding of parts in a part-container.
 	bool excludePaddingInIntervalCalculation;
+
+	// this attribute is used to determine the order of partition instructions for a multidimensional data partition;
+	// it is by itself not important for the proper functioning of this class
+	int priorityOrder;
 public:
 	PartitionInstr(const char *n, Dimension pd, int id, int count, bool r);
 	virtual ~PartitionInstr() {}
@@ -30,6 +35,8 @@ public:
 	void setExcludePaddingFlag(bool stat) { excludePaddingInIntervalCalculation = stat; }
 	PartitionInstr *getPreviousInstr() { return prevInstr; }
 	int getPartsCount() { return partsCount; }
+	void setPriorityOrder(int priorityOrder) { this->priorityOrder = priorityOrder; }
+	int getPriorityOrder() {return priorityOrder; }
 
 	void drawIntervals();
 	List<IntervalSeq*> *getTrueIntervalDesc();

@@ -21,16 +21,12 @@
  * we have a graph combining parts from independent hierarchies. So this extension is provided to include the LPS ID along
  * with the level and dimension numbers used earlier.
  * */
-class LpsDimConfig {
+class LpsDimConfig : public DimConfig {
 protected:
-	int level;
-	int dimNo;
 	int lpsId;
 public:
-	LpsDimConfig() { level = dimNo = lpsId = -1; }
+	LpsDimConfig();
 	LpsDimConfig(int level, int dimNo, int lpsId);
-	inline int getLevel() { return level; }
-	inline int getDimNo() { return dimNo; }
 	inline int getLpsId() { return lpsId; }
 	bool isEqual(LpsDimConfig other);
 	void print(int indentLevel, std::ostream &stream);
@@ -94,6 +90,7 @@ public:
 	LpsDimConfig getConfig() { return branchConfig; }
 	void addEntry(Container *descendant);
 	void print(int indentLevel, std::ostream &stream);
+	List<Container*> *getContainerList();
 
 	// returns the container with an specific Id on the branch if exists; otherwise returns NULL
 	Container *getEntry(int id);
@@ -129,9 +126,11 @@ public:
 	Container *getContainer(List<int*> *containerPath, std::vector<LpsDimConfig> dimOrder, int position = 0);
 
 	// This returns all the descendant containers that belongs to a particular segment (indicated by the segment tag) that are
-	// below the sub-tree rooted at the current container. Note that for a multi-dimensional LPS, the containers here are all
-	// that are at the lowest level in the part hierarchy. To explain this with an example, consider the current container is
-	// at Space A and a 2D Space B divides A. Then the part hierarchy rooted at the current container may look like as follows
+	// below the sub-tree rooted at the current container. Alternatively, it returns all descendant containers regardless of
+	// their segment tags if the third argument is specified as false. Note that for a multi-dimensional LPS, the containers
+	// here are all that are at the lowest level in the part hierarchy. To explain this with an example, consider the current
+	// container is at Space A and a 2D Space B divides A. Then the part hierarchy rooted at the current container may look
+	// like as follows.
 	//	current Container
 	// 	|----Space-B:dim-1 [a set of containers]
 	// 		|-----Space-B:dim-2 [a set of containers under each container in the above]
@@ -139,7 +138,7 @@ public:
 	// return all Space-B:dim-2 containers underneath the current container that has a particular segment tag.
 	// Note that this function does not recursively goes down to find the container for the specified LPS, i.e., the lpsId
 	// should match one of the branches of the current container.
-	List<Container*> *listDescendantContainersForLps(int lpsId, int segmentTag);
+	List<Container*> *listDescendantContainersForLps(int lpsId, int segmentTag, bool segmentSpecific = true);
 
 	// This forms a compact data representation for the data parts for a particular segment that fall within the confinement of
 	// the sub-tree rooted at the current container. Note that if the dimOrder vector starts from a dimension and level higher

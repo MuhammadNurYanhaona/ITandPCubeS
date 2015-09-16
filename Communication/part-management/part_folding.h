@@ -44,6 +44,9 @@ public:
 	// levels; the first argument is there to restrict such pruning up to a specified level as sometimes there
 	// might be a need to keep a fold description expanded up to a minimum number of levels
 	void pruneFolding(int lowerLevelBound, DataItemConfig *dataConfig);
+
+	// generates an interval description as a list of multidimensional interval sequences for the entire fold
+	List<MultidimensionalIntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig);
 };
 
 // this class represents a single path in a part-folding; the path progresses bottom up; i.e., initial reference

@@ -20,6 +20,7 @@ PartitionInstr::PartitionInstr(const char *n, Dimension pd, int id, int count, b
 	prevInstr = NULL;
 	hasPadding = false;
 	excludePaddingInIntervalCalculation = false;
+	priorityOrder = 0;
 }
 
 List<IntervalSeq*> *PartitionInstr::getTrueIntervalDesc() {

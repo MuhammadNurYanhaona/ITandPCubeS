@@ -10,9 +10,11 @@ using namespace std;
 
 //--------------------------------------------- LPS Dimension Configuration --------------------------------------------------/
 
-LpsDimConfig::LpsDimConfig(int level, int dimNo, int lpsId) {
-	this->level = level;
-	this->dimNo = dimNo;
+LpsDimConfig::LpsDimConfig() : DimConfig(-1, -1) {
+	lpsId = -1;
+}
+
+LpsDimConfig::LpsDimConfig(int level, int dimNo, int lpsId) : DimConfig(level, dimNo) {
 	this->lpsId = lpsId;
 }
 
@@ -145,6 +147,14 @@ void Branch::addEntry(Container *descendant) {
 	descendantIds.insert(descendantIds.begin() + location, key);
 }
 
+List<Container*> *Branch::getContainerList() {
+	List<Container*> *containerList = new List<Container*>;
+	for (unsigned int i = 0; i < descendants.size(); i++) {
+		containerList->Append(descendants.at(i));
+	}
+	return containerList;
+}
+
 Container *Branch::getEntry(int id) {
 	int location = binsearch::locateKey(descendantIds, id);
 	if (location != KEY_NOT_FOUND) {
@@ -271,20 +281,29 @@ Container *BranchingContainer::getContainer(List<int*> *pathToContainer, vector<
 	return nextLevel->getContainer(pathToContainer, dimOrder, position + 1);
 }
 
-List<Container*> *BranchingContainer::listDescendantContainersForLps(int lpsId, int segmentTag) {
+List<Container*> *BranchingContainer::listDescendantContainersForLps(int lpsId, int segmentTag, bool segmentSpecific) {
+
 	List<Container*> *containerList = new List<Container*>;
 	Branch *branch = getBranch(lpsId);
 	if (branch == NULL) {
 		return containerList;
 	}
-	List<Container*> *containersOnBranch = branch->getContainersForSegment(segmentTag);
+
+	List<Container*> *containersOnBranch = NULL;
+	if (segmentSpecific) {
+		containersOnBranch = branch->getContainersForSegment(segmentTag);
+	} else {
+		containersOnBranch = branch->getContainerList();
+	}
+
 	for (int i = 0; i < containersOnBranch->NumElements(); i++) {
 		Container *nextContainer = containersOnBranch->Nth(i);
 		BranchingContainer *nextBranch = dynamic_cast<BranchingContainer*>(nextContainer);
 		if (nextBranch == NULL || nextBranch->getBranch(lpsId) == NULL) {
 			containerList->Append(nextContainer);
 		} else {
-			List<Container*> *nextBranchList = nextBranch->listDescendantContainersForLps(lpsId, segmentTag);
+			List<Container*> *nextBranchList =
+					nextBranch->listDescendantContainersForLps(lpsId, segmentTag, segmentSpecific);
 			containerList->AppendAll(nextBranchList);
 			delete nextBranchList;
 		}
