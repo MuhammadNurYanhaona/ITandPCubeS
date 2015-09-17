@@ -63,8 +63,10 @@ public:
 
 	int getSenderLps() { return senderLps; }
 	DataItemConfig *getSenderConfig() { return senderConfig; }
+	PartIdContainer *getSenderPartTree() { return senderPartTree; }
 	int getReceiverLps() { return receiverLps; }
 	DataItemConfig *getReceiverConfig() { return receiverConfig; }
+	PartIdContainer *getReceiverPartTree() { return receiverPartTree; }
 	int getDataDimensions() { return senderConfig->getDimensionality(); }
 	bool isRootConfinement(int rootLps) { return confinementLps == rootLps; }
 	BranchingContainer *getDistributionTree() { return partDistributionTree; }
@@ -94,10 +96,13 @@ public:
 	// then reconfigure sender and receiver paddings before generating interval descriptions for branches of a
 	// confinement based on demand of the situation.
 	void configurePaddingInPartitionConfigs();
-private:
-	// an auxiliary function to be used to construct sender and receiver LPS dimension order paths
+
+	// two auxiliary functions to be used to construct sender and receiver LPS dimension order paths
 	std::vector<LpsDimConfig> *forwardTruncatedDimVector(int truncateLevel,
 			std::vector<LpsDimConfig> *originalVector);
+	std::vector<LpsDimConfig> *backwardTruncatedDimVector(int truncateLevel,
+				std::vector<LpsDimConfig> *originalVector);
+private:
 	// an auxiliary function to be used for configuring padding in sender and receiver data configurations
 	void setPaddingThresholdInDataConfig(DataItemConfig *config, int thresholdLps);
 };
@@ -181,6 +186,7 @@ private:
 	BranchingContainer *confinementContainer;
 public:
 	Confinement(int dd, BranchingContainer *cC, ConfinementConstructionConfig *config);
+	BranchingContainer *getContainer() { return confinementContainer; }
 
 	// once a confinement is configured, this function returns information about all data movement requirements
 	// needed to synchronize the participants residing within the confinement
@@ -189,11 +195,13 @@ public:
 	// functions to use to get sender-receiver pair of a data exchange
 	Participant *getSender(int listIndex) { return senderList->Nth(listIndex); }
 	Participant *getReceiver(int listIndex) { return receiverList->Nth(listIndex); }
+
+	// this static utility method should be used to find and set up all confinement roots for a communication
+	static List<Confinement*> *generateAllConfinements(ConfinementConstructionConfig *config, int rootLps);
 private:
 	// a helper function to be used for generating the sender and receiver list of the confinement
 	List<Participant*> *generateParticipantList(List<Container*> *participantBranches,
 			CommRole role, std::vector<LpsDimConfig> pathOrder, DataItemConfig *dataConfig, int pruningLevel);
 };
-
 
 #endif /* CONFINEMENT_MGMT_H_ */

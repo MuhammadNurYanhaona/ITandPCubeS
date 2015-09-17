@@ -60,6 +60,16 @@ vector<LpsDimConfig> *ConfinementConstructionConfig::forwardTruncatedDimVector(i
 	return truncatedVector;
 }
 
+vector<LpsDimConfig> *ConfinementConstructionConfig::backwardTruncatedDimVector(int truncateLevel,
+		std::vector<LpsDimConfig> *originalVector) {
+	vector<LpsDimConfig> *truncatedVector = new vector<LpsDimConfig>;
+	unsigned int index = originalVector->size() - 1;
+	while (originalVector->at(index).getLevel() != truncateLevel) index--;
+	truncatedVector->insert(truncatedVector->begin(),
+			originalVector->begin(), originalVector->begin() + index);
+	return truncatedVector;
+}
+
 int ConfinementConstructionConfig::getConfinementLevel(vector<LpsDimConfig> *configVector) {
 	if (configVector == NULL) {
 		configVector = senderConfig->generateDimOrderVector();
@@ -346,4 +356,76 @@ List<Participant*> *Confinement::generateParticipantList(List<Container*> *parti
 	}
 
 	return participantList;
+}
+
+List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstructionConfig *config, int rootLps) {
+
+	// setup the data partition configurations of sender and receiver sides properly before they been used in any
+	// interval description construction process
+	config->configurePaddingInPartitionConfigs();
+
+	// If the confinement level is the root LPS (that is there is no sharing between the sender and the receiver
+	// LPS paths) then there will be a single confinement root for the underlying data synchronization. So we create
+	// the confinement using the part-distribution-tree and return it
+	BranchingContainer *partDistributionTree = config->getDistributionTree();
+	int dataDimensions = config->getDataDimensions();
+	if (config->isRootConfinement(rootLps)) {
+		List<Confinement*> *confinementList = new List<Confinement*>;
+		Confinement *rootConfinement = new Confinement(dataDimensions, partDistributionTree, config);
+		confinementList->Append(rootConfinement);
+		return confinementList;
+	}
+
+	// determine the confinement level to retrieve all confinement roots' id from part-tracking hierarchies and the
+	// confinement vector to locate the corresponding containers in the distribution tree
+	vector<LpsDimConfig> *senderVector = config->getSenderConfig()->generateDimOrderVector();
+	int confinementLevel = config->getConfinementLevel(senderVector);
+	vector<LpsDimConfig> *confinementVector = config->backwardTruncatedDimVector(confinementLevel, senderVector);
+
+	List<Confinement*> *confinementList = new List<Confinement*>;
+
+	// any of the part-tracking-tree can be NULL indicating that the executing segment has no portion of the data
+	// structure
+	PartIdContainer *senderTree = config->getSenderPartTree();
+	if (senderTree != NULL) {
+		List<List<int*>*> *partIdList = senderTree->getAllPartIdsAtLevel(confinementLevel, dataDimensions);
+		for (int i = 0; i < partIdList->NumElements(); i++) {
+			List<int*> *containerId = partIdList->Nth(i);
+			Container *container = partDistributionTree->getContainer(containerId, *confinementVector);
+			BranchingContainer *branchContainer = reinterpret_cast<BranchingContainer*>(container);
+			Confinement *confinement = new Confinement(dataDimensions, branchContainer, config);
+			confinementList->Append(confinement);
+		}
+	}
+
+	// if the underlying synchronization is intended for the parts of the same part-tracking-tree then the sender
+	// tree processing has already returned all confinement roots
+	PartIdContainer *receiverTree = config->getReceiverPartTree();
+	int confinementsFoundBefore = confinementList->NumElements();
+	if (!config->isIntraContrainerSync() && receiverTree != NULL) {
+		List<List<int*>*> *partIdList = receiverTree->getAllPartIdsAtLevel(confinementLevel, dataDimensions);
+		for (int i = 0; i < partIdList->NumElements(); i++) {
+			List<int*> *containerId = partIdList->Nth(i);
+			Container *container = partDistributionTree->getContainer(containerId, *confinementVector);
+			BranchingContainer *branchContainer = reinterpret_cast<BranchingContainer*>(container);
+
+			// before adding the second set of confinement roots for the receiver paths, we need to do redundancy
+			// checking against the confinements found by searching for the senders as some of the confinements in
+			// two sides of the communication may be common
+			bool confinementExists = false;
+			for (int j = 0; j < confinementsFoundBefore; j++) {
+				Confinement *sendConfinement = confinementList->Nth(j);
+				if (sendConfinement->getContainer() == branchContainer) {
+					confinementExists = true;
+					break;
+				}
+			}
+			if (!confinementExists) {
+				Confinement *confinement = new Confinement(dataDimensions, branchContainer, config);
+				confinementList->Append(confinement);
+			}
+		}
+	}
+
+	return confinementList;
 }
