@@ -225,8 +225,10 @@ void BlockSizeInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, Li
 		}
 	}
 
-	rangeList->RemoveAt(rangeList->NumElements() - 1);
-	if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
+	if (descInConstruct->NumElements() > 0) {
+		rangeList->RemoveAt(rangeList->NumElements() - 1);
+		if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
+	}
 }
 
 //----------------------------------------------------- Block Count ------------------------------------------------------
@@ -375,8 +377,10 @@ void BlockCountInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, L
 		}
 	}
 
-	rangeList->RemoveAt(rangeList->NumElements() - 1);
-	if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
+	if (descInConstruct->NumElements() > 0) {
+		rangeList->RemoveAt(rangeList->NumElements() - 1);
+		if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
+	}
 }
 
 //-------------------------------------------------------- Stride --------------------------------------------------------

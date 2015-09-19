@@ -24,14 +24,14 @@ int mainPDT() {
 	dimOrder1.push_back(LpsDimConfig(2, 0, 3));
 
 	// insert some data part for two segments
-	List<int*> *first = generateIdFromArray(new int[6] {0, 0, 0, 1, 5, 6}, 2, 6);
+	List<int*> *first = idutils::generateIdFromArray(new int[6] {0, 0, 0, 1, 5, 6}, 2, 6);
 	rootContainer->insertPart(dimOrder1, 0, first);
-	List<int*> *second = generateIdFromArray(new int[6] {0, 0, 0, 1, 6, 0}, 2, 6);
+	List<int*> *second = idutils::generateIdFromArray(new int[6] {0, 0, 0, 1, 6, 0}, 2, 6);
 	rootContainer->insertPart(dimOrder1, 0, second);
 	rootContainer->insertPart(dimOrder1, 1, second);
-	List<int*> *third = generateIdFromArray(new int[6] {0, 0, 2, 0, 1, 2}, 2, 6);
+	List<int*> *third = idutils::generateIdFromArray(new int[6] {0, 0, 2, 0, 1, 2}, 2, 6);
 	rootContainer->insertPart(dimOrder1, 0, third);
-	List<int*> *fourth = generateIdFromArray(new int[6] {1, 0, 2, 0, 0, 0}, 2, 6);
+	List<int*> *fourth = idutils::generateIdFromArray(new int[6] {1, 0, 2, 0, 0, 0}, 2, 6);
 	rootContainer->insertPart(dimOrder1, 0, fourth);
 	rootContainer->insertPart(dimOrder1, 1, fourth);
 
@@ -43,9 +43,9 @@ int mainPDT() {
 	dimOrder2.push_back(LpsDimConfig(1, 0, 5));
 
 	// insert some data for a new segment
-	first = generateIdFromArray(new int[4] {0, 0, 1, 0}, 2, 4);
+	first = idutils::generateIdFromArray(new int[4] {0, 0, 1, 0}, 2, 4);
 	rootContainer->insertPart(dimOrder2, 2, first);
-	second = generateIdFromArray(new int[4] {0, 0, 1, 1}, 2, 4);
+	second = idutils::generateIdFromArray(new int[4] {0, 0, 1, 1}, 2, 4);
 	rootContainer->insertPart(dimOrder2, 2, second);
 
 	// configuration for third partition
@@ -56,10 +56,10 @@ int mainPDT() {
 	dimOrder3.push_back(LpsDimConfig(1, 1, 2));
 
 	// insert some data for first and third segment
-	first = generateIdFromArray(new int[4] {0, 0, 0, 1}, 2, 4);
+	first = idutils::generateIdFromArray(new int[4] {0, 0, 0, 1}, 2, 4);
 	rootContainer->insertPart(dimOrder3, 0, first);
 	rootContainer->insertPart(dimOrder3, 2, first);
-	second = generateIdFromArray(new int[4] {0, 0, 7, 7}, 2, 4);
+	second = idutils::generateIdFromArray(new int[4] {0, 0, 7, 7}, 2, 4);
 	rootContainer->insertPart(dimOrder3, 0, second);
 
 	rootContainer->print(0, cout);

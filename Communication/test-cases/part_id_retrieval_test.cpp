@@ -26,13 +26,13 @@ int mainPIRT() {
 	dimOrder.push_back(DimConfig(2, 0));
 
 	PartIdContainer *partIdContainer = new PartListContainer(dimOrder[0]);
-	List<int*> *first = generateIdFromArray(new int[6] {0, 0, 0, 1, 5, 6}, 2, 6);
+	List<int*> *first = idutils::generateIdFromArray(new int[6] {0, 0, 0, 1, 5, 6}, 2, 6);
 	partIdContainer->insertPartId(first, 2, dimOrder);
-	List<int*> *second = generateIdFromArray(new int[6] {0, 0, 0, 1, 6, 0}, 2, 6);
+	List<int*> *second = idutils::generateIdFromArray(new int[6] {0, 0, 0, 1, 6, 0}, 2, 6);
 	partIdContainer->insertPartId(second, 2, dimOrder);
-	List<int*> *third = generateIdFromArray(new int[6] {0, 0, 2, 0, 1, 2}, 2, 6);
+	List<int*> *third = idutils::generateIdFromArray(new int[6] {0, 0, 2, 0, 1, 2}, 2, 6);
 	partIdContainer->insertPartId(third, 2, dimOrder);
-	List<int*> *fourth = generateIdFromArray(new int[6] {1, 0, 2, 0, 0, 0}, 2, 6);
+	List<int*> *fourth = idutils::generateIdFromArray(new int[6] {1, 0, 2, 0, 0, 0}, 2, 6);
 	partIdContainer->insertPartId(fourth, 2, dimOrder);
 
 	cout << "Part Hierarchy\n";

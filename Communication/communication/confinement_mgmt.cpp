@@ -15,11 +15,13 @@ using namespace std;
 
 //--------------------------------------- Confinement Construction Configuration ---------------------------------------------/
 
-ConfinementConstructionConfig::ConfinementConstructionConfig(int sLps, DataItemConfig *sCon,
+ConfinementConstructionConfig::	ConfinementConstructionConfig(int lST,
+		int sLps, DataItemConfig *sCon,
 		int rLps, DataItemConfig *rCon,
 		int cLps,
 		PartIdContainer *sPTree, PartIdContainer *rPTree,
 		BranchingContainer *pDTree) {
+	localSegmentTag = lST;
 	senderLps = sLps;
 	senderConfig = sCon;
 	receiverLps = rLps;
@@ -104,7 +106,7 @@ List<List<int*>*> *ConfinementConstructionConfig::getConfinementIds(int confinem
 				bool found = false;
 				for (int j = 0; j < existingConfinements; j++) {
 					List<int*> *reference = confinementList->Nth(j);
-					if (isIdsEqual(candidate, reference, dimensions)) {
+					if (idutils::areIdsEqual(candidate, reference, dimensions)) {
 						found = true;
 						break;
 					}
@@ -248,104 +250,151 @@ List<MultidimensionalIntervalSeq*> *DataExchange::getCommonRegion(Participant *s
 	return overlap;
 }
 
-//----------------------------------------------------- Confinement ----------------------------------------------------------/
+//-------------------------------------- Cross Segment Interaction Specification ---------------------------------------------/
 
-Confinement::Confinement(int dd, BranchingContainer *cC, ConfinementConstructionConfig *config) {
+CrossSegmentInteractionSpec::CrossSegmentInteractionSpec(Container *container, ConfinementConstructionConfig *config) {
 
-	dataDimensions = dd;
-	confinementContainer = cC;
-	participantSegments = cC->getSegmentTags();
+	this->localSegmentTag = config->getLocalSegmentTag();
+
+	DataItemConfig *senderConfig = config->getSenderConfig();
+	vector<LpsDimConfig> *senderPath = senderConfig->generateDimOrderVector();
+	int confinementLevel = config->getConfinementLevel(senderPath);
+	int dataDimensions = senderConfig->getDimensionality();
+	generateParticipantList(container,
+			dataDimensions, SEND, *senderPath, senderConfig, confinementLevel);
+
+	DataItemConfig *receiverConfig = config->getReceiverConfig();
+	vector<LpsDimConfig> *receiverPath = receiverConfig->generateDimOrderVector();
+	generateParticipantList(container,
+				dataDimensions, RECEIVE, *receiverPath, receiverConfig, confinementLevel);
+}
+
+List<DataExchange*> *CrossSegmentInteractionSpec::generateSendExchanges() {
+	List<Participant*> *localSenderList = new List<Participant*>;
+	localSenderList->Append(localSender);
+	return Confinement::generateDataExchangeList(localSenderList, remoteReceivers);
+}
+
+List<DataExchange*> *CrossSegmentInteractionSpec::generateReceiveExchanges() {
+	List<Participant*> *localReceiverList = new List<Participant*>;
+	localReceiverList->Append(localReceiver);
+	return Confinement::generateDataExchangeList(remoteSenders, localReceiverList);
+}
+
+void CrossSegmentInteractionSpec::generateParticipantList(Container *confinementContainer,
+		int dataDimensions,
+		CommRole role,
+		std::vector<LpsDimConfig> pathOrder,
+		DataItemConfig *dataConfig,
+		int pruningLevel) {
+
+	List<Participant*> *remoteParticipants = new List<Participant*>;
+	Participant *localParticipant = NULL;
+	List<PartFolding*> *foldingList = new List<PartFolding*>;
+	vector<int> segmentTags = confinementContainer->getSegmentTags();
+	vector<int*> *containerId = confinementContainer->getPartId(dataDimensions);
+
+	for (unsigned int i = 0; i < segmentTags.size(); i++) {
+
+		int segmentTag = segmentTags.at(i);
+		PartFolding *folding = confinementContainer->foldContainerForSegment(segmentTag, pathOrder, true);
+		folding->pruneFolding(pruningLevel, dataConfig);
+
+		if (segmentTag == localSegmentTag) {
+			List<MultidimensionalIntervalSeq*> *dataDesc = folding->generateIntervalDesc(dataConfig);
+			if (dataDesc != NULL) localParticipant = new Participant(role, containerId, dataDesc);
+			continue;
+		}
+
+		bool foldingFound = false;
+		int matchingIndex = -1;
+		for (int k = 0; k < foldingList->NumElements(); k++) {
+			PartFolding *reference = foldingList->Nth(k);
+			if (reference->isEqualInContent(folding)) {
+				foldingFound = true;
+				matchingIndex = k;
+				break;
+			}
+		}
+		if (!foldingFound) {
+			List<MultidimensionalIntervalSeq*> *dataDesc = folding->generateIntervalDesc(dataConfig);
+			if (dataDesc != NULL) {
+				Participant *participant = new Participant(role, containerId, dataDesc);
+				int senderCountSoFar = remoteParticipants->NumElements();
+				participant->setId(senderCountSoFar);
+				participant->addSegmentTag(segmentTag);
+				remoteParticipants->Append(participant);
+			}
+		} else {
+			Participant *participant = remoteParticipants->Nth(matchingIndex);
+			participant->addSegmentTag(segmentTag);
+			delete folding;
+		}
+	}
+
+	while (foldingList->NumElements() > 0) {
+		PartFolding *folding = foldingList->Nth(0);
+		foldingList->RemoveAt(0);
+		delete folding;
+	}
+
+	if (role == SEND) {
+		this->localSender = localParticipant;
+		this->remoteSenders = remoteParticipants;
+	} else {
+		this->localReceiver = localParticipant;
+		this->remoteReceivers = remoteParticipants;
+	}
+}
+
+//------------------------------------- Within Container Interaction Specification -------------------------------------------/
+
+IntraContainerInteractionSpec::IntraContainerInteractionSpec(BranchingContainer *container,
+		ConfinementConstructionConfig *config) {
+
+	this->localSegmentTag = localSegmentTag;
+	this->dataDimensions = config->getDataDimensions();
 
 	vector<LpsDimConfig> *senderPath = config->getSendPathInDistributionTree();
 	int senderBranchHeaderLps = senderPath->at(0).getLpsId();
-	List<Container*> *senderBranches = confinementContainer->listDescendantContainersForLps(
-			senderBranchHeaderLps, 0, false);
+	List<Container*> *senderBranches = container->listDescendantContainersForLps(senderBranchHeaderLps, 0, false);
 
 	vector<LpsDimConfig> *receiverPath = config->getReceivePathInDistributionTree();
 	int receiverBranchHeaderLps = receiverPath->at(0).getLpsId();
 	List<Container*> *receiverBranches = NULL;
 	if (!config->isIntraContrainerSync()) {
-		receiverBranches = confinementContainer->listDescendantContainersForLps(receiverBranchHeaderLps, 0, false);
+		receiverBranches = container->listDescendantContainersForLps(receiverBranchHeaderLps, 0, false);
 	} else receiverBranches = senderBranches;
 
 	int senderBranchLevel = senderPath->at(0).getLevel();
 	senderList = generateParticipantList(senderBranches,
 			SEND, *senderPath, config->getSenderConfig(), senderBranchLevel);
 
-	if (!config->isIntraContrainerSync()) {
-		int receiverBranchLevel = receiverPath->at(0).getLevel();
-		receiverList = generateParticipantList(receiverBranches,
-				RECEIVE, *receiverPath, config->getReceiverConfig(), receiverBranchLevel);
-	} else {
-		receiverList = senderList;
-		for (int i = 0; i < senderList->NumElements(); i++) {
-			senderList->Nth(i)->setRole(SEND_OR_RECEIVE);
-		}
-	}
+	int receiverBranchLevel = receiverPath->at(0).getLevel();
+	receiverList = generateParticipantList(receiverBranches,
+			RECEIVE, *receiverPath, config->getReceiverConfig(), receiverBranchLevel);
 }
 
-List<DataExchange*> *Confinement::generateDataExchangeList() {
-	List<DataExchange*> *dataExchangeList = new List<DataExchange*>;
-	for (int i = 0; i < senderList->NumElements(); i++) {
-		Participant *sender = senderList->Nth(i);
-		for (int j = 0; j < receiverList->NumElements(); j++) {
-			Participant *receiver = receiverList->Nth(j);
-			if (sender->isEqual(receiver)) {
-				DataExchange *exchange = new DataExchange(i, j);
-				dataExchangeList->Append(exchange);
-				continue;
-			}
-			List<MultidimensionalIntervalSeq*> *overlap = DataExchange::getCommonRegion(sender, receiver);
-			if (overlap != NULL) {
-				DataExchange *exchange = new DataExchange(i, j, overlap);
-				dataExchangeList->Append(exchange);
-			}
-		}
-	}
-	if (dataExchangeList == NULL) {
-		delete dataExchangeList;
-		return NULL;
-	}
-	return dataExchangeList;
-}
-
-List<Participant*> *Confinement::generateParticipantList(List<Container*> *participantBranches,
-		CommRole role, vector<LpsDimConfig> pathOrder, DataItemConfig *dataConfig, int pruningLevel) {
+List<Participant*> *IntraContainerInteractionSpec::generateParticipantList(List<Container*> *participantBranches,
+		CommRole role,
+		vector<LpsDimConfig> pathOrder,
+		DataItemConfig *dataConfig, int pruningLevel) {
 
 	List<Participant*> *participantList = new List<Participant*>;
 	List<PartFolding*> *foldingList = new List<PartFolding*>;
 
-	for (unsigned int i = 0; i < participantSegments.size(); i++) {
-		int segmentTag = participantSegments.at(i);
-		for (int j = 0; j < participantBranches->NumElements(); j++) {
-			Container *branch = participantBranches->Nth(j);
-			PartFolding *folding = branch->foldContainerForSegment(segmentTag, pathOrder, true);
-			folding->pruneFolding(pruningLevel, dataConfig);
-			bool foldingFound = false;
-			int matchingIndex = -1;
-			for (int k = 0; k < foldingList->NumElements(); k++) {
-				PartFolding *reference = foldingList->Nth(k);
-				if (reference->isEqualInContent(folding)) {
-					foldingFound = true;
-					matchingIndex = k;
-					break;
-				}
-			}
-			if (!foldingFound) {
-				vector<int*> *containerId = branch->getPartId(dataDimensions);
-				List<MultidimensionalIntervalSeq*> *dataDesc = folding->generateIntervalDesc(dataConfig);
-				if (dataDesc != NULL) {
-					Participant *participant = new Participant(role, containerId, dataDesc);
-					int senderCountSoFar = participantList->NumElements();
-					participant->setId(senderCountSoFar);
-					participant->addSegmentTag(segmentTag);
-					participantList->Append(participant);
-				}
-			} else {
-				Participant *participant = participantList->Nth(matchingIndex);
-				participant->addSegmentTag(segmentTag);
-				delete folding;
-			}
+	for (int j = 0; j < participantBranches->NumElements(); j++) {
+		Container *branch = participantBranches->Nth(j);
+		PartFolding *folding = branch->foldContainerForSegment(localSegmentTag, pathOrder, true);
+		folding->pruneFolding(pruningLevel, dataConfig);
+		vector<int*> *containerId = branch->getPartId(dataDimensions);
+		List<MultidimensionalIntervalSeq*> *dataDesc = folding->generateIntervalDesc(dataConfig);
+		if (dataDesc != NULL) {
+			Participant *participant = new Participant(role, containerId, dataDesc);
+			int senderCountSoFar = participantList->NumElements();
+			participant->setId(senderCountSoFar);
+			participant->addSegmentTag(localSegmentTag);
+			participantList->Append(participant);
 		}
 	}
 
@@ -356,6 +405,37 @@ List<Participant*> *Confinement::generateParticipantList(List<Container*> *parti
 	}
 
 	return participantList;
+}
+
+List<DataExchange*> *IntraContainerInteractionSpec::generateExchanges() {
+	List<DataExchange*> *exchangeList = Confinement::generateDataExchangeList(senderList, receiverList);
+	if (exchangeList != NULL) {
+		// eliminate any circular exchange description
+		for (int i = 0; i < exchangeList->NumElements(); i++) {
+			DataExchange *exchange = exchangeList->Nth(i);
+			vector<int*> *senderId = getSender(exchange->getSenderId())->getContainerId();
+			vector<int*> *receiverId = getReceiver(exchange->getReceiverId())->getContainerId();
+			if (idutils::areIdsEqual(senderId, receiverId, dataDimensions)) {
+				exchangeList->RemoveAt(i);
+				delete exchange;
+			}
+		}
+	}
+	return exchangeList;
+}
+
+//----------------------------------------------------- Confinement ----------------------------------------------------------/
+
+Confinement::Confinement(int dd, BranchingContainer *cC, ConfinementConstructionConfig *config) {
+
+	dataDimensions = dd;
+	confinementContainer = cC;
+	participantSegments = cC->getSegmentTags();
+	remoteInteractions = new CrossSegmentInteractionSpec(confinementContainer, config);
+	bool localInterchangeApplicable = config->isIntraContrainerSync();
+	if (localInterchangeApplicable) {
+		localInteractions = new IntraContainerInteractionSpec(confinementContainer, config);
+	} else localInteractions = NULL;
 }
 
 List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstructionConfig *config, int rootLps) {
@@ -428,4 +508,31 @@ List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstruction
 	}
 
 	return confinementList;
+}
+
+List<DataExchange*> *Confinement::generateDataExchangeList(List<Participant*> *senderList,
+		List<Participant*> *receiverList) {
+
+	List<DataExchange*> *dataExchangeList = new List<DataExchange*>;
+	for (int i = 0; i < senderList->NumElements(); i++) {
+		Participant *sender = senderList->Nth(i);
+		for (int j = 0; j < receiverList->NumElements(); j++) {
+			Participant *receiver = receiverList->Nth(j);
+			if (sender->isEqual(receiver)) {
+				DataExchange *exchange = new DataExchange(i, j);
+				dataExchangeList->Append(exchange);
+				continue;
+			}
+			List<MultidimensionalIntervalSeq*> *overlap = DataExchange::getCommonRegion(sender, receiver);
+			if (overlap != NULL) {
+				DataExchange *exchange = new DataExchange(i, j, overlap);
+				dataExchangeList->Append(exchange);
+			}
+		}
+	}
+	if (dataExchangeList == NULL) {
+		delete dataExchangeList;
+		return NULL;
+	}
+	return dataExchangeList;
 }

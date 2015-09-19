@@ -20,18 +20,32 @@ int mainPIET() {
 	DrawingLine drawingLine = DrawingLine(dimension, 10);
 	List<Range> *rangeList = new List<Range>;
 
-	// scenario #1
+//	// scenario #1
+//	BlockSizeInstr blockSize = BlockSizeInstr(dimension, 1, 20);
+//	blockSize.setPadding(4, 4);
+//	blockSize.drawTrueIntervalDesc(dimension, 10);
+//	BlockCountInstr blockCount = BlockCountInstr(blockSize.getDimension(), 0, 4);
+//	blockCount.setPrevInstr(&blockSize);
+//	blockCount.setPadding(1, 1);
+//	blockCount.drawTrueIntervalDesc(dimension, 10);
+//	blockSize.setExcludePaddingFlag(true);
+//	blockCount.setExcludePaddingFlag(true);
+//	rangeList->Append(Range(1, 3));
+//	rangeList->Append(Range(0));
+//	blockCount.getIntervalDescForRangeHierarchy(rangeList, intervalList);
+
+	// scenario #2
 	BlockSizeInstr blockSize = BlockSizeInstr(dimension, 1, 20);
-	blockSize.setPadding(4, 4);
+	blockSize.setPadding(5, 5);
 	blockSize.drawTrueIntervalDesc(dimension, 10);
-	BlockCountInstr blockCount = BlockCountInstr(blockSize.getDimension(), 0, 4);
+	BlockCountInstr blockCount = BlockCountInstr(blockSize.getDimension(), 0, 6);
 	blockCount.setPrevInstr(&blockSize);
 	blockCount.setPadding(1, 1);
 	blockCount.drawTrueIntervalDesc(dimension, 10);
 	blockSize.setExcludePaddingFlag(true);
 	blockCount.setExcludePaddingFlag(true);
 	rangeList->Append(Range(1, 3));
-	rangeList->Append(Range(0));
+	rangeList->Append(Range(0, 1));
 	blockCount.getIntervalDescForRangeHierarchy(rangeList, intervalList);
 
 	cout << "The number of distinct interval sequences: " << intervalList->NumElements();
