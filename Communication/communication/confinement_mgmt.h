@@ -28,6 +28,8 @@
 #include <iostream>
 #include <vector>
 
+class ExchangeIterator;
+
 // constants to determine what role a particular branch in a confinement should play in the communication
 enum CommRole {SEND, RECEIVE, SEND_OR_RECEIVE};
 
@@ -160,7 +162,7 @@ private:
 	bool fullOverlap;
 public:
 	// constructor to be used in the full overlap situation
-	DataExchange(int senderId, int receiverId);
+	DataExchange(Participant *sender, int receiverId);
 	// constructor to be used in other situation
 	DataExchange(int senderId, int receiverId, List<MultidimensionalIntervalSeq*> *exchangeDesc);
 
@@ -168,6 +170,10 @@ public:
 	int getReceiverId() {return receiverId; }
 	bool isFullOverlap() { return fullOverlap; }
 	List<MultidimensionalIntervalSeq*> *getExchangeDesc() { return exchangeDesc; }
+
+	// tells the total number of data points that need to be exchanged between the sender and receiver as part of
+	// this data exchange
+	int getTotalElementsCount();
 
 	// This static function is to be used to determine if a candidate pair of sender-receiver participants of a
 	// confinement should indeed exchange data. If the outcome of this function is NULL then the two parties do
@@ -268,6 +274,26 @@ public:
 	// an utility method to be used by cross-segment and within-container interaction specification classes
 	static List<DataExchange*> *generateDataExchangeList(List<Participant*> *senderList,
 			List<Participant*> *receiverList);
+};
+
+/* An iterator to traverse through the data points of a data exchange
+ * */
+class ExchangeIterator {
+private:
+	int totalElementsCount;
+	int currentElement;
+	List<MultidimensionalIntervalSeq*> *sequences;
+	int currentSequence;
+	SequenceIterator *iterator;
+public:
+	ExchangeIterator(DataExchange *exchange);
+	~ExchangeIterator();
+	bool hasMoreElements() { return currentElement < totalElementsCount; }
+
+	// returns the next index point in the data exchange; returns NULL if it reaches the end of the exchange
+	std::vector<int> *getNextElement();
+
+	void printNextElement(std::ostream &stream);
 };
 
 #endif /* CONFINEMENT_MGMT_H_ */

@@ -300,6 +300,27 @@ List<IntervalSeq*> *IntervalSeq::computeIntersection(IntervalSeq *other) {
 	return intersect;
 }
 
+int IntervalSeq::getNextIndex(IntervalState *state) {
+
+	int interval = state->getIteration();
+	int index = state->getIndex();
+
+	if (index < length - 1) {
+		state->step();
+	} else {
+		if (interval < count - 1) {
+			state->jumpToNextIteration();
+		} else {
+			state->reset();
+			return INVALID_INDEX;
+		}
+	}
+
+	interval = state->getIteration();
+	index = state->getIndex();
+	return begin + interval * period + index;
+}
+
 bool IntervalSeq::isEqual(IntervalSeq *other) {
 	return (this->begin == other->begin
 			&& this->length == other->length
@@ -316,6 +337,14 @@ MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
 	for (int i = 0; i < dimensionality; i++) {
 		intervals[i] = NULL;
 	}
+}
+
+int MultidimensionalIntervalSeq::getNumOfElements() {
+	int count = intervals[0]->getNumOfElements();
+	for (int i = 1; i < dimensionality; i++) {
+		count *= intervals[i]->getNumOfElements();
+	}
+	return count;
 }
 
 void MultidimensionalIntervalSeq::copyIntervals(vector<IntervalSeq*> *templateVector) {
@@ -394,6 +423,19 @@ List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::generateInterva
 	return result;
 }
 
+int MultidimensionalIntervalSeq::compareTo(MultidimensionalIntervalSeq *other) {
+	for (int i = 0; i < dimensionality; i++) {
+		IntervalSeq* seq1 = intervals[i];
+		IntervalSeq* seq2 = other->intervals[i];
+		if (seq1->begin < seq2->begin) {
+			return -1;
+		} else if (seq1->begin > seq2->begin) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 void MultidimensionalIntervalSeq::draw() {
 	for (int i = 0; i < dimensionality; i++) {
 		IntervalSeq *interval = intervals[i];
@@ -407,5 +449,108 @@ void MultidimensionalIntervalSeq::draw() {
 		interval->draw(&drawLine);
 		cout << "Dimension No: " << i + 1;
 		drawLine.draw();
+	}
+}
+
+//---------------------------------------------------------- Sequence Iterator ----------------------------------------------------------/
+
+SequenceIterator::SequenceIterator(MultidimensionalIntervalSeq *sequence) {
+	this->sequence = sequence;
+	dimensionality = sequence->getDimensionality();
+	index = new vector<int>;
+	index->reserve(dimensionality);
+	elementCount = sequence->getNumOfElements();
+	currentElementNo = 0;
+	for (int dimNo = 0; dimNo < dimensionality; dimNo++) {
+		cursors.push(new IntervalState());
+		index->push_back(INVALID_INDEX);
+	}
+	initCursorsAndIndex();
+}
+
+vector<int> *SequenceIterator::getNextElement() {
+
+	int lastDim = dimensionality - 1;
+	IntervalSeq *lastLinearSeq = sequence->getIntervalForDim(lastDim);
+	int lastDimIndex = lastLinearSeq->getNextIndex(cursors.top());
+	index->at(lastDim) = lastDimIndex;
+
+	if (lastDimIndex == INVALID_INDEX) {
+		stack<IntervalState*> holderStack;
+		bool rewindPointFound = false;
+		while (!rewindPointFound) {
+
+			holderStack.push(cursors.top());
+			cursors.pop();
+
+			// rewind from a previous position is infeasible when all cursors are removed; that means
+			// we have already traversed all the elements of the sequence
+			if (cursors.size() == 0) {
+				while (holderStack.size() > 0) {
+					cursors.push(holderStack.top());
+					holderStack.pop();
+				}
+				initCursorsAndIndex();
+				return NULL;
+			}
+
+			// try to move further on an earlier dimension
+			int dimNo = cursors.size() - 1;
+			IntervalSeq *linearSeq = sequence->getIntervalForDim(dimNo);
+			int dimIndex = linearSeq->getNextIndex(cursors.top());
+
+			if (dimIndex != INVALID_INDEX) {
+				index->at(dimNo) = dimIndex;
+				rewindPointFound = true;
+			}
+		}
+
+		// put cursors back from holder stack to the original stack and update the remaining indexes
+		while (holderStack.size() > 0) {
+			IntervalState *state = holderStack.top();
+			cursors.push(state);
+			holderStack.pop();
+			int dimNo = cursors.size() - 1;
+			IntervalSeq *linearSeq = sequence->getIntervalForDim(dimNo);
+			index->at(dimNo) = linearSeq->getNextIndex(cursors.top());
+		}
+
+	}
+	currentElementNo++;
+	return index;
+}
+
+void SequenceIterator::reset() {
+	currentElementNo = 0;
+	initCursorsAndIndex();
+}
+
+void SequenceIterator::printNextElement(std::ostream &stream) {
+	vector<int> *element = getNextElement();
+	for (int i = 0; i < dimensionality; i++) {
+		stream << element->at(i);
+		if (i < dimensionality - 1) {
+			stream << ',';
+		}
+	}
+	stream << '\n';
+}
+
+void SequenceIterator::initCursorsAndIndex() {
+	stack<IntervalState*> holderStack;
+	while (!cursors.empty()) {
+		holderStack.push(cursors.top());
+		cursors.pop();
+	}
+	for (int dimNo = 0; dimNo < dimensionality; dimNo++) {
+		IntervalState *dimState = holderStack.top();
+		if (dimNo < dimensionality - 1) {
+			IntervalSeq *linearSeq = sequence->getIntervalForDim(dimNo);
+			index->at(dimNo) = linearSeq->getNextIndex(dimState);
+		} else {
+			index->at(dimNo) = INVALID_INDEX;
+		}
+		cursors.push(dimState);
+		holderStack.pop();
 	}
 }

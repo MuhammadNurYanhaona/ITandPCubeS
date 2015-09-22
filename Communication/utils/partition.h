@@ -9,6 +9,21 @@
 #include "../structure.h"
 #include "interval.h"
 
+
+/* This is an auxiliary data structure definition to be used during transferring data in between communication buffer
+ * and the operating memory data-parts. The data parts are stored as a part-hierarchy (see the part-tracking library)
+ * and multiple parts may contribute to a single communication buffer and/or receive updated data points from it. We
+ * need a mechanism to transform an index in the communication buffer step-by-step into the actual memory location of
+ * the memory address holding (or going to receive) the value at the index. This data structure maintains information
+ * to traverse the part hierarchy and along the way the iterative transformation of the original index.
+ * */
+class XformedIndexInfo {
+private:
+	int index;
+	int partNo;
+	Dimension partDimension;
+};
+
 class PartitionInstr {
 protected:
 	const char *name;

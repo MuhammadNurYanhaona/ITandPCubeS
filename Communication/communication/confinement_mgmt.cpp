@@ -212,18 +212,40 @@ bool Participant::isEqual(Participant *other) {
 
 //---------------------------------------------------- Data Exchange ---------------------------------------------------------/
 
-DataExchange::DataExchange(int senderId, int receiverId) {
-	this->senderId = senderId;
+DataExchange::DataExchange(Participant *sender, int receiverId) {
+	this->senderId = sender->getId();
 	this->receiverId = receiverId;
-	exchangeDesc = NULL;
+	exchangeDesc = sender->getDataDescription();
 	fullOverlap = true;
 }
 
 DataExchange::DataExchange(int senderId, int receiverId, List<MultidimensionalIntervalSeq*> *exchangeDesc) {
 	this->senderId = senderId;
 	this->receiverId = receiverId;
-	this->exchangeDesc = exchangeDesc;
+	List<MultidimensionalIntervalSeq*> *orderedSeqList = new List<MultidimensionalIntervalSeq*>;
+	orderedSeqList->Append(exchangeDesc->Nth(0));
+	for (int i = 1; i < exchangeDesc->NumElements(); i++) {
+		MultidimensionalIntervalSeq *currentSeq = exchangeDesc->Nth(i);
+		int insertLocation = orderedSeqList->NumElements();
+		for (int j = 0; j < orderedSeqList->NumElements(); j++) {
+			MultidimensionalIntervalSeq *referenceSeq = orderedSeqList->Nth(j);
+			if (currentSeq->compareTo(referenceSeq) < 0) {
+				insertLocation = j;
+				break;
+			}
+		}
+		orderedSeqList->InsertAt(currentSeq, insertLocation);
+	}
+	this->exchangeDesc = orderedSeqList;
 	fullOverlap = false;
+}
+
+int DataExchange::getTotalElementsCount() {
+	int count = exchangeDesc->Nth(0)->getNumOfElements();
+	for (int i = 1; i < exchangeDesc->NumElements(); i++) {
+		count += exchangeDesc->Nth(i)->getNumOfElements();
+	}
+	return count;
 }
 
 List<MultidimensionalIntervalSeq*> *DataExchange::getCommonRegion(Participant *sender, Participant *receiver) {
@@ -519,7 +541,7 @@ List<DataExchange*> *Confinement::generateDataExchangeList(List<Participant*> *s
 		for (int j = 0; j < receiverList->NumElements(); j++) {
 			Participant *receiver = receiverList->Nth(j);
 			if (sender->isEqual(receiver)) {
-				DataExchange *exchange = new DataExchange(i, j);
+				DataExchange *exchange = new DataExchange(sender, j);
 				dataExchangeList->Append(exchange);
 				continue;
 			}
@@ -535,4 +557,42 @@ List<DataExchange*> *Confinement::generateDataExchangeList(List<Participant*> *s
 		return NULL;
 	}
 	return dataExchangeList;
+}
+
+//-------------------------------------------------- Exchange Iterator -------------------------------------------------------/
+
+ExchangeIterator::ExchangeIterator(DataExchange *exchange) {
+	this->totalElementsCount = exchange->getTotalElementsCount();
+	this->sequences = exchange->getExchangeDesc();
+	this->iterator = new SequenceIterator(sequences->Nth(0));
+	this->currentElement = 0;
+	this->currentSequence = 0;
+}
+
+ExchangeIterator::~ExchangeIterator() {
+	if (iterator != NULL) delete iterator;
+}
+
+vector<int> *ExchangeIterator::getNextElement() {
+	if (!iterator->hasMoreElements()) {
+		delete iterator;
+		currentSequence++;
+		if (currentSequence < sequences->NumElements()) {
+			iterator = new SequenceIterator(sequences->Nth(currentSequence));
+		} else return NULL;
+	}
+	currentElement++;
+	return iterator->getNextElement();
+}
+
+void ExchangeIterator::printNextElement(std::ostream &stream) {
+	vector<int> *element = getNextElement();
+	int dimensionality = sequences->Nth(0)->getDimensionality();
+	for (int i = 0; i < dimensionality; i++) {
+		stream << element->at(i);
+		if (i < dimensionality - 1) {
+			stream << ',';
+		}
+	}
+	stream << '\n';
 }
