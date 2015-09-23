@@ -27,6 +27,7 @@ public:
 	void addDescendant(PartFolding *descendant) { descendants->Append(descendant); }
 	List<PartFolding*> *getDescendants() { return descendants; }
 	Range getIdRange() { return idRange; }
+	int getSiblingsCount() { return idRange.max - idRange.min + 1; }
 	void print(std::ostream &stream, int indentLevel);
 
 	// recursively removes all descendant part foldings and then deletes the descendants list

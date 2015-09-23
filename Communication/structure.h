@@ -30,6 +30,10 @@ public:
         	length = 0;
         	range = Range();
         }
+        Dimension(int length) {
+        	this->length = length;
+        	range = Range(0, length - 1);
+        }
         void setLength() {
         	length = range.max - range.min + 1;
         }

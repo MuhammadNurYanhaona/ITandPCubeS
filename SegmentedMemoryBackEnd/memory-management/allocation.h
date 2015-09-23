@@ -24,7 +24,7 @@ class PartMetadata {
 	// the number of dimensions in the data structure
 	int dimensionality;
 	// possibly multi-dimensional part Id specifying the index of the part within the whole; note that we
-	// have a list here as partitioning in IT is hierarchical and for identificant of a part in an LPS we 
+	// have a list here as partitioning in IT is hierarchical and for identification of a part in an LPS we 
 	// may need to identify its ancestor parts in higher LPSes
 	List<int*> *idList;
 	// spread of the part along different dimensions
@@ -32,7 +32,7 @@ class PartMetadata {
 	// part as then we will consider all indexes within the data has been transformed in a way to conform 
 	// with the reordering  
 	Dimension *boundary;
-	// if padding is used at partitioning then its overlappings along of boundaries with neighboring parts
+	// if padding is used at partitioning then its overlapping along of boundaries with neighboring parts
 	int *padding;
 	// the interval description for the part with and without padding
 	HyperplaneInterval *coreInterval;

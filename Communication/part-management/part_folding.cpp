@@ -59,8 +59,10 @@ void PartFolding::print(std::ostream &stream, int indentLevel) {
 	stream << '\n';
 	for (int i = 0; i < indentLevel; i++) stream << '\t';
 	stream << idRange.min << "-" << idRange.max;
-	for (int i = 0; i < descendants->NumElements(); i++) {
-		descendants->Nth(i)->print(stream, indentLevel + 1);
+	if (descendants != NULL) {
+		for (int i = 0; i < descendants->NumElements(); i++) {
+			descendants->Nth(i)->print(stream, indentLevel + 1);
+		}
 	}
 }
 
@@ -103,7 +105,7 @@ void PartFolding::pruneFolding(int lowerLevelBound, DataItemConfig *dataConfig) 
 			PartFolding *nextFold = descendants->Nth(i);
 			nextFold->pruneFolding(lowerLevelBound, dataConfig);
 			if (nextFold->descendants == NULL) {
-				prunnedDescendants++;
+				prunnedDescendants += nextFold->getSiblingsCount();
 			}
 		}
 	// condition for leaf level folding state

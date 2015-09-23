@@ -2,6 +2,7 @@
 #include "../utils/list.h"
 #include "../utils/binary_search.h"
 #include "part_folding.h"
+#include "../communication/data_transfer.h"
 
 #include <vector>
 #include <iostream>
@@ -207,6 +208,50 @@ void PartContainer::foldContainer(List<PartFolding*> *fold) {
 	delete rangeList;
 }
 
+void PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
+		TransferSpec *transferSpec,
+		DataPartSpec *dataPartSpec) {
+
+	DataItemConfig *dataConfig = dataPartSpec->getConfig();
+	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
+	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
+	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
+
+	int partNo = dimIndex->partNo;
+	vector<int> partIndex;
+	int dataDimensions = dataConfig->getDimensionality();
+	partIndex.reserve(dataDimensions);
+	for (int i = 0; i < dataDimensions; i++) {
+		partIndex[i] = xformVector->at(i)->index;
+	}
+	int dataItemSize = transferSpec->getStepSize();
+
+	SuperPart *part = getPart(partNo);
+	if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
+		PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
+		char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
+		transferSpec->performTransfer(dataLocation);
+	}
+
+	if (paddedIndex != NULL) {
+		int partNo = paddedIndex->partNo;
+		partIndex[dimNo] = paddedIndex->index;
+		SuperPart *part = getPart(partNo);
+		if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
+			PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
+			char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
+			transferSpec->performTransfer(dataLocation);
+		}
+		delete paddedIndex;
+	}
+}
+
+SuperPart *PartContainer::getPart(int partNo) {
+	int location = binsearch::locateKey(partArray, partNo);
+	if (location == KEY_NOT_FOUND) return NULL;
+	return dataPartList[location];
+}
+
 //------------------------------------------------------- Part List Container -----------------------------------------------------------/
 
 PartListContainer::~PartListContainer() {
@@ -287,6 +332,32 @@ void PartListContainer::foldContainer(List<PartFolding*> *fold) {
 	}
 }
 
+void PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
+				TransferSpec *transferSpec,
+				DataPartSpec *dataPartSpec) {
+
+	DataItemConfig *dataConfig = dataPartSpec->getConfig();
+	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
+	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
+	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
+
+	int partNo = dimIndex->partNo;
+	PartIdContainer *nextContainer = getContainer(partNo);
+	if (nextContainer != NULL) {
+		nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
+	}
+
+	if (paddedIndex != NULL) {
+		dimIndex->copyInfo(paddedIndex);
+		int partNo = dimIndex->partNo;
+		PartIdContainer *nextContainer = getContainer(partNo);
+		if (nextContainer != NULL) {
+			nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
+		}
+		delete paddedIndex;
+	}
+}
+
 List<List<int*>*> *PartListContainer::getAllPartIdsAtLevel(int levelNo, int dataDimensions,
 		List<int*> *partIdUnderConstruct, int previousLevel) {
 
@@ -323,6 +394,12 @@ List<List<int*>*> *PartListContainer::getAllPartIdsAtLevel(int levelNo, int data
 		return NULL;
 	}
 	return partIdList;
+}
+
+PartIdContainer *PartListContainer::getContainer(int partNo) {
+	int index = binsearch::locateKey(partArray, partNo);
+	if (index == KEY_NOT_FOUND) return NULL;
+	return nextLevelContainers[index];
 }
 
 //---------------------------------------------------------- Part Iterator --------------------------------------------------------------/

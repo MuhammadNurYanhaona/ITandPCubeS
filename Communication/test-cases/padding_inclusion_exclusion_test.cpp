@@ -45,7 +45,7 @@ int mainPIET() {
 	blockSize.setExcludePaddingFlag(true);
 	blockCount.setExcludePaddingFlag(true);
 	rangeList->Append(Range(1, 3));
-	rangeList->Append(Range(0, 1));
+	rangeList->Append(Range(0, 2));
 	blockCount.getIntervalDescForRangeHierarchy(rangeList, intervalList);
 
 	cout << "The number of distinct interval sequences: " << intervalList->NumElements();

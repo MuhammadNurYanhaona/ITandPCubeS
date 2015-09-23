@@ -100,6 +100,10 @@ void BlockSizeInstr::setPadding(int frontPadding, int rearPadding) {
 }
 
 Dimension BlockSizeInstr::getDimension(bool includePadding) {
+	return getDimension(parentDim, partId, partsCount, includePadding);
+}
+
+Dimension BlockSizeInstr::getDimension(Dimension parentDim, int partId, int partsCount, bool includePadding) {
 	int begin = parentDim.range.min + partId * size;
 	int remaining = parentDim.range.max - begin + 1;
 	int intervalLength = (remaining >= size) ? size : remaining;
@@ -231,6 +235,38 @@ void BlockSizeInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, Li
 	}
 }
 
+XformedIndexInfo *BlockSizeInstr::transformIndex(XformedIndexInfo *indexToXform) {
+
+	Dimension dimension = indexToXform->partDimension;
+	int index = indexToXform->index;
+	int count = calculatePartsCount(dimension, false);
+
+	bool includePadding = hasPadding & !excludePaddingInIntervalCalculation;
+	int partNo = index / size;
+	Dimension newDimension = getDimension(dimension, partNo, count, includePadding);
+
+	indexToXform->partDimension = newDimension;
+	indexToXform->index = index;
+	indexToXform->partNo = partNo;
+
+	if (includePadding) {
+		Dimension paddinglessDim = getDimension(dimension, partNo, count, false);
+		int indexForwardDrift = index - paddinglessDim.range.min;
+		int indexBackwardDrift = paddinglessDim.range.max - index;
+		if (indexForwardDrift <= frontPadding && partNo > 0) {
+			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
+					partNo - 1, getDimension(dimension, partNo - 1, count, true));
+			return paddingPart;
+		} else if (indexBackwardDrift <= rearPadding && partNo < count - 1) {
+			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
+					partNo + 1, getDimension(dimension, partNo + 1, count, true));
+			return paddingPart;
+		}
+	}
+
+	return NULL;
+}
+
 //----------------------------------------------------- Block Count ------------------------------------------------------
 
 BlockCountInstr::BlockCountInstr(Dimension pd, int id, int count)
@@ -251,9 +287,13 @@ void BlockCountInstr::setPadding(int frontPadding, int rearPadding) {
 }
 
 Dimension BlockCountInstr::getDimension(bool includePadding) {
-	int size = parentDim.length / count;
+	return getDimension(parentDim, partId, partsCount, includePadding);
+}
+
+Dimension BlockCountInstr::getDimension(Dimension parentDim, int partId, int partsCount, bool includePadding) {
+	int size = parentDim.length / partsCount;
 	int begin = parentDim.range.min + partId * size;
-	int length = (partId < count - 1) ? size : parentDim.range.max - begin + 1;
+	int length = (partId < partsCount - 1) ? size : parentDim.range.max - begin + 1;
 	Dimension partDimension;
 	if (includePadding) {
 		partDimension.range.min = max(begin - frontPadding, parentDim.range.min);
@@ -283,7 +323,7 @@ List<IntervalSeq*> *BlockCountInstr::getIntervalDesc() {
 }
 
 int BlockCountInstr::calculatePartsCount(Dimension dimension, bool updateProperties) {
-	int count = max(1, min(count, dimension.length));
+	int count = max(1, min(this->count, dimension.length));
 	if (updateProperties) {
 		this->parentDim = dimension;
 		this->partsCount = count;
@@ -383,6 +423,39 @@ void BlockCountInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, L
 	}
 }
 
+XformedIndexInfo *BlockCountInstr::transformIndex(XformedIndexInfo *indexToXform) {
+
+	Dimension dimension = indexToXform->partDimension;
+	int index = indexToXform->index;
+	int count = calculatePartsCount(dimension, false);
+
+	int partSize = dimension.length / count;
+	int partNo = index / partSize;
+	bool includePadding = hasPadding & !excludePaddingInIntervalCalculation;
+	Dimension newDimension = getDimension(dimension, partNo, count, includePadding);
+
+	indexToXform->partDimension = newDimension;
+	indexToXform->index = index;
+	indexToXform->partNo = partNo;
+
+	if (includePadding) {
+		Dimension paddinglessDim = getDimension(dimension, partNo, count, false);
+		int indexForwardDrift = index - paddinglessDim.range.min;
+		int indexBackwardDrift = paddinglessDim.range.max - index;
+		if (indexForwardDrift <= frontPadding && partNo > 0) {
+			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
+					partNo - 1, getDimension(dimension, partNo - 1, count, true));
+			return paddingPart;
+		} else if (indexBackwardDrift <= rearPadding && partNo < count - 1) {
+			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
+					partNo + 1, getDimension(dimension, partNo + 1, count, true));
+			return paddingPart;
+		}
+	}
+
+	return NULL;
+}
+
 //-------------------------------------------------------- Stride --------------------------------------------------------
 
 StrideInstr::StrideInstr(Dimension pd, int id, int ppuCount)
@@ -393,7 +466,11 @@ StrideInstr::StrideInstr(Dimension pd, int id, int ppuCount)
 }
 
 Dimension StrideInstr::getDimension(bool includePadding) {
-	int length = parentDim.length;
+	return getDimension(parentDim, partId, partsCount, false);
+}
+
+Dimension StrideInstr::getDimension(Dimension parentDimension, int partId, int partsCount, bool includePadding) {
+	int length = parentDimension.length;
 	int perStrideEntries = length / partsCount;
 	int myEntries = perStrideEntries;
 	int remainder = length % partsCount;
@@ -516,6 +593,24 @@ void StrideInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, List<
 	if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
 }
 
+XformedIndexInfo *StrideInstr::transformIndex(XformedIndexInfo *indexToXform) {
+
+	Dimension dimension = indexToXform->partDimension;
+	int index = indexToXform->index;
+	int count = calculatePartsCount(dimension, false);
+
+	int zeroBasedIndex = index - dimension.range.min;
+	int xformedIndex = zeroBasedIndex / count;
+	int partNo = zeroBasedIndex % count;
+	Dimension newDimension = getDimension(dimension, partNo, count, false);
+
+	indexToXform->partDimension = newDimension;
+	indexToXform->index = xformedIndex;
+	indexToXform->partNo = partNo;
+
+	return NULL;
+}
+
 //----------------------------------------------------- Block Stride -----------------------------------------------------
 
 BlockStrideInstr::BlockStrideInstr(Dimension pd, int id, int ppuCount, int size)
@@ -528,6 +623,10 @@ BlockStrideInstr::BlockStrideInstr(Dimension pd, int id, int ppuCount, int size)
 }
 
 Dimension BlockStrideInstr::getDimension(bool includePadding) {
+	return getDimension(parentDim, partId, partsCount, false);
+}
+
+Dimension BlockStrideInstr::getDimension(Dimension parentDim, int partId, int partsCount, bool includePadding) {
 	int strideLength = size * partsCount;
 	int strideCount = parentDim.length / strideLength;
 	int myEntries = strideCount * size;
@@ -685,4 +784,24 @@ void BlockStrideInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, 
 	}
 	rangeList->RemoveAt(rangeList->NumElements() - 1);
 	if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
+}
+
+XformedIndexInfo *BlockStrideInstr::transformIndex(XformedIndexInfo *indexToXform) {
+
+	Dimension dimension = indexToXform->partDimension;
+	int index = indexToXform->index;
+	int count = calculatePartsCount(dimension, false);
+
+	int strideLength = size * count;
+	int zeroBasedIndex = index - dimension.range.min;
+
+	int partNo = (zeroBasedIndex % strideLength) / size;
+	int xformedIndex = (zeroBasedIndex / strideLength) * size + zeroBasedIndex % size;
+	Dimension newDimension = getDimension(dimension, partNo, count, false);
+
+	indexToXform->partDimension = newDimension;
+	indexToXform->index = xformedIndex;
+	indexToXform->partNo = partNo;
+
+	return NULL;
 }
