@@ -99,7 +99,7 @@ public:
 	}
 	int getDimNo() { return dimNo; }
 	std::vector<FoldStrain*> *getFold() { return fold; }
-	void print(std::ostream &stream);
+	void print(std::ostream &stream, int indentLevel);
 
 	// function to be used to get individual dimension chains within a fold strain
 	static List<DimensionFold*> *separateDimensionFolds(FoldStrain *foldStrain);
@@ -117,6 +117,11 @@ public:
 	// the lowest level. For the lowest level, the interval description generation process within the partition
 	// library takes care of dimension length inequalities.
 	List<DimensionFold*> *branchOutForDimHeterogeneity(DataItemConfig *dataConfig);
+
+	// This attempts to reduce the number of levels in the dimension fold to make interval description generation
+	// process more efficient. Further, if there are lesser number of levels then the need of branching out to
+	// account for dimension length heterogeneity in parts is minimized.
+	void pruneFolding(DataItemConfig *dataConfig);
 
 private:
 	// a recursive helper function for branchOutForDimHeterogeneity routine's calculation

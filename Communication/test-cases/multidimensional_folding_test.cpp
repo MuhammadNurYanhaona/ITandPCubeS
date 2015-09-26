@@ -75,7 +75,7 @@ int mainMDFT() {
 			List<DimensionFold*> *dimFolds = DimensionFold::separateDimensionFolds(strain);
 			cout << '\n';
 			for (int k = 0; k < dimFolds->NumElements(); k++) {
-				dimFolds->Nth(k)->print(cout);
+				dimFolds->Nth(k)->print(cout, 0);
 			}
 		}
 	}

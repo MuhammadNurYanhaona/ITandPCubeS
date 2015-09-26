@@ -68,7 +68,7 @@ void PartFolding::print(std::ostream &stream, int indentLevel) {
 
 List<FoldStrain*> *PartFolding::extractStrains(std::vector<PartFolding*> *currentFoldingChain) {
 	List<FoldStrain*> *strains = new List<FoldStrain*>;
-	if (descendants->NumElements() != 0) {
+	if (descendants != NULL && descendants->NumElements() != 0) {
 		currentFoldingChain->push_back(this);
 		for (int i = 0; i < descendants->NumElements(); i++) {
 			PartFolding *descendant = descendants->Nth(i);
@@ -159,6 +159,10 @@ List<MultidimensionalIntervalSeq*> *FoldStrain::generateIntervalDesc(DataItemCon
 			DimensionFold *dimensionFold = dimensionFoldList->Nth(i);
 			int dimensioNo = dimensionFold->getDimNo();
 			if (d == dimensioNo) {
+				// we make an attempt to prune the dimension fold into a maximally compact fold-strain path to make
+				// the final interval description for it also compact
+				dimensionFold->pruneFolding(dataConfig);
+
 				// Note that during folding part containers attention has not been given to ensure there is no miss
 				// match in the dimension lengths in the interim layers of a fold. In fact, that was a difficult
 				// logic to integrate into folding. But presence of heterogeneity in a fold may lead to erroneous
@@ -234,17 +238,20 @@ List<DimensionFold*> *DimensionFold::separateDimensionFolds(FoldStrain *foldStra
 	return dimensionFoldList;
 }
 
-void DimensionFold::print(std::ostream &stream) {
-	stream << '[' << dimNo << ": ";
+void DimensionFold::print(std::ostream &stream, int indentLevel) {
+	for (int i = 0; i < indentLevel; i++) {
+		stream << '\t';
+	}
+	stream << "Dimension " << dimNo << " [";
 	for (unsigned int i = 0; i < fold->size(); i++) {
-		stream << '(';
+		if (i > 0) stream << ", ";
 		FoldStrain *strain = fold->at(i);
+		stream << "level " << strain->getLevel() << ": ";
 		stream << strain->getIdRange().min;
 		stream << "-";
 		stream << strain->getIdRange().max;
-		stream << ')';
 	}
-	stream << ']';
+	stream << ']' << "\n";
 }
 
 List<IntervalSeq*> *DimensionFold::generateIntervalDesc(DataItemConfig *dataConfig) {
@@ -269,11 +276,47 @@ List<IntervalSeq*> *DimensionFold::generateIntervalDesc(DataItemConfig *dataConf
 }
 
 List<DimensionFold*> *DimensionFold::branchOutForDimHeterogeneity(DataItemConfig *dataConfig) {
-	List<DimensionFold*> *foldList = new List<DimensionFold*>;
+	vector<FoldStrain*> *constrVector = new vector<FoldStrain*>;
+	List<DimensionFold*> *foldList = branchOut(dataConfig, constrVector);
+	delete constrVector;
 	return foldList;
 }
 
-List<DimensionFold*> *DimensionFold::branchOut(DataItemConfig *dataConfig, std::vector<FoldStrain*> *constructionBranch) {
+void DimensionFold::pruneFolding(DataItemConfig *dataConfig) {
+
+	// there must be at least one level in the fold to do any computation over it
+	int foldLength = fold->size();
+	if (foldLength > 1) {
+		for (int i = 0; i < foldLength; i++) {
+			FoldStrain *strain = fold->at(i);
+			int levelNo = strain->getLevel();
+			Range range = strain->getIdRange();
+			// set the parent dimension information that the partition instruction at current level divides and the parts count
+			dataConfig->adjustDimensionAndPartsCountAtLevel(levelNo, dimNo);
+			// this is probably not needed for correct interval description generation
+			dataConfig->setPartIdAtLevel(levelNo, dimNo, range.min);
+		}
+
+		// to take an upper level into consideration for pruning bottom-most levels should have all the parts
+		int pruningLevel = foldLength - 1;
+		for (int i = foldLength - 1; i > 0; i++) {
+			FoldStrain *strain = fold->at(i);
+			Range range = strain->getIdRange();
+			PartitionInstr *instr = dataConfig->getInstruction(strain->getLevel(), dimNo);
+			int count = instr->getPartsCount();
+			if (count == range.max - range.min + 1) {
+				pruningLevel = i;
+			} else break;
+		}
+
+		// prune levels that are full
+		while (fold->size() > pruningLevel - 1) {
+			fold->pop_back();
+		}
+	}
+}
+
+List<DimensionFold*> *DimensionFold::branchOut(DataItemConfig *dataConfig, vector<FoldStrain*> *constructionBranch) {
 
 	List<DimensionFold*> *dimensionFoldList = new List<DimensionFold*>;
 	int updatePoint = constructionBranch->size();
