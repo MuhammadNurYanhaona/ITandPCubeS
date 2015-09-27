@@ -205,9 +205,11 @@ List<MultidimensionalIntervalSeq*> *FoldStrain::generateIntervalDesc(DataItemCon
 //------------------------------------------------------------ Dimension Fold -----------------------------------------------------------/
 
 List<DimensionFold*> *DimensionFold::separateDimensionFolds(FoldStrain *foldStrain) {
+
 	List<int> *foundDimensionList = new List<int>;
 	List<vector<FoldStrain*>*> *dimFoldsInConstruct = new List<vector<FoldStrain*>*>;
 	FoldStrain *currentFold = foldStrain;
+
 	while (currentFold != NULL) {
 		int dimensionNo = currentFold->getDimNo();
 		vector<FoldStrain*> *dimVector = NULL;
@@ -226,6 +228,7 @@ List<DimensionFold*> *DimensionFold::separateDimensionFolds(FoldStrain *foldStra
 		dimVector->insert(dimVector->begin(), copy);
 		currentFold = currentFold->getPrevious();
 	}
+
 	List<DimensionFold*> *dimensionFoldList = new List<DimensionFold*>;
 	for (int i = 0; i < foundDimensionList->NumElements(); i++) {
 		int dimension = foundDimensionList->Nth(i);
@@ -233,6 +236,7 @@ List<DimensionFold*> *DimensionFold::separateDimensionFolds(FoldStrain *foldStra
 		DimensionFold *dimensionFold = new DimensionFold(dimension, foldDesc);
 		dimensionFoldList->Append(dimensionFold);
 	}
+
 	delete foundDimensionList;
 	delete dimFoldsInConstruct;
 	return dimensionFoldList;
@@ -298,8 +302,8 @@ void DimensionFold::pruneFolding(DataItemConfig *dataConfig) {
 		}
 
 		// to take an upper level into consideration for pruning bottom-most levels should have all the parts
-		int pruningLevel = foldLength - 1;
-		for (int i = foldLength - 1; i > 0; i++) {
+		int pruningLevel = foldLength;
+		for (int i = foldLength - 1; i > 0; i--) {
 			FoldStrain *strain = fold->at(i);
 			Range range = strain->getIdRange();
 			PartitionInstr *instr = dataConfig->getInstruction(strain->getLevel(), dimNo);
@@ -310,7 +314,7 @@ void DimensionFold::pruneFolding(DataItemConfig *dataConfig) {
 		}
 
 		// prune levels that are full
-		while (fold->size() > pruningLevel - 1) {
+		while (fold->size() > pruningLevel) {
 			fold->pop_back();
 		}
 	}

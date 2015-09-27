@@ -1,3 +1,7 @@
+/* This test generates a part-container hierarchy, folds the hierarchy into a compact description, tries to prune it up
+ * to a desired level, then describes the fold as list of, possibly multidimensional, interval sequences.
+ * */
+
 #include "../structure.h"
 #include "../part-management/part_folding.h"
 #include "../part-management/part_tracking.h"
@@ -119,6 +123,16 @@ int mainFPT() {
 			for (int k = 0; k < dimensionFolds->NumElements(); k++) {
 				dimensionFolds->Nth(k)->print(cout, 1);
 			}
+		}
+	}
+
+	cout << "\n\nInterval Sequences for Folds:--------------------------";
+	for (int i = 0; i < fold->NumElements(); i++) {
+		PartFolding *folding = fold->Nth(i);
+		cout << "\nFold #" << i + 1 << ":---------------------------------------\n";
+		List<MultidimensionalIntervalSeq*> *intList = folding->generateIntervalDesc(dataConfig);
+		for (int j = 0; j < intList->NumElements(); j++) {
+			intList->Nth(j)->draw();
 		}
 	}
 

@@ -89,14 +89,7 @@ public:
 		this->dimNo = dimNo;
 		this->fold = fold;
 	}
-	~DimensionFold() {
-		int size = 0;
-		while ((size = fold->size()) > 0) {
-			FoldStrain *entry = fold->at(size - 1);
-			fold->erase(fold->begin() + size - 1);
-			delete entry;
-		}
-	}
+	~DimensionFold() { delete fold; }
 	int getDimNo() { return dimNo; }
 	std::vector<FoldStrain*> *getFold() { return fold; }
 	void print(std::ostream &stream, int indentLevel);
