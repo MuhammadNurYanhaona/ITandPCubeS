@@ -152,8 +152,8 @@ public:
  * */
 class DataExchange {
 private:
-	int senderId;
-	int receiverId;
+	Participant *sender;
+	Participant *receiver;
 	List<MultidimensionalIntervalSeq*> *exchangeDesc;
 
 	// A full overlap flag is used when the sender and receiver have exactly the same data configuration. In
@@ -162,14 +162,17 @@ private:
 	bool fullOverlap;
 public:
 	// constructor to be used in the full overlap situation
-	DataExchange(Participant *sender, int receiverId);
+	DataExchange(Participant *sender, Participant *receiver);
 	// constructor to be used in other situation
-	DataExchange(int senderId, int receiverId, List<MultidimensionalIntervalSeq*> *exchangeDesc);
+	DataExchange(Participant *sender,
+			Participant *receiver,
+			List<MultidimensionalIntervalSeq*> *exchangeDesc);
 
-	int getSenderId() { return senderId; }
-	int getReceiverId() {return receiverId; }
+	Participant *getSender() { return sender; }
+	Participant *getReceiver() {return receiver; }
 	bool isFullOverlap() { return fullOverlap; }
 	List<MultidimensionalIntervalSeq*> *getExchangeDesc() { return exchangeDesc; }
+	void describe(int indentLevel, std::ostream &stream);
 
 	// tells the total number of data points that need to be exchanged between the sender and receiver as part of
 	// this data exchange
@@ -179,6 +182,8 @@ public:
 	// confinement should indeed exchange data. If the outcome of this function is NULL then the two parties do
 	// not interact. Otherwise, a data exchange instance should be created to record information about the pair.
 	static List<MultidimensionalIntervalSeq*> *getCommonRegion(Participant *sender, Participant *receiver);
+private:
+	void drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList);
 };
 
 /* For a particular data synchronization scenario there might be a need to move data between different segments,
@@ -195,6 +200,10 @@ private:
 	Participant *localReceiver;
 	List<Participant*> *remoteSenders;
 	List<Participant*> *remoteReceivers;
+
+	// local interaction is allowed when the local sender and receiver are from different LPS hierarchies; the
+	// same hierarchy case is tackled by the next class
+	bool localInteractionAllowed;
 public:
 	CrossSegmentInteractionSpec(Container *confinementContainer, ConfinementConstructionConfig *config);
 
@@ -203,6 +212,7 @@ public:
 
 	Participant *getRemoteSender(int listIndex) { return remoteSenders->Nth(listIndex); }
 	Participant *getRemoteReceiver(int listIndex) { return remoteReceivers->Nth(listIndex); }
+	void describe(int indentLevel, std::ostream &stream);
 private:
 	// an utility function to initialize the participant lists
 	void generateParticipantList(Container *confinementContainer,

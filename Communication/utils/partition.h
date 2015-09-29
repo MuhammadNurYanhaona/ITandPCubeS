@@ -61,7 +61,12 @@ protected:
 	// it is by itself not important for the proper functioning of this class
 	int priorityOrder;
 public:
+	// constructor to be used for already known parent dimension to be partitioned by this function, the part Id, and
+	// the number of partitions
 	PartitionInstr(const char *n, Dimension pd, int id, int count, bool r);
+	// constructor to be used to set up the above properties later
+	PartitionInstr(const char *n, bool r);
+
 	virtual ~PartitionInstr() {}
 	void setPrevInstr(PartitionInstr *prevInstr) { this->prevInstr = prevInstr; }
 	void setPartId(int partId) { this->partId = partId; }
@@ -101,12 +106,28 @@ public:
 	virtual XformedIndexInfo *transformIndex(XformedIndexInfo *indexToXform) = 0;
 };
 
+/* This represents a place-holder partition instruction to be used for data dimensions that have been replicated or
+ * not been partitioned on a particular logical processing space (LPS).
+ * */
+class VoidInstr : public PartitionInstr {
+public:
+	VoidInstr();
+	Dimension getDimension(bool includePadding=true) { return parentDim; }
+	Dimension getDimension(Dimension pD, int pId, int pC, bool iP) { return pD; }
+	int calculatePartsCount(Dimension dimension, bool updateProperties);
+	List<IntervalSeq*> *getIntervalDesc();
+	List<IntervalSeq*> *getIntervalDescForRange(Range idRange) { return getIntervalDesc(); }
+	void getIntervalDescForRangeHierarchy(List<Range> *rangeList, List<IntervalSeq*> *descInConstruct);
+	XformedIndexInfo *transformIndex(XformedIndexInfo *indexToXform);
+};
+
 class BlockSizeInstr : public PartitionInstr {
 protected:
 	int size;
 	int frontPadding;
 	int rearPadding;
 public:
+	BlockSizeInstr(int size);
 	BlockSizeInstr(Dimension pd, int id, int size);
 	Dimension getDimension(bool includePadding=true);
 	Dimension getDimension(Dimension parentDimension, int partId, int partsCount, bool includePadding);
@@ -125,6 +146,7 @@ protected:
 	int frontPadding;
 	int rearPadding;
 public:
+	BlockCountInstr(int count);
 	BlockCountInstr(Dimension pd, int id, int count);
 	Dimension getDimension(bool includePadding=true);
 	Dimension getDimension(Dimension parentDimension, int partId, int partsCount, bool includePadding);
@@ -141,6 +163,7 @@ class StrideInstr : public PartitionInstr {
 private:
 	int ppuCount;
 public:
+	StrideInstr(int ppuCount);
 	StrideInstr(Dimension pd, int id, int ppuCount);
 	Dimension getDimension(bool includePadding=true);
 	Dimension getDimension(Dimension parentDimension, int partId, int partsCount, bool includePadding);
@@ -157,6 +180,7 @@ private:
 	int size;
 	int ppuCount;
 public:
+	BlockStrideInstr(int ppuCount, int size);
 	BlockStrideInstr(Dimension pd, int id, int ppuCount, int size);
 	Dimension getDimension(bool includePadding=true);
 	Dimension getDimension(Dimension parentDimension, int partId, int partsCount, bool includePadding);

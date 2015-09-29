@@ -10,6 +10,7 @@
 #include "../part-management/part_tracking.h"
 #include <iostream>
 #include <vector>
+#include <sstream>
 
 using namespace std;
 
@@ -212,16 +213,17 @@ bool Participant::isEqual(Participant *other) {
 
 //---------------------------------------------------- Data Exchange ---------------------------------------------------------/
 
-DataExchange::DataExchange(Participant *sender, int receiverId) {
-	this->senderId = sender->getId();
-	this->receiverId = receiverId;
+DataExchange::DataExchange(Participant *sender, Participant *receiver) {
+	this->sender = sender;
+	this->receiver = receiver;
 	exchangeDesc = sender->getDataDescription();
 	fullOverlap = true;
 }
 
-DataExchange::DataExchange(int senderId, int receiverId, List<MultidimensionalIntervalSeq*> *exchangeDesc) {
-	this->senderId = senderId;
-	this->receiverId = receiverId;
+DataExchange::DataExchange(Participant *sender,
+		Participant *receiver, List<MultidimensionalIntervalSeq*> *exchangeDesc) {
+	this->sender = sender;
+	this->receiver = receiver;
 	List<MultidimensionalIntervalSeq*> *orderedSeqList = new List<MultidimensionalIntervalSeq*>;
 	orderedSeqList->Append(exchangeDesc->Nth(0));
 	for (int i = 1; i < exchangeDesc->NumElements(); i++) {
@@ -238,6 +240,28 @@ DataExchange::DataExchange(int senderId, int receiverId, List<MultidimensionalIn
 	}
 	this->exchangeDesc = orderedSeqList;
 	fullOverlap = false;
+}
+
+void DataExchange::describe(int indentLevel, ostream &stream) {
+	ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	stream << indent.str() << "Sender Segments: ";
+	vector<int> sendTags = sender->getSegmentTags();
+	for (unsigned int i = 0; i < sendTags.size(); i++) {
+		stream << sendTags[i] << ' ';
+	}
+	stream << '\n' << indent.str() << "Receiver Segments: ";
+	vector<int> receiveTags = receiver->getSegmentTags();
+	for (unsigned int i = 0; i < receiveTags.size(); i++) {
+		stream << receiveTags[i] << ' ';
+	}
+	stream << '\n' << indent.str() << "Sender Data Content:\n";
+	drawDataDescription(sender->getDataDescription());
+	stream << '\n' << indent.str() << "Receiver Data Content:\n";
+	drawDataDescription(receiver->getDataDescription());
+	stream << "\n" << indent.str() << "Total data items: " << getTotalElementsCount() << "\n";
+	stream << '\n' << indent.str() << "To be Exchanged Data: \n";
+	drawDataDescription(exchangeDesc);
 }
 
 int DataExchange::getTotalElementsCount() {
@@ -272,6 +296,14 @@ List<MultidimensionalIntervalSeq*> *DataExchange::getCommonRegion(Participant *s
 	return overlap;
 }
 
+void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList) {
+	for (int i = 0; i < seqList->NumElements(); i++) {
+		cout << "Sequence #" << i << ":\n";
+		MultidimensionalIntervalSeq *seq = seqList->Nth(i);
+		seq->draw();
+	}
+}
+
 //-------------------------------------- Cross Segment Interaction Specification ---------------------------------------------/
 
 CrossSegmentInteractionSpec::CrossSegmentInteractionSpec(Container *container, ConfinementConstructionConfig *config) {
@@ -285,22 +317,57 @@ CrossSegmentInteractionSpec::CrossSegmentInteractionSpec(Container *container, C
 	generateParticipantList(container,
 			dataDimensions, SEND, *senderPath, senderConfig, confinementLevel);
 
+	// even when the sender and the receivers are from the same LPS, we need to generate separate participants lists for
+	// them as the data part configuration may be different, e.g., one can have padding enabled in some levels but other not
 	DataItemConfig *receiverConfig = config->getReceiverConfig();
 	vector<LpsDimConfig> *receiverPath = receiverConfig->generateDimOrderVector();
 	generateParticipantList(container,
 				dataDimensions, RECEIVE, *receiverPath, receiverConfig, confinementLevel);
+
+	this->localInteractionAllowed = !config->isIntraContrainerSync();
 }
 
 List<DataExchange*> *CrossSegmentInteractionSpec::generateSendExchanges() {
+	if (localSender == NULL) return NULL;
 	List<Participant*> *localSenderList = new List<Participant*>;
 	localSenderList->Append(localSender);
-	return Confinement::generateDataExchangeList(localSenderList, remoteReceivers);
+	if (localReceiver == NULL || !localInteractionAllowed) {
+		return Confinement::generateDataExchangeList(localSenderList, remoteReceivers);
+	} else {
+		List<Participant*> *receiverList = new List<Participant*>;
+		receiverList->AppendAll(remoteReceivers);
+		receiverList->Append(localReceiver);
+		return Confinement::generateDataExchangeList(localSenderList, receiverList);
+	}
 }
 
 List<DataExchange*> *CrossSegmentInteractionSpec::generateReceiveExchanges() {
+	if (localReceiver == NULL) return NULL;
 	List<Participant*> *localReceiverList = new List<Participant*>;
 	localReceiverList->Append(localReceiver);
 	return Confinement::generateDataExchangeList(remoteSenders, localReceiverList);
+}
+
+void CrossSegmentInteractionSpec::describe(int indentLevel, std::ostream &stream) {
+	ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	if (localSender != NULL && remoteReceivers->NumElements() > 0) {
+		stream << indent.str() << "Send is activated from local operating memory\n";
+		stream << indent.str() << "Remote Receivers: ";
+		stream << remoteReceivers->NumElements() << "\n";
+	} else {
+		stream << indent.str() << "Current segment will not send any data\n";
+	}
+	if (localReceiver != NULL && remoteSenders->NumElements() > 0) {
+		stream << indent.str() << "Receive is activated from local operating memory\n";
+		stream << indent.str() << "Remote Senders: ";
+		stream << remoteSenders->NumElements() << "\n";
+	} else {
+		stream << indent.str() << "Current segment will not receive any data\n";
+	}
+	if (localInteractionAllowed && localSender != NULL && localReceiver != NULL) {
+		stream << indent.str() << "Involves local transfer between part hierarchies\n";
+	}
 }
 
 void CrossSegmentInteractionSpec::generateParticipantList(Container *confinementContainer,
@@ -316,15 +383,30 @@ void CrossSegmentInteractionSpec::generateParticipantList(Container *confinement
 	vector<int> segmentTags = confinementContainer->getSegmentTags();
 	vector<int*> *containerId = confinementContainer->getPartId(dataDimensions);
 
+	// Sometimes the confinement level may be the root of the distribution hierarchy. We cannot prune the root in the
+	// folded partition description of a segment's data content. The best that can be done is to prune up to the first
+	// LPS level along the data structure's partition configuration hierarchy. Therefore an adjustment has been made
+	// here for the active pruning level.
+	int activePruningLevel = max(0, pruningLevel);
+
 	for (unsigned int i = 0; i < segmentTags.size(); i++) {
 
 		int segmentTag = segmentTags.at(i);
 		PartFolding *folding = confinementContainer->foldContainerForSegment(segmentTag, pathOrder, true);
-		folding->pruneFolding(pruningLevel, dataConfig);
+		if (folding == NULL) continue;
+
+		// Note that individual dimension folds get pruned before we generate the interval description for a fold. Still
+		// we attempt an initial pruning of the entire multidimensional fold before to reduce the number of strands that
+		// we will need to consider later. This pruning below is not essential for the correctness of the final interval
+		// description but it improves the chance of that being more compact.
+		folding->pruneFolding(activePruningLevel, dataConfig);
 
 		if (segmentTag == localSegmentTag) {
 			List<MultidimensionalIntervalSeq*> *dataDesc = folding->generateIntervalDesc(dataConfig);
-			if (dataDesc != NULL) localParticipant = new Participant(role, containerId, dataDesc);
+			if (dataDesc != NULL) {
+				localParticipant = new Participant(role, containerId, dataDesc);
+				localParticipant->addSegmentTag(localSegmentTag);
+			}
 			continue;
 		}
 
@@ -435,8 +517,8 @@ List<DataExchange*> *IntraContainerInteractionSpec::generateExchanges() {
 		// eliminate any circular exchange description
 		for (int i = 0; i < exchangeList->NumElements(); i++) {
 			DataExchange *exchange = exchangeList->Nth(i);
-			vector<int*> *senderId = getSender(exchange->getSenderId())->getContainerId();
-			vector<int*> *receiverId = getReceiver(exchange->getReceiverId())->getContainerId();
+			vector<int*> *senderId = exchange->getSender()->getContainerId();
+			vector<int*> *receiverId = exchange->getReceiver()->getContainerId();
 			if (idutils::areIdsEqual(senderId, receiverId, dataDimensions)) {
 				exchangeList->RemoveAt(i);
 				delete exchange;
@@ -541,13 +623,13 @@ List<DataExchange*> *Confinement::generateDataExchangeList(List<Participant*> *s
 		for (int j = 0; j < receiverList->NumElements(); j++) {
 			Participant *receiver = receiverList->Nth(j);
 			if (sender->isEqual(receiver)) {
-				DataExchange *exchange = new DataExchange(sender, j);
+				DataExchange *exchange = new DataExchange(sender, receiver);
 				dataExchangeList->Append(exchange);
 				continue;
 			}
 			List<MultidimensionalIntervalSeq*> *overlap = DataExchange::getCommonRegion(sender, receiver);
 			if (overlap != NULL) {
-				DataExchange *exchange = new DataExchange(i, j, overlap);
+				DataExchange *exchange = new DataExchange(sender, receiver, overlap);
 				dataExchangeList->Append(exchange);
 			}
 		}

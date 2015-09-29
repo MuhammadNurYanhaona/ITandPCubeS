@@ -23,6 +23,18 @@ PartitionInstr::PartitionInstr(const char *n, Dimension pd, int id, int count, b
 	priorityOrder = 0;
 }
 
+PartitionInstr::PartitionInstr(const char *n, bool r) {
+	name = n;
+	reorderIndex = r;
+	parentDim = Dimension();
+	partId = -1;
+	partsCount = 0;
+	prevInstr = NULL;
+	hasPadding = false;
+	excludePaddingInIntervalCalculation = false;
+	priorityOrder = 0;
+}
+
 List<IntervalSeq*> *PartitionInstr::getTrueIntervalDesc() {
 	List<IntervalSeq*> *intervalList = new List<IntervalSeq*>;
 	getIntervalDesc(intervalList);
@@ -80,10 +92,56 @@ bool PartitionInstr::isFilledDimension(Range idRange, Dimension dimension) {
 	return count == (idRange.max - idRange.min + 1);
 }
 
+//--------------------------------------------------- Void Instruction ---------------------------------------------------
+
+VoidInstr::VoidInstr() : PartitionInstr("Void", false) {
+	partsCount = 1;
+	partId = 0;
+}
+
+int VoidInstr::calculatePartsCount(Dimension dimension, bool updateProperties) {
+	if (updateProperties) {
+		this->parentDim = dimension;
+		partsCount = 1;
+	}
+	return 1;
+}
+
+List<IntervalSeq*> *VoidInstr::getIntervalDesc() {
+	List<IntervalSeq*> *list = new List<IntervalSeq*>;
+	int begin = parentDim.range.min;
+	int length = parentDim.length;
+	int period = length;
+	int count = 1;
+	IntervalSeq *interval = new IntervalSeq(begin, length, period, count);
+	list->Append(interval);
+	return list;
+}
+
+void VoidInstr::getIntervalDescForRangeHierarchy(List<Range> *rangeList, List<IntervalSeq*> *descInConstruct) {
+	if (descInConstruct->NumElements() == 0) {
+		List<IntervalSeq*> *myIntervalList = getIntervalDesc();
+		descInConstruct->AppendAll(myIntervalList);
+		delete myIntervalList;
+	}
+	rangeList->RemoveAt(rangeList->NumElements() - 1);
+	if (prevInstr != NULL) prevInstr->getIntervalDescForRangeHierarchy(rangeList, descInConstruct);
+}
+
+XformedIndexInfo *VoidInstr::transformIndex(XformedIndexInfo *indexToXform) {
+	indexToXform->partNo = 0;
+	return NULL;
+}
+
 //------------------------------------------------------ Block Size ------------------------------------------------------
 
-BlockSizeInstr::BlockSizeInstr(Dimension pd, int id, int size)
-: PartitionInstr("Block-Size", pd, id, 0, false) {
+BlockSizeInstr::BlockSizeInstr(int size) : PartitionInstr("Block-Size", false) {
+	this->size = size;
+	frontPadding = 0;
+	rearPadding = 0;
+}
+
+BlockSizeInstr::BlockSizeInstr(Dimension pd, int id, int size) : PartitionInstr("Block-Size", pd, id, 0, false) {
 	int dimLength = pd.length;
 	this->partsCount = (dimLength + size - 1) / size;
 	this->size = size;
@@ -269,8 +327,13 @@ XformedIndexInfo *BlockSizeInstr::transformIndex(XformedIndexInfo *indexToXform)
 
 //----------------------------------------------------- Block Count ------------------------------------------------------
 
-BlockCountInstr::BlockCountInstr(Dimension pd, int id, int count)
-: PartitionInstr("Block-Count", pd, id, 0, false) {
+BlockCountInstr::BlockCountInstr(int count) : PartitionInstr("Block-Count", false) {
+	this->count = count;
+	frontPadding = 0;
+	rearPadding = 0;
+}
+
+BlockCountInstr::BlockCountInstr(Dimension pd, int id, int count) : PartitionInstr("Block-Count", pd, id, 0, false) {
 	int length = pd.length;
 	this->partsCount = max(1, min(count, length));
 	this->count = count;
@@ -458,8 +521,11 @@ XformedIndexInfo *BlockCountInstr::transformIndex(XformedIndexInfo *indexToXform
 
 //-------------------------------------------------------- Stride --------------------------------------------------------
 
-StrideInstr::StrideInstr(Dimension pd, int id, int ppuCount)
-: PartitionInstr("Stride", pd, id, 0, true) {
+StrideInstr::StrideInstr(int ppuCount) : PartitionInstr("Stride", true) {
+	this->ppuCount = ppuCount;
+}
+
+StrideInstr::StrideInstr(Dimension pd, int id, int ppuCount) : PartitionInstr("Stride", pd, id, 0, true) {
 	int length = pd.length;
 	this->partsCount = max(1, min(ppuCount, length));
 	this->ppuCount = ppuCount;
@@ -613,8 +679,13 @@ XformedIndexInfo *StrideInstr::transformIndex(XformedIndexInfo *indexToXform) {
 
 //----------------------------------------------------- Block Stride -----------------------------------------------------
 
-BlockStrideInstr::BlockStrideInstr(Dimension pd, int id, int ppuCount, int size)
-: PartitionInstr("Block-Stride", pd, id, 0, true) {
+BlockStrideInstr::BlockStrideInstr(int ppuCount, int size) : PartitionInstr("Block-Stride", true) {
+	this->size = size;
+	this->ppuCount = ppuCount;
+}
+
+BlockStrideInstr::BlockStrideInstr(Dimension pd, int id,
+		int ppuCount, int size) : PartitionInstr("Block-Stride", pd, id, 0, true) {
 	this->size = size;
 	this->ppuCount = ppuCount;
 	int length = pd.length;

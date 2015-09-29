@@ -47,7 +47,7 @@ int mainITT() {
 	}
 
 	cout << "\nIterator for a a list of sequences:\n";
-	DataExchange *exchange = new DataExchange(0, 1, seqList);
+	DataExchange *exchange = new DataExchange(NULL, NULL, seqList);
 	ExchangeIterator *listIterator = new ExchangeIterator(exchange);
 	while (listIterator->hasMoreElements()) {
 		listIterator->printNextElement(cout);

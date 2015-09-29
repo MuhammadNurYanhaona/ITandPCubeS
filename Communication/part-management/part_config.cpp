@@ -35,11 +35,11 @@ DataItemConfig::DataItemConfig(int dimensions, int levels) {
 	this->levels = levels;
 	dataDimensions.reserve(dimensions);
 	for (int i = 0; i < dimensions; i++) {
-		dataDimensions[i] = Dimension();
+		dataDimensions.insert(dataDimensions.begin() + i, Dimension());
 	}
 	partitionConfigs.reserve(levels);
 	for (int i = 0; i < levels; i++) {
-		partitionConfigs[i] = new PartitionConfig(dimensions);
+		partitionConfigs.insert(partitionConfigs.begin() + i, new PartitionConfig(dimensions));
 	}
 }
 
@@ -105,6 +105,24 @@ vector<LpsDimConfig> *DataItemConfig::generateDimOrderVector() {
 			int configLocation = levelNo * dimensionality + location;
 			dimOrderVector->insert(dimOrderVector->begin() + configLocation,
 					LpsDimConfig(levelNo, dimNo, currentConfig->getLpsId()));
+		}
+	}
+	return dimOrderVector;
+}
+
+vector<DimConfig> *DataItemConfig::generateDimOrderVectorWithoutLps() {
+	vector<DimConfig> *dimOrderVector = new vector<DimConfig>;
+	for (int levelNo = 0; levelNo < levels; levelNo++) {
+		PartitionConfig *currentConfig = partitionConfigs[levelNo];
+		vector<int> instrOrder;
+		int dimensionality = dataDimensions.size();
+		for (int dimNo = 0; dimNo < dimensionality; dimNo++) {
+			PartitionInstr *instr = currentConfig->getInstruction(dimNo);
+			int priority = instr->getPriorityOrder();
+			int location = binsearch::locatePointOfInsert(instrOrder, priority);
+			instrOrder.insert(instrOrder.begin() + location, priority);
+			int configLocation = levelNo * dimensionality + location;
+			dimOrderVector->insert(dimOrderVector->begin() + configLocation, DimConfig(levelNo, dimNo));
 		}
 	}
 	return dimOrderVector;

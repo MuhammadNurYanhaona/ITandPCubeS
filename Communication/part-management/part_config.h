@@ -5,6 +5,7 @@
 #include "../utils/partition.h"
 #include "../structure.h"
 
+class DimConfig;
 class LpsDimConfig;
 
 // the class that represents the partition configuration for a data structure on a single LPS
@@ -56,6 +57,8 @@ public:
 	// partitioned dimensions of a data structure have been ordered in that tree. This function generates the order
 	// vector that is followed when constructing that tree.
 	std::vector<LpsDimConfig> *generateDimOrderVector();
+	// this version is needed to traverse/use the part-container-tree which is specific to a particular LPS chain
+	std::vector<DimConfig> *generateDimOrderVectorWithoutLps();
 };
 
 #endif /* PART_CONFIG_H_ */

@@ -67,6 +67,7 @@ void PartFolding::print(std::ostream &stream, int indentLevel) {
 }
 
 List<FoldStrain*> *PartFolding::extractStrains(std::vector<PartFolding*> *currentFoldingChain) {
+
 	List<FoldStrain*> *strains = new List<FoldStrain*>;
 	if (descendants != NULL && descendants->NumElements() != 0) {
 		currentFoldingChain->push_back(this);
@@ -82,6 +83,10 @@ List<FoldStrain*> *PartFolding::extractStrains(std::vector<PartFolding*> *curren
 		FoldStrain *currentStrain = foldStrain;
 		for (int i = currentFoldingChain->size() - 1; i >= 0; i--) {
 			PartFolding *ancestor = (*currentFoldingChain)[i];
+
+			// do not include the placeholder root level of the part folding in the generated strain, if exists
+			if (ancestor->level == -1) break;
+
 			FoldStrain *prevStrain = new FoldStrain(ancestor->dimNo, ancestor->level, ancestor->idRange);
 			currentStrain->setPrevious(prevStrain);
 			currentStrain = prevStrain;
@@ -93,32 +98,51 @@ List<FoldStrain*> *PartFolding::extractStrains(std::vector<PartFolding*> *curren
 
 void PartFolding::pruneFolding(int lowerLevelBound, DataItemConfig *dataConfig) {
 
-	dataConfig->adjustDimensionAndPartsCountAtLevel(level, dimNo);
-	int partsCount = dataConfig->getInstruction(level, dimNo)->getPartsCount();
-	int prunnedDescendants = 0;
-
-	// condition for intermediate folding state
-	if (descendants != NULL && descendants->NumElements() != 0) {
-		int descendantsCount = descendants->NumElements();
-		for (int i = 0; i < descendantsCount; i++) {
-			dataConfig->setPartIdAtLevel(level, dimNo, idRange.min);
+	// skipping the placeholder root level of the fold from setup configuration (the placeholder may not exists)
+	if (level == -1) {
+		for (int i = 0; i < descendants->NumElements(); i++) {
 			PartFolding *nextFold = descendants->Nth(i);
 			nextFold->pruneFolding(lowerLevelBound, dataConfig);
-			if (nextFold->descendants == NULL) {
-				prunnedDescendants += nextFold->getSiblingsCount();
-			}
 		}
-	// condition for leaf level folding state
 	} else {
-		prunnedDescendants = idRange.max - idRange.min + 1;
-	}
+		dataConfig->adjustDimensionAndPartsCountAtLevel(level, dimNo);
+		dataConfig->setPartIdAtLevel(level, dimNo, idRange.min);
 
-	// pruning is achieved by deleting descendant foldings and set the descendant list a NULL; the NULL
-	// setting is important to propagate the information about pruning to the immediate ancestor level
-	// fold so that the recursive pruning process can continue making progress
-	if (level > lowerLevelBound && prunnedDescendants == partsCount) {
-		clearContent();
-		descendants = NULL;
+		// condition for intermediate folding state
+		if (descendants != NULL && descendants->NumElements() != 0) {
+
+			// determine the number of sub-partitions possible in the immediate next level
+			PartFolding *firstChild = descendants->Nth(0);
+			int nextLevel = firstChild->getLevel();
+			int nextDimension = firstChild->getDimNo();
+			dataConfig->adjustDimensionAndPartsCountAtLevel(nextLevel, nextDimension);
+			int partsCount = dataConfig->getInstruction(nextLevel, nextDimension)->getPartsCount();
+
+			// to eliminate the nested level from the folding configuration, individual descendants themselves
+			// should be pruned and the number of descendants the current folding level holds should be equal to
+			// the number of sub-partitions
+			int prunedDescendants = 0;
+			int descendantsCount = descendants->NumElements();
+			for (int i = 0; i < descendantsCount; i++) {
+				PartFolding *nextFold = descendants->Nth(i);
+				nextFold->pruneFolding(lowerLevelBound, dataConfig);
+				if (nextFold->descendants == NULL) {
+					prunedDescendants += nextFold->getSiblingsCount();
+				}
+			}
+
+			// prune the lower level only if the next level lies below the pruning level bound
+			if (nextLevel > lowerLevelBound && prunedDescendants == partsCount) {
+				clearContent();
+				descendants = NULL;
+			}
+
+		// condition for leaf level folding state; this sets the descendants list to NULL to indicate the default
+		// prune-ability of the lowest level
+		} else {
+			clearContent();
+			descendants = NULL;
+		}
 	}
 }
 

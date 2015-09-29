@@ -23,6 +23,8 @@ public:
 	PartFolding(int id, int dimNo, int level);
 	PartFolding(Range *idRange, int dimNo, int level);
 	~PartFolding();
+	inline int getLevel() { return level; }
+	inline int getDimNo() { return dimNo; }
 	bool isEqualInContent(PartFolding *other);
 	void addDescendant(PartFolding *descendant) { descendants->Append(descendant); }
 	List<PartFolding*> *getDescendants() { return descendants; }

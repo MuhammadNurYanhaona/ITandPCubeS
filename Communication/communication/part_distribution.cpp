@@ -224,7 +224,14 @@ void BranchingContainer::print(int indentLevel, std::ostream &stream) {
 	}
 }
 
-void BranchingContainer::insertPart(vector<LpsDimConfig> dimOrder, int segmentTag, List<int*> *partId, int position) {
+void BranchingContainer::insertPart(vector<LpsDimConfig> dimOrder,
+		int segmentTag,
+		List<int*> *partId, int position) {
+
+	// Note that segment tag has been added to each container along the path to the leaf branch that will represent
+	// the would be recorded part-ID so that looking at any position in the part distribution hierarchy, we can
+	// immediately say if there is any data part relevant for a particular segment extant under or on that position.
+	this->addSegmentTag(segmentTag);
 
 	LpsDimConfig dimConfig = dimOrder.at(position);
 	int lpsId = dimConfig.getLpsId();
@@ -245,6 +252,11 @@ void BranchingContainer::insertPart(vector<LpsDimConfig> dimOrder, int segmentTa
 			branch->addEntry(nextContainer);
 		}
 	} else {
+		// A hybrid container is needed when one or more intermediate steps for a hierarchical data partition contain
+		// their own larger data parts for computation. To clarify, suppose Space A divides Space B and there are
+		// computations occurring in both spaces and data is reordered by Space A after Space B. Then two separate
+		// allocations will be maintained for larger Space B data parts and smaller Space A sub-data parts. Therefore,
+		// the part distribution tree will contain hybrid containers marking the super parts belonging to Space B.
 		BranchingContainer *intermediate = dynamic_cast<BranchingContainer*>(nextContainer);
 		HybridBranchingContainer *hybrid = dynamic_cast<HybridBranchingContainer*>(nextContainer);
 		if (lastEntry && intermediate != NULL && hybrid == NULL) {
@@ -312,12 +324,22 @@ List<Container*> *BranchingContainer::listDescendantContainersForLps(int lpsId, 
 	return containerList;
 }
 
-PartFolding *BranchingContainer::foldContainerForSegment(int segmentTag, std::vector<LpsDimConfig> dimOrder, bool foldBack) {
+PartFolding *BranchingContainer::foldContainerForSegment(int segmentTag,
+		vector<LpsDimConfig> dimOrder,
+		bool foldBack) {
 
 	if (!hasSegmentTag(segmentTag)) return NULL;
+
+	// If the configuration level is -1 then this container is the root of the part-distribution-tree and we need to skip it
+	// as the dimension-order vector derived from the data-partition-configuration does not consider a distribution root that
+	// holds all data parts.
 	int position = 0;
-	while (!dimOrder.at(position).isEqual(config)) position++;
-	if (position == dimOrder.size() - 1) {
+	if (config.getLevel() != -1) {
+		while (!dimOrder.at(position).isEqual(config)) position++;
+	} else position = -1;
+
+	int lastDimOrderEntry = dimOrder.size() - 1;
+	if (position == lastDimOrderEntry) {
 		HybridBranchingContainer *hybrid = dynamic_cast<HybridBranchingContainer*>(this);
 		if (hybrid != NULL) {
 			Container *leafContainer = hybrid->getLeaf();
@@ -337,23 +359,23 @@ PartFolding *BranchingContainer::foldContainerForSegment(int segmentTag, std::ve
 	return (foldBack && parent != NULL) ? parent->foldBackContainer(folding) : folding;
 }
 
-void BranchingContainer::foldContainer(int segmentTag,
-		List<PartFolding*> *fold, std::vector<LpsDimConfig> dimOrder, int position) {
+void BranchingContainer::foldContainer(int segmentTag, List<PartFolding*> *fold,
+		vector<LpsDimConfig> dimOrder, int position) {
 
 	LpsDimConfig nextConfig = dimOrder.at(position);
 	Branch *branch = getBranch(nextConfig.getLpsId());
 	if (branch != NULL) {
+
 		List<Container*> *containerList = branch->getContainersForSegment(segmentTag);
 		int nextPosition = position + 1;
-
 		for (int i = 0; i < containerList->NumElements(); i++) {
-
 			Container *container = containerList->Nth(i);
 			BranchingContainer *nextBranch = dynamic_cast<BranchingContainer*>(container);
 			HybridBranchingContainer *hybrid = dynamic_cast<HybridBranchingContainer*>(container);
 			PartFolding *foldElement = NULL;
 
-			if (nextPosition < dimOrder.size() - 1) {
+			int lastEntry = dimOrder.size() - 1;
+			if (nextPosition < lastEntry) {
 				PartFolding *subFold = new PartFolding(container->getId(), nextConfig.getDimNo(), nextConfig.getLevel());
 				nextBranch->foldContainer(segmentTag, subFold->getDescendants(), dimOrder, nextPosition);
 				if (subFold->getDescendants()->NumElements() > 0) {
