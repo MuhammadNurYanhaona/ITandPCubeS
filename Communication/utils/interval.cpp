@@ -373,6 +373,7 @@ List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::computeIntersec
 		if (intersect == NULL || intersect->NumElements() == 0) {
 			while (dimensionalIntersects->NumElements() > 0) {
 				List<IntervalSeq*> *subIntersect = dimensionalIntersects->Nth(0);
+				dimensionalIntersects->RemoveAt(0);
 				delete subIntersect;
 			}
 			delete dimensionalIntersects;

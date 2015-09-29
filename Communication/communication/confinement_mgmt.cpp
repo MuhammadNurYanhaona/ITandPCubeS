@@ -69,7 +69,7 @@ vector<LpsDimConfig> *ConfinementConstructionConfig::backwardTruncatedDimVector(
 	unsigned int index = originalVector->size() - 1;
 	while (originalVector->at(index).getLevel() != truncateLevel) index--;
 	truncatedVector->insert(truncatedVector->begin(),
-			originalVector->begin(), originalVector->begin() + index);
+			originalVector->begin(), originalVector->begin() + index + 1);
 	return truncatedVector;
 }
 
@@ -245,12 +245,14 @@ DataExchange::DataExchange(Participant *sender,
 void DataExchange::describe(int indentLevel, ostream &stream) {
 	ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	stream << indent.str() << "Sender No: " << sender->getId() << "\n";
 	stream << indent.str() << "Sender Segments: ";
 	vector<int> sendTags = sender->getSegmentTags();
 	for (unsigned int i = 0; i < sendTags.size(); i++) {
 		stream << sendTags[i] << ' ';
 	}
-	stream << '\n' << indent.str() << "Receiver Segments: ";
+	stream << indent.str() << "\nReceiver No: " << receiver->getId() << "\n";
+	stream << indent.str() << "Receiver Segments: ";
 	vector<int> receiveTags = receiver->getSegmentTags();
 	for (unsigned int i = 0; i < receiveTags.size(); i++) {
 		stream << receiveTags[i] << ' ';
@@ -456,13 +458,12 @@ void CrossSegmentInteractionSpec::generateParticipantList(Container *confinement
 IntraContainerInteractionSpec::IntraContainerInteractionSpec(BranchingContainer *container,
 		ConfinementConstructionConfig *config) {
 
-	this->localSegmentTag = localSegmentTag;
+	this->localSegmentTag = config->getLocalSegmentTag();
 	this->dataDimensions = config->getDataDimensions();
 
 	vector<LpsDimConfig> *senderPath = config->getSendPathInDistributionTree();
 	int senderBranchHeaderLps = senderPath->at(0).getLpsId();
 	List<Container*> *senderBranches = container->listDescendantContainersForLps(senderBranchHeaderLps, 0, false);
-
 	vector<LpsDimConfig> *receiverPath = config->getReceivePathInDistributionTree();
 	int receiverBranchHeaderLps = receiverPath->at(0).getLpsId();
 	List<Container*> *receiverBranches = NULL;
@@ -473,7 +474,6 @@ IntraContainerInteractionSpec::IntraContainerInteractionSpec(BranchingContainer 
 	int senderBranchLevel = senderPath->at(0).getLevel();
 	senderList = generateParticipantList(senderBranches,
 			SEND, *senderPath, config->getSenderConfig(), senderBranchLevel);
-
 	int receiverBranchLevel = receiverPath->at(0).getLevel();
 	receiverList = generateParticipantList(receiverBranches,
 			RECEIVE, *receiverPath, config->getReceiverConfig(), receiverBranchLevel);
@@ -489,7 +489,9 @@ List<Participant*> *IntraContainerInteractionSpec::generateParticipantList(List<
 
 	for (int j = 0; j < participantBranches->NumElements(); j++) {
 		Container *branch = participantBranches->Nth(j);
+		vector<int> segmentTags = branch->getSegmentTags();
 		PartFolding *folding = branch->foldContainerForSegment(localSegmentTag, pathOrder, true);
+		if (folding == NULL) continue;
 		folding->pruneFolding(pruningLevel, dataConfig);
 		vector<int*> *containerId = branch->getPartId(dataDimensions);
 		List<MultidimensionalIntervalSeq*> *dataDesc = folding->generateIntervalDesc(dataConfig);
@@ -514,18 +516,40 @@ List<Participant*> *IntraContainerInteractionSpec::generateParticipantList(List<
 List<DataExchange*> *IntraContainerInteractionSpec::generateExchanges() {
 	List<DataExchange*> *exchangeList = Confinement::generateDataExchangeList(senderList, receiverList);
 	if (exchangeList != NULL) {
-		// eliminate any circular exchange description
+		List<DataExchange*> *filteredList = new List<DataExchange*>;
+		// keep only those exchanges that are not circular in nature
 		for (int i = 0; i < exchangeList->NumElements(); i++) {
 			DataExchange *exchange = exchangeList->Nth(i);
 			vector<int*> *senderId = exchange->getSender()->getContainerId();
 			vector<int*> *receiverId = exchange->getReceiver()->getContainerId();
-			if (idutils::areIdsEqual(senderId, receiverId, dataDimensions)) {
-				exchangeList->RemoveAt(i);
-				delete exchange;
+			if (!idutils::areIdsEqual(senderId, receiverId, dataDimensions)) {
+				filteredList->Append(exchange);
 			}
 		}
+		delete exchangeList;
+		return filteredList;
 	}
 	return exchangeList;
+}
+
+void IntraContainerInteractionSpec::describe(int indentLevel, ostream &stream) {
+	ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	stream << indent.str() << "Participating branch count: " << senderList->NumElements();
+	for (int i = 0; i < senderList->NumElements(); i++) {
+		stream << '\n' << indent.str() << "\tParticipant #" << i << ": ";
+		Participant *participant = senderList->Nth(i);
+		vector<int*> *containerId = participant->getContainerId();
+		for (unsigned int level = 0; level < containerId->size(); level++) {
+			stream << "[";
+			int *idAtLevel = containerId->at(level);
+			for (int dim = 0; dim < dataDimensions; dim++) {
+				if (dim > 0) stream << ", ";
+				stream << idAtLevel[dim];
+			}
+			stream << "]";
+		}
+	}
 }
 
 //----------------------------------------------------- Confinement ----------------------------------------------------------/
@@ -565,7 +589,6 @@ List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstruction
 	vector<LpsDimConfig> *senderVector = config->getSenderConfig()->generateDimOrderVector();
 	int confinementLevel = config->getConfinementLevel(senderVector);
 	vector<LpsDimConfig> *confinementVector = config->backwardTruncatedDimVector(confinementLevel, senderVector);
-
 	List<Confinement*> *confinementList = new List<Confinement*>;
 
 	// any of the part-tracking-tree can be NULL indicating that the executing segment has no portion of the data

@@ -81,6 +81,7 @@ vector<int*> *Container::getPartId(int dataDimensions) {
 			partIdVector->insert(partIdVector->begin(), partId);
 			partId = new int[dataDimensions];
 			partId[currentDimNo] = currentContainerId;
+			lastLps = currentLps;
 		}
 		current = current->parent;
 		if (current == NULL) break;

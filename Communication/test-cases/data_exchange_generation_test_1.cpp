@@ -108,6 +108,8 @@ int mainDEGT1() {
 	distributionTree->insertPart(*lufLpsDimOrder, 1, partId);
 	partId = idutils::generateIdFromArray(new int[2] {3, 0}, 2, 2);
 	distributionTree->insertPart(*lufLpsDimOrder, 1, partId);
+	partId = idutils::generateIdFromArray(new int[2] {4, 0}, 2, 2);
+	distributionTree->insertPart(*lufLpsDimOrder, 1, partId);
 
 //	distributionTree->print(0, cout);
 

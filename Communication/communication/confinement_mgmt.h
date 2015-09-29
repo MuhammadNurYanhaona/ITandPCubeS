@@ -247,6 +247,7 @@ public:
 	bool isSynchronizationNeeded() { return senderList->NumElements() > 1; }
 
 	List<DataExchange*> *generateExchanges();
+	void describe(int indentLevel, std::ostream &stream);
 private:
 	// a helper function to be used for generating the sender and receiver list of the confinement
 	List<Participant*> *generateParticipantList(List<Container*> *participantBranches,
