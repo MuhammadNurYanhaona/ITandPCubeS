@@ -60,7 +60,7 @@ char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, std::vector<int>
 
 	int dataPointNo = 0;
 	int multiplier = 1;
-	for (unsigned int i = partIndex->size() - 1; i >= 0; i--) {
+	for (int i = partIndex->size() - 1; i >= 0; i--) {
 		int firstIndex = partDimensions[i].range.min;
 		int dimensionIndex = partIndex->at(i);
 		dataPointNo += (dimensionIndex - firstIndex) * multiplier;

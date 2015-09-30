@@ -62,7 +62,6 @@ class DataPart {
         PartMetadata *metadata;
         void *data;
   public:
-        static long spaceConsumed;
         DataPart(PartMetadata *metadata) {
                 this->metadata = metadata;
                 this->data = NULL;
@@ -75,10 +74,17 @@ class DataPart {
                 for (int i = 0; i < charSize; i++) {
                         charData[i] = 0;
                 }
-                spaceConsumed += size * sizeof(type);
         }
         inline PartMetadata *getMetadata() { return metadata; }
         void *getData() { return data; }
+        template <class type> static void print(DataPart *dataPart, std::ostream &stream) {
+        	int size = dataPart->metadata->getSize();
+        	type *typedData = reinterpret_cast<type*>(dataPart->getData());
+        	for (int i = 0; i < size; i++) {
+        		stream << typedData[i] << " ";
+        	}
+        	stream << "\n";
+        }
 };
 
 #endif /* ALLOCATION_H_ */

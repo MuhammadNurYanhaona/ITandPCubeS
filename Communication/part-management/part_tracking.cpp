@@ -222,7 +222,7 @@ void PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 	int dataDimensions = dataConfig->getDimensionality();
 	partIndex.reserve(dataDimensions);
 	for (int i = 0; i < dataDimensions; i++) {
-		partIndex[i] = xformVector->at(i)->index;
+		partIndex.push_back(xformVector->at(i)->index);
 	}
 	int dataItemSize = transferSpec->getStepSize();
 

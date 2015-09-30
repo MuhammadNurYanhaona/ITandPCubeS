@@ -22,6 +22,11 @@ public:
 	int partNo;
 	Dimension partDimension;
 public:
+	XformedIndexInfo() {
+		this->index = 0;
+		this->partNo = 0;
+		this->partDimension = Dimension();
+	}
 	XformedIndexInfo(int index, int partNo, Dimension partDimension) {
 		this->index = index;
 		this->partNo = partNo;
