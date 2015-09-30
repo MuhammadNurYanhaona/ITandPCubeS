@@ -76,41 +76,67 @@ List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) 
 
 	// optimization for a common special case
 	if (subInterval->count == 1) {
-		int fullIterations = subInterval->length / this->length;
-		int extraEntries = subInterval->length % this->length;
+
 		List<IntervalSeq*> *intervalList = new List<IntervalSeq*>;
-		if (fullIterations > 0) {
-			int pieceBegin = this->begin + (subInterval->begin / this->length) * this->period
-					+ subInterval->begin % this->length;
-			IntervalSeq *fullIterationSequence = new IntervalSeq(pieceBegin,
-					this->length, this->period, fullIterations);
-			intervalList->Append(fullIterationSequence);
+		int elementsToCover = subInterval->length;
+		int currentSubHead = subInterval->begin;
+
+		// find the drift of the sub-interval beginning from the beginning of any iteration of the current interval
+		int frontDrift = subInterval->begin % this->length;
+		// if there is a front drift then add a partial iteration of the current sequence in the interval list
+		if (frontDrift > 0) {
+			// the end of the partial sub-iteration happens at the end of the overlapped iteration of this sequence
+			// or at the end of the sub-interval, whichever comes earlier
+			int partIterLength = std::min(this->length - frontDrift, subInterval->length);
+			int pieceBegin = this->begin + (currentSubHead / this->length) * this->period + frontDrift;
+			IntervalSeq *partialIteration = new IntervalSeq(pieceBegin, partIterLength, partIterLength, 1);
+			intervalList->Append(partialIteration);
+			currentSubHead += partIterLength;
+			elementsToCover -= partIterLength;
 		}
-		if (extraEntries > 0) {
-			int extraEntryStart = subInterval->begin + fullIterations * this->length;
-			int pieceBegin = this->begin + (extraEntryStart / this->length) * this->period
-					+ extraEntryStart % this->length;
-			IntervalSeq *partialIteration =
-					new IntervalSeq(pieceBegin, extraEntries, extraEntries, 1);
+
+		// then we check how many full iterations of the current sequence can happen for the spread of the remaining
+		// portion of the subinterval
+		int fullIterations = elementsToCover / this->length;
+		if (fullIterations > 0) {
+			int pieceBegin = this->begin + (currentSubHead / this->length) * this->period;
+			IntervalSeq *fullIterSequence = new IntervalSeq(pieceBegin, length, period, fullIterations);
+			intervalList->Append(fullIterSequence);
+			currentSubHead += fullIterations * length;
+			elementsToCover -= fullIterations * length;
+		}
+
+		// finally, we add any remaining entries from the sub-interval as an incomplete partial iteration of the
+		// current sequence
+		if (elementsToCover > 0) {
+			int pieceBegin = this->begin + (currentSubHead / this->length) * this->period;
+			IntervalSeq *partialIteration = new IntervalSeq(pieceBegin, elementsToCover, elementsToCover, 1);
 			intervalList->Append(partialIteration);
 		}
 		return intervalList;
 	}
 
+	// in the general case, we will determine all different pieces of the sub-interval that can originate within some
+	// interval of the current sequence; we stop as we identify a re-occurrence of an existing piece; then we generate
+	// a set of interval sequences for the sub-interval by determining how many times a single piece can appear
 	List<Range> *uniqueRangeList = new List<Range>;
 	List<int> *uniqueIntervalBeginnings = new List<int>;
 
-	int subLineSpanEnd = subInterval->begin
-			+ (subInterval->count - 1) * subInterval->period
+	int subLineSpanEnd = subInterval->begin + (subInterval->count - 1) * subInterval->period
 			+ subInterval->length - 1;
-	int subIntervalEndingIndex = this->begin
-			+ (subLineSpanEnd / this->length) * this->period
+	int subIntervalEndingIndex = this->begin + (subLineSpanEnd / this->length) * this->period
 			+ subLineSpanEnd % this->length;
-	int piecePeriod = subIntervalEndingIndex;
+	int piecePeriod = subIntervalEndingIndex + 1;
 
+	// iterate over the intervals of the sub-sequence
 	for (int i = 0; i < subInterval->count; i++) {
+
+		// determine where in the current sequence's iteration the beginning of the iteration of the sub-sequence lies
 		int localBegin = subInterval->begin + subInterval->period * i;
 		int parentBegin = localBegin % this->length;
+
+		// if the beginning of this piece has been observed before than there are no more new pieces to consider and we
+		// should determine the period to be used for the pieces found so far.
 		bool alreadyObserved = false;
 		for (int j = 0; j < uniqueIntervalBeginnings->NumElements(); j++) {
 			if (uniqueIntervalBeginnings->Nth(j) == parentBegin) {
@@ -118,6 +144,7 @@ List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) 
 				break;
 			}
 		}
+		// the period is the distance from the first piece to the current piece
 		if (alreadyObserved) {
 			int firstOccurance = uniqueRangeList->Nth(0).min;
 			int firstHolderBlock = firstOccurance / this->length;
@@ -126,8 +153,12 @@ List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) 
 			piecePeriod = blockAdvance * this->period;
 			break;
 		}
+
+		// if the current piece has not been observed before then record it for future reference
 		uniqueIntervalBeginnings->Append(parentBegin);
 
+		// in case one iteration of the sub-sequence is larger than that of the current sequence, there will be several
+		// broken pieces for the current sub-sequence iteration; we record all of that
 		int rangeMin = localBegin;
 		int lengthYetToCover = subInterval->length;
 		while (lengthYetToCover > 0) {
@@ -143,6 +174,7 @@ List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) 
 		}
 	}
 
+	// finally generate interval sequences for the pieces identified
 	List<IntervalSeq*> *intervalList = new List<IntervalSeq*>;
 	for (int i = 0; i < uniqueRangeList->NumElements(); i++) {
 		Range range = uniqueRangeList->Nth(i);
@@ -151,8 +183,12 @@ List<IntervalSeq*> *IntervalSeq::transformSubInterval(IntervalSeq *subInterval) 
 		int pieceCount = ((subIntervalEndingIndex - pieceBegin + 1)
 				+ piecePeriod - 1) / piecePeriod;
 		int pieceLength = range.max - range.min + 1;
+
+		// if there is just one iteration of the current piece then adjust the piece-period to piece-length that may
+		// simplify future calculations involving this sequence
 		IntervalSeq *intervalPiece = new IntervalSeq(pieceBegin,
-				pieceLength, piecePeriod, pieceCount);
+				pieceLength, (pieceCount == 1) ? pieceLength : piecePeriod, pieceCount);
+
 		intervalList->Append(intervalPiece);
 	}
 	return intervalList;

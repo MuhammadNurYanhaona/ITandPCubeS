@@ -35,12 +35,12 @@ int mainHIDT() {
 //		blockSize.drawIntervals();
 //		blockSize.drawTrueIntervalDesc(dim, 10);
 
-	//	// scenario #3
-	//	BlockStrideInstr blockStride = BlockStrideInstr(dim, 2, 5, 5);
-	//	BlockSizeInstr blockSize = BlockSizeInstr(blockStride.getDimension(), 1, 12);
-	//	blockSize.setPrevInstr(&blockStride);
-	//	blockSize.drawIntervals();
-	//	blockSize.drawTrueIntervalDesc(dim, 10);
+//		// scenario #3
+//		BlockStrideInstr blockStride = BlockStrideInstr(dim, 2, 5, 5);
+//		BlockSizeInstr blockSize = BlockSizeInstr(blockStride.getDimension(), 1, 12);
+//		blockSize.setPrevInstr(&blockStride);
+//		blockSize.drawIntervals();
+//		blockSize.drawTrueIntervalDesc(dim, 10);
 
 	//	// scenario #4
 	//	StrideInstr stride = StrideInstr(dim, 2, 6);
@@ -78,12 +78,21 @@ int mainHIDT() {
 	//	blockSize.setPrevInstr(&stride);
 	//	blockSize.drawTrueIntervalDesc(dim, 10);
 
-	// scenario #8
-	BlockStrideInstr blockStride = BlockStrideInstr(dim, 1, 2, 5);
-	BlockSizeInstr blockSize = BlockSizeInstr(blockStride.getDimension(), 0, 21);
+	//	// scenario #8
+	//	BlockStrideInstr blockStride = BlockStrideInstr(dim, 1, 2, 5);
+	//	BlockSizeInstr blockSize = BlockSizeInstr(blockStride.getDimension(), 0, 22);
+	//	blockSize.setPrevInstr(&blockStride);
+	//	blockSize.drawIntervals();
+	//	blockSize.drawTrueIntervalDesc(dim, 10);
+
+	// scenario #9
+	BlockStrideInstr blockStride = BlockStrideInstr(dim, 0, 2, 5);
+	BlockSizeInstr blockSize = BlockSizeInstr(blockStride.getDimension(), 0, 10);
 	blockSize.setPrevInstr(&blockStride);
-	blockSize.drawIntervals();
-	blockSize.drawTrueIntervalDesc(dim, 10);
+	StrideInstr stride = StrideInstr(blockSize.getDimension(), 1, 2);
+	stride.setPrevInstr(&blockSize);
+	stride.drawIntervals();
+	stride.drawTrueIntervalDesc(dim, 10);
 
 	return 0;
 }

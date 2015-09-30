@@ -18,7 +18,7 @@
 
 using namespace std;
 
-int main() {
+int mainDEGT2() {
 
 	// grid dimensions
 	Dimension rows = Dimension(100);
