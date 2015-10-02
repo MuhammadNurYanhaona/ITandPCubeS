@@ -29,24 +29,46 @@ enum TransferDirection { COMM_BUFFER_TO_DATA_PART, DATA_PART_TO_COMM_BUFFER };
  * operating memory
  * */
 class TransferSpec {
-private:
+protected:
 	// indicates read from or write to the communication buffer location
 	TransferDirection direction;
-	// indicates the step size to be used to identify the operating memory location and how much data to copy
-	size_t elementSize;
+	// indicates the step size to be used to identify the operating memory location and how much data to copy;
+	// here the size is specified in terms of the number of characters a single data item is equivalent to
+	int elementSize;
 	// address in the communication buffer for read/write
 	char *bufferEntry;
 	// the actual index of the data-point retrieved from the interval representation of the communication buffer
 	std::vector<int> *dataIndex;
 public:
-	TransferSpec(TransferDirection direction, size_t elementSize);
+	TransferSpec(TransferDirection direction, int elementSize);
+	virtual ~TransferSpec() {}
 	void setBufferEntry(char *bufferEntry, std::vector<int> *dataIndex);
 	inline std::vector<int> *getDataIndex() { return dataIndex; }
-	inline int getStepSize() { return elementSize / sizeof(char); }
+	inline int getStepSize() { return elementSize; }
 
 	// function to be used to do the data transfer once the participating location in the operating memory has been
 	// identified
-	void performTransfer(char *dataPartLocation);
+	virtual void performTransfer(char *dataPartLocation);
+};
+
+/* This subclass of transfer specification is used in the case where we do not intend to do a data transfer at an
+ * instance; rather, we intend to get the address within the operating memory where data should be written into or
+ * should be read from later.
+ * */
+class TransferLocationSpec : public TransferSpec {
+private:
+	char **bufferLocation;
+public:
+	// the transfer direction used here is irrelevant; one is picked because the super class constructor needs one
+	TransferLocationSpec(int elementSize) : TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize) {
+		bufferLocation = NULL;
+	}
+	void setBufferLocation(char **bufferLocation) {
+		this->bufferLocation = bufferLocation;
+	}
+	void performTransfer(char *dataPartLocation) {
+		*bufferLocation = dataPartLocation;
+	}
 };
 
 /* class holding information that is needed to traverse the part-container hierarchy and identify the location of

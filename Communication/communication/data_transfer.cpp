@@ -11,14 +11,14 @@ using namespace std;
 
 //---------------------------------------------------- Transfer Specification -----------------------------------------------------/
 
-TransferSpec::TransferSpec(TransferDirection direction, size_t elementSize) {
+TransferSpec::TransferSpec(TransferDirection direction, int elementSize) {
 	this->direction = direction;
 	this->elementSize = elementSize;
 	this->bufferEntry = NULL;
 	this->dataIndex = NULL;
 }
 
-void TransferSpec::setBufferEntry(char *bufferEntry, std::vector<int> *dataIndex) {
+void TransferSpec::setBufferEntry(char *bufferEntry, vector<int> *dataIndex) {
 	this->bufferEntry = bufferEntry;
 	this->dataIndex = dataIndex;
 }
