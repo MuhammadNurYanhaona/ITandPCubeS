@@ -34,20 +34,13 @@ class PartMetadata {
 	Dimension *boundary;
 	// if padding is used at partitioning then its overlapping along of boundaries with neighboring parts
 	int *padding;
-	// the interval description for the part with and without padding
-	HyperplaneInterval *coreInterval;
-	// this is valid for only those partition functions that support paddings
-	HyperplaneInterval *paddedInterval;
   public:
 	PartMetadata(int dimensionality, List<int*> *idList, Dimension *boundary, int *padding);
-	void setIntervals(HyperplaneInterval *coreInterval, HyperplaneInterval *paddedInterval);
 	int getSize();
 	inline int getDimensions() { return dimensionality; }
 	inline List<int*> *getIdList() { return idList; }
 	inline Dimension *getBoundary() { return boundary; }
 	inline int *getPadding() { return padding; }
-	inline HyperplaneInterval *getCoreInterval() { return coreInterval; }
-	inline HyperplaneInterval *getPaddedInterval() { return paddedInterval; }
 	bool isMatchingId(List<int*> *candidateId);
 	
 	// this is the method to be used to populate the storage dimension information properly for a data part
@@ -81,7 +74,6 @@ class DataPart {
 	PartMetadata *metadata;
 	void *data;
   public:
-	static long spaceConsumed;
 	DataPart(PartMetadata *metadata) { 
 		this->metadata = metadata;
 		this->data = NULL; 
@@ -94,16 +86,12 @@ class DataPart {
                 for (int i = 0; i < charSize; i++) {
                         charData[i] = 0;
                 }
-		spaceConsumed += size * sizeof(type);
 	}
 	inline PartMetadata *getMetadata() { return metadata; }
 	void *getData() { return data; }	
 };
 
-/* This class describes all the parts of a data structure that a PPU hold. This metadata is needed to derive infor-
-   mation about communication buffers for PPU-PPU interactions. It is, however, mostly needed during constructions 
-   of LPUs for computation-stage executions and determining how to fill in data recieved from others and to put 
-   data to other buffers when sending to and from individual data parts.
+/* This class provides generic information about all the parts of an LPS data structure that a segment holds
 */
 class ListMetadata {
   protected:
@@ -115,19 +103,12 @@ class ListMetadata {
 	// synchronized for overlappings in their boundary regions. The following flag indicates if that is needed 
 	// for the current data structure
 	bool hasPadding;
-	// interval specification for the union of all parts within the list; this ignores padding
-	IntervalSet *intervalSpec;
-	// interval specification that includes padding within data parts
-	IntervalSet *paddedIntervalSpec;
   public:
 	ListMetadata(int dimensionality, Dimension *boundary);
 	inline int getDimensions() { return dimensionality; }
 	inline Dimension *getBoundary() { return boundary; }
 	inline void setPadding(bool hasPadding) { this->hasPadding = hasPadding; }
 	inline bool isPadded() { return hasPadding; }
-	void generateIntervalSpec(List<PartMetadata*> *partList);
-	inline IntervalSet *getCoreIntervalSpec() { return intervalSpec; }
-	inline IntervalSet *getPaddedIntervalSpec() { return paddedIntervalSpec; }
 };
 
 /* This is the class holding all parts of a particular data structures that a PPU holds for some LPS. Although it

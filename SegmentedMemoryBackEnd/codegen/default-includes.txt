@@ -25,9 +25,12 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/common_utils.h"
-#include "../utils/interval_utils.h"
+#include "../utils/interval.h"
+#include "../utils/binary_search.h"
+#include "../utils/id_generation.h"
 
 // for routines related to partition functions
+#include "../partition-lib/partition.h"
 #include "../partition-lib/index_xform.h"
 #include "../partition-lib/partition_mgmt.h"
 
@@ -38,13 +41,21 @@
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"
 
-// to input-output and initialization
+// for input-output and initialization
 #include "../runtime/input_prompt.h"
 #include "../runtime/output_prompt.h"
 #include "../runtime/allocator.h"
 #include "../input-output/stream.h"
 #include "../input-output/data_handler.h"
 #include "../input-output/environment_base.h"
+
+// for communication
+#include "../communication/part_folding.h"
+#include "../communication/part_config.h"
+#include "../communication/part_distribution.h"
+#include "../communication/confinement_mgmt.h"
+#include "../communication/data_transfer.h"
+#include "../communication/comm_buffer.h"
 
 // for threading
 #include <pthread.h>

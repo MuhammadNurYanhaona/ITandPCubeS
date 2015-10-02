@@ -1,9 +1,15 @@
 #ifndef PART_FOLDING_H_
 #define PART_FOLDING_H_
 
+/* Folding of a data-part-container or a section of a container is done to generate a compact description, in terms of
+ * ranges of data parts, of the data content of a segment before generating a mathematical description of the content.
+ * The compactness of the representation compared to the original data-part hierarchy helps reducing the runtime of the
+ * mathematical description generation process significantly in most cases.  
+ */
+
 #include "../utils/list.h"
-#include "../structure.h"
 #include "../utils/interval.h"
+#include "../codegen/structure.h"
 #include "part_config.h"
 #include <cstdlib>
 #include <iostream>
@@ -11,16 +17,16 @@
 
 class FoldStrain;
 
-/* This class represents a folding of part IDs from a part-container for any data structure. The folding can
- * subsequently be used to construct a compact interval set representation of the entire container without.
+/* This class represents a folding of part IDs from a part-container for any data structure. The folding can subsequently 
+ * be used to construct a compact interval set representation of the entire container without.
  * */
 class PartFolding {
-protected:
+  protected:
 	int dimNo;
 	int level;
 	List<PartFolding*> *descendants;
 	Range idRange;
-public:
+  public:
 	PartFolding(int id, int dimNo, int level);
 	PartFolding(Range *idRange, int dimNo, int level);
 	~PartFolding();
@@ -53,15 +59,15 @@ public:
 	List<MultidimensionalIntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig);
 };
 
-// this class represents a single path in a part-folding; the path progresses bottom up; i.e., initial reference
-// holds the tail of the path
+// this class represents a single path in a part-folding; the path progresses bottom up; i.e., initial reference holds 
+// the tail of the path
 class FoldStrain {
-private:
+  private:
 	int dimNo;
 	int level;
 	Range idRange;
 	FoldStrain *previous;
-public:
+  public:
 	FoldStrain(int dimNo, int level, Range idRange) {
 		this->dimNo = dimNo;
 		this->level = level;
@@ -84,10 +90,10 @@ public:
 
 // this class is used to generate separate folding chains per dimensions from a strain of part folding
 class DimensionFold {
-private:
+  private:
 	int dimNo;
 	std::vector<FoldStrain*> *fold;
-public:
+  public:
 	DimensionFold(int dimNo, std::vector<FoldStrain*> *fold) {
 		this->dimNo = dimNo;
 		this->fold = fold;
@@ -119,7 +125,7 @@ public:
 	// account for dimension length heterogeneity in parts is minimized.
 	void pruneFolding(DataItemConfig *dataConfig);
 
-private:
+  private:
 	// a recursive helper function for branchOutForDimHeterogeneity routine's calculation
 	List<DimensionFold*> *branchOut(DataItemConfig *dataConfig, std::vector<FoldStrain*> *branchUnderConstruction);
 };

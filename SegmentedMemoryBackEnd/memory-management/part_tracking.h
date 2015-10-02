@@ -5,12 +5,15 @@
 // its Id.
 
 #include "../utils/list.h"
-
 #include <iostream>
 #include <vector>
 #include <cstdlib>
 
 class PartIterator;
+class XformedIndexInfo;
+class DataPartSpec;
+class TransferSpec;
+class PartFolding;
 
 // the list of parts for a data structure should be stored in an order so that their is a one-to-one correspondence
 // between advancement from one LPU to the next with the changes in the data parts that constitute those LPUs. If that
@@ -20,7 +23,7 @@ class PartIterator;
 // class to retain the data-dimension to LPS-dimension alignment information, and store data parts in that order, to 
 // counter that problem.  
 class DimConfig {
-  private:
+  protected:
 	int level;
 	int dimNo;
   public:
@@ -39,6 +42,7 @@ class SuperPart {
 	List<int*> *partId;
   public:
 	SuperPart(List<int*> *partId, int dataDimensions);
+	virtual ~SuperPart() {}
 	List<int*> *getPartId() { return partId; }
 	bool isMatchingId(int dimensions, List<int*> *candidatePartId);
 };
@@ -57,6 +61,7 @@ class PartIdContainer {
   public:
 	PartIdContainer(DimConfig dimConfig);
 	virtual ~PartIdContainer() {}
+	int getLevel() { return level; }
 	// returns the index within the part array where the next container/data-part for a certain part Id may be 
 	// found; returns key-not-found if the part-id does not match
 	int getCurrentLevelPartIndex(List<int*> *partId);
@@ -84,6 +89,27 @@ class PartIdContainer {
 	bool insertPartId(List<int*> *partId, int dataDimensions, std::vector<DimConfig> dimOrder) {
 		return insertPartId(partId, dataDimensions, dimOrder, 0);
 	}
+	// function to be implemented by sub-classes so that a concrete description of the parts content of a segment
+	// can be generated
+	virtual void foldContainer(List<PartFolding*> *fold) = 0;
+
+	// generates the part-IDs that lead to all containers that the part-hierarchy contains at a particular level,
+	// which corresponds to some intermediate LPS or the terminal LPS the parts of this hierarchy elements of; this
+	// will be used to locate the confinement groups of communication (each partId represents a separate confinement
+	// group) that will be later used in the part-distribution library for determining the details of communication.
+	// The last two parameters here are used to control the recursive part generation process.
+	virtual List<List<int*>*> *getAllPartIdsAtLevel(int levelNo,
+			int dataDimensions,
+			List<int*> *partIdUnderConstruct = new List<int*>,
+			int previousLevel = -1);
+
+	// function to be used for transferring data elements between a communication buffer and one or more data parts
+	// this is a recursive process of identifying the data part that holds the memory location to participate in the
+	// exchange with the communication buffer, transforming index along the way so that the address within the part
+	// for the actual data-structure-index is known, then do the read/write based on the transfer specification.
+	virtual void transferData(std::vector<XformedIndexInfo*> *xformVector,
+			TransferSpec *transferSpec,
+			DataPartSpec *dataPartSpec) = 0;
 };
 
 // this is the leaf level container that holds the actual parts of a data structure
@@ -99,13 +125,20 @@ class PartContainer : public PartIdContainer {
 	void postProcess();
 	SuperPart *getPartAtIndex(int index) { return dataPartList[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
+	void foldContainer(List<PartFolding*> *fold);
+	void transferData(std::vector<XformedIndexInfo*> *xformVector,
+			TransferSpec *transferSpec,
+			DataPartSpec *dataPartSpec);
+
 	// function to be used to set up an actual part as the replacement for the place-holder SuperPart after a
 	// valid data part has been created and initialized based on the nature of the data structure under concern 
 	void replacePartAtIndex(SuperPart *repacement, int index);
+  private:
+	SuperPart *getPart(int partNo);
 };
 
-// the part-list-container works as intermediate nodes in the hierarchical part-id-container construction and sub-
-// sequent part identification processes
+// the part-list-container works as intermediate nodes in the hierarchical part-id-container construction and later
+// part identification processes
 class PartListContainer : public PartIdContainer {
   protected:
 	std::vector<PartIdContainer*> nextLevelContainers;
@@ -119,9 +152,19 @@ class PartListContainer : public PartIdContainer {
 	void print(int indentLevel, std::ostream &stream);
 	PartIdContainer *getNestedContainerAtIndex(int index) { return nextLevelContainers[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
+	void foldContainer(List<PartFolding*> *fold);
+	void transferData(std::vector<XformedIndexInfo*> *xformVector,
+				TransferSpec *transferSpec,
+				DataPartSpec *dataPartSpec);
+	List<List<int*>*> *getAllPartIdsAtLevel(int levelNo,
+			int dataDimensions,
+			List<int*> *partIdUnderConstruct = new List<int*>,
+			int previousLevel = -1);
+  private:
+	PartIdContainer *getContainer(int partNo);
 };
 
-// an supplementary class to gather information about Part-Iterator's (look at below) efficiency in locating objects 
+// a supplementary class to gather information about Part-Iterator's (look at below) efficiency in locating objects
 class IteratorStatistics {
   public:
 	int directAccess;
@@ -166,6 +209,7 @@ class PartIterator {
 	void recordOneStepAdvance() { stats.oneStepAdvance++; }
 	void recordMove() { stats.nonAdjacentMoves++; }
 	void printStats(std::ostream &stream, int indent) { stats.print(stream, indent); }
+	void resetStats() {	this->stats = IteratorStatistics(); }
   private:
 	bool advance(int lastAccessPoint);
 };

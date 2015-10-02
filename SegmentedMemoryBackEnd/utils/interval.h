@@ -15,7 +15,7 @@
 #include <stack>
 #include <climits>
 #include "list.h"
-#include "../structure.h"
+#include "../codegen/structure.h"
 
 class IntervalState;
 
@@ -29,7 +29,7 @@ static const int INVALID_INDEX = INT_MIN;
 /* A supporting class to be used to visualize an interval sequence
  * */
 class DrawingLine {
-private:
+  private:
 	// expanse of the line that which which one or more interval sequences will be drawn
 	Dimension dim;
 	// the position in the line will be written in periodic interval equal to the label gap
@@ -37,7 +37,7 @@ private:
 	// the characters representing the current status of the line; it spans from dim.min to dim.max and a 1
 	// is represented by the inclusion-character and a 0 by the exclusion character
 	List<char> *line;
-public:
+  public:
 	DrawingLine(Dimension dim, int labelGap);
 	void setIndexToOne(int index);
 	void draw();
@@ -48,7 +48,7 @@ public:
 /* class representing a one-dimensional sequence of intervals occurring at a fixed period for a finite number of times
  * */
 class IntervalSeq {
-public:
+  public:
 	// the starting point of the first interval in the sequence
 	int begin;
 	// the length within a period the interval is 1
@@ -57,7 +57,7 @@ public:
 	int period;
 	// the number of interval in the sequence
 	int count;
-public:
+  public:
 	IntervalSeq(int b, int l, int p, int c);
 	void increaseCount(int amount) {
 		count += amount;
@@ -95,10 +95,10 @@ public:
 /* A multidimensional sequence of intervals to represent multidimensional data structure parts
  * */
 class MultidimensionalIntervalSeq {
-protected:
+  protected:
 	int dimensionality;
 	std::vector<IntervalSeq*> intervals;
-public:
+  public:
 	MultidimensionalIntervalSeq(int dimensionality);
 
 	// returns the total number of 1's included in this multidimensional interval sequence
@@ -124,7 +124,7 @@ public:
 	// dimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalSeqs(int dimensionality,
 			List<List<IntervalSeq*>*> *intervalSeqLists);
-private:
+  private:
 	// a recursive helper routine to generate multidimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(int dimensionality,
 			List<List<IntervalSeq*>*> *intervalSeqLists,
@@ -135,10 +135,10 @@ private:
  * along each dimension. That is, it is like a cursor in an interval sequence for dimension.
  * */
 class IntervalState {
-private:
+  private:
 	int iteration;
 	int index;
-public:
+  public:
 	// index is initialized to -1 as the cursor will be used as a next pointer that moves the index to 0th position
 	// at the beginning of the sequence access
 	IntervalState() { iteration = 0; index = -1; }
@@ -153,14 +153,14 @@ public:
  * in a fixed, incremental order
  * */
 class SequenceIterator {
-private:
+  private:
 	std::vector<int> *index;
 	int dimensionality;
 	MultidimensionalIntervalSeq *sequence;
 	std::stack<IntervalState*> cursors;
 	int elementCount;
 	int currentElementNo;
-public:
+  public:
 	SequenceIterator(MultidimensionalIntervalSeq *sequence);
 	bool hasMoreElements() { return currentElementNo < elementCount; }
 
@@ -169,7 +169,7 @@ public:
 
 	void reset();
 	void printNextElement(std::ostream &stream);
-private:
+  private:
 	void initCursorsAndIndex();
 };
 

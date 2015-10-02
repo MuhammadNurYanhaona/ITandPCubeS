@@ -15,12 +15,6 @@ PartMetadata::PartMetadata(int dimensionality, List<int*> *idList, Dimension *bo
 	this->padding = padding;
 }
         
-void PartMetadata::setIntervals(HyperplaneInterval *coreInterval, HyperplaneInterval *paddedInterval) {
-	this->coreInterval = coreInterval;
-	this->paddedInterval = paddedInterval;
-	if (paddedInterval == NULL) this->paddedInterval = coreInterval;
-}
-
 int PartMetadata::getSize() {
 	int size = 1;
 	for (int i = 0; i < dimensionality; i++) {
@@ -47,41 +41,12 @@ void PartMetadata::updateStorageDimension(PartDimension *partDimension) {
 	}
 }
 
-long DataPart::spaceConsumed = 0;
-
 //---------------------------------------------------------------- List Metadata ---------------------------------------------------------------/
 
 ListMetadata::ListMetadata(int dimensionality, Dimension *boundary) {
 	this->dimensionality = dimensionality;
 	this->boundary = boundary;
 	this->hasPadding = false;
-	this->intervalSpec = NULL;
-	this->paddedIntervalSpec = NULL;
-}
-
-void ListMetadata::generateIntervalSpec(List<PartMetadata*> *partList) {
-	intervalSpec = new IntervalSet;
-	intervalSpec->add(partList->Nth(0)->getCoreInterval());
-	for (int i = 1; i < partList->NumElements(); i++) {
-		IntervalSet *dataSpec = new IntervalSet;
-		IntervalSet *currentSpec = intervalSpec;
-		dataSpec->add(partList->Nth(i)->getCoreInterval());
-		intervalSpec = currentSpec->getUnion(dataSpec);
-		delete dataSpec;
-	}
-	if (!hasPadding) {
-		paddedIntervalSpec = intervalSpec;
-	} else {
-		paddedIntervalSpec = new IntervalSet;
-		paddedIntervalSpec->add(partList->Nth(0)->getPaddedInterval());
-		for (int i = 1; i < partList->NumElements(); i++) {
-			IntervalSet *dataSpec = new IntervalSet;
-			IntervalSet *currentSpec = paddedIntervalSpec;
-			dataSpec->add(partList->Nth(i)->getPaddedInterval());
-			paddedIntervalSpec = currentSpec->getUnion(dataSpec);
-			delete dataSpec;
-		}
-	}
 }
 
 //---------------------------------------------------------------- Data Parts List -------------------------------------------------------------/
