@@ -22,19 +22,19 @@
 class SyncConfig {
   private:
 	ConfinementConstructionConfig *confinementConfig;
-	List<DataPart*> *senderDataParts;
-	List<DataPart*> *receiverDataParts;
+	DataPartsList *senderDataParts;
+	DataPartsList *receiverDataParts;
 	int elementSize;
   public:
-	SyncConfig(ConfinementConstructionConfig *cc, List<DataPart*> *sDP, List<DataPart*> *rDP, int eS) {
+	SyncConfig(ConfinementConstructionConfig *cc, DataPartsList *sDP, DataPartsList *rDP, int eS) {
 		confinementConfig = cc;
 		senderDataParts = sDP;
 		receiverDataParts = rDP;
 		elementSize = eS;
 	}
 	ConfinementConstructionConfig *getConfinementConfig() { return confinementConfig; }
-	List<DataPart*> *getSenderDataParts() { return senderDataParts; }
-	List<DataPart*> *getReceiverDataParts() { return receiverDataParts; }
+	DataPartsList *getSenderDataParts() { return senderDataParts; }
+	DataPartsList *getReceiverDataParts() { return receiverDataParts; }
 	int getElementSize() { return elementSize; }
 };
 
@@ -61,8 +61,8 @@ class CommBuffer {
 	PartIdContainer *receiverTree;
 
 	// the list of operating memory data parts which data items will be read from and/or be written to
-	List<DataPart*> *senderPartList;
-	List<DataPart*> *receiverPartList;
+	DataPartsList *senderPartList;
+	DataPartsList *receiverPartList;
 
 	// data partition configurations for data-parts on two sides of the synchronization are needed to locate the
 	// right part and the right location for update within it
@@ -112,7 +112,7 @@ class PreprocessedCommBuffer : public CommBuffer {
 	// a helper function to traverse a part container tree and get all memory locations for data items that are part
 	// of the data-exchange a communication-buffer has been created for
 	void setupMappingBuffer(char **buffer,
-			List<DataPart*> *dataPartList,
+			DataPartsList *dataPartList,
 			PartIdContainer *partContainerTree,
 			DataItemConfig *dataConfig);
 };

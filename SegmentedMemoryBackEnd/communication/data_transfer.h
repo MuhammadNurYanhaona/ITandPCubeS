@@ -71,17 +71,17 @@ class TransferLocationSpec : public TransferSpec {
 	}
 };
 
-/* class holding information that is needed to traverse the part-container hierarchy and identify the location of
- * a data transfer
+/* class holding information that is needed to traverse the part-container hierarchy and identify the location of a data 
+ * transfer
  * */
 class DataPartSpec {
   private:
 	int dimensionality;
 	Dimension *dataDimensions;
-	List<DataPart*> *partList;
+	DataPartsList *dataParts;
 	DataItemConfig *dataConfig;
   public:
-	DataPartSpec(List<DataPart*> *partList, DataItemConfig *dataConfig);
+	DataPartSpec(DataPartsList *dataParts, DataItemConfig *dataConfig);
 	~DataPartSpec() { delete[] dataDimensions; }
 	inline DataItemConfig *getConfig() { return dataConfig; }
 

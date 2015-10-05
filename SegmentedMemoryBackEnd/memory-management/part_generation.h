@@ -17,11 +17,13 @@
 
 #include "../utils/list.h"
 #include "../codegen/structure.h"
+#include "../partition-lib/partition.h"
 
 class DimConfig;
 class PartMetadata;
 class ListMetadata;
 class DataPartsList;
+class DataItemConfig;
 
 /* This is just a helper class to hold the results of different configuration functions of Dim Parition Config 
    class as needed for data parts construction. 
@@ -120,6 +122,13 @@ class DimPartitionConfig {
 	// determines how many unique parts of the data structure can be found along this dimension by
 	// dividing the parent dimension 
 	virtual int getPartsCount(Dimension parentDimension) = 0;
+
+	// The DimPartitionConfig and its subclasses are designed state-free. So is the DataPartitionConfig 
+	// class that holds instances of these classes to specify the partition construction of a data structure
+	// for a particular LPS. For calculations related to communication, however, we need stateful versions
+	// of these classes and for the hierarchical agregate DataPartitionConfig class. This function is 
+	// provided to aid in the stateful DataItemConfig, the counterpart of DataPartitionConfig, creation. 
+	virtual PartitionInstr *getPartitionInstr() = 0;
 };
 
 /* configuration subclass to be instantiated when a data dimension has not been divided within the LPS */
@@ -134,6 +143,7 @@ class ReplicationConfig : public DimPartitionConfig {
 	int pickPartCount(int *lpuCount) { return 1; }
 	int getPartsCount(Dimension parentDimension) { return 1; }
 	Dimension getPartDimension(int partId, Dimension parentDimension) { return parentDimension; }		
+	PartitionInstr *getPartitionInstr() { return new VoidInstr(); }
 };
 
 /* configuration subclass corresponding to 'block_size' partition function; it takes a 'size' parameter */
@@ -148,6 +158,7 @@ class BlockSizeConfig : public DimPartitionConfig {
 	
 	int getPartsCount(Dimension parentDimension);
 	Dimension getPartDimension(int partId,   Dimension parentDimension);
+	PartitionInstr *getPartitionInstr();
 };
 
 /* configuration subclass corresponding to 'block_count' partition function; it takes a 'count' parameter */
@@ -162,6 +173,7 @@ class BlockCountConfig : public DimPartitionConfig {
 	
 	int getPartsCount(Dimension parentDimension);
 	Dimension getPartDimension(int partId,   Dimension parentDimension);
+	PartitionInstr *getPartitionInstr();
 };
 
 /* configuration subclass for parameter-less 'stride' partition function */
@@ -175,6 +187,7 @@ class StrideConfig : public DimPartitionConfig {
 	int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
 			List<int> *partCountList, 
 			List<Dimension*> *partDimensionList);
+	PartitionInstr *getPartitionInstr() { return new StrideInstr(ppuCount); }
 };
 
 /* configuration subclass for 'block_stride' partition function that takes a 'block_size' parameter */
@@ -189,6 +202,7 @@ class BlockStrideConfig : public DimPartitionConfig {
 	int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
 			List<int> *partCountList, 
 			List<Dimension*> *partDimensionList);
+	PartitionInstr *getPartitionInstr();
 };
 
 /* This is the class that holds the partition configuration for different dimensions of a single data structure 
@@ -217,12 +231,16 @@ class DataPartitionConfig {
 	// a configuration instance that is needed to construct the part-container (check part_tracking.h)
 	// instance for the underlying data structure
 	std::vector<DimConfig> *dimensionOrder;
+	// an integer identifier for the LPS the data structure partition is specified for
+	int lpsId;
   public:
 	DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfigs);
 	void setParent(DataPartitionConfig *parent, int parentJump);
 	DimPartitionConfig *getDimensionConfig(int dimNo) { return dimensionConfigs->Nth(dimNo); }
 	void configureDimensionOrder();
 	std::vector<DimConfig> *getDimensionOrder();
+	void setLpsId(int lpsId) { this->lpsId = lpsId; }
+	int getLpsId() { return lpsId; }
 	
 	// the function is to be used for generating metadata for subsequent use in generating a data part
 	PartMetadata *generatePartMetadata(List<int*> *partIdList);
@@ -264,6 +282,13 @@ class DataPartitionConfig {
 	// that decision about the nature and content of communication for shared data can be made.
 	ListMetadata *generatePartListMetadata(List<List<int*>*> *partIds);
 
+	// Stateful versions of data-partition-configuration are needed by the communication libraries; To
+	// give an example why is that, consider a synchronization of ghost boundary regions of data parts.
+	// Then the sender parts will have their paddings disabled but not the receiver parts, despite the
+	// whole synchronization being taken place within the sphere/confinement of a single LPS. In that
+	// case, we will have two DataItemConfig instances, one for the sender and the other for the receiver,
+	// and activate paddings on the second before we use them to calculate data movement requirements.
+	DataItemConfig *generateStateFulVersion();
   private:
 	// a recursive helper routine for the generatePartId(List<int*> lpuIds) function
 	void generatePartId(List<int*> *lpuIds, int position, 

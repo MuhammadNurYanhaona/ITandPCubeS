@@ -4,7 +4,10 @@
 #include "../utils/list.h"
 #include "../utils/binary_search.h"
 #include "../codegen/structure.h"
+#include "../partition-lib/partition.h"
+#include "../communication/part_config.h"
 
+#include <stack>
 #include <vector>
 #include <algorithm>
 #include <iostream>
@@ -147,6 +150,13 @@ int BlockSizeConfig::getEffectiveRearPadding(int partId, Dimension parentDimensi
 	return paddedEnd - end;
 }
 
+PartitionInstr *BlockSizeConfig::getPartitionInstr() {
+	int size = partitionArgs[0];
+	BlockSizeInstr *instr = new BlockSizeInstr(size);
+	instr->setPadding(paddings[0], paddings[1]);
+	return instr;
+}
+
 //----------------------------------------------------------- Block Count Config ----------------------------------------------------------/
 
 int BlockCountConfig::getPartsCount(Dimension parentDimension) {
@@ -196,6 +206,13 @@ int BlockCountConfig::getEffectiveRearPadding(int partId, Dimension parentDimens
 	int end = begin + length - 1;
 	int paddedEnd = std::min(parentDimension.range.max, end + paddings[1]);
 	return paddedEnd - end;
+}
+
+PartitionInstr *BlockCountConfig::getPartitionInstr() {
+	int count = partitionArgs[0];
+	BlockCountInstr *instr = new BlockCountInstr(count);
+	instr->setPadding(paddings[0], paddings[1]);
+	return instr;
 }
 
 //-------------------------------------------------------------- Stride Config ------------------------------------------------------------/
@@ -306,6 +323,11 @@ int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *
 			partCountList, partDimensionList);
 }
 
+PartitionInstr *BlockStrideConfig::getPartitionInstr() {
+	int blockSize = partitionArgs[0];
+	return new BlockStrideInstr(ppuCount, blockSize); 
+}
+
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
 
 DataPartitionConfig::DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfigs) {
@@ -335,6 +357,8 @@ void DataPartitionConfig::configureDimensionOrder() {
 		}
 	}
 
+	// ordering of the dimensions in the part-hierarchy-container-tree should follow their alignment order
+	// with the LPS dimensions to make part searching take less steps 
 	int level = getPartIdLevels() - 1;
 	std::vector<int> lpsOrdering;
 	std::vector<int> configOrdering;
@@ -350,6 +374,15 @@ void DataPartitionConfig::configureDimensionOrder() {
 	
 	for (int i = 0; i < configOrdering.size(); i++) {
 		this->dimensionOrder->push_back(DimConfig(level, configOrdering[i]));
+	}
+
+	// ordering of the replicated/un-partitioned dimensions does not matter; so just append them at the end
+	for (int d = 0; d < dimensionCount; d++) {
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
+		int alignment = dimConfig->getLpsAlignment();
+		if (alignment == -1) {
+			this->dimensionOrder->push_back(DimConfig(level, d));
+		}
 	}
 }
         
@@ -527,4 +560,58 @@ ListMetadata *DataPartitionConfig::generatePartListMetadata(List<List<int*>*> *p
 	ListMetadata *listMetadata = new ListMetadata(dimensionCount, dataDimensions);
 	listMetadata->setPadding(hasPadding);
 	return listMetadata;
+}
+
+DataItemConfig *DataPartitionConfig::generateStateFulVersion() {
+	
+	DataPartitionConfig *current = this;
+	int levelCount = 1;
+	while (current->parent != NULL) {
+		levelCount++;
+		current = current->parent;
+	}
+	DataItemConfig *dataItemConfig = new DataItemConfig(dimensionCount, levelCount);
+	
+	for (int i = 0; i < dimensionCount; i++) {
+		Dimension dataDimension = dimensionConfigs->Nth(i)->getDataDimension();
+		dataItemConfig->setDimension(i, dataDimension);
+	}
+
+	std::stack<DataPartitionConfig*> configStack;
+	current = this;
+	while (current != NULL) {
+		configStack.push(current);
+		current = current->parent;
+	}
+
+	int level = 0;
+	int entryCovered = 0;
+	while (!configStack.empty()) {
+		
+		current = configStack.top();
+		configStack.pop();
+		dataItemConfig->setLpsIdOfLevel(level, current->getLpsId());
+
+		for (int i = 0; i < dimensionCount; i++) {
+			PartitionInstr *instr = current->getDimensionConfig(i)->getPartitionInstr();
+			dataItemConfig->setPartitionInstr(level, i, instr);
+		}
+		
+		std::vector<DimConfig> *dimOrder = current->getDimensionOrder();
+		int size = dimOrder->size();
+		std::vector<DimConfig> orderInCurrentLevel;
+		orderInCurrentLevel.insert(orderInCurrentLevel.begin(), 
+				dimOrder->begin() + entryCovered, dimOrder->begin() + size);
+		for (int i = 0; i < orderInCurrentLevel.size(); i++) {
+			DimConfig dimConfig = orderInCurrentLevel.at(i);
+			int dimension = dimConfig.getDimNo();
+			dataItemConfig->getInstruction(level, dimension)->setPriorityOrder(i);
+		}
+
+		entryCovered += orderInCurrentLevel.size(); 	
+		level++;
+	}
+	
+	dataItemConfig->updateParentLinksOnPartitionConfigs();
+	return dataItemConfig;
 }

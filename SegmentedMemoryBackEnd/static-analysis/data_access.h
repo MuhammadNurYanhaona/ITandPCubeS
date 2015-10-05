@@ -137,6 +137,7 @@ class DependencyArc {
 	// An Id to indicate the index of the arc in the source's list; it is used to determine the variable name correspond
 	// to the arc 
 	int arcId;
+	// A name constructed from LPS and data structure information to create runtime variables for this dependency
 	const char *arcName;
   public:
 	DependencyArc(FlowStage *source, FlowStage *destination, const char *varName);

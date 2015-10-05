@@ -156,9 +156,14 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
 		programFile << "\")" << paramSeparator << jumps << ")" << stmtSeparator;
 	}
 
-	// finally configure a dimension-config vector reference to be used to generate a part container for
-	// holding all data-structure parts for the underlying data structure for current LPS for the segment
+	// configure a dimension-config vector reference to be used to generate a part container for holding 
+	// all data-structure parts for the underlying data structure for current LPS for the segment
 	programFile << indent << "config->configureDimensionOrder()" << stmtSeparator; 
+
+	// finally, set the integer LPS identifier in the configuration that will be needed to traverse the
+	// part-distribution-tree that holds partition hierarchy information of a data structure's parts for
+	// different LPSes.
+	programFile << indent << "config->setLpsId(Space_" << lps->getName() << ")" << stmtSeparator; 
 
 	programFile << indent << "return config" << stmtSeparator;
 	programFile << "}\n";

@@ -61,7 +61,7 @@ PreprocessedCommBuffer::~PreprocessedCommBuffer() {
 }
 
 void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
-		List<DataPart*> *dataPartList,
+		DataPartsList *dataPartList,
 		PartIdContainer *partContainerTree,
 		DataItemConfig *dataConfig) {
 

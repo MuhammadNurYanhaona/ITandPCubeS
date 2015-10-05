@@ -33,8 +33,8 @@ void TransferSpec::performTransfer(char *dataPartLocation) {
 
 //--------------------------------------------------- Data Part Specification -----------------------------------------------------/
 
-DataPartSpec::DataPartSpec(List<DataPart*> *partList, DataItemConfig *dataConfig) {
-	this->partList = partList;
+DataPartSpec::DataPartSpec(DataPartsList *dataParts, DataItemConfig *dataConfig) {
+	this->dataParts = dataParts;
 	this->dataConfig = dataConfig;
 	dimensionality = dataConfig->getDimensionality();
 	dataDimensions = new Dimension[dimensionality];
@@ -43,7 +43,7 @@ DataPartSpec::DataPartSpec(List<DataPart*> *partList, DataItemConfig *dataConfig
 	}
 }
 
-void DataPartSpec::initPartTraversalReference(std::vector<int> *dataIndex, std::vector<XformedIndexInfo*> *transformVector) {
+void DataPartSpec::initPartTraversalReference(vector<int> *dataIndex, vector<XformedIndexInfo*> *transformVector) {
 	for (int i = 0; i < dimensionality; i++) {
 		XformedIndexInfo *dimIndex = transformVector->at(i);
 		dimIndex->index = dataIndex->at(i);
@@ -52,9 +52,10 @@ void DataPartSpec::initPartTraversalReference(std::vector<int> *dataIndex, std::
 	}
 }
 
-char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, std::vector<int> *partIndex, int dataItemSize) {
+char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, vector<int> *partIndex, int dataItemSize) {
 
 	int partNo = partLocator->getPartListIndex();
+	List<DataPart*> *partList = dataParts->getCurrentList();
 	DataPart *dataPart = partList->Nth(partNo);
 	Dimension *partDimensions = dataPart->getMetadata()->getBoundary();
 
