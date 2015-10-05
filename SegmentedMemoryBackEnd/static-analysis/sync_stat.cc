@@ -10,7 +10,7 @@
 #include <fstream>
 
 
-//----------------------------------------------- Sync Requirement -----------------------------------------------/
+//----------------------------------------------------------- Sync Requirement -------------------------------------------------------------/
 
 SyncRequirement::SyncRequirement(const char *syncTypeName) {
 	this->syncTypeName = syncTypeName;
@@ -77,6 +77,33 @@ int SyncRequirement::compareTo(SyncRequirement *other) {
 	return 0;
 }
 
+CommunicationCharacteristics *SyncRequirement::getCommunicationInfo(int segmentationPPS) {
+
+	CommunicationCharacteristics *commCharacter = new CommunicationCharacteristics(variableName);
+	Space *commRoot = arc->getCommRoot();
+	Space *syncRoot = arc->getSyncRoot();
+	Space *confinementSpace = (syncRoot != NULL) ? syncRoot : commRoot;
+	Space *senderSyncSpace = arc->getSource()->getSpace();	
+	Space *receiverSyncSpace = arc->getSource()->getSpace();
+	DataStructure *senderStruct = senderSyncSpace->getStructure(variableName);
+	DataStructure *receiverStruct = receiverSyncSpace->getStructure(variableName);
+	
+	// in the general case, to involve communication, either the confinement of the synchronization must be
+	// above the PPS level where memory segmentation occurs, or there must be two different allocations for 
+	// the data structure in the sender and receiver sides of the synchronization
+	bool communicationNeeded = (confinementSpace->getPpsId() > segmentationPPS) 
+			|| (senderStruct->getAllocator() != receiverStruct->getAllocator());
+
+	commCharacter->setCommunicationRequired(communicationNeeded);
+	commCharacter->setConfinementSpace(confinementSpace);
+	commCharacter->setSenderSyncSpace(senderSyncSpace);
+	commCharacter->setReceiverSyncSpace(receiverSyncSpace);
+	commCharacter->setSenderDataAllocatorSpace(senderStruct->getAllocator());
+	commCharacter->setReceiverDataAllocatorSpace(receiverStruct->getAllocator());
+
+	return commCharacter;	
+}
+
 List<SyncRequirement*> *SyncRequirement::sortList(List<SyncRequirement*> *reqList) {
 	
 	if (reqList == NULL || reqList->NumElements() <= 1) return reqList;
@@ -99,7 +126,7 @@ List<SyncRequirement*> *SyncRequirement::sortList(List<SyncRequirement*> *reqLis
 	return sortedList;
 }
 
-//----------------------------------------------- Replication Sync ----------------------------------------------/
+//----------------------------------------------------------- Replication Sync -------------------------------------------------------------/
 
 void ReplicationSync::print(int indent) {
 	for (int i = 0; i < indent; i++) std::cout << '\t';
@@ -107,7 +134,7 @@ void ReplicationSync::print(int indent) {
 	SyncRequirement::print(indent);
 }
 
-//---------------------------------------------- Ghost Region Sync ----------------------------------------------/
+//---------------------------------------------------------- Ghost Region Sync -------------------------------------------------------------/
 
 GhostRegionSync::GhostRegionSync() : SyncRequirement("GSync") {
 	overlappingDirections = NULL;
@@ -121,7 +148,7 @@ void GhostRegionSync::print(int indent) {
 	std::ostringstream indentStr;
 	for (int i = 0; i < indent; i++) indentStr << '\t';
 	std::cout << indentStr.str() << "Type: " << "ghost region sync" << std::endl;
-	std::cout << indentStr.str() << "Directions:";
+	std::cout << indentStr.str() << "Overlapping Dimensions:";
 	for (int i = 0; i < overlappingDirections->NumElements(); i++) {
 		std::cout << " " << overlappingDirections->Nth(i);
 	}
@@ -129,7 +156,27 @@ void GhostRegionSync::print(int indent) {
 	SyncRequirement::print(indent);
 }
 
-//--------------------------------------------- Up Propagation Sync ---------------------------------------------/
+CommunicationCharacteristics *GhostRegionSync::getCommunicationInfo(int segmentationPPS) {
+
+	CommunicationCharacteristics *commCharacter = new CommunicationCharacteristics(variableName);
+	SyncStage *updaterSyncStage = dynamic_cast<SyncStage*>(arc->getSource());
+	FlowStage *actualUpdater = updaterSyncStage->getUltimateModifier(variableName);
+	Space *syncSpace = updaterSyncStage->getSpace();
+	Space *confinementSpace = syncSpace->getParent();
+	DataStructure *structure = actualUpdater->getSpace()->getStructure(variableName);
+	Space *allocatorSpace = structure->getAllocator(); 
+
+	commCharacter->setCommunicationRequired(true);
+	commCharacter->setConfinementSpace(confinementSpace);
+	commCharacter->setSenderSyncSpace(syncSpace);
+	commCharacter->setReceiverSyncSpace(syncSpace);
+	commCharacter->setSenderDataAllocatorSpace(allocatorSpace);
+	commCharacter->setReceiverDataAllocatorSpace(allocatorSpace);
+	
+	return commCharacter;	
+}
+
+//--------------------------------------------------------- Up Propagation Sync ------------------------------------------------------------/
 
 void UpPropagationSync::print(int indent) {
 	for (int i = 0; i < indent; i++) std::cout << '\t';
@@ -141,7 +188,7 @@ Space *UpPropagationSync::getSyncSpan() {
 	return arc->getSource()->getSpace();	
 }
 
-//-------------------------------------------- Down Propagation Sync --------------------------------------------/
+//-------------------------------------------------------- Down Propagation Sync -----------------------------------------------------------/
 
 void DownPropagationSync::print(int indent) {
 	for (int i = 0; i < indent; i++) std::cout << '\t';
@@ -149,7 +196,7 @@ void DownPropagationSync::print(int indent) {
 	SyncRequirement::print(indent);
 }
 
-//------------------------------------------- Cross Propagation Sync --------------------------------------------/
+//-------------------------------------------------------- Cross Propagation Sync ----------------------------------------------------------/
 
 void CrossPropagationSync::print(int indent) {
 	for (int i = 0; i < indent; i++) std::cout << '\t';
@@ -157,7 +204,7 @@ void CrossPropagationSync::print(int indent) {
 	SyncRequirement::print(indent);
 }
 
-//------------------------------------------ Variable Sync Requirement ------------------------------------------/
+//------------------------------------------------------ Variable Sync Requirement ---------------------------------------------------------/
 
 VariableSyncReqs::VariableSyncReqs(const char *varName) {
 	this->varName = varName;
@@ -172,11 +219,12 @@ void VariableSyncReqs::print(int indent) {
 	for (int i = 0; i < indent; i++) std::cout << '\t';
 	std::cout << "Variable: " << varName << std::endl;
 	for (int i = 0; i < syncList->NumElements(); i++) {
+		if (i > 0) std::cout << std::endl;
 		syncList->Nth(i)->print(indent + 1);
 	}	
 }
 
-//-------------------------------------------- Stage Sync Requirement -------------------------------------------/
+//-------------------------------------------------------- Stage Sync Requirement ----------------------------------------------------------/
 
 StageSyncReqs::StageSyncReqs(FlowStage *computation) {
 	this->computation = computation;
@@ -232,12 +280,13 @@ void StageSyncReqs::print(int indent) {
 		std::cout << indentStr.str() << "Computation: " << computation->getName() << std::endl;
 		std::cout << indentStr.str() << "Update on: Space " << updaterLps->getName() << std::endl;
 		for (int i = 0; i < varSyncList->NumElements(); i++) {
+			if (i > 0) std::cout << std::endl;
 			varSyncList->Nth(i)->print(indent + 1);
 		}
 	}
 }
 
-List<SyncRequirement*> *StageSyncReqs::getAllSyncReqirements() {
+List<SyncRequirement*> *StageSyncReqs::getAllSyncRequirements() {
 	
 	List<SyncRequirement*> *finalSyncList = new List<SyncRequirement*>;
 	List<VariableSyncReqs*> *varSyncList = getVarSyncList();
@@ -268,7 +317,7 @@ List<SyncRequirement*> *StageSyncReqs::getAllNonSignaledSyncReqs() {
 	return activeSyncList;
 }
 
-//-------------------------------------------- Stage Sync Dependencies ------------------------------------------/
+//------------------------------------------------------- Stage Sync Dependencies ----------------------------------------------------------/
 
 StageSyncDependencies::StageSyncDependencies(FlowStage *computation) {
 	this->computation = computation;

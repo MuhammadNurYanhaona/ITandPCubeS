@@ -17,15 +17,15 @@ class DataDependencies;
 class StageSyncReqs;
 class StageSyncDependencies;
 class SyncRequirement;
+class CommunicationCharacteristics;
 
-/* An important point to remember about synchronization related enums and classes in this headers is that
-   they corresponds to situations where there is a need for definite data movements along with signaling 
-   the fact that an update has taken place. The information regarding the signaling requirement is retained 
-   in the dependency arcs and some other variables that are kept in each flow stages. Forgetting this issue
-   may produce confusions in the understanding of the intended implementation of synchronization stages.
-   To clarify this distinction with an example, Entrance, return and Exit syncs are put in place only for 
-   dynamic and subpartitioned LPSes. Reappearance syncs are only for LPSes having overlapping ghost regions
-   in some data structure partitions.      
+/* An important point to remember about synchronization related enums and classes in this headers is that they corresponds 
+   to situations where there is a need for definite data movements along with signaling the fact that an update has taken 
+   place. The information regarding the signaling requirement is retained in the dependency arcs and some other variables 
+   that are kept in each flow stages. Forgetting this issue may produce confusions in the understanding of the intended 
+   implementation of synchronization stages. To clarify this distinction with an example, Entrance, return and Exit syncs 
+   are put in place only for dynamic and subpartitioned LPSes. Reappearance syncs are only for LPSes having overlapping 
+   ghost regions in some data structure partitions.      
 */
 
 /* 	Task global variables may be synchronized/retrieved in several cases. The cases are
@@ -52,9 +52,9 @@ enum SyncMode { Load, Load_And_Configure, Ghost_Region_Update, Restore };
 */
 enum RepeatCycleType { Subpartition_Repeat, Conditional_Repeat };
 
-/*	Base class for representing a stage in the execution flow of a task. Instead of directly using
-	the compute and meta-compute stages that we get from the abstract syntax tree, we derive a modified
-	set of flow stages that are easier to reason with for later part of the compiler. 
+/*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
+	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
+	easier to reason with for later part of the compiler. 
 */
 class FlowStage {
   protected:
@@ -63,15 +63,14 @@ class FlowStage {
 	Hashtable<VariableAccess*> *accessMap;
 	Expr *executeCond;  
 	
-	// Index indicates the position of a flow stage compared to other stages and group No specifies its
-	// container stage's, if exists, index. Finally, repeat index is the index of the closest repeat 
-	// cycle then encircles current stage. 
+	// Index indicates the position of a flow stage compared to other stages and group No specifies its container 
+	// stage's, if exists, index. Finally, repeat index is the index of the closest repeat  cycle then encircles 
+	// current stage. 
 	int index;
 	int groupNo;
 	int repeatIndex;
         
-	// three data structures that track all communication and synchronization requirements related to
-	// a flow stage
+	// three data structures that track all communication and synchronization requirements related to a flow stage
 	DataDependencies *dataDependencies;
 	StageSyncReqs *synchronizationReqs;
 	StageSyncDependencies *syncDependencies;
@@ -154,7 +153,7 @@ class FlowStage {
 	// Calling these routine make sense only ofter the synchronization requirement analyis is done
 	StageSyncReqs *getAllSyncRequirements();
 	StageSyncDependencies *getAllSyncDependencies();
-	virtual void printSyncRequirements();
+	virtual void printSyncRequirements(int indentLevel);
 
 	// this function indicates if there is any synchronization requirement between the execution of the current
 	// and the execution of the stage passed as argument
@@ -177,24 +176,44 @@ class FlowStage {
 	// analysis during code generation regarding what data to exchange among PPU controllers; obviously, this is 
 	// only usable after dependency analysis has been done. 
 	virtual List<DependencyArc*> *getAllTaskDependencies();
+
+	// This function is used to recursively retrieves all variables used in the task that will be communicated 
+	// across segments or within different allocations within a segment as part of some synchronization process.
+	// Notice that it needs the Id of the physical Space (PPS) where memory segmentation has taken place. Thus
+	// using it is only meaningful after LPS-to-PPS mappings are known  
+	virtual List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
+	// This function uses the same recursive process, but it returns detail communication information 
+	virtual List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
 };
 
-/*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
-	These stages have no code within. They only keep track of the data structures need to be synchronized. 
+/*	Sync stages are automatically added to the user specified execution flow graph during static analysis. These 
+	stages have no code within. They only keep track of the data structures need to be synchronized. 
 */
 class SyncStage : public FlowStage {
   protected:
 	SyncMode mode;
 	SyncStageType type;
+
+	// A sync stage exists to support data read/write and synchronization for compute stages. Although it has 
+	// an accessed-variables list, that we assign to it to draw the data dependency arcs properly. When comes 
+	// the implementation of data load/store/synchronization as dictated by those dependency arcs, we need to
+	// find out the actual execution stages that did the data write. Therefore, a map of previous data modifier 
+	// flow stages is maintained in sync-stages to track down the actual modifiers.  
+	Hashtable<FlowStage*> *prevDataModifiers;
   public:
 	SyncStage(Space *space, SyncMode mode, SyncStageType type);
 	int populateAccessMap(List<VariableAccess*> *accessLogs, 
 		bool filterOutNonReads, bool filterOutNonWritten);
+	void performDependencyAnalysis(PartitionHierarchy *hierarchy); 
 	bool isLoaderSync() { return (mode == Load || mode == Load_And_Configure); }
+	void analyzeSynchronizationNeeds();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	
 	// For now usage statistics is not been gathered for sync stages 
 	void calculateLPSUsageStatistics() {}
+
+	// returns the execution stage that did actual write of a structure listed as modified my this sync stage
+	FlowStage *getUltimateModifier(const char *varName);
 };
 
 /*	This class is equivalent to a ComputeStage with executable code from abstract syntax tree
@@ -218,8 +237,8 @@ class ExecutionStage : public FlowStage {
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 
-	simplified though. We can think it as simple linear sequence of stages without any repeat cycle. So 
-	unless nested in a repeat cycle, a composite Stage will execute only once. 
+	simplified though. We can think it as simple linear sequence of stages without any repeat cycle. So unless 
+	nested in a repeat cycle, a composite Stage will execute only once. 
 */
 class CompositeStage : public FlowStage {
   protected:
@@ -263,7 +282,7 @@ class CompositeStage : public FlowStage {
 	// So this is the last method to envoke in the process of resolving synchronization.
 	void analyzeSynchronizationNeedsForComposites();
 	
-	void printSyncRequirements();
+	void printSyncRequirements(int indentLevel);
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 
 	// helper functions for code generation-------------------------------------------------------------------
@@ -294,6 +313,8 @@ class CompositeStage : public FlowStage {
 	void setLpsExecutionFlags();
 	List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
 	virtual List<DependencyArc*> *getAllTaskDependencies();
+	List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
+	List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
 
 	// this function is used by only the first composite stage (that represents the entire computation) and
 	// repeat cycles to initiate the counters that are used to track if an updater of need-to-be synchronized

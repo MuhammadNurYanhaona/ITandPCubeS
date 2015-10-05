@@ -8,6 +8,7 @@
 #include "../syntax/ast_type.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../utils/string_utils.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
@@ -94,6 +95,7 @@ void FlowStage::performDependencyAnalysis(Hashtable<VariableAccess*> *accessLogs
                         if (modifier != NULL && modifier != this && isDataModifierRelevant(modifier)) {
                                 DependencyArc *arc = new DependencyArc(modifier, this, accessLog->getName());
 				arc->deriveSyncAndCommunicationRoots(hierarchy);
+
 				// Note that setting up outgoing arc on the source of the dependency happens inside
 				// the constructor of the DepedencyArc class. So here we have to consider the 
 				// destination of the arc only.  
@@ -164,6 +166,7 @@ void FlowStage::calculateLPSUsageStatistics() {
 }
 
 void FlowStage::analyzeSynchronizationNeeds() {
+	
 	List<DependencyArc*> *outgoingArcList = dataDependencies->getOutgoingArcs();
 	synchronizationReqs = new StageSyncReqs(this);
 	for (int i = 0; i < outgoingArcList->NumElements(); i++) {
@@ -171,9 +174,11 @@ void FlowStage::analyzeSynchronizationNeeds() {
 		const char *varName = arc->getVarName();
 		FlowStage *destination = arc->getDestination();
 		Space *destLps = destination->getSpace();
-		// if the destination and current flow stage's LPSes are the same then two scenarios are there
+
+		// If the destination and current flow stage's LPSes are the same then two scenarios are there
 		// for us to consider: either the variable is replicated or it has overlapping partitions among
-		// adjacent LPUs
+		// adjacent LPUs. The former case is handled here. The latter is taken care of by the sync
+		// stage's overriding implementation; therefore we ignore it. 
 		if (destLps == space) {
 			if (space->isReplicatedInCurrentSpace(varName)) {
 				ReplicationSync *replication = new ReplicationSync();
@@ -182,19 +187,6 @@ void FlowStage::analyzeSynchronizationNeeds() {
 				replication->setWaitingComputation(destination);
 				replication->setDependencyArc(arc);
 				synchronizationReqs->addVariableSyncReq(varName, replication, true);
-			} else {
-				DataStructure *structure = space->getLocalStructure(varName);
-				ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
-				if (array == NULL) continue;
-				if (!array->hasOverlappingsAmongPartitions()) continue;
-				List<int> *overlappingDims = array->getOverlappingPartitionDims();
-				GhostRegionSync *ghostRegion = new GhostRegionSync();
-				ghostRegion->setVariableName(varName);
-				ghostRegion->setDependentLps(destLps);
-				ghostRegion->setWaitingComputation(destination);
-				ghostRegion->setDependencyArc(arc);
-				ghostRegion->setOverlappingDirections(overlappingDims);
-				synchronizationReqs->addVariableSyncReq(varName, ghostRegion, true);
 			}
 		// If the destination and current flow stage's LPSes are not the same then there is definitely
 		// a synchronization need. The specific type of synchronization needed depends on the relative
@@ -221,7 +213,11 @@ StageSyncReqs *FlowStage::getAllSyncRequirements() { return synchronizationReqs;
 
 StageSyncDependencies *FlowStage::getAllSyncDependencies() { return syncDependencies; }
 
-void FlowStage::printSyncRequirements() { synchronizationReqs->print(0); }
+void FlowStage::printSyncRequirements(int indentLevel) {
+	for (int i = 0; i < indentLevel; i++) std::cout << '\t';
+	std::cout << "Stage: " << name << "\n"; 
+	synchronizationReqs->print(indentLevel + 1); 
+}
 
 bool FlowStage::isDependentStage(FlowStage *suspectedDependent) {
 	if (synchronizationReqs == NULL) return false;
@@ -243,15 +239,17 @@ List<const char*> *FlowStage::getAllOutgoingDependencyNamesAtNestingLevel(int ne
 
 void FlowStage::setReactivatorFlagsForSyncReqs() {
 	
-	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncReqirements();
+	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
 	List<SyncRequirement*> *filteredList = new List<SyncRequirement*>;
 	if (syncList != NULL && syncList->NumElements() > 0) {
 		for (int i = 0; i < syncList->NumElements(); i++) {
 			SyncRequirement *sync = syncList->Nth(i);
 			DependencyArc *arc = sync->getDependencyArc();
+			
 			// if this is not the signal source then we can skip this arc as the signal source will
 			// take care of the reactivation flag processing
 			if (this != arc->getSignalSrc()) continue;
+
 			filteredList->Append(sync);	
 		}
 	}
@@ -320,6 +318,33 @@ List<DependencyArc*> *FlowStage::getAllTaskDependencies() {
 	return dataDependencies->getOutgoingArcs();
 }
 
+List<const char*> *FlowStage::getVariablesNeedingCommunication(int segmentedPPS) {
+
+	if (synchronizationReqs == NULL) return NULL;
+	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
+	List<const char*> *varList = new List<const char*>;
+	for (int i = 0; i < syncList->NumElements(); i++) {
+		SyncRequirement *syncReq = syncList->Nth(i);
+		bool commNeeded = syncReq->getCommunicationInfo(segmentedPPS)->isCommunicationRequired();
+		const char *varName = syncReq->getVariableName();
+		if (commNeeded && !string_utils::contains(varList, varName)) {
+			varList->Append(varName);
+		}
+	}
+	return varList;
+}
+
+List<CommunicationCharacteristics*> *FlowStage::getCommCharacteristicsForSyncReqs(int segmentedPPS) {
+	if (synchronizationReqs == NULL) return NULL;
+	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
+	List<CommunicationCharacteristics*> *commCharList = new List<CommunicationCharacteristics*>;
+	for (int i = 0; i < syncList->NumElements(); i++) {
+		SyncRequirement *syncReq = syncList->Nth(i);
+		commCharList->Append(syncReq->getCommunicationInfo(segmentedPPS));
+	}	
+	return commCharList;
+}
+
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(0, space, NULL) {
@@ -334,6 +359,8 @@ SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStag
 	} else {
 		this->name = "\"Data Restorer Sync\"";
 	}
+	
+	this->prevDataModifiers = new Hashtable<FlowStage*>;
 }
 
 int SyncStage::populateAccessMap(List<VariableAccess*> *accessLogs, 
@@ -370,8 +397,74 @@ int SyncStage::populateAccessMap(List<VariableAccess*> *accessLogs,
 	return count;
 }
 
+void SyncStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
+	
+	LastModifierPanel *modifierPanel = LastModifierPanel::getPanel();
+        Iterator<VariableAccess*> iter = accessMap->GetIterator();
+        VariableAccess *accessLog;
+
+	// just save a reference to the last modifier of any variable this sync stage is interested in
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                if (accessLog->isRead() || accessLog->isModified()) {
+                        FlowStage *modifier = modifierPanel->getLastModifierOfVar(accessLog->getName());
+                        if (modifier != NULL && modifier != this && isDataModifierRelevant(modifier)) {
+				prevDataModifiers->Enter(accessLog->getName(), modifier);
+			}
+		}
+	}
+	
+	// then call the superclass's dependency analysis function
+	FlowStage::performDependencyAnalysis(hierarchy);
+}
+
+void SyncStage::analyzeSynchronizationNeeds() {
+
+	// the general logic for setting up synchronization requirements works for all sync stages except the
+	// ghost region sync stages
+	if (mode != Ghost_Region_Update) {
+		FlowStage::analyzeSynchronizationNeeds();
+	} else {
+		List<DependencyArc*> *outgoingArcList = dataDependencies->getOutgoingArcs();
+		synchronizationReqs = new StageSyncReqs(this);
+		for (int i = 0; i < outgoingArcList->NumElements(); i++) {
+			
+			DependencyArc *arc = outgoingArcList->Nth(i);
+			const char *varName = arc->getVarName();
+			FlowStage *destination = arc->getDestination();
+
+			// if the destination is another ghost region sync stage then we ignore this dependency
+			// as the segmented-memory communication model ensures that such dependencies will be
+			// resolved automatically
+			SyncStage *destSync = dynamic_cast<SyncStage*>(destination);
+			if (destSync != NULL && destSync->mode == Ghost_Region_Update) continue;
+
+			Space *destLps = destination->getSpace();
+			DataStructure *structure = space->getLocalStructure(varName);
+			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+			if (array == NULL) continue;
+			if (!array->hasOverlappingsAmongPartitions()) continue;
+			List<int> *overlappingDims = array->getOverlappingPartitionDims();
+			GhostRegionSync *ghostRegion = new GhostRegionSync();
+			ghostRegion->setVariableName(varName);
+			ghostRegion->setDependentLps(destLps);
+			ghostRegion->setWaitingComputation(destination);
+			ghostRegion->setDependencyArc(arc);
+			ghostRegion->setOverlappingDirections(overlappingDims);
+			synchronizationReqs->addVariableSyncReq(varName, ghostRegion, true);
+		}
+	}
+}
+
 void SyncStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
 	// for multicore back-ends sync stages do nothing 
+}
+
+FlowStage *SyncStage::getUltimateModifier(const char *varName) {
+	FlowStage *lastModifier = prevDataModifiers->Lookup(varName);
+	if (lastModifier == NULL) return NULL;
+	SyncStage *previousSync = dynamic_cast<SyncStage*>(lastModifier);
+	if (previousSync == NULL) return lastModifier;
+	return previousSync->getUltimateModifier(varName);
 }
 
 //------------------------------------------------ Execution Stage -------------------------------------------------------/
@@ -499,7 +592,7 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	stream << '\n' << nextIndent.str() << "threadState->threadLog);\n";
 
 	// then update all synchronization counters that depend on the execution of this stage for their activation
-	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncReqirements();
+	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
 	for (int i = 0; i < syncList->NumElements(); i++) {
 		stream << nextIndent.str() << syncList->Nth(i)->getDependencyArc()->getArcName();
 		stream << " += stage" << index << "Executed;\n";

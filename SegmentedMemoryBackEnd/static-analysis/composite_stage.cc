@@ -8,6 +8,7 @@
 #include "../syntax/ast_type.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../utils/string_utils.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
@@ -649,10 +650,12 @@ void CompositeStage::deriveSynchronizationDependencies() {
 	}
 }
 
-void CompositeStage::printSyncRequirements() {
+void CompositeStage::printSyncRequirements(int indentLevel) {
+	for (int i = 0; i < indentLevel; i++) std::cout << '\t';
+	std::cout << "Stage: " << name << ":\n";
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
-		stage->printSyncRequirements();
+		stage->printSyncRequirements(indentLevel + 1);
 	}	
 }
 
@@ -791,6 +794,38 @@ List<DependencyArc*> *CompositeStage::getAllTaskDependencies() {
 		list->AppendAll(stage->getAllTaskDependencies());
 	}
 	return list;
+}
+
+List<const char*> *CompositeStage::getVariablesNeedingCommunication(int segmentedPPS) {
+	List<const char*> *varList = new List<const char*>;
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		List<const char*> *stageVarList = stage->getVariablesNeedingCommunication(segmentedPPS);
+		if (stageVarList == NULL) continue;
+		for (int j = 0; j < stageVarList->NumElements(); j++) {
+			const char *varName = stageVarList->Nth(j);
+			if (!string_utils::contains(varList, varName)) {
+				varList->Append(varName);
+			}
+		}
+		delete stageVarList;
+	}
+	return varList;
+}
+
+List<CommunicationCharacteristics*> *CompositeStage::getCommCharacteristicsForSyncReqs(int segmentedPPS) {
+	
+	List<CommunicationCharacteristics*> *commCharList = new List<CommunicationCharacteristics*>;
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		List<CommunicationCharacteristics*> *stageCommList 
+				= stage->getCommCharacteristicsForSyncReqs(segmentedPPS);
+		if (stageCommList != NULL) {
+			commCharList->AppendAll(stageCommList);
+		}
+		delete stageCommList;
+	}
+	return commCharList;
 }
 
 void CompositeStage::declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingIndex) {

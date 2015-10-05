@@ -42,7 +42,7 @@ void SyncManager::processSyncList() {
 			}
 		}
 		StageSyncReqs *stageSyncReqs = stage->getAllSyncRequirements();
-		List<SyncRequirement*> *stageSyncList = stageSyncReqs->getAllSyncReqirements();
+		List<SyncRequirement*> *stageSyncList = stageSyncReqs->getAllSyncRequirements();
 		for (int i = 0; i < stageSyncList->NumElements(); i++) {
 			SyncRequirement *sync = stageSyncList->Nth(i);
 			DependencyArc *arc = sync->getDependencyArc();

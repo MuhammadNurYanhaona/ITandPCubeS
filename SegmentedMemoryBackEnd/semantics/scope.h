@@ -7,6 +7,8 @@
 #include <sstream>
 #include <fstream>
 
+// We need different scope types as different parts of the source code follows different scoping
+// rules.
 enum ScopeType {	
 			ProgramScope, 
 			TupleScope,
@@ -16,7 +18,11 @@ enum ScopeType {
 			FunctionScope, 
 			StatementBlockScope, 
 			ExecutionScope,	
- 
+
+			// This are the scope types that support type inferrences for variables.
+			// So when an undeclared variable's type is inferred in these scopes or
+			// in any scope nested within one of these scope. The variable gets reg-
+			// istered here for declaration during code generation. 
 			TaskInitBodyScope,
 			FunctionBodyScope,
 			ComputationStageScope, 

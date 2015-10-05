@@ -18,7 +18,7 @@ Task "Prefix Sum":
 		}
 		"Copy Final Local Sum" (Space A) {
 			do {
-				c[j] = a[a.local.dimension1.range.end]
+				c[j] = a[a.local.dimension1.range.max]
 			} for j in c
 		}
 		"Prefix Sum Of Aggregates" (Space B) {

@@ -17,11 +17,16 @@
 
 #include <sstream>
 
-//------------------------------------------- Task ----------------------------------------------/
+//------------------------------------------------------- Task Definition ---------------------------------------------------------/
 
-TaskDef::TaskDef(Identifier *i, DefineSection *d, EnvironmentConfig *e, 
-                InitializeInstr *init, ComputeSection *c, PartitionSection *p): Definition(*i->GetLocation()) {
-        Assert(i != NULL && d != NULL && e != NULL && c != NULL && p != NULL);
+TaskDef::TaskDef(Identifier *i, 
+		DefineSection *d, 
+		EnvironmentConfig *e, 
+                InitializeInstr *init, 
+		ComputeSection *c, 
+		PartitionSection *p): Definition(*i->GetLocation()) {
+        
+	Assert(i != NULL && d != NULL && e != NULL && c != NULL && p != NULL);
         id = i;
 	id->SetParent(this);
 	define = d;
@@ -242,7 +247,7 @@ EnvironmentLink *TaskDef::getEnvironmentLink(const char *linkName) {
 	return NULL;
 }
 
-//------------------------------------- Define Section ------------------------------------------/
+//-------------------------------------------------------- Define Section ---------------------------------------------------------/
 
 DefineSection::DefineSection(List<VariableDef*> *def, yyltype loc) : Node(loc) {
 	Assert(def != NULL);
@@ -256,7 +261,7 @@ void DefineSection::PrintChildren(int indentLevel) {
 	define->PrintAll(indentLevel + 1);
 }
 
-//------------------------------------- Initialize Section ----------------------------------------/
+//----------------------------------------------------- Initialize Section --------------------------------------------------------/
 
 InitializeInstr::InitializeInstr(List<Identifier*> *a, List<Stmt*> *c, yyltype loc) : Node(loc) {
 	Assert(a != NULL && c != NULL);
@@ -406,9 +411,9 @@ void InitializeInstr::generateCode(std::ostringstream &stream) {
 	}		
 }
 
-//------------------------------------- Environment Section ----------------------------------------/
+//----------------------------------------------------- Environment Section -------------------------------------------------------/
 
-//-------------------------------------------------------------------------Environment Link
+//------------------------------------------------------------------------------------------------------------------Environment Link
 EnvironmentLink::EnvironmentLink(Identifier *v, LinkageType m) : Node(*v->GetLocation()) {
 	Assert(v != NULL);
 	var = v;
@@ -433,7 +438,7 @@ const char *EnvironmentLink::GetPrintNameForNode() {
 		: (mode == TypeLink) ? "Link" : "Create if Not Linked";
 }
 
-//-----------------------------------------------------------------------Environment Config
+//--------------------------------------------------------------------------------------------------------------Environment Config
 EnvironmentConfig::EnvironmentConfig(List<EnvironmentLink*> *l, yyltype loc) : Node(loc) {
 	Assert(l != NULL);
 	links = l;
@@ -448,9 +453,9 @@ void EnvironmentConfig::PrintChildren(int indentLevel) {
 
 
 
-//------------------------------------- Compute Section ------------------------------------------/
+//------------------------------------------------------- Compute Section ---------------------------------------------------------/
 
-//--------------------------------------------------------------- Deprecated Data Flow Stage
+//------------------------------------------------------------------------------------------------------- Deprecated Data Flow Stage
 void DataFlowStage::setNestingIndex(int nestingIndex) { this->nestingIndex = nestingIndex; }
 void DataFlowStage::setNestingController(DataFlowStage *con) { nestingController = con; }
 int DataFlowStage::getNestingIndex() { return nestingIndex; }
@@ -459,7 +464,7 @@ int DataFlowStage::getComputeIndex() { return computeIndex; }
 Hashtable<VariableAccess*> *DataFlowStage::getAccessMap() { return accessMap; }
 Space *DataFlowStage::getSpace() { return executionSpace; }
 
-//------------------------------------------------------------------------------Stage Header
+//----------------------------------------------------------------------------------------------------------------------Stage Header
 StageHeader::StageHeader(Identifier *s, char si, Expr *a) : Node(*s->GetLocation()) {
 	Assert(s!= NULL);
 	stageId = s;
@@ -504,7 +509,7 @@ void StageHeader::checkVariableAccess(Scope *taskGlobalScope, Hashtable<Variable
 	Stmt::mergeAccessedVariables(accessMap, table);
 }
 
-//---------------------------------------------------------------------------- Compute Stage
+//-------------------------------------------------------------------------------------------------------------------- Compute Stage
 ComputeStage::ComputeStage(StageHeader *h, List<Stmt*> *c) : DataFlowStage(*h->GetLocation()) {
 	
 	Assert(h != NULL && c != NULL);
@@ -739,7 +744,7 @@ void ComputeStage::populateRepeatIndexes(List <const char*> *currentList) {
 	}
 }
 
-//-------------------------------------------------------------------------- Repeat Control
+//------------------------------------------------------------------------------------------------------------------- Repeat Control
 RepeatControl::RepeatControl(Identifier *b, Expr *r, yyltype loc) : DataFlowStage(loc) {
 	Assert(b != NULL && r != NULL);
 	begin = b;
@@ -860,7 +865,7 @@ void RepeatControl::populateRepeatIndexes(List <const char*> *currentList) {
 	}
 }
 
-//-------------------------------------------------------------------------- Stage Sequence
+//------------------------------------------------------------------------------------------------------------------- Stage Sequence
 MetaComputeStage::MetaComputeStage(List<ComputeStage*> *s, RepeatControl *r) : Node() {
 	Assert(s != NULL);
 	stageSequence = s;
@@ -1037,7 +1042,7 @@ void MetaComputeStage::populateRepeatIndexes(List <const char*> *currentList) {
 	}
 }
 
-//------------------------------------------------------------------------- Compute Section
+//------------------------------------------------------------------------------------------------------------------ Compute Section
 ComputeSection::ComputeSection(List<MetaComputeStage*> *s, yyltype loc) : Node(loc) {
 	Assert(s != NULL);
 	stageSeqList = s;
@@ -1116,6 +1121,11 @@ void ComputeSection::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
                 computation->performDependencyAnalysis(hierarchy);
 }
         
-void ComputeSection::print() { computation->print(0); }
+void ComputeSection::print() {
+	std::cout << "\nExecution Flow:\n"; 
+	computation->print(0); 
+	std::cout << "\nSynchronization Requirements:\n"; 
+	computation->printSyncRequirements(0);
+}
 
 CompositeStage *ComputeSection::getComputation() { return computation; }
