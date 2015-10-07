@@ -19,6 +19,7 @@
 #include "task_invocation.h"
 #include "memory_mgmt.h"
 #include "file_io.h"
+#include "communication.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -153,6 +154,9 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	syncManager->generateSyncInitializerFn();
 	syncManager->generateSyncStructureForThreads();
 	syncManager->generateFnForThreadsSyncStructureInit();
+
+	// generate communication related data structures and functions
+	generateFnsForDistributionTrees(headerFile, programFile, taskDef, pcubesConfig);
 
 	// generate task executor and associated functions
 	generateFnToInitEnvLinksFromEnvironment(taskDef, 

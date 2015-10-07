@@ -885,7 +885,7 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
 	functionHeader << ")";
 	functionBody << "}\n";
 
-	headerFile << "void " << functionHeader.str() << ";\n\n";	
+	headerFile << std::endl << "void " << functionHeader.str() << ";\n\n";	
 	programFile << std::endl << "void " << initials << "::"; 
 	programFile <<functionHeader.str() << " " << functionBody.str();
 	programFile << std::endl;

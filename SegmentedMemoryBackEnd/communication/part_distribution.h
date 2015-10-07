@@ -198,6 +198,9 @@ class PartDistributionMap {
 			distributionMap->Enter(varName, new BranchingContainer(0, LpsDimConfig()));
 		}
 	}
+	void setDistributionForVariable(const char *varName, Container *distributionTree) {
+		distributionMap->Enter(varName, distributionTree);
+	}
 	Container *getDistrubutionTree(const char *varName) { 
 		return distributionMap->Lookup(varName); 
 	}
