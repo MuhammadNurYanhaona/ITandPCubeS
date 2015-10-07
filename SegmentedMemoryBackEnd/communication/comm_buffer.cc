@@ -40,6 +40,10 @@ bool CommBuffer::isReceiveActivated() {
 	return dataExchange->getReceiver()->hasSegmentTag(localSegmentTag);
 }
 
+int CommBuffer::compareTo(CommBuffer *other, bool forReceive) { 
+	return dataExchange->compareTo(other->dataExchange, forReceive); 
+}
+
 //---------------------------------------------- Pre-processed Communication Buffer ----------------------------------------------/
 
 PreprocessedCommBuffer::PreprocessedCommBuffer(DataExchange *ex, SyncConfig *sC) : CommBuffer(ex, sC) {
@@ -205,4 +209,51 @@ void PreprocessedVirtualCommBuffer::readData() {
 		char *writeLocation = receiverTransferMapping[i];
 		memcpy(writeLocation, readLocation, elementSize);
 	}
+}
+
+//-------------------------------------------------- Communication Buffer Manager ------------------------------------------------/
+
+CommBufferManager::CommBufferManager(const char *dependencyName) {
+	this->dependencyName = dependencyName;
+	commBufferList = new List<CommBuffer*>;
+}
+
+CommBufferManager::~CommBufferManager() {
+	while (commBufferList->NumElements() > 0) {
+		CommBuffer *buffer = commBufferList->Nth(0);
+		commBufferList->RemoveAt(0);
+		delete buffer;
+	}
+	delete commBufferList;
+}
+
+void CommBufferManager::executeSend() {
+	List<CommBuffer*> *sendBufferList = getSortedList(false);
+	for (int i = 0; i < sendBufferList->NumElements(); i++) {
+		sendBufferList->Nth(i)->readData();
+	}
+	delete sendBufferList;
+}
+
+void CommBufferManager::executeReceive() {
+	List<CommBuffer*> *receiveBufferList = getSortedList(true);
+	for (int i = 0; i < receiveBufferList->NumElements(); i++) {
+		receiveBufferList->Nth(i)->writeData();
+	}
+	delete receiveBufferList;
+}
+
+List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive) {
+	List<CommBuffer*> *sortedList = new List<CommBuffer*>;
+	for (int i = 0; i < commBufferList->NumElements(); i++) {
+		CommBuffer *buffer = commBufferList->Nth(i);
+		if (sortForReceive && !buffer->isReceiveActivated()) continue;
+		else if (!sortForReceive && !buffer->isSendActivated()) continue;
+		int j = 0;
+		for (; j < sortedList->NumElements(); j++) {
+			if (sortedList->Nth(j)->compareTo(buffer, sortForReceive) > 0) break;
+		}
+		sortedList->InsertAt(buffer, j);
+	}
+	return sortedList;
 }

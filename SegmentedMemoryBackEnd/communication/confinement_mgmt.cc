@@ -11,6 +11,7 @@
 #include <iostream>
 #include <vector>
 #include <sstream>
+#include <algorithm>
 
 using namespace std;
 
@@ -296,6 +297,38 @@ List<MultidimensionalIntervalSeq*> *DataExchange::getCommonRegion(Participant *s
 		return NULL;
 	}
 	return overlap;
+}
+
+int DataExchange::compareTo(DataExchange *other, bool forReceive) {
+	
+	vector<int> mySegmentTags;
+	vector<int> othersSegmentTags;
+	if (forReceive) {
+		mySegmentTags = sender->getSegmentTags();
+		othersSegmentTags = other->sender->getSegmentTags();
+	} else {
+		mySegmentTags = receiver->getSegmentTags();
+		othersSegmentTags = other->receiver->getSegmentTags();
+	}
+	
+	// try to prioritize the exchange having participants with lower PPU IDs in the other side
+	int smallestTagVectorSize = min(mySegmentTags.size(), othersSegmentTags.size());
+	for (int i = 0; i < smallestTagVectorSize; i++) {
+		if (mySegmentTags.at(i) < othersSegmentTags.at(i)) return -1;
+		else if (mySegmentTags.at(i) > othersSegmentTags.at(i)) return 1;
+	}
+
+	// then try to prioritize the exchange that have more PPUs waiting-on/signaling-from the other side
+	if (mySegmentTags.size() > othersSegmentTags.size()) return -1;
+	else if (mySegmentTags.size() < othersSegmentTags.size()) return 1;
+
+	// if the exchanges are equivalent in both cases then prioritize the one that communicate more data
+	int myEntries = getTotalElementsCount();
+	int othersEntries = other->getTotalElementsCount();
+	if (myEntries < othersEntries) return -1;
+	else if (myEntries > othersEntries) return 1;
+
+	return 0;
 }
 
 void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList) {

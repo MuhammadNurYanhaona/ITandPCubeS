@@ -772,7 +772,7 @@ void generateClassesForGlobalScalars(const char *filePath, List<TaskGlobalScalar
 		Type *type = scalar->getType();
 		const char *varName = scalar->getName();
 		*stream << indent;
-		*stream << type->getCppDeclaration(varName, true);
+		*stream << type->getCppDeclaration(varName);
 		*stream << stmtSeparator;
 		
 		// check if there are multiple versions for the variable; if YES then create copies for
@@ -783,7 +783,7 @@ void generateClassesForGlobalScalars(const char *filePath, List<TaskGlobalScalar
 			std::ostringstream oldVersionName;
 			oldVersionName << varName << "_lag_" << j;
 			*stream << indent;
-			*stream << type->getCppDeclaration(oldVersionName.str().c_str(), true);
+			*stream << type->getCppDeclaration(oldVersionName.str().c_str());
 			*stream << stmtSeparator;
 		}
 	}

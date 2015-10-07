@@ -36,12 +36,11 @@
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
                 const char *outputDirectory,
                 const char *mappingFile,
-		const char *processorFile, bool isolatedTask) {
+		const char *processorFile) {
 
 	this->taskDef = taskDef;
 	this->mappingFile = mappingFile;
 	this->processorFile = processorFile;
-	this->isolatedTask = isolatedTask;
 
 	std::ostringstream headerFileStr;
 	headerFileStr << outputDirectory;
@@ -155,13 +154,10 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	syncManager->generateSyncStructureForThreads();
 	syncManager->generateFnForThreadsSyncStructureInit();
 
-	// generate routines needed for supporting task invocation from the coordinator
-	if (!isolatedTask) {
-		std::cout << "Generating task invocation related routines\n";
-		generateFnToInitEnvLinksFromEnvironment(taskDef, 
+	// generate task executor and associated functions
+	generateFnToInitEnvLinksFromEnvironment(taskDef, 
 				initials, envLinkList, headerFile, programFile);
-		generateTaskExecutor(this);
-	}
+	generateTaskExecutor(this);
 
 	// initialize the variable transformation map that would be used to translate the code 
 	// inside initialize and compute blocks
@@ -184,104 +180,6 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generatePThreadRunFn(headerFile, programFile, initials);
 
 	closeNameSpace(headerFile);
-}
-
-void TaskGenerator::generateTaskMain() {
-	
-	std::cout << "\n-----------------------------------------------------------------\n";
-	std::cout << "Generating a main function for task: " << taskDef->getName();
-	std::cout << "\n-----------------------------------------------------------------\n";
-	
-	std::ofstream stream;
-	stream.open(programFile, std::ofstream::out | std::ofstream::app);
-	stream << "/*-----------------------------------------------------------------------------------\n";
-        stream << "main function\n";
-        stream << "------------------------------------------------------------------------------------*/\n";
-	
-	// write the function signature
-	stream << "\nint main(int argc, char *argv[]) {\n\n";
-	stream << indent << "std::cout << \"Starting " << taskDef->getName() << " Task\\n\"" << stmtSeparator;
-	stream << std::endl;
-		
-	// declares a list of default task related variables
-	stream << indent << "// declaring common task related variables\n";
-	stream << indent << "TaskGlobals taskGlobals" << stmtSeparator; 	
-	stream << indent << "ThreadLocals threadLocals" << stmtSeparator;
-	stream << indent << "EnvironmentLinks envLinks" << stmtSeparator;
-	stream << indent << "ArrayMetadata *metadata = new ArrayMetadata" << stmtSeparator;
-	const char *upperInitials = string_utils::getInitials(taskDef->getName());
-	stream << indent << upperInitials << "Environment environment" << stmtSeparator;
-	stream << indent << upperInitials << "Partition partition" << stmtSeparator;
-	stream << std::endl;
-
-	// create a log file for overall program log printing
-	stream << indent << "// creating a program log file\n";
-	stream << indent << "std::cout << \"Creating diagnostic log: it-program.log\\n\"" << stmtSeparator;
-	stream << indent << "std::ofstream logFile" << stmtSeparator;
-	stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator << std::endl;
-
-	// generate prompts to read metadata of arrays and values of other structures in environment links
-	List<const char*> *externalEnvLinks = initiateEnvLinks(stream);
-
-	// read in partition parameters
-	readPartitionParameters(stream);
-
-	// if the task involves synchronization then initialize the global sync variables that would be used
-	// by different threads
-	if (syncManager->involvesSynchronization()) {
-		stream << std::endl << indent << "// initializing sync primitives\n";
-		stream << indent << "std::cout << \"Initializing sync primitives\\n\"" << stmtSeparator;
-		stream << indent << "initializeSyncPrimitives()" << stmtSeparator;
-	}
-
-	// read any initialization parameter that are not already covered as environment links and invoke the
-	// initialize function
-	inovokeTaskInitializer(stream, externalEnvLinks);
-
-	// assign the metadata created in the static arraymetadata object so that thread initialization can
-	// be done
-	stream << std::endl << indent << "// setting the global metadata variable\n";
-	stream << indent << "arrayMetadata = *metadata" << stmtSeparator;
-	stream << indent << "metadata->print(logFile)" << stmtSeparator;	
-
-	// generate thread-state objects for the intended number of threads and initialize their root LPUs
-	initiateThreadStates(stream);
-
-	// group threads into segments; then allocate and initialize the segment memory for current process
-	performSegmentGrouping(stream);
-	initializeSegmentMemory(stream);
-
-	// start execution time monitoring timer
-	stream << std::endl << indent << "// starting execution timer clock\n";
-	stream << indent << "struct timeval start" << stmtSeparator;
-	stream << indent << "gettimeofday(&start, NULL)" << stmtSeparator;
-
-	// start threads 
-	startThreads(stream);
-
-	// calculate running time
-	stream << indent << "// calculating task running time\n";
-	stream << indent << "struct timeval end" << stmtSeparator;
-	stream << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
-	stream << indent << "double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
-	stream << std::endl << indent << indent << indent;
-	stream << "- (start.tv_sec + start.tv_usec / 1000000.0))" << stmtSeparator;
-	stream << indent << "logFile << \"Execution Time: \" << runningTime << \" Seconds\" << std::endl";
-	stream << stmtSeparator << std::endl;
-
-	// write all environment variables into files
-	// writeResults(stream);
-	
-	// close the log file
-	stream << std::endl << indent << "logFile.close()" << stmtSeparator;
-	// display the running time on console
-	stream << indent << "std::cout << \"Parallel Execution Time: \" << runningTime <<";
-	stream << " \" Seconds\" << std::endl" << stmtSeparator;
-	// then exit the function
-	stream << indent << "return 0" << stmtSeparator;
-	stream << "}\n";
-	stream.close();
-	
 }
 
 List<const char*> *TaskGenerator::initiateEnvLinks(std::ofstream &stream) {

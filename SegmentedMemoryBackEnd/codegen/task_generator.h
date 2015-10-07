@@ -16,11 +16,10 @@ class PPS_Definition;
 class MappingNode;
 
 // This is basically a coordinator class that generates data structures, constansts, and functions
-// corresponding to a single IT task in matching header and program file. It is a coordinator as
-// most of these functionalities are implemented by calling other code generation utility libraries
-// with appropriate parameters. The only function that it generates on its own is a main function
-// correspond to the task.
-
+// corresponding to a single IT task in matching header and program file. It is a coordinator as most 
+// of these functionalities are implemented by calling other code generation utility libraries with 
+// appropriate parameters. It has several helper functions for generating parts within the executor
+// function for this task.
 class TaskGenerator {
   private:
 	TaskDef *taskDef;
@@ -31,15 +30,12 @@ class TaskGenerator {
 	const char *initials;
 	MappingNode *mappingRoot;
 	SyncManager *syncManager;
-	
-	// parameter that indicates a main function needs to be generated for this task automatically
-	// as there are no controller program invoking and controlling tasks in the source code
-	bool isolatedTask;
   public:
 	TaskGenerator(TaskDef *taskDef, 
 		const char *outputDirectory, 
 		const char *mappingFile,
-		const char *processorFile,bool isolatedTask);
+		const char *processorFile);
+
 	const char *getHeaderFile() { return headerFile; }
 	const char *getProgramFile() { return programFile; }
 	TaskDef *getTaskDef() { return taskDef; }
@@ -52,11 +48,8 @@ class TaskGenerator {
 	// function to generate all data structures and methods that are relevant to this task 
 	// including a thread run function to run the task as a parallel program in multiple threads
 	void generate(List<PPS_Definition*> *pcubesConfig);
-	// function to generate a main function for the task in the absense of any coordinator 
-	// program in the IT source file
-	void generateTaskMain();
 
-	// a supporting function for task main that initiates the environment links based on input
+	// a supporting function for task executor that initiates the environment links based on input
 	// from console; it returns the list of external links to aid the calculation of other helper
 	// functions
 	List<const char*> *initiateEnvLinks(std::ofstream &programFile);

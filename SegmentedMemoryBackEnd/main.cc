@@ -86,29 +86,21 @@ int main(int argc, const char *argv[]) {
 	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription(pcubesFile);
 	// iterate over list of tasks and generate code for each of them in separate files
 	List<TaskDef*> *taskList = ProgramDef::program->getTasks();
-	TaskGenerator *firstTaskGenerator= NULL;
-	bool isolatedTask = ProgramDef::program->isIsolatedTaskProgram();
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		TaskDef *taskDef = taskList->Nth(i);
 		// do static analysis of the task to determine what data structure has been 
 		// accessed in what LPS before code generation starts
 		taskDef->getComputation()->calculateLPSUsageStatistics();
 		TaskGenerator *generator = new TaskGenerator(taskDef, 
-				outputDir, mappingFile, processorFile, isolatedTask);
+				outputDir, mappingFile, processorFile);
 		generator->generate(pcubesConfig);
-		if (i == 0) firstTaskGenerator = generator;
 	}
 	// generate classes for the list of tuples present in the source in a header file
 	generateClassesForTuples(tupleHeader, ProgramDef::program->getTuples());
-	// if the program file consist of an isolated task then generate a main function based
-	// on the task definition	
-	if (ProgramDef::program->isIsolatedTaskProgram()) {
-		firstTaskGenerator->generateTaskMain();
-	// otherwise invoke the library handling task-invocations to generate all routines
-	// needed for multi-task management and a the main function corresponds to the 
-	// coordinator program definition
-	} else {
-		processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
-	}
+	// invoke the library handling task-invocations to generate all routines needed for 
+	// multi-task management and a the main function corresponds to the coordinator 
+	// program definition
+	processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
+	//***********************************************************************************
 }
 

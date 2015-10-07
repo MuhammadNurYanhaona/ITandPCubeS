@@ -182,6 +182,12 @@ class DataExchange {
 	// confinement should indeed exchange data. If the outcome of this function is NULL then the two parties do
 	// not interact. Otherwise, a data exchange instance should be created to record information about the pair.
 	static List<MultidimensionalIntervalSeq*> *getCommonRegion(Participant *sender, Participant *receiver);
+
+	// This function is used to order data-exchanges participating in a single synchronization; the second argu-
+	// ment indicates if the sender or receiver side of the data exchanges should be compared for ordering. It
+	// returns -1 if the current should appear first, 1 if rather the 'other' should take that position, and 0 if 
+	// their ordering does not matter.  
+	int compareTo(DataExchange *other, bool forReceive);
   private:
 	void drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList);
 };

@@ -1,3 +1,6 @@
+#ifndef _H_comm_buffer
+#define _H_comm_buffer
+
 /* This header file hosts different kinds of communication buffers that are needed in different data synchronization
  * scenarios involving some form of data movements. For each data synchronization instance, there will be one or more
  * communication buffers. Sometimes, there will be more than one types of buffer for a single synchronization. The
@@ -72,6 +75,7 @@ class CommBuffer {
 	CommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	virtual ~CommBuffer() {}
 	int getBufferSize() { return elementCount * elementSize; }
+	int compareTo(CommBuffer *other, bool forReceive);
 
 	// Each subclass should provide its implementation for the following two functions. During the execution of the
 	// program, if the computation halts in any synchronization involving communication, the segment controller will
@@ -80,12 +84,12 @@ class CommBuffer {
 	// doing computation.
 	virtual void readData() = 0;
 	virtual void writeData() = 0;
-  protected:
-	ExchangeIterator *getIterator() { return new ExchangeIterator(dataExchange); }
-
+	
 	// these two functions tell if the current segment is sending data, receiving data, or both
 	bool isSendActivated();
 	bool isReceiveActivated();
+  protected:
+	ExchangeIterator *getIterator() { return new ExchangeIterator(dataExchange); }
 };
 
 /* This extension is added to shorten the time for data transfer between the operating memory data parts and the
@@ -170,3 +174,35 @@ class PreprocessedVirtualCommBuffer : public PreprocessedCommBuffer {
 	void readData();
 	void writeData() {}
 };
+
+/* This class contains all communication buffers related to a particular data synchronization and does the buffer read
+   write (equivalent to send and receive respectively) on all buffers if one of its executeSend() and executeReceive()  
+   has been triggered. 
+*/
+class CommBufferManager {
+  protected:
+	// the name of the dependency arc all communications are issued for 
+	const char *dependencyName;
+	// list of buffers that will be exchanged for the dependency resolution
+	List<CommBuffer*> *commBufferList;
+  public:
+	CommBufferManager(const char *dependencyName);
+	~CommBufferManager();
+	void addCommBuffer(CommBuffer *buffer) { commBufferList->Append(buffer); }
+	virtual void executeSend();
+	virtual void executeReceive();
+	void executeTransfer() { executeSend(); executeReceive(); }
+	
+	// Before issuing a send a checking should be done to ensure that all sends related to previous synchronization 
+	// have ended already. The default implementation of waiting for clean state is doing nothing and assuming that 
+	// everything is always okay. Subclasses need to provide an implementation that is in concert with the behavior 
+	// of executeSend()
+	virtual void waitForStageBeingClean() {}
+  protected:
+	// Communication buffers are sorted before send/receive to reduce the data buffering time in segments/processes
+	// the sorting here is dependent on what particular role the executing segment is going to play at the present
+	// instance.
+	List<CommBuffer*> *getSortedList(bool sortForReceive);	
+};
+
+#endif

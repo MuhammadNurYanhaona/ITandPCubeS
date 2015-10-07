@@ -11,6 +11,7 @@
  * */
 
 #include "../utils/list.h"
+#include "../utils/hashtable.h"
 #include "part_folding.h"
 #include "../memory-management/part_tracking.h"
 #include <vector>
@@ -177,6 +178,29 @@ class HybridBranchingContainer : public BranchingContainer {
 
 	Container *getLeaf() { return leaf; }
 	void addSegmentTag(int segmentTag, bool leafLevelTag);
+};
+
+/* This is a holder class to be used at runtime to save and access part distribution trees of all data structures for a task 
+*/
+class PartDistributionMap {
+  protected:
+	Hashtable<Container*> *distributionMap;
+  public:
+	PartDistributionMap() { 
+		distributionMap = new Hashtable<Container*>; 
+	}
+	~PartDistributionMap() { 
+		delete distributionMap; 
+	}
+	void setupNewDistributionForVariable(const char *varName) {
+		Container *currentDistributionTree = distributionMap->Lookup(varName);
+		if (currentDistributionTree == NULL) {
+			distributionMap->Enter(varName, new BranchingContainer(0, LpsDimConfig()));
+		}
+	}
+	Container *getDistrubutionTree(const char *varName) { 
+		return distributionMap->Lookup(varName); 
+	}
 };
 
 #endif /* PART_DISTRIBUTION_H_ */

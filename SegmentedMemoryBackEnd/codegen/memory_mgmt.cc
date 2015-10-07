@@ -361,6 +361,14 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 		programFile << varName << ")" << stmtSeparator;
 	}
 
+	// the root LPS of the hierarchy does not allocate any array; so there is no need to proceed further if the
+	// current LPS is the root
+	if (lps == rootLps) {
+		programFile << std::endl << indent << "return space" << lpsName << "Content" << stmtSeparator;		
+		programFile << "}\n";	
+		return;
+	}
+
 	// iterate over the threads of the segment and try to initialize the parts of each allocated data structures
 	programFile << std::endl << indent << "for (int i = 0; i < threads->NumElements(); i++) {\n";
 	programFile << doubleIndent << "ThreadState *thread = threads->Nth(i)" << stmtSeparator;
