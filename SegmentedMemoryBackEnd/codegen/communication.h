@@ -8,6 +8,7 @@
 #include "../utils/list.h"
 #include "../syntax/ast_task.h"
 #include "../semantics/task_space.h"
+#include "../static-analysis/sync_stat.h"
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -32,5 +33,30 @@ void generateFnsForDistributionTrees(const char *headerFile,
 void generateFnForDistributionMap(std::ofstream &headerFile,
                 std::ofstream &programFile,
                 const char *initials, List<const char*> *varList);
+
+// This function generates a library function to generate a communication confinement construction configuration for
+// a particular dependency arc. The configuration is later needed to determine what data will be exchanged between
+// segments and between memory locations within a segment
+void generateConfinementConstrConfigFn(std::ofstream &headerFile,
+                std::ofstream &programFile,
+                const char *initials, CommunicationCharacteristics *commCharacter);
+
+// This calls the above function to generate confinement construction configurations for different data dependencies
+List<CommunicationCharacteristics*> *generateFnsForConfinementConstrConfigs(const char *headerFile, 
+		const char *programFile, 
+		TaskDef *taskDef, List<PPS_Definition*> *pcubesConfig);
+
+// This function generates a library function that will return all intra and cross-segment data transfer requirements
+// as part of a synchronization for a specific data-dependency
+void generateFnForDataExchanges(std::ofstream &headerFile,
+                std::ofstream &programFile,
+                const char *initials, 
+		Space rootLps, CommunicationCharacteristics *commCharacter);
+
+// This calls the above functions to generate data-exchanges lists for different dependency arcs
+void generateAllDataExchangeFns(const char *headerFile,
+                const char *programFile,
+                TaskDef *taskDef,
+                List<CommunicationCharacteristics*> *commCharacterList);	
 
 #endif

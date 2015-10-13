@@ -18,6 +18,8 @@
    requirements of the task. 
 */
 
+class SyncRequirement;
+
 /* Whether a synchronization specification results in communication of data or mere synching of PPUs (in 
    current compiler threads) depends on the mapping of LPSes to PPSes and the specific nature of the partition
    functions used to partition the underlying data. Further, once it is determined that a synchronization
@@ -39,16 +41,11 @@ class CommunicationCharacteristics {
 	// the variable may be allocated in ancestor/descendant space other than those that call for the sync
 	Space *senderDataAllocatorSpace;
 	Space *receiverDataAllocatorSpace;
+	// a back pointer to the sync requirement is needed for code generation
+	SyncRequirement *syncRequirement;
   public:
-	CommunicationCharacteristics(const char *varName) {
-		this->varName = varName;
-		communicationRequired = false;
-		confinementSpace = NULL;
-		senderDataAllocatorSpace = NULL;
-		senderSyncSpace = NULL;
-		receiverDataAllocatorSpace = NULL;
-		receiverSyncSpace = NULL;
-	}
+	CommunicationCharacteristics(const char *varName);
+	const char *getVarName() { return varName; }
 	void setCommunicationRequired(bool flag) { communicationRequired = flag; }
 	bool isCommunicationRequired() { return communicationRequired; }
 	void setConfinementSpace(Space *confinementSpace) { this->confinementSpace = confinementSpace; }
@@ -65,6 +62,8 @@ class CommunicationCharacteristics {
 		this->receiverDataAllocatorSpace = receiverDataAllocatorSpace;
 	}
 	Space *getReceiverDataAllocatorSpace() { return receiverDataAllocatorSpace; }
+	void setSyncRequirement(SyncRequirement *syncRequirement);
+	SyncRequirement *getSyncRequirement();
 };
 
 // This is the common super-class to encode the sync requirement to a single computation stage in a single 

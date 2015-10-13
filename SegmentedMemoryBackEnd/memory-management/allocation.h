@@ -174,6 +174,7 @@ class DataPartsList {
 	inline int getEpochCount() { return epochCount; }
 	inline List<DataPart*> *getCurrentList() { return partLists[epochHead]; }
 	inline ListMetadata *getMetadata() { return metadata; }
+	PartIdContainer *getPartContainer() { return partContainer; }
 };
 
 #endif

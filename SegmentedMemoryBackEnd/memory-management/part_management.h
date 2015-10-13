@@ -53,6 +53,7 @@ class DataItems {
 	// function to get an older epoch version of a part
 	DataPart *getDataPart(List<int*> *partidList, int epoch, PartIterator *iterator);
 	List<DataPart*> *getAllDataParts();
+	PartIdContainer *getPartIdContainer() { return partsList->getPartContainer(); }
 	virtual void advanceEpoch() { partsList->advanceEpoch(); }
 };
 

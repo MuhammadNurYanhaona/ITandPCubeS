@@ -245,6 +245,9 @@ class SegmentState {
 	}
 	void addParticipant(ThreadState *thread) { participantList->Append(thread); }
 	List<ThreadState*> *getParticipantList() { return participantList; }
+
+	// this tells how many participants will do computations suppossed to execute within a particular LPS
+	int getPpuCountForLps(int lpsId);
 };
 
 #endif

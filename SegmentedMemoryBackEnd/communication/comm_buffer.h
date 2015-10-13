@@ -17,6 +17,7 @@
 #include "../memory-management/allocation.h"
 #include "../memory-management/part_tracking.h"
 #include "../utils/list.h"
+#include "../runtime/comm_barrier.h"
 
 /* To configure the communication buffers properly, we need the data-parts-list representing the operating memory for
  * a data structure for involved LPSes and data item size along with the other information provided by a confinement
@@ -132,6 +133,7 @@ class PhysicalCommBuffer : public CommBuffer {
 	~PhysicalCommBuffer() { delete[] data; }
 	void readData();
 	void writeData();
+	void setData(char *data) { this->data = data; }
 	char *getData() { return data; }
   protected:
 	void transferData(TransferSpec *transferSpec,
@@ -149,6 +151,8 @@ class PreprocessedPhysicalCommBuffer : public PreprocessedCommBuffer {
 	~PreprocessedPhysicalCommBuffer() { delete[] data; }
 	void readData();
 	void writeData();
+	void setData(char *data) { this->data = data; }
+	char *getData() { return data; }
 };
 
 /* This extension is for situations where we do not want any intervening memory to be allocated for the communication
@@ -176,8 +180,8 @@ class PreprocessedVirtualCommBuffer : public PreprocessedCommBuffer {
 };
 
 /* This class contains all communication buffers related to a particular data synchronization and does the buffer read
-   write (equivalent to send and receive respectively) on all buffers if one of its executeSend() and executeReceive()  
-   has been triggered. 
+   write as part of the communication. Subclasses should provide implementation for the send() and receive() functions
+   to do the actual data transfer.
 */
 class CommBufferManager {
   protected:
@@ -189,15 +193,18 @@ class CommBufferManager {
 	CommBufferManager(const char *dependencyName);
 	~CommBufferManager();
 	void addCommBuffer(CommBuffer *buffer) { commBufferList->Append(buffer); }
-	virtual void executeSend();
-	virtual void executeReceive();
-	void executeTransfer() { executeSend(); executeReceive(); }
+
+	// two functions to pre and post process communication buffers before a send and after a receive respectively
+	// these basically read and write the communication buffers
+	void prepareBuffersForSend();
+	void processBuffersAfterReceive();	
+
+	// functions to be implemented by the sync-type specific subclasses for send and receive; the signal type 
+	// indicates if the invoking PPU is interested in communication or not and the iteration represents the invo-
+	// cation count from the PPU for any synchronization that happens repeatedly in the course of execution  
+	virtual void send(SignalType signal, int iteration) = 0;
+	virtual void receive(SignalType signal, int iteration) = 0;
 	
-	// Before issuing a send a checking should be done to ensure that all sends related to previous synchronization 
-	// have ended already. The default implementation of waiting for clean state is doing nothing and assuming that 
-	// everything is always okay. Subclasses need to provide an implementation that is in concert with the behavior 
-	// of executeSend()
-	virtual void waitForStageBeingClean() {}
   protected:
 	// Communication buffers are sorted before send/receive to reduce the data buffering time in segments/processes
 	// the sorting here is dependent on what particular role the executing segment is going to play at the present

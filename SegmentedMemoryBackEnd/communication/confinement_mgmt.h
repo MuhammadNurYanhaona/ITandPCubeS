@@ -85,7 +85,7 @@ class ConfinementConstructionConfig {
 	std::vector<LpsDimConfig> *getReceivePathInDistributionTree();
 
 	// tells if updater and receiver data parts are from the same data distribution; this should be true for
-	// ghost-boundary-region synchronization; do not confuse it with intra-segment synchronization
+	// ghost-boundary-region and replica synchronization; do not confuse it with intra-segment synchronization
 	bool isIntraContrainerSync() { return senderLps == receiverLps; }
 
 	// determines the part container levels of the confinement root for the part tracking trees; note that
@@ -188,6 +188,11 @@ class DataExchange {
 	// returns -1 if the current should appear first, 1 if rather the 'other' should take that position, and 0 if 
 	// their ordering does not matter.  
 	int compareTo(DataExchange *other, bool forReceive);
+
+	// The types of communication buffers ideal for segment-local data exchanges are different from that ideal for
+	// interactions between two or more segments. This this function is provided to aid in proper communication
+	// buffer type selection at a particular context. 
+	bool isIntraSegmentExchange(int localSegmentTag);
   private:
 	void drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList);
 };
@@ -237,8 +242,8 @@ class IntraContainerInteractionSpec {
 	int dataDimensions;
 
 	// even for within-container data synchronization, we maintain separate sender and receiver lists despite the
-	// same set of part-tracking containers being processed to create the two lists because the data description for
-	// sending and receiving might be different, e.g., padding may be enabled for the sender but not for the
+	// same set of part-tracking containers being processed to create the two lists because the data description 
+	// for sending and receiving might be different, e.g., padding may be enabled for the sender but not for the
 	// receiver side during interval description generation process
 	List<Participant*> *senderList;
 	List<Participant*> *receiverList;
@@ -284,6 +289,10 @@ class Confinement {
 
 	CrossSegmentInteractionSpec *getRemoteInteractions() { return remoteInteractions; }
 	IntraContainerInteractionSpec *getLocalInteractions() { return localInteractions; }
+
+	// return the list of data exchanges that will take place within this confinement as part of remote and
+	// local interactions
+	List<DataExchange*> *getAllDataExchanges();
 
 	// this static utility method should be used to find and set up all confinement roots for a communication
 	static List<Confinement*> *generateAllConfinements(ConfinementConstructionConfig *config, int rootLps);

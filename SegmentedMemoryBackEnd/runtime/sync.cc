@@ -18,12 +18,12 @@ Copyright 2015 by Andrew Grimshaw
 Barrier::Barrier(int size) {
         _size=size;
         _count=size;
-        sem_init(&mutex,0,1);   // init to 1
+        sem_init(&mutex,0,1);   	// init to 1
         sem_init(&throttle,0,0);        // init to 0
-        sem_init(&waitq,0,0);   // init to 0
+        sem_init(&waitq,0,0);   	// init to 0
 }
 
-void Barrier::wait(){
+void Barrier::wait() {
 	sem_wait(&mutex);	// Make sure only one in at a  time
 	_count--;
 	if (_count==0 ) {
@@ -32,7 +32,7 @@ void Barrier::wait(){
 			sem_post(&waitq);	// Wake up another waiter
 			sem_wait(&throttle);	// Wait for the waiter to awaken and signal me.
 		}
-		_count=_size;	// Reset the counter
+		_count=_size;		// Reset the counter
 		sem_post(&mutex);	// Release the mutex
 	}
 	else {
@@ -49,18 +49,18 @@ RS::RS(int size): b(size) {
 	_count=0;
 	_gappers=0;
 	_iteration=-1;
-	sem_init(&mutex,0,1); 	// init to 1
+	sem_init(&mutex,0,1); 		// init to 1
 	sem_init(&throttle,0,0);	// init to 0
 	sem_init(&throttle2,0,0);	// init to 0
-	sem_init(&waitq,0,0);	// init to 0
+	sem_init(&waitq,0,0);		// init to 0
 }
 
 
-void RS::signal(int iteration){
+void RS::signal(int iteration) {
 	b.wait();return;
-}
+} 
 
-void RS::wait(int iteration){
+void RS::wait(int iteration) {
 	b.wait();return;
 }
 

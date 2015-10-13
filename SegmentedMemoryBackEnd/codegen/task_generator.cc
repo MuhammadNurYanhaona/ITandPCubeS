@@ -32,6 +32,7 @@
 #include "../syntax/ast_task.h"
 #include "../syntax/ast_type.h"
 #include "../static-analysis/task_global.h"
+#include "../static-analysis/sync_stat.h"
 #include "../semantics/task_space.h"
 
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
@@ -157,6 +158,10 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 
 	// generate communication related data structures and functions
 	generateFnsForDistributionTrees(headerFile, programFile, taskDef, pcubesConfig);
+	List<CommunicationCharacteristics*> *commCharacterList 
+			= generateFnsForConfinementConstrConfigs(headerFile, 
+					programFile, taskDef, pcubesConfig);
+	generateAllDataExchangeFns(headerFile, programFile, taskDef, commCharacterList);
 
 	// generate task executor and associated functions
 	generateFnToInitEnvLinksFromEnvironment(taskDef, 

@@ -331,6 +331,15 @@ int DataExchange::compareTo(DataExchange *other, bool forReceive) {
 	return 0;
 }
 
+bool DataExchange::isIntraSegmentExchange(int localSegmentTag) {
+	vector<int> sendersTags = sender->getSegmentTags();
+	if (sendersTags.size() > 1 || sendersTags.at(0) != localSegmentTag) return false;
+	vector<int> receiversTags = receiver->getSegmentTags();
+	if (receiversTags.size() > 1 
+		|| receiversTags.at(0) != localSegmentTag) return false;
+	return true;
+}
+
 void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList) {
 	for (int i = 0; i < seqList->NumElements(); i++) {
 		cout << "Sequence #" << i << ":\n";
@@ -598,6 +607,33 @@ Confinement::Confinement(int dd, BranchingContainer *cC, ConfinementConstruction
 	if (localInterchangeApplicable) {
 		localInteractions = new IntraContainerInteractionSpec(confinementContainer, config);
 	} else localInteractions = NULL;
+}
+
+List<DataExchange*> *Confinement::getAllDataExchanges() {
+
+	List<DataExchange*> *dataExchangeList = new List<DataExchange*>;
+	List<DataExchange*> *remoteSends = remoteInteractions->generateSendExchanges();
+	if (remoteSends != NULL) {
+		dataExchangeList->AppendAll(remoteSends);
+		delete remoteSends;
+	}
+	List<DataExchange*> *remoteReceives = remoteInteractions->generateReceiveExchanges();
+	if (remoteReceives != NULL) {
+		dataExchangeList->AppendAll(remoteReceives);
+		delete remoteReceives;
+	}
+	if (localInteractions != NULL) {
+		List<DataExchange*> *localExchanges = localInteractions->generateExchanges();
+		if (localExchanges != NULL) {
+			dataExchangeList->AppendAll(localExchanges);
+			delete localExchanges;
+		}
+	}
+	if (dataExchangeList->NumElements() == 0) {
+		delete dataExchangeList;
+		return NULL;
+	}
+	return dataExchangeList;
 }
 
 List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstructionConfig *config, int rootLps) {

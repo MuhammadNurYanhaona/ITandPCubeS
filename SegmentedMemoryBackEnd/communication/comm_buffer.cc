@@ -227,7 +227,7 @@ CommBufferManager::~CommBufferManager() {
 	delete commBufferList;
 }
 
-void CommBufferManager::executeSend() {
+void CommBufferManager::prepareBuffersForSend() {
 	List<CommBuffer*> *sendBufferList = getSortedList(false);
 	for (int i = 0; i < sendBufferList->NumElements(); i++) {
 		sendBufferList->Nth(i)->readData();
@@ -235,7 +235,7 @@ void CommBufferManager::executeSend() {
 	delete sendBufferList;
 }
 
-void CommBufferManager::executeReceive() {
+void CommBufferManager::processBuffersAfterReceive() {
 	List<CommBuffer*> *receiveBufferList = getSortedList(true);
 	for (int i = 0; i < receiveBufferList->NumElements(); i++) {
 		receiveBufferList->Nth(i)->writeData();

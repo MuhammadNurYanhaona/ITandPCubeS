@@ -525,8 +525,19 @@ void ThreadState::logIteratorStatistics() {
 /***********************************************  Segment State  ****************************************************/
 
 SegmentState::SegmentState(int segmentId, int physicalId) {
-                this->segmentId = segmentId;
-                this->physicalId = physicalId;
-                this->participantList = new List<ThreadState*>;
-                this->partConfigMap = NULL;
+	this->segmentId = segmentId;
+	this->physicalId = physicalId;
+	this->participantList = new List<ThreadState*>;
+	this->partConfigMap = NULL;
+}
+
+int SegmentState::getPpuCountForLps(int lpsId) {
+	int count = 0;
+	for (int i = 0; i < participantList->NumElements(); i++) {
+		ThreadState *thread = participantList->Nth(i);
+		if (thread->isValidPpu(lpsId)) {
+			count++;
+		}
+	}
+	return count;
 }

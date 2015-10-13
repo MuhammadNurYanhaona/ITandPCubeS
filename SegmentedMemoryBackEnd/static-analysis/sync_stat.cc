@@ -9,6 +9,26 @@
 #include <sstream>
 #include <fstream>
 
+//---------------------------------------------------- Communication Characteristics -------------------------------------------------------/
+
+CommunicationCharacteristics::CommunicationCharacteristics(const char *varName) {
+	this->varName = varName;
+	communicationRequired = false;
+	confinementSpace = NULL;
+	senderDataAllocatorSpace = NULL;
+	senderSyncSpace = NULL;
+	receiverDataAllocatorSpace = NULL;
+	receiverSyncSpace = NULL;
+	syncRequirement = NULL;
+}
+
+void CommunicationCharacteristics::setSyncRequirement(SyncRequirement *syncRequirement) {
+	this->syncRequirement = syncRequirement;
+}
+
+SyncRequirement *CommunicationCharacteristics::getSyncRequirement() { 
+	return syncRequirement; 
+}
 
 //----------------------------------------------------------- Sync Requirement -------------------------------------------------------------/
 
@@ -100,6 +120,7 @@ CommunicationCharacteristics *SyncRequirement::getCommunicationInfo(int segmenta
 	commCharacter->setReceiverSyncSpace(receiverSyncSpace);
 	commCharacter->setSenderDataAllocatorSpace(senderStruct->getAllocator());
 	commCharacter->setReceiverDataAllocatorSpace(receiverStruct->getAllocator());
+	commCharacter->setSyncRequirement(this);
 
 	return commCharacter;	
 }
@@ -172,6 +193,7 @@ CommunicationCharacteristics *GhostRegionSync::getCommunicationInfo(int segmenta
 	commCharacter->setReceiverSyncSpace(syncSpace);
 	commCharacter->setSenderDataAllocatorSpace(allocatorSpace);
 	commCharacter->setReceiverDataAllocatorSpace(allocatorSpace);
+	commCharacter->setSyncRequirement(this);
 	
 	return commCharacter;	
 }
