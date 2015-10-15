@@ -47,6 +47,16 @@ namespace binsearch {
 		}
 		return maxIndex + 1;
 	}
+	
+	inline bool insertIfNotExist(std::vector<int> *array, int key) {
+		int location = locateKey(*array, key);
+		if (location == KEY_NOT_FOUND) {
+			location = locatePointOfInsert(*array, key);
+			array->insert(array->begin() + location, key);
+			return true;
+		}
+		return false;
+	}
 }
 
 #endif

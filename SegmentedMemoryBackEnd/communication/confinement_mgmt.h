@@ -193,6 +193,10 @@ class DataExchange {
 	// interactions between two or more segments. This this function is provided to aid in proper communication
 	// buffer type selection at a particular context. 
 	bool isIntraSegmentExchange(int localSegmentTag);
+
+	// Like the previous function this is also used for determining what kind of communicator should be used for
+	// synchronizations for a specific data dependency
+	static int getTotalParticipantsCount(List<DataExchange*> *exchangeList, bool sendingSide);
   private:
 	void drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList);
 };

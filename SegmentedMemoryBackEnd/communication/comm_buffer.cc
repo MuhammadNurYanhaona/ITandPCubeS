@@ -5,6 +5,7 @@
 #include "../memory-management/allocation.h"
 #include "../memory-management/part_tracking.h"
 #include "../utils/list.h"
+#include "../utils/binary_search.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -256,4 +257,36 @@ List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive) {
 		sortedList->InsertAt(buffer, j);
 	}
 	return sortedList;
+}
+
+void CommBufferManager::seperateLocalAndRemoteBuffers(int localSegmentTag, 
+		List<CommBuffer*> *localBufferList, 
+		List<CommBuffer*> *remoteBufferList) {
+	
+	for (int i = 0; i < commBufferList->NumElements(); i++) {
+		CommBuffer *buffer = commBufferList->Nth(i);
+		DataExchange *exchange = buffer->getExchange();
+		if (exchange->isIntraSegmentExchange(localSegmentTag)) {
+			localBufferList->Append(buffer);
+		} else remoteBufferList->Append(buffer);
+	}
+}
+
+std::vector<int> *CommBufferManager::getParticipantsTags() {
+	std::vector<int> *participantTags = new std::vector<int>;
+	for (int i = 0; i < commBufferList->NumElements(); i++) {
+		CommBuffer *buffer = commBufferList->Nth(i);
+		DataExchange *exchange = buffer->getExchange();
+		std::vector<int> senderTags = exchange->getSender()->getSegmentTags();
+		for (int j = 0; j < senderTags.size(); j++) {
+			int currentTag = senderTags.at(j);
+			binsearch::insertIfNotExist(participantTags, currentTag);
+		}
+		std::vector<int> receiverTags = exchange->getReceiver()->getSegmentTags();
+		for (int j = 0; j < receiverTags.size(); j++) {
+			int currentTag = receiverTags.at(j);
+			binsearch::insertIfNotExist(participantTags, currentTag);
+		}
+	}
+	return participantTags;
 }

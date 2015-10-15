@@ -248,6 +248,8 @@ class SegmentState {
 
 	// this tells how many participants will do computations suppossed to execute within a particular LPS
 	int getPpuCountForLps(int lpsId);
+	
+	bool computeStagesInLps(int lpsId) { return getPpuCountForLps(lpsId) > 0; }
 };
 
 #endif

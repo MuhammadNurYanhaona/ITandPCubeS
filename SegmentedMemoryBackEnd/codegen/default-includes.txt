@@ -55,6 +55,9 @@
 #include "../communication/confinement_mgmt.h"
 #include "../communication/data_transfer.h"
 #include "../communication/comm_buffer.h"
+#include "../communication/communicator.h"
+#include "../communication/scalar_communicator.h"
+#include "../communication/array_communicator.h"
 
 // for threading
 #include <pthread.h>

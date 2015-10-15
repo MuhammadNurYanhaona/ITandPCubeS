@@ -348,6 +348,24 @@ void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqLi
 	}
 }
 
+int DataExchange::getTotalParticipantsCount(List<DataExchange*> *exchangeList, bool sendingSide) {
+	std::vector<int> participantVector;
+	for (int i = 0; i < exchangeList->NumElements(); i++) {
+		DataExchange *exchange = exchangeList->Nth(i);
+		std::vector<int> exchangeTags;
+		if (sendingSide) {
+			exchangeTags = exchange->getSender()->getSegmentTags();
+		} else {
+			exchangeTags = exchange->getReceiver()->getSegmentTags();
+		}
+		for (int j = 0; j < exchangeTags.size(); j++) {
+			int currentTag = exchangeTags.at(j);
+			binsearch::insertIfNotExist(&participantVector, currentTag);
+		}
+	}
+	return participantVector.size();
+}
+
 //-------------------------------------- Cross Segment Interaction Specification ---------------------------------------------/
 
 CrossSegmentInteractionSpec::CrossSegmentInteractionSpec(Container *container, ConfinementConstructionConfig *config) {

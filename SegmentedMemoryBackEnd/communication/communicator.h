@@ -50,13 +50,19 @@ class ReceiveBarrier : public CommBarrier {
  */
 class Communicator : public CommBufferManager {
   protected:
+	// identifier for the current segment to be used for local and remote disambiguation
+	int localSegmentTag;
 	// keep track of the number of times this communicator has been used
 	int iterationNo;
 	// two barriers to pause/resume PPU controllers participating in communication
 	SendBarrier *sendBarrier;
 	ReceiveBarrier *receiveBarrier;
   public:
-	Communicator(const char *dependencyName, int senderCount, int receiverCount);
+	Communicator(int localSegmentTag, const char *dependencyName, int senderCount, int receiverCount);
+
+	// if a specific data synchronization type can be optimized by using a special communicator that includes only the part-
+	// icipant segments in its group then the sub-class should use this function to set up the communicator
+	void setupMpiCommunicator(std::vector<int> participantSegments) {}
 
 	// These are the implementation of send and receive functions from the communication-buffer manager class. The logic is
 	// to just wait on the relevent barrier whose shouldWait() and releaseFunction() invoke other functions in this class to

@@ -18,6 +18,7 @@
 #include "../memory-management/part_tracking.h"
 #include "../utils/list.h"
 #include "../runtime/comm_barrier.h"
+#include <vector>
 
 /* To configure the communication buffers properly, we need the data-parts-list representing the operating memory for
  * a data structure for involved LPSes and data item size along with the other information provided by a confinement
@@ -75,6 +76,7 @@ class CommBuffer {
   public:
 	CommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	virtual ~CommBuffer() {}
+	DataExchange *getExchange() { return dataExchange; }
 	int getBufferSize() { return elementCount * elementSize; }
 	int compareTo(CommBuffer *other, bool forReceive);
 
@@ -192,12 +194,13 @@ class CommBufferManager {
   public:
 	CommBufferManager(const char *dependencyName);
 	~CommBufferManager();
+	void setCommBufferList(List<CommBuffer*> *commBufferList) { this->commBufferList = commBufferList; }
 	void addCommBuffer(CommBuffer *buffer) { commBufferList->Append(buffer); }
 
 	// two functions to pre and post process communication buffers before a send and after a receive respectively
 	// these basically read and write the communication buffers
-	void prepareBuffersForSend();
-	void processBuffersAfterReceive();	
+	virtual void prepareBuffersForSend();
+	virtual void processBuffersAfterReceive();	
 
 	// functions to be implemented by the sync-type specific subclasses for send and receive; the signal type 
 	// indicates if the invoking PPU is interested in communication or not and the iteration represents the invo-
@@ -209,7 +212,15 @@ class CommBufferManager {
 	// Communication buffers are sorted before send/receive to reduce the data buffering time in segments/processes
 	// the sorting here is dependent on what particular role the executing segment is going to play at the present
 	// instance.
-	List<CommBuffer*> *getSortedList(bool sortForReceive);	
+	List<CommBuffer*> *getSortedList(bool sortForReceive);
+
+	// This function divides the commBufferList of the buffer manager into two lists: one holding buffers for only
+	// intra-segment data transfers and the other for cross-segments data transfers
+	void seperateLocalAndRemoteBuffers(int localSegmentTag, 
+			List<CommBuffer*> *localBufferList, List<CommBuffer*> *remoteBufferList);
+
+	// this returns IDs of all segments that participate in communications related to the current buffer manager
+	virtual std::vector<int> *getParticipantsTags(); 		
 };
 
 #endif

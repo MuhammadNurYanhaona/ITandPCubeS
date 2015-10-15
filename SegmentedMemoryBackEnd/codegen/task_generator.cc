@@ -162,6 +162,9 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 			= generateFnsForConfinementConstrConfigs(headerFile, 
 					programFile, taskDef, pcubesConfig);
 	generateAllDataExchangeFns(headerFile, programFile, taskDef, commCharacterList);
+	if (commCharacterList->NumElements() > 0) {
+		generateAllCommunicators(headerFile, programFile, taskDef, commCharacterList);
+	}
 
 	// generate task executor and associated functions
 	generateFnToInitEnvLinksFromEnvironment(taskDef, 

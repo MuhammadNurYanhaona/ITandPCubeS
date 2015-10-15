@@ -104,7 +104,7 @@ CommunicationCharacteristics *SyncRequirement::getCommunicationInfo(int segmenta
 	Space *syncRoot = arc->getSyncRoot();
 	Space *confinementSpace = (syncRoot != NULL) ? syncRoot : commRoot;
 	Space *senderSyncSpace = arc->getSource()->getSpace();	
-	Space *receiverSyncSpace = arc->getSource()->getSpace();
+	Space *receiverSyncSpace = arc->getDestination()->getSpace();
 	DataStructure *senderStruct = senderSyncSpace->getStructure(variableName);
 	DataStructure *receiverStruct = receiverSyncSpace->getStructure(variableName);
 	

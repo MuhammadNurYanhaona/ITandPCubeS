@@ -51,12 +51,31 @@ List<CommunicationCharacteristics*> *generateFnsForConfinementConstrConfigs(cons
 void generateFnForDataExchanges(std::ofstream &headerFile,
                 std::ofstream &programFile,
                 const char *initials, 
-		Space rootLps, CommunicationCharacteristics *commCharacter);
+		Space *rootLps, CommunicationCharacteristics *commCharacter);
 
 // This calls the above functions to generate data-exchanges lists for different dependency arcs
 void generateAllDataExchangeFns(const char *headerFile,
                 const char *programFile,
                 TaskDef *taskDef,
-                List<CommunicationCharacteristics*> *commCharacterList);	
+                List<CommunicationCharacteristics*> *commCharacterList);
+
+// This function generates a functions to instantiating a communicator for synchronizing a scalar variable dependency
+void generateScalarCommmunicatorFn(std::ofstream &headerFile,
+                std::ofstream &programFile,
+                const char *initials,
+                Space *rootLps, CommunicationCharacteristics *commCharacter);	
+
+// This function generates a functions to instantiating a communicator for synchronizing an array update dependency
+void generateArrayCommmunicatorFn(std::ofstream &headerFile,
+                std::ofstream &programFile,
+                const char *initials,
+                Space *rootLps, CommunicationCharacteristics *commCharacter);	
+
+// This calls the two functions above to generate communicators for all data dependencies within a task that involve
+// communications 
+void generateAllCommunicators(const char *headerFile,
+                const char *programFile,
+                TaskDef *taskDef,
+                List<CommunicationCharacteristics*> *commCharacterList);
 
 #endif
