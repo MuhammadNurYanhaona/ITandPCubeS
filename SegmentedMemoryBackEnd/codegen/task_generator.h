@@ -30,6 +30,7 @@ class TaskGenerator {
 	const char *initials;
 	MappingNode *mappingRoot;
 	SyncManager *syncManager;
+	int segmentedPPS;
   public:
 	TaskGenerator(TaskDef *taskDef, 
 		const char *outputDirectory, 
@@ -77,6 +78,9 @@ class TaskGenerator {
 	// a supporting function to initialize all data parts of different structures that will be 
 	// needed in computations carried by the threads of the segment managed by the current process 
 	void initializeSegmentMemory(std::ofstream &stream);
+	// a supporting function to creates a map of data communicators that will be used to resolve
+	// data dependencies within the task that requires communications between segments
+	bool generateCommunicators(std::ofstream &stream);
 	// a supporting function that starts threads once initialization is done for all necessary 
 	// data	structures
 	void startThreads(std::ofstream &stream);

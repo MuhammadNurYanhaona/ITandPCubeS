@@ -60,6 +60,7 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 	initials = string_utils::toLower(initials);
 
 	mappingRoot = NULL;
+	segmentedPPS = 0;
 }
 
 const char *TaskGenerator::getHeaderFileName(TaskDef *taskDef) {
@@ -91,7 +92,6 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	Space *rootLps = lpsHierarchy->getRootSpace();
 
 	// determine where memory segmentation happens in the hardware
-	int segmentedPPS = 0;
 	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
 		PPS_Definition *pps = pcubesConfig->Nth(i);
 		if (pps->segmented) {
@@ -157,6 +157,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	syncManager->generateFnForThreadsSyncStructureInit();
 
 	// generate communication related data structures and functions
+	std::cout << "Generating communication related data structures and functions\n";
 	generateFnsForDistributionTrees(headerFile, programFile, taskDef, pcubesConfig);
 	List<CommunicationCharacteristics*> *commCharacterList 
 			= generateFnsForConfinementConstrConfigs(headerFile, 
@@ -164,6 +165,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generateAllDataExchangeFns(headerFile, programFile, taskDef, commCharacterList);
 	if (commCharacterList->NumElements() > 0) {
 		generateAllCommunicators(headerFile, programFile, taskDef, commCharacterList);
+		generateCommunicatorMapFn(headerFile, programFile, taskDef, commCharacterList);
 	}
 
 	// generate task executor and associated functions
@@ -303,7 +305,7 @@ bool TaskGenerator::isUnsupportedInputType(Type *type, const char *varName) {
 
 void TaskGenerator::readPartitionParameters(std::ofstream &stream) {
 	
-	std::cout << "Generating code for taking input partition parameters\n";
+	std::cout << "\tGenerating code for taking input partition parameters\n";
 
 	List<Identifier*> *partitionArgs = taskDef->getPartitionArguments();
 	
@@ -349,7 +351,7 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream,
 		List<const char*> *externalEnvLinks, 
 		bool skipArgInitialization) {
 	
-	std::cout << "Generating code for invoking the task initializer function\n";
+	std::cout << "\tGenerating code for invoking the task initializer function\n";
 
 	InitializeInstr *initSection = taskDef->getInitSection();
 	List<const char*> *initArguments = NULL;
@@ -429,7 +431,7 @@ void TaskGenerator::inovokeTaskInitializer(std::ofstream &stream,
 
 void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	
-	std::cout << "Generating state variables for threads\n";
+	std::cout << "\tGenerating state variables for threads\n";
 
 	stream << std::endl << indent << "// declaring and initializing state variables for threads \n";	
 
@@ -484,7 +486,7 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 
 void TaskGenerator::performSegmentGrouping(std::ofstream &stream, bool segmentIdPassed) {
 	
-	std::cout << "Grouping threads into segments\n";
+	std::cout << "\tGrouping threads into segments\n";
 
 	stream << std::endl << indent << "// grouping threads into segments\n";	
 	
@@ -519,7 +521,7 @@ void TaskGenerator::performSegmentGrouping(std::ofstream &stream, bool segmentId
 
 void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	
-	std::cout << "Generating code for initializing segment memory\n";
+	std::cout << "\tGenerating code for initializing segment memory\n";
 
 	stream << std::endl << indent << "// initializing segment memory\n";	
 	
@@ -546,9 +548,42 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	stream << indent << "logFile.flush()" << stmtSeparator;
 }
 
+bool TaskGenerator::generateCommunicators(std::ofstream &stream) {	
+
+	// first check if communicator setup is needed for this task, if NO then return false
+        List<const char*> *syncVars = taskDef->getComputation()->getVariablesNeedingCommunication(segmentedPPS);
+	if (syncVars == NULL || syncVars->NumElements() == 0) {
+		return false;
+	}
+
+	std::cout << "\tGenerating code for initializing communicators map\n";
+	stream << std::endl << indent << "// initializing communicators map\n";	
+	
+	// first generate a distribution map for data shared among multiple segments
+	stream << indent << "PartDistributionMap *distributionMap = generateDistributionMap(";
+	stream << "segmentList" << paramSeparator << "configMap)" << stmtSeparator;
+
+	// then use that map to create communicators for shared arrays; the same function creates communicator for scalars
+	stream << indent << "Hashtable<Communicator*> *communicatorMap = generateCommunicators(";
+	stream << "mySegment" << paramSeparator;
+	stream << '\n' << indent << doubleIndent;
+	stream << "segmentList" << paramSeparator << "taskData" << paramSeparator;
+	stream << "configMap" << paramSeparator << "distributionMap)" << stmtSeparator;
+
+	// finally assign the communicator map to the threads of the current segment
+	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";
+	stream << doubleIndent << "threadStateList[i]->setCommunicatorMap(communicatorMap)" << stmtSeparator;
+	stream << indent << "}\n"; 
+	
+	stream << indent << "logFile << \"\\tcommunicators have been created\\n\"" << stmtSeparator;
+	stream << indent << "logFile.flush()" << stmtSeparator;
+
+	return true;
+}
+
 void TaskGenerator::startThreads(std::ofstream &stream) {
 	
-	std::cout << "Generating code for starting threads\n";
+	std::cout << "\tGenerating code for starting threads\n";
 
 	stream << std::endl << indent << "// starting threads\n";
 	stream << indent << "logFile << \"\\tlaunching threads\\n\"" << stmtSeparator;	

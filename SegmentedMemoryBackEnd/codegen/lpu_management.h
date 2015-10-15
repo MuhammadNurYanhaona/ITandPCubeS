@@ -5,6 +5,7 @@
 #include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"
+#include "../communication/communicator.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/interval_utils.h"
@@ -148,6 +149,8 @@ class ThreadState {
 	TaskData *taskData;
 	// a map of iterators that will be needed to identifiy data parts for LPUs
 	Hashtable<PartIterator*> *partIteratorMap;
+	// a map of communicators to be used to exchange data for data dependencies involving communication
+	Hashtable<Communicator*> *communicatorMap;
 	// an auxiliary variable used in LPU generation process
 	List<int*> *lpuIdChain;
   public:
@@ -159,7 +162,11 @@ class ThreadState {
 	TaskData *getTaskData() { return taskData; }
 	void setPartIteratorMap(Hashtable<PartIterator*> *map) { this->partIteratorMap = map; }
 	PartIterator *getIterator(int lpsId, const char *varName);
-		
+	void setCommunicatorMap(Hashtable<Communicator*> *map) { this->communicatorMap = map; }
+	Communicator *getCommunicator(const char *dependencyName) { 
+		return communicatorMap->Lookup(dependencyName); 
+	}
+			
 	virtual void setLpsParentIndexMap() = 0;
 	virtual void setRootLpu(Metadata *metadata) = 0;
 	virtual void setRootLpu(LPU *rootLpu) = 0;

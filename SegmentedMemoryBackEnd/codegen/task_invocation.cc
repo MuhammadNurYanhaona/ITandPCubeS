@@ -152,7 +152,7 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
                 const char *headerFileName,
                 const char *programFileName) {
 	
-	std::cout << "\tGenerating routine to initiate environment-link from environment reference\n";
+	std::cout << "Generating routine to initiate environment-link from environment reference\n";
 	std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
@@ -235,7 +235,7 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
 
 void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	
-	std::cout << "\tGenerating task execute routine \n";
+	std::cout << "Generating task execute routine \n";
 	std::ofstream programFile, headerFile;
         headerFile.open (taskGenerator->getHeaderFile(), std::ofstream::out | std::ofstream::app);
         programFile.open (taskGenerator->getProgramFile(), std::ofstream::out | std::ofstream::app);
@@ -350,7 +350,24 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
         programFile << "- (start.tv_sec + start.tv_usec / 1000000.0))" << stmtSeparator;
         programFile << indent << "logFile << \"Memory preparation time: \" << allocationTime";
 	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
-	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+	programFile << indent << "double timeConsumedSoFar = allocationTime" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator;
+
+	// generate list of communicators that will be used for resolving data dependencies involving communications
+	bool communicatorsGenerated = taskGenerator->generateCommunicators(programFile);
+	if (communicatorsGenerated) {
+		// log time spent on communicator setup
+		programFile << std::endl;
+		programFile << indent << "// calculating communicators setup time\n";
+		programFile << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
+        	programFile << indent << "double communicatorTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
+        	programFile << std::endl << indent << indent << indent;
+        	programFile << "- (start.tv_sec + start.tv_usec / 1000000.0)) - timeConsumedSoFar" << stmtSeparator;
+        	programFile << indent << "logFile << \"Communicators setup time: \" << communicatorTime";
+		programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+		programFile << indent << "timeConsumedSoFar += communicatorTime" << stmtSeparator;
+		programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+	}
 
 	// read data structures from files if instructed by the coordinator program
 	programFile << indent << "initializeEnvironment";
@@ -366,12 +383,12 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
         programFile << indent << "double readingTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
         programFile << std::endl << indent << indent << indent;
-        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0)) - allocationTime" << stmtSeparator;
+        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0)) - timeConsumedSoFar" << stmtSeparator;
         programFile << indent << "logFile << \"Data reading time: \" << readingTime";
 	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+	programFile << indent << "timeConsumedSoFar += readingTime" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	
-
 	// start threads and wait for them to finish execution of the task 
         taskGenerator->startThreads(programFile);
 
@@ -381,15 +398,13 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
         programFile << indent << "double computationTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
         programFile << std::endl << indent << indent << indent;
-        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0))";
-        programFile << std::endl << indent << indent << indent;
-	programFile << "- allocationTime - readingTime"; 
-	programFile << stmtSeparator << indent << "logFile << \"Computation time: \" << computationTime";
+        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0)) - timeConsumedSoFar" << stmtSeparator;
+	programFile << indent << "logFile << \"Computation time: \" << computationTime";
 	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+	programFile << indent << "timeConsumedSoFar += readingTime" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	
-	// write environmental data structures into output files if instructed by the coordinator program 
-	// through output bindings
+	// write environmental data structures into output files if instructed by the coordinator program through output bindings
 	programFile << indent << "// storing outputs in files\n"; 
 	programFile << indent << "logFile << \"\\tgoing to write output to files\\n\"" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator;

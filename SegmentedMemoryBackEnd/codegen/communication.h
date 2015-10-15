@@ -78,4 +78,12 @@ void generateAllCommunicators(const char *headerFile,
                 TaskDef *taskDef,
                 List<CommunicationCharacteristics*> *commCharacterList);
 
+// This function generates a function for constructing a map of communicators for a segment that will be shared by
+// its PPU controllers. Later when a situation for dependency resolution occurs the PPU controllers retrieve the
+// communicator created for that dependency and invoke send or receive on it depending on the demand of the situation.    
+void generateCommunicatorMapFn(const char *headerFile,
+                const char *programFile,
+                TaskDef *taskDef,
+                List<CommunicationCharacteristics*> *commCharacterList);	
+
 #endif

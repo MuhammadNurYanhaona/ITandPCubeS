@@ -764,3 +764,86 @@ void generateAllCommunicators(const char *headerFileName,
 	programFile.close();
 	headerFile.close();
 }
+
+void generateCommunicatorMapFn(const char *headerFileName,
+                const char *programFileName,
+                TaskDef *taskDef,
+                List<CommunicationCharacteristics*> *commCharacterList) {
+	
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open()) {
+                std::cout << "Unable to open output program file for generating a communicator map";
+                std::exit(EXIT_FAILURE);
+        }
+        if (!headerFile.is_open()) {
+                std::cout <<  "Unable to open output header file for generating a communicator map";
+                std::exit(EXIT_FAILURE);
+        }
+
+	const char *initials = string_utils::getInitials(taskDef->getName());
+        initials = string_utils::toLower(initials);
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+
+	decorator::writeSubsectionHeader(headerFile, "communicator map");
+	decorator::writeSubsectionHeader(programFile, "communicator map");
+
+	std::ostringstream fnHeader;
+	std::ostringstream fnBody;
+
+	// define the function signature
+	fnHeader << "generateCommunicators(SegmentState *localSegment" << paramSeparator;
+	fnHeader << '\n' << doubleIndent << "List<SegmentState*> *segmentList" << paramSeparator;
+	fnHeader << '\n' << doubleIndent << "TaskData *taskData" << paramSeparator;
+	fnHeader << '\n' << doubleIndent << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
+	fnHeader << "\n" << doubleIndent << "PartDistributionMap *distributionMap)";
+
+	fnBody << "{\n\n";
+
+	// instantiate a communicator map
+	fnBody << indent << "Hashtable<Communicator*> *communicatorMap = new Hashtable<Communicator*>";
+	fnBody << stmtSeparator;
+
+	// iterate over the list of communication characteristics and invoke appropriate function to create a communicator
+	// each entry in the list
+	for (int i = 0; i < commCharacterList->NumElements(); i++) {
+		
+		CommunicationCharacteristics *commCharacter = commCharacterList->Nth(i);
+		const char *dependencyName = commCharacter->getSyncRequirement()->getDependencyArc()->getArcName();
+		const char *varName = commCharacter->getVarName();
+		DataStructure *structure = rootLps->getStructure(varName);
+		Type *varType = structure->getType();
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		
+		fnBody << indent << "Communicator *communicator" << i << " = getCommunicatorFor_";
+		fnBody << dependencyName << "(";
+		if (array == NULL) {
+			fnBody << "localSegment" << paramSeparator;
+			fnBody << '\n' << indent << doubleIndent;
+			fnBody << "segmentList" << paramSeparator;
+			fnBody << "sizeof(" << varType->getCType() << ')';
+		} else {
+			fnBody << "localSegment" << paramSeparator;
+			fnBody << '\n' << indent << doubleIndent;
+			fnBody << "taskData" << paramSeparator;
+			fnBody << "partConfigMap" << paramSeparator;
+			fnBody << "distributionMap";
+		}
+		fnBody << ")" << stmtSeparator;
+		fnBody << indent << "communicatorMap->Enter(\"" << dependencyName << "\"" << paramSeparator;
+		fnBody << "communicator" << i << ")" << stmtSeparator;	
+	}
+
+	// return the map
+	fnBody << '\n' << indent << "return communicatorMap" << stmtSeparator;
+	fnBody << "}";	
+
+	headerFile << "Hashtable<Communicator*> *" << fnHeader.str() << stmtSeparator;
+	programFile << "\nHashtable<Communicator*> *" << initials << "::";
+	programFile << fnHeader.str() << " " << fnBody.str();
+
+	programFile.close();
+	headerFile.close();
+}
+
