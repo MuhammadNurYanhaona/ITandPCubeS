@@ -120,7 +120,13 @@ class SyncRequirement {
 	// So it should be called only after those steps have been completed. 
 	virtual CommunicationCharacteristics *getCommunicationInfo(int segmentationPPS);
 
-	static List<SyncRequirement*> *sortList(List<SyncRequirement*> *reqList);	
+	static List<SyncRequirement*> *sortList(List<SyncRequirement*> *reqList);
+
+	// filter out two kinds of data dependencies from one list into two separate lists for communication
+	// not-communication based implementation
+	static void separateCommunicationFromSynchronizations(int segmentedPPS, 
+			List<SyncRequirement*> *sourceList, 
+			List<SyncRequirement*> *commList, List<SyncRequirement*> *syncList);	
 };
 
 // As the name suggests, this represents a sync requirements among all LPUs within an LPS due to a replicated 

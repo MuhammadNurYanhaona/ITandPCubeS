@@ -238,7 +238,19 @@ class ExecutionStage : public FlowStage {
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 
 	simplified though. We can think it as simple linear sequence of stages without any repeat cycle. So unless 
-	nested in a repeat cycle, a composite Stage will execute only once. 
+	nested in a repeat cycle, a composite Stage will execute only once.
+
+	NOTE NOTE NOTE NOTE: data dependencies in an IT task are distinguished between synchronization dependencies
+	and communication dependencies based on the target hardware platfrom and how LPS-to-PPS mapping is done. The
+	strategy we applied to drag LPU-LPU dependencies to PPU-PPU (note that a segment is a higher level PPU by 
+	itself) moves all data dependencies from their execution and sync-stages to encompassing composite stages.
+	Thus, here we separate the two types of dependencies and generate different code for them. For communication
+	dependencies we just need a send and a receive. For synchronization dependencies, in its most flexible mode,
+	there should be a signalUpdate-waitForUpdate-signalRead-waitForRead sync cycle giving four functions. The
+	implementation of the underlying synchronization primitives (done by Profe.), however, tied the signal with
+	wait like a barrier fashion. So although we originally had template for four synchronization functions. We
+	did not use them later. Rather we have two simplified functions for signalUpdate-waitForRead shorter cycle.
+	The bottom line is do not get frightened by two many data dependency resolution functions here.       
 */
 class CompositeStage : public FlowStage {
   protected:
@@ -296,16 +308,18 @@ class CompositeStage : public FlowStage {
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace);
 	
-	// For multi-core backends there is no need to generate codes for sync-stages; therefore, we filter them
-	// out during nested stages grouping.
+	// Until we incorporate the backend support for dynamic LPSes, there is no need to generate codes for sync 
+	// stages; therefore, we filter them out during nested stages grouping.
 	static List<FlowStage*> *filterOutSyncStages(List<FlowStage*> *originalList);
 	
-	// For multi-core backends our current decision is to drag down LPU-LPU synchronization to PPU-PPU syn-
-	// chronization. As we group flow-stages during code generations and iterations over multiplexed LPUs
-	// take place on a group basis, we need to know all synchronization dependencies the stages of a group
-	// has and resolve them before we start code generation for the stages. The following two functions help
-	// in doing that.
-	static List<SyncRequirement*> *getSyncDependeciesOfGroup(List<FlowStage*> *group);
+	// For both multi-core and segmented-memeory backends, our current decision is to drag down LPU-LPU synch-
+	// ronization to PPU-PPU synchronization. As we group flow-stages during code generations and iterations 
+	// over multiplexed LPUs take place on a group basis, we need to know all data dependencies the stages of a 
+	// group has and resolve them before we start code generation for the stages. The following three functions 
+	// help in doing that.
+	static List<SyncRequirement*> *getDataDependeciesOfGroup(List<FlowStage*> *group);
+	void generateDataReceivesForGroup(std::ofstream &stream, int indentation, 
+			List<SyncRequirement*> *commDependencies);
 	void generateSyncCodeForGroupTransitions(std::ofstream &stream, int indentation, 
 			List<SyncRequirement*> *syncDependencies);
 
@@ -321,10 +335,11 @@ class CompositeStage : public FlowStage {
 	// variable indeed did executed 
 	void declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingLevel);
 	
-	// Just like synchronization dependencies that are dragged down to PPU level, synchronization signals need
-	// to be dragged down to PPU level to keep the scheme consistent. The following two functions are used for
-	// that purpose
-	static List<SyncRequirement*> *getSyncSignalsOfGroup(List<FlowStage*> *group);
+	// Just like data dependencies that are dragged down to PPU level, shared data update signals need to be
+	// brought to PPU level to keep the scheme consistent. The following three methods are used for that purpose
+	static List<SyncRequirement*> *getUpdateSignalsOfGroup(List<FlowStage*> *group);
+	void generateDataSendsForGroup(std::ofstream &stream, int indentation,
+			List<SyncRequirement*> *commRequirements);
 	void generateSignalCodeForGroupTransitions(std::ofstream &stream, int indentation,
 			List<SyncRequirement*> *syncRequirements);
 

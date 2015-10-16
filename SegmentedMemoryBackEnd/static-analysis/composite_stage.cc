@@ -9,6 +9,7 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
+#include "../utils/code_constant.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
@@ -425,25 +426,35 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		
 		List<FlowStage*> *currentGroup = stageGroups->Nth(i);
 
-		// commented out this code as the barrier based priliminary implementation does not need this
-		/*-------------------------------------------------------------------------------------------------
-		// first generate code for waiting on all synchronization dependencies before diving into 
-		// multiplexed LPU iterations.
-		List<SyncRequirement*> *syncDependencies = getSyncDependeciesOfGroup(currentGroup);
-		// sort the sync dependencies to ensure that their is a consistent order of the waiting primitives
-		syncDependencies = SyncRequirement::sortList(syncDependencies);
-		generateSyncCodeForGroupTransitions(stream, nextIndentation, syncDependencies);
-		//-----------------------------------------------------------------------------------------------*/
+		// retrieve all data dependencies, and sort them to ensure waitings for updates happen in order
+		List<SyncRequirement*> *dataDependencies = getDataDependeciesOfGroup(currentGroup);
+		dataDependencies = SyncRequirement::sortList(dataDependencies);
 		
-		// retrieve all synchronization signals that need to be activated if the stages in the group execute
-		List<SyncRequirement*> *syncSignals = getSyncSignalsOfGroup(currentGroup);
+		// separate dependencies into communication and synchronization dependencies then take appropriate 
+		// actions based on type (the simplified implementation does nothing with the synchronization 
+		// dependencies)
+		int segmentedPPS = space->getSegmentedPPS();
+		List<SyncRequirement*> *commDependencies = new List<SyncRequirement*>;
+		List<SyncRequirement*> *syncDependencies = new List<SyncRequirement*>;
+		SyncRequirement::separateCommunicationFromSynchronizations(segmentedPPS, 
+				dataDependencies, commDependencies, syncDependencies);
+		generateDataReceivesForGroup(stream, nextIndentation, commDependencies);
+		
+		// retrieve all shared data update signals that need to be activated if stages in the group execute
+		List<SyncRequirement*> *updateSignals = getUpdateSignalsOfGroup(currentGroup);
 		// mark these signals as signaled so that they are not reactivated within the nested code
-		for (int j = 0; j < syncSignals->NumElements(); j++) {
-			syncSignals->Nth(j)->signal();
+		for (int j = 0; j < updateSignals->NumElements(); j++) {
+			updateSignals->Nth(j)->signal();
 		}
-		// sort the sync signals to ensure waiting for signal clearance (equivalent to get signals from the
+		// sort the update signals to ensure waiting for signal clearance (equivalent to get signals from the
 		// readers that all of them have finished reading the last update) happens in proper order
-		syncSignals = SyncRequirement::sortList(syncSignals);
+		updateSignals = SyncRequirement::sortList(updateSignals);
+
+		// divide the signals between those issuing communications and those that do not  
+		List<SyncRequirement*> *commSignals = new List<SyncRequirement*>;
+		List<SyncRequirement*> *syncSignals = new List<SyncRequirement*>;
+		SyncRequirement::separateCommunicationFromSynchronizations(segmentedPPS, 
+				updateSignals, commSignals, syncSignals);
 
 		// simplified implementation	
 		//-------------------------------------------------------------------------------------------------
@@ -458,8 +469,9 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		currentGroup = filterOutSyncStages(currentGroup);
 		if (currentGroup->NumElements() == 0) {
 			// before rulling sync stages out, we need to ensure that whatever signals they were supposed
-			// issue are by-default issued
-			generateSignalCodeForGroupTransitions(stream, nextIndentation, syncSignals); 
+			// issue are by-default issued and whatever data they were supposed to send are sent
+			generateSignalCodeForGroupTransitions(stream, nextIndentation, syncSignals);
+			generateDataSendsForGroup(stream, nextIndentation, commSignals); 
 			continue;
 		}
 
@@ -505,6 +517,9 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// made by stages within current group  
 		genSimplifiedSignalsForGroupTransitionsCode(stream, nextIndentation, syncSignals);
 		//-------------------------------------------------------------------------------------------------
+		
+		// communicate any update of shared data	
+		generateDataSendsForGroup(stream, nextIndentation, commSignals); 
 
 		// commented out this code as the barrier based priliminary implementation does not need this
 		/*-------------------------------------------------------------------------------------------------
@@ -678,7 +693,7 @@ List<FlowStage*> *CompositeStage::filterOutSyncStages(List<FlowStage*> *original
 	return filteredList;
 }
 
-List<SyncRequirement*> *CompositeStage::getSyncDependeciesOfGroup(List<FlowStage*> *group) {
+List<SyncRequirement*> *CompositeStage::getDataDependeciesOfGroup(List<FlowStage*> *group) {
 	List<SyncRequirement*> *syncList = new List<SyncRequirement*>;
 	for (int i = 0; i < group->NumElements(); i++) {
 		FlowStage *stage = group->Nth(i);
@@ -687,6 +702,79 @@ List<SyncRequirement*> *CompositeStage::getSyncDependeciesOfGroup(List<FlowStage
 		syncList->AppendAll(activeDependencies);
 	}
 	return syncList;
+}
+
+void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int indentation,
+                        List<SyncRequirement*> *commDependencies) {
+	
+	// Note that all synchronization we are dealing here is strictly within the boundary of composite stage under
+	// concern. Now if there is a synchronization dependency to a nested stage for the execution of another stage
+	// that comes after it, it means that the dependency is between a latter iteration on the dependent stage on
+	// an earlier iteration on the source stage. This is because, otherwise the dependent stage will execute before
+	// the source stage and there should not be any dependency. Now, such dependency is only valid for iterations 
+	// except the first one. So there should be a checking on iteration number before we apply waiting on such
+	// dependencies. On the other hand, if the source stage executes earlier than the dependent stage then it applies
+	// always, i.e., it is independent of any loop iteration, if exists, that sorrounds the composite stage.
+	// Therefore, we use following two lists to partition the list of communication requirements into forward and
+	// backword dependencies. 
+	List<SyncRequirement*> *forwardDependencies = new List<SyncRequirement*>;
+	List<SyncRequirement*> *backwardDependencies = new List<SyncRequirement*>;
+
+	for (int i = 0; i < commDependencies->NumElements(); i++) {
+		SyncRequirement *comm = commDependencies->Nth(i);
+		if (!comm->isActive()) continue;
+		DependencyArc *arc = comm->getDependencyArc();
+		FlowStage *source = arc->getSource();
+		FlowStage *destination = arc->getDestination();
+		if (source->getIndex() < destination->getIndex()) {
+			forwardDependencies->Append(comm);
+		} else backwardDependencies->Append(comm);
+	}
+
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentation; i++) indentStr << '\t';
+	
+	if (commDependencies->NumElements() > 0) {
+		stream << std::endl << indentStr.str() << "// waiting on data reception\n";
+	}
+	
+	// Write the code for forwards communication requirements.
+	for (int i = 0; i < forwardDependencies->NumElements(); i++) {
+		SyncRequirement *comm = forwardDependencies->Nth(i);
+		Space *dependentLps = comm->getDependentLps();
+		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << dependentLps->getName();
+		stream << ")) {\n";
+		stream << indentStr.str() << '\t' << "Communicator *communicator = threadState->getCommunicator(\"";
+		stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
+		stream << indentStr.str() << '\t' << "communicator->receive(REQUESTING_COMMUNICATION";
+		stream << paramSeparator << "repeatIteration)" << stmtSeparator; 
+		stream << indentStr.str() << "}\n";
+	}
+
+	// write the code for backword sync requirements within an if block
+	if (backwardDependencies->NumElements() > 0) {
+		stream << indentStr.str() << "if (repeatIteration > 0) {\n";
+		for (int i = 0; i < backwardDependencies->NumElements(); i++) {
+			SyncRequirement *comm = backwardDependencies->Nth(i);
+			Space *dependentLps = comm->getDependentLps();
+			stream << indentStr.str() << "\tif (threadState->isValidPpu(Space_" << dependentLps->getName();
+			stream << ")) {\n";
+			stream << indentStr.str() << "\t\t";
+			stream << "Communicator *communicator = threadState->getCommunicator(\"";
+			stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
+			stream << indentStr.str() << "\t\t";
+			stream << "communicator->receive(REQUESTING_COMMUNICATION";
+			stream << paramSeparator << "repeatIteration)" << stmtSeparator; 
+			stream << indentStr.str() << "\t}\n";
+		}
+		stream << indentStr.str() << "}\n";
+	}
+
+	// finally deactive all sync dependencies as they are already been taken care of here	
+	for (int i = 0; i < commDependencies->NumElements(); i++) {
+		SyncRequirement *comm = commDependencies->Nth(i);
+		comm->deactivate();
+	}
 }
 
 void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, int indentation,
@@ -707,6 +795,7 @@ void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, 
 
 	for (int i = 0; i < syncDependencies->NumElements(); i++) {
 		SyncRequirement *sync = syncDependencies->Nth(i);
+		if (!sync->isActive()) continue;
 		DependencyArc *arc = sync->getDependencyArc();
 		FlowStage *source = arc->getSource();
 		FlowStage *destination = arc->getDestination();
@@ -845,7 +934,7 @@ void CompositeStage::declareSynchronizationCounters(std::ofstream &stream, int i
 	}
 }
 
-List<SyncRequirement*> *CompositeStage::getSyncSignalsOfGroup(List<FlowStage*> *group) {
+List<SyncRequirement*> *CompositeStage::getUpdateSignalsOfGroup(List<FlowStage*> *group) {
 	List<SyncRequirement*> *syncList = new List<SyncRequirement*>;
 	for (int i = 0; i < group->NumElements(); i++) {
 		FlowStage *stage = group->Nth(i);
@@ -858,11 +947,50 @@ List<SyncRequirement*> *CompositeStage::getSyncSignalsOfGroup(List<FlowStage*> *
 	return syncList;
 }
 
-void CompositeStage::generateSignalCodeForGroupTransitions(std::ofstream &stream, int indentation,
-                        List<SyncRequirement*> *syncRequirements) {
+void CompositeStage::generateDataSendsForGroup(std::ofstream &stream, int indentation,
+		List<SyncRequirement*> *commRequirements) {
+	
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentation; i++) indentStr << indent;
 
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
+	if (commRequirements->NumElements() > 0) {
+		stream << std::endl << indentStr.str() << "// communicating updates\n";
+	}
+
+	// iterate over all the update signals
+	for (int i = 0; i < commRequirements->NumElements(); i++) {
+		
+		SyncRequirement *currentComm = commRequirements->Nth(i);
+		const char *counterVarName = currentComm->getDependencyArc()->getArcName();
+		
+		// check if the current PPU is a valid candidate for signaling update
+		Space *signalingLps = currentComm->getDependencyArc()->getSource()->getSpace();
+		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << signalingLps->getName();
+		stream << ")) {\n";
+		
+		// retrieve the communicator for this dependency
+		stream << indentStr.str() << indent;
+		stream << "Communicator *communicator = threadState->getCommunicator(\"";
+		stream << currentComm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
+		
+		// If the counter variable for the sync has been updated then the current PPU controller
+		// has data to send so it should indicate that fact in its call to the communicator. Otherwise
+		// it should only report that it has reached this particular execution point.
+		stream << indentStr.str() << indent << "if (" << counterVarName << " > 0) {\n";
+		stream << indentStr.str() << doubleIndent << "communicator->send(";
+		stream << "REQUESTING_COMMUNICATION" << paramSeparator << "repeatIteration)" << stmtSeparator;
+		stream << indentStr.str() << indent << "} else communicator->send(";
+		stream << "PASSIVE_REPORTING" << paramSeparator << "repeatIteration)" << stmtSeparator;
+		
+		// then reset the counter	 
+		stream << indentStr.str() << indent << counterVarName << " = 0" << stmtSeparator;
+		stream << indentStr.str() << "}\n";
+	}
+}
+
+void CompositeStage::generateSignalCodeForGroupTransitions(std::ofstream &stream, int indentation,
+		List<SyncRequirement*> *syncRequirements) {
+
 	std::ostringstream indent;
 	for (int i = 0; i < indentation; i++) indent << '\t';
 

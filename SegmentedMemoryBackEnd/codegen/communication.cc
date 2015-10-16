@@ -320,9 +320,13 @@ List<CommunicationCharacteristics*> *generateFnsForConfinementConstrConfigs(cons
 	List<CommunicationCharacteristics*> *commCharacterList 
 			= taskDef->getComputation()->getCommCharacteristicsForSyncReqs(segmentedPPS);
 	List<CommunicationCharacteristics*> *arrayComms = new List<CommunicationCharacteristics*>;
+	List<CommunicationCharacteristics*> *commWithDataMovements = new List<CommunicationCharacteristics*>;
 	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
 	for (int i = 0; i < commCharacterList->NumElements(); i++) {
 		CommunicationCharacteristics *currComm = commCharacterList->Nth(i);
+		if (!currComm->isCommunicationRequired()) continue;
+
+		commWithDataMovements->Append(currComm);
 		const char *varName = currComm->getVarName();	
 		DataStructure *structure = rootLps->getStructure(varName);
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
@@ -345,8 +349,8 @@ List<CommunicationCharacteristics*> *generateFnsForConfinementConstrConfigs(cons
 	headerFile.close();
 	programFile.close();
 
-	// return the list of communication characteristics to be used by later code generation functions
-	return commCharacterList;
+	// return the communication characteristics involving data movements to be used by later code generation functions
+	return commWithDataMovements;
 }
 
 void generateFnForDataExchanges(std::ofstream &headerFile,

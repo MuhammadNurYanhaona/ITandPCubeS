@@ -144,6 +144,7 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	Space *rootSpace = lpsHierarchy->getRootSpace();
 	rootEntry->LPS = rootSpace;
 	rootEntry->PPS = pcubesConfig->Nth(0);
+	rootSpace->setPpsId(pcubesConfig->NumElements());
 	MappingNode *rootNode = new MappingNode();
 	rootNode->parent = NULL;
 	rootNode->mappingConfig = rootEntry;
@@ -185,6 +186,7 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		if (lps->getSubpartition() != NULL) {
 			MapEntry *subEntry = new MapEntry();
 			subEntry->LPS = lps->getSubpartition();
+			subEntry->LPS->setPpsId(ppsId);
 			subEntry->PPS = pps;
 			MappingNode *subNode = new MappingNode();
 			subNode->parent = node;

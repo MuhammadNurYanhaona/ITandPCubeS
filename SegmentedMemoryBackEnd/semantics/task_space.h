@@ -322,6 +322,11 @@ class Space {
 	// the current LPS has been mapped to. PPSes are labeled from 1 to up from the lowest physical space to
 	// the highest 
 	int ppsId;
+	
+	// This is, again, used by the backend compiler. It is needed to determine what data dependency should 
+	// be resolved by moving data around (across segments or within a single segment) and what should be 
+	// resolved by signaling-and-waiting on some synchronization primitives. 
+	int segmentedPPS;
 
 	// a flag indicating if the LPS has some compution stages executing in it; this information is needed to
 	// determine whether or not to generate LPUs for this LPS
@@ -363,6 +368,8 @@ class Space {
 	Symbol *getLpuIdSymbol();
 	void setPpsId(int ppsId) { this->ppsId = ppsId; }
 	int getPpsId() { return ppsId; }
+	void setSegmentedPPS(int segmentedPPS) { this->segmentedPPS = segmentedPPS; }
+	int getSegmentedPPS() { return segmentedPPS; }
 	void flagToExecuteCode() { executesCode = true; }
 	bool doesExecuteCode() { return executesCode; }
 

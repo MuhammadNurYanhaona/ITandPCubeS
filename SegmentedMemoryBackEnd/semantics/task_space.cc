@@ -459,6 +459,7 @@ Space::Space(const char *name, int dimensions, bool dynamic, bool subpartitionSp
 
 	// a mark of an invalid PPS id as PPS ids are positive integers
 	this->ppsId = 0;
+	this->segmentedPPS = 0;
 }
 
 void Space::setStructureList(Hashtable<DataStructure*> *dataStructureList) {
@@ -718,8 +719,14 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 	std::deque<Space*> lpsQueue;
         lpsQueue.push_back(root);
 	while (!lpsQueue.empty()) {
+		
 		Space *lps = lpsQueue.front();
                 lpsQueue.pop_front();
+
+		// setup the segmented PPS property in the LPS here since we are traversing all
+		// LPSes and have the information for the setup
+		lps->setSegmentedPPS(segmentedPPS);
+
 		List<Space*> *children = lps->getChildrenSpaces();	
                 for (int i = 0; i < children->NumElements(); i++) {
                         lpsQueue.push_back(children->Nth(i));

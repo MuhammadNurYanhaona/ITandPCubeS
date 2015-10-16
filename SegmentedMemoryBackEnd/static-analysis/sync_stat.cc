@@ -147,6 +147,20 @@ List<SyncRequirement*> *SyncRequirement::sortList(List<SyncRequirement*> *reqLis
 	return sortedList;
 }
 
+void SyncRequirement::separateCommunicationFromSynchronizations(int segmentedPPS, 
+		List<SyncRequirement*> *sourceList,
+                List<SyncRequirement*> *commList, List<SyncRequirement*> *syncList) {
+
+	if (sourceList == NULL) return;
+	for (int i = 0; i < sourceList->NumElements(); i++) {
+		SyncRequirement *req = sourceList->Nth(i);
+		CommunicationCharacteristics *commCharacter = req->getCommunicationInfo(segmentedPPS);
+		if (commCharacter->isCommunicationRequired()) commList->Append(req);
+		else syncList->Append(req);
+		delete commCharacter;
+	}
+}
+
 //----------------------------------------------------------- Replication Sync -------------------------------------------------------------/
 
 void ReplicationSync::print(int indent) {
