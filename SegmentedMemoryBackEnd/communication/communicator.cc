@@ -69,3 +69,11 @@ Communicator::Communicator(int localSegmentTag,
 	}
 	iterationNo = 0;
 }
+
+void Communicator::setupCommunicator() {
+        std::vector<int> *participants = getParticipantsTags();
+        segmentGroup = new SegmentGroup(*participants);
+        segmentGroup->setupCommunicator();
+        delete participants;
+}
+

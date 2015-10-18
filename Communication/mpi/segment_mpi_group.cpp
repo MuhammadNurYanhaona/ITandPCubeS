@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <vector>
 #include <iostream>
+#include <cstdlib>
 #include "segment_mpi_group.h"
 
 using namespace std;
@@ -32,7 +33,19 @@ void SegmentGroup::setupCommunicator() {
 	MPI_Comm_rank(mpiCommunicator, &groupRank);
 
 	int participantRanks[participants];
-	MPI_Allgather(&segmentRank, 1, MPI_INT, participantRanks, participants, MPI_INT, mpiCommunicator);
+    int status = MPI_Allgather(&segmentRank, 1, MPI_INT,
+                    participantRanks, 1, MPI_INT, mpiCommunicator);
+
+    if (status == MPI_ERR_COMM) {
+            cout << "invalid communicator\n";
+            exit(EXIT_FAILURE);
+    } else if (status == MPI_ERR_COUNT) {
+            cout << "invalid data element count\n";
+            exit(EXIT_FAILURE);
+    } else if (status == MPI_ERR_BUFFER) {
+            cout << "invalid buffer\n";
+            exit(EXIT_FAILURE);
+    }
 
 	for (int rank = 0; rank < participants; rank++) {
 		int segmentTag = participantRanks[rank];

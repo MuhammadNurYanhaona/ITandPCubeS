@@ -30,7 +30,7 @@ class ScalarCommunicator : public Communicator {
 
 	// before a data send/receive the memory address of the scalar variable should be copied into the communicator
 	// using this funtion
-	void setupDataBufferReference(void *dataBuffer) { this->dataBuffer = reinterpret_cast<char*>(dataBuffer); }
+	void setDataBufferReference(void *dataBuffer) { this->dataBuffer = reinterpret_cast<char*>(dataBuffer); }
 
 	// participant tags computation needs to be updated for scalar synchronization as it does not involve examination
 	// of communication buffers
@@ -69,13 +69,8 @@ class ScalarReplicaSyncCommunicator : public ScalarCommunicator {
 		const char *dependencyName, 
 		std::vector<int> *senderSegmentTags, 
 		std::vector<int> *receiverSegmentTags, int dataSize);
-	
-	void send() { participate(true); }
-	void receive() { participate(false); }
-	
-	// the mechanism for communication is the same, just the role varies depending on whether the segment is sending
-	// or receiving an update
-	void participate(bool sending);
+	void send();
+	void receive();
 };
 
 // handles a scenario where update done by a segment executing code for a lower level LPS needs to be propagated to the

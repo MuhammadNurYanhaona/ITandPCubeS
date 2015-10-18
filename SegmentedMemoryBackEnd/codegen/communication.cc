@@ -480,7 +480,7 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	
 	fnHeader << "getCommunicatorFor_" << dependencyName << "(SegmentState *localSegment" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "List<SegmentState*> *segmentList" << paramSeparator;
-	fnHeader << '\n' << doubleIndent << "int sizeOfScalar)";
+	fnHeader << '\n' << doubleIndent << "TaskGlobals *taskGlobals)";
 
 	fnBody << "{\n\n";
 
@@ -511,7 +511,7 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << indent << "int localSegmentTag = localSegment->getPhysicalId()" << stmtSeparator;
 
 	// declare a communicator and instantiate it with appropriate communicator type
-	fnBody << '\n' << indent << "Communicator *communicator = NULL" << stmtSeparator;
+	fnBody << '\n' << indent << "ScalarCommunicator *communicator = NULL" << stmtSeparator;
 
 	// for replication-sync creates a communicator of that type without further consideration 
 	SyncRequirement *syncRequirement = commCharacter->getSyncRequirement();
@@ -562,6 +562,9 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 		fnBody << "dataSize)" << stmtSeparator;
 		fnBody << indent << "}\n";
 	} 
+
+	// set up the data buffer reference in the communicator for the scalar
+	fnBody << indent << "communicator->setDataBufferReference(&(taskGlobals->" << varName << "))" << stmtSeparator;
 
 	fnBody << indent << "return communicator" << stmtSeparator;
 	fnBody << "}\n";
@@ -800,6 +803,7 @@ void generateCommunicatorMapFn(const char *headerFileName,
 	fnHeader << "generateCommunicators(SegmentState *localSegment" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "List<SegmentState*> *segmentList" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "TaskData *taskData" << paramSeparator;
+	fnHeader << '\n' << doubleIndent << "TaskGlobals *taskGlobals" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
 	fnHeader << "\n" << doubleIndent << "PartDistributionMap *distributionMap)";
 
@@ -826,7 +830,7 @@ void generateCommunicatorMapFn(const char *headerFileName,
 			fnBody << "localSegment" << paramSeparator;
 			fnBody << '\n' << indent << doubleIndent;
 			fnBody << "segmentList" << paramSeparator;
-			fnBody << "sizeof(" << varType->getCType() << ')';
+			fnBody << "taskGlobals";
 		} else {
 			fnBody << "localSegment" << paramSeparator;
 			fnBody << '\n' << indent << doubleIndent;

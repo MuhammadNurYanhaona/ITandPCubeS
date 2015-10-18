@@ -7,9 +7,7 @@
 
 using namespace std;
 
-#define NPROCS 8
-
-int main(int argc, char *argv[]) {
+int mainMPICT(int argc, char *argv[]) {
 
 	MPI_Init(&argc, &argv);
 

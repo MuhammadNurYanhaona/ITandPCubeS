@@ -17,6 +17,7 @@
 #include "../utils/list.h"
 #include "../runtime/comm_barrier.h"
 #include "comm_buffer.h"
+#include "mpi_group.h"
 
 class Communicator;
 
@@ -57,12 +58,13 @@ class Communicator : public CommBufferManager {
 	// two barriers to pause/resume PPU controllers participating in communication
 	SendBarrier *sendBarrier;
 	ReceiveBarrier *receiveBarrier;
+	// for a communicator within a group for MPI communications
+	SegmentGroup *segmentGroup;
   public:
 	Communicator(int localSegmentTag, const char *dependencyName, int senderCount, int receiverCount);
 
-	// if a specific data synchronization type can be optimized by using a special communicator that includes only the part-
-	// icipant segments in its group then the sub-class should use this function to set up the communicator
-	void setupMpiCommunicator(std::vector<int> participantSegments) {}
+	// this function should be overriden to setup any platform specific communication resource, if needed 
+	virtual void setupCommunicator();
 
 	// These are the implementation of send and receive functions from the communication-buffer manager class. The logic is
 	// to just wait on the relevent barrier whose shouldWait() and releaseFunction() invoke other functions in this class to
