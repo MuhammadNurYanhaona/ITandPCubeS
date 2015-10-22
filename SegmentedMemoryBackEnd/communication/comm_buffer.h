@@ -79,6 +79,11 @@ class CommBuffer {
 	DataExchange *getExchange() { return dataExchange; }
 	int getBufferSize() { return elementCount * elementSize; }
 	int compareTo(CommBuffer *other, bool forReceive);
+	
+	// should be overriden by buffer types that has a physical storage for holding data; the default is to through a 
+	// fault
+	virtual char *getData();
+	virtual void setData(char *data);
 
 	// Each subclass should provide its implementation for the following two functions. During the execution of the
 	// program, if the computation halts in any synchronization involving communication, the segment controller will
@@ -211,8 +216,9 @@ class CommBufferManager {
   protected:
 	// Communication buffers are sorted before send/receive to reduce the data buffering time in segments/processes
 	// the sorting here is dependent on what particular role the executing segment is going to play at the present
-	// instance.
-	List<CommBuffer*> *getSortedList(bool sortForReceive);
+	// instance. If no second parameter has been provided then the sorting is done over all comm buffers of this 
+	// buffer manager; otherwise the argument list gets sorted
+	List<CommBuffer*> *getSortedList(bool sortForReceive, List<CommBuffer*> *bufferList = NULL);
 
 	// This function divides the commBufferList of the buffer manager into two lists: one holding buffers for only
 	// intra-segment data transfers and the other for cross-segments data transfers

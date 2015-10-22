@@ -89,13 +89,12 @@ void ScalarReplicaSyncCommunicator::receive() {
         }
         if (broadcaster == -1) {
                 cout << "Segment " << localSegmentTag << ": none is making the broadcast\n";
-                exit(EXIT_FAILURE);
-        }
-	
-	status = MPI_Bcast(dataBuffer, dataSize, MPI_CHAR, broadcaster, mpiComm);
-	if (status != MPI_SUCCESS) {
-		cout << "Segment " << localSegmentTag << ": could not receive broadcast\n";
-		exit(EXIT_FAILURE);
+        } else {
+		status = MPI_Bcast(dataBuffer, dataSize, MPI_CHAR, broadcaster, mpiComm);
+		if (status != MPI_SUCCESS) {
+			cout << "Segment " << localSegmentTag << ": could not receive broadcast\n";
+			exit(EXIT_FAILURE);
+		}
 	}
 }
 

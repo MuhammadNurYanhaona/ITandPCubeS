@@ -45,6 +45,16 @@ int CommBuffer::compareTo(CommBuffer *other, bool forReceive) {
 	return dataExchange->compareTo(other->dataExchange, forReceive); 
 }
 
+char *CommBuffer::getData() {
+	std::cout << "buffer content reference is not valid for all communication buffer types";
+	std::exit(EXIT_FAILURE);
+}
+
+void CommBuffer::setData(char *data) {
+	std::cout << "buffer content reference cannot be set in all communication buffer types";
+	std::exit(EXIT_FAILURE);
+}
+
 //---------------------------------------------- Pre-processed Communication Buffer ----------------------------------------------/
 
 PreprocessedCommBuffer::PreprocessedCommBuffer(DataExchange *ex, SyncConfig *sC) : CommBuffer(ex, sC) {
@@ -244,10 +254,15 @@ void CommBufferManager::processBuffersAfterReceive() {
 	delete receiveBufferList;
 }
 
-List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive) {
+List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive, List<CommBuffer*> *bufferList) {
+	
+	List<CommBuffer*> *originalList = commBufferList;
+	if (bufferList != NULL) {
+		originalList = bufferList;
+	}
 	List<CommBuffer*> *sortedList = new List<CommBuffer*>;
-	for (int i = 0; i < commBufferList->NumElements(); i++) {
-		CommBuffer *buffer = commBufferList->Nth(i);
+	for (int i = 0; i < originalList->NumElements(); i++) {
+		CommBuffer *buffer = originalList->Nth(i);
 		if (sortForReceive && !buffer->isReceiveActivated()) continue;
 		else if (!sortForReceive && !buffer->isSendActivated()) continue;
 		int j = 0;
