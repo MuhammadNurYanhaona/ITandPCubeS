@@ -634,6 +634,7 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << indent << "if(receiverDataItems != NULL) receiverDataParts = ";
 	fnBody << "receiverDataItems->getPartsList()" << stmtSeparator;
 	fnBody << indent << "SyncConfig *syncConfig = new SyncConfig(ccConfig" << paramSeparator;
+	fnBody << '\n' << indent << doubleIndent;
 	fnBody << "senderDataParts" << paramSeparator << "receiverDataParts" << paramSeparator;
 	fnBody << "sizeof(" << elementTypeName << "))" << stmtSeparator << '\n';
 
@@ -839,8 +840,11 @@ void generateCommunicatorMapFn(const char *headerFileName,
 			fnBody << "distributionMap";
 		}
 		fnBody << ")" << stmtSeparator;
-		fnBody << indent << "communicatorMap->Enter(\"" << dependencyName << "\"" << paramSeparator;
-		fnBody << "communicator" << i << ")" << stmtSeparator;	
+		fnBody << indent << "if (communicator" << i << " != NULL) {\n";
+		fnBody << doubleIndent << "communicator" << i << "->setupCommunicator()" << stmtSeparator;
+		fnBody << doubleIndent << "communicatorMap->Enter(\"" << dependencyName << "\"" << paramSeparator;
+		fnBody << "communicator" << i << ")" << stmtSeparator;
+		fnBody << indent << "}\n";	
 	}
 
 	// return the map

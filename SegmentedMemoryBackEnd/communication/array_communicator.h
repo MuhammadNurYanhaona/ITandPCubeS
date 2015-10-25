@@ -61,7 +61,6 @@ class UpSyncCommunicator : public Communicator {
 	// when gather_v is used as then we need a collective buffer in the receiver that will hold data received from all 
 	// remote senders
 	char *gatherBuffer;
-	int gatherBufferSize;
 	// a displacement vector is also needed to specify which part of the gather buffer should receive data from which 
 	// segment
 	int *displacements;
@@ -93,10 +92,16 @@ class DownSyncCommunicator : public Communicator {
   protected:
 	// after the communicator setup the mode should be either broadcast or scater_v
 	CommMode commMode;
+	
+	// three variables to be used for scatter_v communication  
+	char *scatterBuffer;
+	int *sendCounts;
+	int *displacements;
   public:
 	DownSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
                 int senderCount, int receiverCount, List<CommBuffer*> *bufferList);
+	~DownSyncCommunicator();
 	
 	// communicator setup needs to be extended to determine the mode of communication
 	void setupCommunicator();
@@ -106,6 +111,10 @@ class DownSyncCommunicator : public Communicator {
 	
 	// the sender segment should not wait on its own update 
 	void afterSend() { iterationNo++; }
+  private:
+	// just like in the case of gather-buffer setup in the up-sync-communicator, a scatter-buffer setup is needed for
+	// this communicator when scatter_v is used as the form of collective communication 
+	void allocateAndLinkScatterBuffer();	
 };
 
 // communicator class for the scenario where LPUs of two different LPSes that are not hierarchically related needs to be
@@ -121,6 +130,17 @@ class CrossSyncCommunicator : public Communicator {
 
 	void sendData();
         void receiveData();
+
+	// Because the way MPI works, the sends can get deadlocked if there is/are receives on the receiving segments. But
+	// it may happen that all segments are trying to send data to others. Consequently there will be no receive issued
+	// by any of them. To overcome this problem, during send, a segment checks if it is supposed to receive any data 
+	// subsequently from other segments and issue aynchronous receives before issuing its own sends (that will be asyn-
+	// chronous too). This method issues the receives but does not wait for them to finish. Rather, it returns the 
+	// array of MPI requests status that the invoker can wait on when needed.
+	MPI_Request *issueAsyncReceives(List<CommBuffer*> *remoteReceiveBuffers);
+	
+	// due to the asynchronous receive setup; if send is invoked no subsequent receive is needed for the same iteration
+	void afterSend() { iterationNo++; }
 };
 
 #endif

@@ -145,7 +145,7 @@ void GhostRegionSyncCommunicator::performTransfer() {
 		Participant *sender = exchange->getSender();
 		int senderSegment = sender->getSegmentTags()[0];
 		int senderRank = segmentGroup->getRank(senderSegment);	
-		int status = MPI_Irecv(data, bufferSize, MPI_INT, senderRank, 0, mpiComm, &recvRequests[i]);
+		int status = MPI_Irecv(data, bufferSize, MPI_CHAR, senderRank, 0, mpiComm, &recvRequests[i]);
                 if (status != MPI_SUCCESS) {
                 	cout << "Segment " << localSegmentTag << ": could not issue asynchronous receive\n";
 			exit(EXIT_FAILURE);
@@ -154,7 +154,7 @@ void GhostRegionSyncCommunicator::performTransfer() {
 
 
 	// then do the sends
-	List<CommBuffer*> *remoteSendBuffers = getSortedList(true, remoteBufferList);
+	List<CommBuffer*> *remoteSendBuffers = getSortedList(false, remoteBufferList);
 	int remoteSends = remoteSendBuffers->NumElements();
 	MPI_Request *sendRequests = new MPI_Request[remoteSends];
 	for (int i = 0; i < remoteSends; i++) {
@@ -165,7 +165,7 @@ void GhostRegionSyncCommunicator::performTransfer() {
 		Participant *receiver = exchange->getReceiver();
 		int receiverSegment = receiver->getSegmentTags()[0];
 		int receiverRank = segmentGroup->getRank(receiverSegment);	
-		int status = MPI_Isend(data, bufferSize, MPI_INT, receiverRank, 0, mpiComm, &recvRequests[i]);
+		int status = MPI_Isend(data, bufferSize, MPI_CHAR, receiverRank, 0, mpiComm, &recvRequests[i]);
                 if (status != MPI_SUCCESS) {
                 	cout << "Segment " << localSegmentTag << ": could not issue asynchronous send\n";
 			exit(EXIT_FAILURE);
@@ -194,8 +194,8 @@ void GhostRegionSyncCommunicator::performTransfer() {
  	delete remoteBufferList;
 	delete remoteSendBuffers;
 	delete remoteReceiveBuffers;
-	delete recvRequests;
-	delete sendRequests;
+	delete[] recvRequests;
+	delete[] sendRequests;
 }	
 
 //----------------------------------------------------------- Up Sync Communicator ------------------------------------------------------------/
@@ -212,13 +212,14 @@ UpSyncCommunicator::UpSyncCommunicator(int localSegmentTag,
 	commMode = UNKNOWN_COLLECTIVE;
 	gatherBuffer = NULL;
 	displacements = NULL;
+	receiveCounts = NULL;
 }
 
 UpSyncCommunicator::~UpSyncCommunicator() {
 	if (gatherBuffer != NULL) {
-		delete gatherBuffer;
-		delete displacements;
-		delete receiveCounts;
+		delete[] gatherBuffer;
+		delete[] displacements;
+		delete[] receiveCounts;
 	}
 }
 
@@ -233,12 +234,11 @@ void UpSyncCommunicator::setupCommunicator() {
 		int gather = (commBufferList->NumElements() > 1) ? 1 : 0;
 
 		MPI_Comm mpiComm = segmentGroup->getCommunicator();
-		int participants = segmentGroup->getParticipantsCount();
 		int myRank = segmentGroup->getRank(localSegmentTag);
 		
 		int status = MPI_Bcast(&gather, 1, MPI_INT, myRank, mpiComm);
 		if (status != MPI_SUCCESS) {
-			cout << "Segment " << localSegmentTag << ": could not broadcast communicator setting\n";
+			cout << "Segment " << localSegmentTag << ": could not broadcast up-sync communicator setting\n";
 			exit(EXIT_FAILURE);
 		}
 		
@@ -246,8 +246,6 @@ void UpSyncCommunicator::setupCommunicator() {
 		if (commMode == GATHER_V) allocateAndLinkGatherBuffer();
 	} else {
 		MPI_Comm mpiComm = segmentGroup->getCommunicator();
-		int participants = segmentGroup->getParticipantsCount();
-		int myRank = segmentGroup->getRank(localSegmentTag);
 		int broadcaster = segmentGroup->getRank(receiverSegment);
 
 		int gather;
@@ -272,7 +270,7 @@ void UpSyncCommunicator::sendData() {
 
 	// for the local data transfer case, just write data from buffer to operating memory as reading has been already 
 	// taken care of
-	if (exchange->isIntraSegmentExchange(localSegmentTag)) {
+	if (exchange->getReceiver()->hasSegmentTag(localSegmentTag)) {
 		sendBuffer->writeData();
 	} else {
 		MPI_Comm mpiComm = segmentGroup->getCommunicator();
@@ -303,7 +301,6 @@ void UpSyncCommunicator::sendData() {
 void UpSyncCommunicator::receiveData() {
 
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
-	int participants = segmentGroup->getParticipantsCount();
 	int myRank = segmentGroup->getRank(localSegmentTag);
 
 	if (commMode == SEND_RECEIVE) {
@@ -377,13 +374,164 @@ DownSyncCommunicator::DownSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
                 int senderCount, 
 		int receiverCount, List<CommBuffer*> *bufferList) 
-		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {}
+		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {
+	
+	// there should be only one sender in a down sync communication
+	Assert(senderCount == 1);
+	
+	commMode = UNKNOWN_COLLECTIVE;
+	scatterBuffer = NULL;
+	sendCounts = NULL;
+	displacements = NULL;
+}
 
-void DownSyncCommunicator::setupCommunicator() {}
+DownSyncCommunicator::~DownSyncCommunicator() {
+	if (scatterBuffer != NULL) {
+		delete[] scatterBuffer;
+		delete[] sendCounts;
+		delete[] displacements;
+	}
+}
 
-void DownSyncCommunicator::sendData() {}
+void DownSyncCommunicator::setupCommunicator() {
+	
+	Communicator::setupCommunicator();
+	
+	int senderTag = commBufferList->Nth(0)->getExchange()->getSender()->getSegmentTags()[0];
+	if (senderTag == localSegmentTag) {
+		int scatter = (commBufferList->NumElements() > 1) ? 1 : 0;
+		
+		MPI_Comm mpiComm = segmentGroup->getCommunicator();
+		int myRank = segmentGroup->getRank(localSegmentTag);
+		
+		int status = MPI_Bcast(&scatter, 1, MPI_INT, myRank, mpiComm);
+		if (status != MPI_SUCCESS) {
+			cout << "Segment " << localSegmentTag << ": could not broadcast down-sync communicator setting\n";
+			exit(EXIT_FAILURE);
+		}
+		
+		commMode = (scatter == 1) ? SCATTER_V : BROADCAST;
+		if (commMode == SCATTER_V) allocateAndLinkScatterBuffer();
+	} else {
+		MPI_Comm mpiComm = segmentGroup->getCommunicator();
+		int broadcaster = segmentGroup->getRank(senderTag);
 
-void DownSyncCommunicator::receiveData() {}
+		int scatter;
+		int status = MPI_Bcast(&scatter, 1, MPI_INT, broadcaster, mpiComm);
+		if (status != MPI_SUCCESS) {
+			cout << "Segment " << localSegmentTag << ": did not receive communicator setting broadcast\n";
+			exit(EXIT_FAILURE);
+		}
+		commMode = (scatter == 1) ? SCATTER_V : BROADCAST;
+	}
+}
+
+void DownSyncCommunicator::sendData() {
+
+	MPI_Comm mpiComm = segmentGroup->getCommunicator();
+	int myRank = segmentGroup->getRank(localSegmentTag);
+
+	if (commMode == BROADCAST) {
+		CommBuffer *buffer = commBufferList->Nth(0);
+		char *data = buffer->getData();
+		int bufferSize = buffer->getBufferSize();
+		int status = MPI_Bcast(data, bufferSize, MPI_CHAR, myRank, mpiComm);
+		if (status != MPI_SUCCESS) {
+			cout << "Segment " << localSegmentTag << ": could not broadcast update to lower level LPS\n";
+			exit(EXIT_FAILURE);
+		}
+		// need to update own operating memory data as the sender will bypass the receive call on the communicator
+		buffer->writeData();
+	} else {		
+		// need to update its own receiving buffer in the scatter mode separately; interchange for others are included
+		// in the scatter buffer configuration 
+		List<CommBuffer*> *localList = new List<CommBuffer*>;
+		List<CommBuffer*> *remoteList = new List<CommBuffer*>;
+		seperateLocalAndRemoteBuffers(localSegmentTag, localList, remoteList);
+		localList->Nth(0)->writeData();
+		delete localList;
+		delete remoteList;
+
+		char dummyReceive = 0;
+		int status = MPI_Scatterv(scatterBuffer, sendCounts, displacements, MPI_CHAR,
+                                &dummyReceive, 0, MPI_CHAR, myRank, mpiComm);
+                if (status != MPI_SUCCESS) {
+                        cout << "Segment" << localSegmentTag << ": could not scatter data update on down-sync\n";
+                        exit(EXIT_FAILURE);
+                }
+	}
+}
+
+void DownSyncCommunicator::receiveData() {
+
+	// there will be one communication buffer per receiver regardless of the communication mode on a down-sync as there is
+	// just one sender
+	CommBuffer *buffer = commBufferList->Nth(0);
+	char *data = buffer->getData();
+	int bufferSize = buffer->getBufferSize();
+	int senderTag = buffer->getExchange()->getSender()->getSegmentTags()[0];
+	
+	MPI_Comm mpiComm = segmentGroup->getCommunicator();
+	int sender = segmentGroup->getRank(senderTag);
+
+	if (commMode == BROADCAST) {
+		int status = MPI_Bcast(data, bufferSize, MPI_CHAR, sender, mpiComm);
+		if (status != MPI_SUCCESS) {
+			cout << "Segment " << localSegmentTag << ": did not receive broadcast update on down-sync\n";
+			exit(EXIT_FAILURE);
+		}
+	} else {
+		int status = MPI_Scatterv(NULL, NULL, NULL, MPI_CHAR, data, bufferSize, MPI_CHAR, sender, mpiComm);
+                if (status != MPI_SUCCESS) {
+                        cout << "Segment" << localSegmentTag << ": could not participate in data scattering\n";
+                        exit(EXIT_FAILURE);
+                }
+	}
+} 
+
+void DownSyncCommunicator::allocateAndLinkScatterBuffer() {
+
+	List<CommBuffer*> *sendList = getSortedList(false);
+	List<CommBuffer*> *localList = new List<CommBuffer*>;
+	List<CommBuffer*> *remoteList = new List<CommBuffer*>;
+	seperateLocalAndRemoteBuffers(localSegmentTag, localList, remoteList);
+	
+	// local communication buffers need not be updated
+	delete localList;
+
+	int scatterBufferSize = 0;
+	for (int i = 0; i < remoteList->NumElements(); i++) {
+		scatterBufferSize += remoteList->Nth(i)->getBufferSize();
+	}
+	scatterBuffer = new char[scatterBufferSize];
+
+	int participants = segmentGroup->getParticipantsCount();
+	displacements = new int[participants];
+	sendCounts = new int[participants];
+
+	// both displacements and receiveCount vectors must have entries for everyone in the segment group
+	for (int i = 0; i < participants; i++) {
+		displacements[i] = 0;
+		sendCounts[i] = 0;
+	}
+	
+	int currentIndex = 0;
+	for (int i = 0; i < remoteList->NumElements(); i++) {
+		CommBuffer *buffer = remoteList->Nth(i);
+		buffer->setData(scatterBuffer + currentIndex);
+		
+		// note that in the gather mode there should be only one receiver segment par communication buffer
+		int receiverSegment = buffer->getExchange()->getReceiver()->getSegmentTags()[0];
+		int receiverRank = segmentGroup->getRank(receiverSegment);
+		displacements[receiverRank] = currentIndex;
+		int bufferSize = buffer->getBufferSize();
+		sendCounts[receiverRank] = bufferSize;
+		currentIndex += bufferSize;
+	}
+
+	delete sendList;
+	delete remoteList;
+}
 
 //---------------------------------------------------- ----- Cross Sync Communicator ----------------------------------------------------------/
 
@@ -398,8 +546,147 @@ void CrossSyncCommunicator::setupCommunicator() {
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
 }
+ 
+void CrossSyncCommunicator::sendData() {
 
-void CrossSyncCommunicator::sendData() {}
+	List<CommBuffer*> *localBuffers = new List<CommBuffer*>;
+	List<CommBuffer*> *remoteBuffers = new List<CommBuffer*>;
 
-void CrossSyncCommunicator::receiveData() {}
+	seperateLocalAndRemoteBuffers(localSegmentTag,localBuffers, remoteBuffers);
+	
+	// write the local buffers into operating memory; as in other cases, reading has been done already in some earlier function call
+	for (int i = 0; i < localBuffers->NumElements(); i++) {
+		localBuffers->Nth(i)->writeData();
+	}
+	delete localBuffers;
+
+	// issue asynchronous receives first, when applicable
+	MPI_Request *receiveRequests = NULL;
+	List<CommBuffer*> *remoteReceives = getSortedList(true, remoteBuffers);
+	int receiveCount = remoteReceives->NumElements();
+	if (receiveCount > 0) {
+		receiveRequests = issueAsyncReceives(remoteReceives);		
+	}
+	
+	// calculate the number of MPI requests that should be issued
+	List<CommBuffer*> *remoteSends = getSortedList(false, remoteBuffers);
+	int sendCount = 0;
+	for (int i = 0; i < remoteSends->NumElements(); i++) {
+		CommBuffer *buffer = remoteSends->Nth(i);
+		Participant *participant = buffer->getExchange()->getReceiver();
+		sendCount += participant->getSegmentTags().size();
+		if (participant->hasSegmentTag(localSegmentTag)) {
+			sendCount--;
+		}		
+	}
+
+	// issue the sends
+	MPI_Comm mpiComm = segmentGroup->getCommunicator();
+	MPI_Request *sendRequests = new MPI_Request[sendCount];
+	int requestIndex = 0;
+	for (int i = 0; i < remoteSends->NumElements(); i++) {
+		CommBuffer *buffer = remoteSends->Nth(i);
+		vector<int> receiverSegments = buffer->getExchange()->getReceiver()->getSegmentTags();
+		for (int j = 0; j < receiverSegments.size(); j++) {
+			int segmentTag = receiverSegments.at(j);
+			if (segmentTag == localSegmentTag) continue;
+
+			int receiver =segmentGroup->getRank(segmentTag);
+			char *data = buffer->getData();
+			int bufferSize = buffer->getBufferSize();
+			int status = MPI_Isend(data, bufferSize, MPI_CHAR, receiver, 0, mpiComm, &sendRequests[requestIndex]);
+			if (status != MPI_SUCCESS) {
+				cout << "Segment " << localSegmentTag << ": could not issue asynchronous send\n";
+				exit(EXIT_FAILURE);
+			}
+			requestIndex++;
+		}
+	}
+	
+	// wait for all receives to finish and write data back to operating memory from receive buffers
+	if (receiveCount > 0) {
+		int status = MPI_Waitall(receiveCount, receiveRequests, MPI_STATUSES_IGNORE);
+		if (status != MPI_SUCCESS) {
+			cout << "Segment "<< localSegmentTag << ": some of the asynchronous receives failed\n";
+			exit(EXIT_FAILURE);
+		}
+		for (int i = 0; i < remoteReceives->NumElements(); i++) {
+			CommBuffer *buffer = remoteReceives->Nth(i);
+			buffer->writeData();
+		}
+	}
+
+	// wait for all sends to finish
+	int status = MPI_Waitall(sendCount, sendRequests, MPI_STATUSES_IGNORE);
+	if (status != MPI_SUCCESS) {
+		cout << "Segment " << localSegmentTag << ": some of the asynchronous sends failed\n";
+		exit(EXIT_FAILURE);
+	}
+
+	delete remoteBuffers;
+	delete remoteSends;
+	delete remoteReceives;
+	if (receiveCount > 0) delete[] receiveRequests;
+	delete[] sendRequests;
+}
+
+void CrossSyncCommunicator::receiveData() {
+	
+	List<CommBuffer*> *localBuffers = new List<CommBuffer*>;
+	List<CommBuffer*> *remoteBuffers = new List<CommBuffer*>;
+	seperateLocalAndRemoteBuffers(localSegmentTag,localBuffers, remoteBuffers);
+	
+	// local buffers has been taken care of in the sendData() function
+	delete localBuffers;
+	
+	// issue asynchronous receives
+	MPI_Request *receiveRequests = NULL;
+	List<CommBuffer*> *remoteReceives = getSortedList(true, remoteBuffers);
+	int receiveCount = remoteReceives->NumElements();
+	if (receiveCount > 0) {
+		receiveRequests = issueAsyncReceives(remoteReceives);		
+	}
+
+	// wait for all receives to finish; see there is no writing back of data; this is because write will be invoked automatically
+	if (receiveCount > 0) {
+		int status = MPI_Waitall(receiveCount, receiveRequests, MPI_STATUSES_IGNORE);
+		if (status != MPI_SUCCESS) {
+			cout << "Segment "<< localSegmentTag << ": some of the asynchronous receives failed\n";
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	delete remoteBuffers;
+	delete remoteReceives;
+	if (receiveCount > 0) delete[] receiveRequests;
+}
+
+MPI_Request *CrossSyncCommunicator::issueAsyncReceives(List<CommBuffer*> *remoteReceiveBuffers) {
+
+	MPI_Comm mpiComm = segmentGroup->getCommunicator();
+	int receiveCount = remoteReceiveBuffers->NumElements();
+	MPI_Request *receiveRequests = new MPI_Request[receiveCount];
+
+	for (int i = 0; i < remoteReceiveBuffers->NumElements(); i++) {
+		CommBuffer *buffer = remoteReceiveBuffers->Nth(i);
+
+		// Notice that the assumption here is that there is only one sender par buffer. This needs to be changed for a more
+		// flexible implementation as there might be replication in-between the two LPSes getting synchronized through this
+		// communicator. A flexible implementation should somehow setup tags for different buffers and the receiver should 
+		// wait on the tag (using specific tag combined with MPI_ANY_SOURCE sender) of the buffer instead of on a particular
+		// sender segment.
+		int senderSegment = buffer->getExchange()->getSender()->getSegmentTags()[0];
+		int sender = segmentGroup->getRank(senderSegment);
+
+		int bufferSize = buffer->getBufferSize();
+		char *data = buffer->getData();
+		int status = MPI_Irecv(data, bufferSize, MPI_CHAR, sender, 0, mpiComm, &receiveRequests[i]);
+                if (status != MPI_SUCCESS) {
+                	cout << "Segment " << localSegmentTag << ": could not issue asynchronous receive\n";
+			exit(EXIT_FAILURE);
+		}
+		
+	}
+	return receiveRequests;
+}
 
