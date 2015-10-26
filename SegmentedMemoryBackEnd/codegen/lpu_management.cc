@@ -9,7 +9,6 @@
 #include "structure.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
-#include "../utils/interval_utils.h"
 #include "../memory-management/allocation.h"
 #include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"

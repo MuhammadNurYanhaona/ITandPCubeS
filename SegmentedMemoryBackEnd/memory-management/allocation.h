@@ -13,7 +13,6 @@
 #include "part_tracking.h"
 #include "part_generation.h"
 #include "../utils/list.h"
-#include "../utils/interval_utils.h"
 #include "../codegen/structure.h"
 
 /* This class holds all information to identify a part of a data structure configured for a particular LPS and

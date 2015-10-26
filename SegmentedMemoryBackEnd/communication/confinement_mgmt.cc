@@ -38,9 +38,9 @@ vector<LpsDimConfig> *ConfinementConstructionConfig::getSendPathInDistributionTr
 	vector<LpsDimConfig> *configVector = senderConfig->generateDimOrderVector();
 	int confinementLevel = getConfinementLevel(configVector);
 	if (senderLps == confinementLps) {
-		return forwardTruncatedDimVector(confinementLevel, configVector);
+		return forwardTruncateDimVector(confinementLevel, configVector);
 	} else {
-		return forwardTruncatedDimVector(confinementLevel + 1, configVector);
+		return forwardTruncateDimVector(confinementLevel + 1, configVector);
 	}
 }
 
@@ -48,13 +48,13 @@ vector<LpsDimConfig> *ConfinementConstructionConfig::getReceivePathInDistributio
 	vector<LpsDimConfig> *configVector = receiverConfig->generateDimOrderVector();
 	int confinementLevel = getConfinementLevel(configVector);
 	if (receiverLps == confinementLps) {
-		return forwardTruncatedDimVector(confinementLevel, configVector);
+		return forwardTruncateDimVector(confinementLevel, configVector);
 	} else {
-		return forwardTruncatedDimVector(confinementLevel + 1, configVector);
+		return forwardTruncateDimVector(confinementLevel + 1, configVector);
 	}
 }
 
-vector<LpsDimConfig> *ConfinementConstructionConfig::forwardTruncatedDimVector(int truncateLevel,
+vector<LpsDimConfig> *ConfinementConstructionConfig::forwardTruncateDimVector(int truncateLevel,
 		std::vector<LpsDimConfig> *originalVector) {
 	vector<LpsDimConfig> *truncatedVector = new vector<LpsDimConfig>;
 	unsigned int index = 0;
@@ -64,7 +64,7 @@ vector<LpsDimConfig> *ConfinementConstructionConfig::forwardTruncatedDimVector(i
 	return truncatedVector;
 }
 
-vector<LpsDimConfig> *ConfinementConstructionConfig::backwardTruncatedDimVector(int truncateLevel,
+vector<LpsDimConfig> *ConfinementConstructionConfig::backwardTruncateDimVector(int truncateLevel,
 		std::vector<LpsDimConfig> *originalVector) {
 	vector<LpsDimConfig> *truncatedVector = new vector<LpsDimConfig>;
 	unsigned int index = originalVector->size() - 1;
@@ -182,6 +182,16 @@ Participant::Participant(CommRole r, std::vector<int*> *c, List<Multidimensional
 	id = 0;
 }
 
+Participant::~Participant() {
+	delete containerId;
+	while (dataDescription->NumElements() > 0) {
+		MultidimensionalIntervalSeq *seq = dataDescription->Nth(0);
+		dataDescription->RemoveAt(0);
+		delete seq;
+	}
+	delete dataDescription;
+}
+
 void Participant::addSegmentTag(int segmentTag) {
 	int location = binsearch::locateKey(segmentTags, segmentTag);
 	if (location == KEY_NOT_FOUND) {
@@ -241,6 +251,17 @@ DataExchange::DataExchange(Participant *sender,
 	}
 	this->exchangeDesc = orderedSeqList;
 	fullOverlap = false;
+}
+
+DataExchange::~DataExchange() {
+	if (!fullOverlap) {
+		while (exchangeDesc->NumElements() > 0) {
+			MultidimensionalIntervalSeq *seq = exchangeDesc->Nth(0);
+			exchangeDesc->RemoveAt(0);
+			delete seq;
+		}
+		delete exchangeDesc;
+	}
 }
 
 void DataExchange::describe(int indentLevel, ostream &stream) {
@@ -345,6 +366,34 @@ void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqLi
 		cout << "Sequence #" << i << ":\n";
 		MultidimensionalIntervalSeq *seq = seqList->Nth(i);
 		seq->draw();
+	}
+}
+
+bool DataExchange::contentsEqual(DataExchange *other) {
+	if (this->exchangeDesc->NumElements() != other->exchangeDesc->NumElements()) return false;
+	for (int i = 0; i < this->exchangeDesc->NumElements(); i++) {
+		MultidimensionalIntervalSeq *mySeq = this->exchangeDesc->Nth(i);
+		bool seqFound = false;
+		for (int j = 0; j < other->exchangeDesc->NumElements(); j++) {
+			MultidimensionalIntervalSeq *otherSeq = other->exchangeDesc->Nth(j);
+			if (mySeq->isEqual(otherSeq)) {
+				seqFound = true;
+				break;
+			}
+		}
+		if (!seqFound) return false;
+	}
+	return true;
+}
+
+void DataExchange::mergeWithOther(DataExchange *other) {
+	vector<int> senderTagsInOther = other->getSender()->getSegmentTags();
+	for (int i = 0; i < senderTagsInOther.size(); i++) {
+		sender->addSegmentTag(senderTagsInOther.at(i));
+	}
+	vector<int> receiverTagsInOther = other->receiver->getSegmentTags();
+	for (int i = 0; i < receiverTagsInOther.size(); i++) {
+		receiver->addSegmentTag(receiverTagsInOther.at(i));
 	}
 }
 
@@ -640,6 +689,32 @@ List<DataExchange*> *Confinement::getAllDataExchanges() {
 		dataExchangeList->AppendAll(remoteReceives);
 		delete remoteReceives;
 	}
+
+	// Compacting is done only for non-local data exchanges as there should be no two data local data exchanges that
+	// have the same data content. If they do then there is an error in the data exchange generation process.
+	List<DataExchange*> *compactList = new List<DataExchange*>;
+	while (dataExchangeList->NumElements() > 0) {
+		
+		DataExchange *exchange = dataExchangeList->Nth(0);
+		dataExchangeList->RemoveAt(0);
+
+		DataExchange *matchingExchange = NULL;
+		for (int j = 0; j < compactList->NumElements(); j++) {
+			if (exchange->contentsEqual(compactList->Nth(j))) {
+				matchingExchange = compactList->Nth(j);
+				break;
+			}
+		}
+		if (matchingExchange != NULL) {
+			matchingExchange->mergeWithOther(exchange);
+			delete exchange;
+		} else {
+			compactList->Append(exchange);
+		}
+	}
+	dataExchangeList->AppendAll(compactList);
+	delete compactList;
+
 	if (localInteractions != NULL) {
 		List<DataExchange*> *localExchanges = localInteractions->generateExchanges();
 		if (localExchanges != NULL) {
@@ -676,7 +751,7 @@ List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstruction
 	// confinement vector to locate the corresponding containers in the distribution tree
 	vector<LpsDimConfig> *senderVector = config->getSenderConfig()->generateDimOrderVector();
 	int confinementLevel = config->getConfinementLevel(senderVector);
-	vector<LpsDimConfig> *confinementVector = config->backwardTruncatedDimVector(confinementLevel, senderVector);
+	vector<LpsDimConfig> *confinementVector = config->backwardTruncateDimVector(confinementLevel, senderVector);
 	List<Confinement*> *confinementList = new List<Confinement*>;
 
 	// any of the part-tracking-tree can be NULL indicating that the executing segment has no portion of the data

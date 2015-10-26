@@ -107,9 +107,9 @@ class ConfinementConstructionConfig {
 	void configurePaddingInPartitionConfigs();
 
 	// two auxiliary functions to be used to construct sender and receiver LPS dimension order paths
-	std::vector<LpsDimConfig> *forwardTruncatedDimVector(int truncateLevel,
+	std::vector<LpsDimConfig> *forwardTruncateDimVector(int truncateLevel,
 			std::vector<LpsDimConfig> *originalVector);
-	std::vector<LpsDimConfig> *backwardTruncatedDimVector(int truncateLevel,
+	std::vector<LpsDimConfig> *backwardTruncateDimVector(int truncateLevel,
 				std::vector<LpsDimConfig> *originalVector);
   private:
 	// an auxiliary function to be used for configuring padding in sender and receiver data configurations
@@ -135,6 +135,7 @@ class Participant {
 	int id;
   public:
 	Participant(CommRole r, std::vector<int*> *c, List<MultidimensionalIntervalSeq*> *d);
+	~Participant();
 	void addSegmentTag(int segmentTag);
 	std::vector<int> getSegmentTags() { return segmentTags; }
 	bool hasSegmentTag(int segmentTag);
@@ -167,6 +168,7 @@ class DataExchange {
 	DataExchange(Participant *sender,
 			Participant *receiver,
 			List<MultidimensionalIntervalSeq*> *exchangeDesc);
+	~DataExchange();
 
 	Participant *getSender() { return sender; }
 	Participant *getReceiver() {return receiver; }
@@ -193,6 +195,13 @@ class DataExchange {
 	// interactions between two or more segments. This this function is provided to aid in proper communication
 	// buffer type selection at a particular context. 
 	bool isIntraSegmentExchange(int localSegmentTag);
+
+	// These two functions are used to reduce the number of data exchanges when some of them are exchanging the
+	// same data but between different sender-receiver pair. The first function compares if the data contents are
+	// the same for two data exchanges and the second function adds the segment tags from the second pair to the
+	// current pair. Use these functions cautiously, after verifying that combining exchanges has no side effects.
+	bool contentsEqual(DataExchange *other);
+	void mergeWithOther(DataExchange *other);
 
 	// Like the previous function this is also used for determining what kind of communicator should be used for
 	// synchronizations for a specific data dependency

@@ -2,7 +2,6 @@
 #include "part_tracking.h"
 #include "../utils/utility.h"
 #include "../utils/list.h"
-#include "../utils/interval_utils.h"
 #include "../codegen/structure.h"
 
 //---------------------------------------------------------------- Part Metadata ---------------------------------------------------------------/

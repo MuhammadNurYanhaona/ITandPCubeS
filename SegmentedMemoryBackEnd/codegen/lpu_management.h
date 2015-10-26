@@ -8,7 +8,6 @@
 #include "../communication/communicator.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
-#include "../utils/interval_utils.h"
 #include <fstream>
 
 /* Remember that there is a partial ordering of logical processing spaces (LPS). Thereby, the number of

@@ -18,7 +18,7 @@ ReplicationSyncCommunicator::ReplicationSyncCommunicator(int localSegmentTag,
 
 	// Tn a replication sync scenario, the same data is shared among all participating segments. Thus there 
 	// should be only one confinement and only one data interchange configurtion in it for the current 
-	// segment to do communication for. Consequently, the there should be exactly one communication buffer.
+	// segment to do communication for. Consequently, there should be exactly one communication buffer.
 	Assert(bufferList->NumElements() == 1);
 }
 
@@ -285,9 +285,6 @@ void UpSyncCommunicator::sendData() {
                         	exit(EXIT_FAILURE);
                 	}
 		} else {
-			MPI_Comm mpiComm = segmentGroup->getCommunicator();
-			int receiverSegment = exchange->getReceiver()->getSegmentTags()[0];
-			int receiver = segmentGroup->getRank(receiverSegment);
 			int status = MPI_Gatherv(data, bufferSize, MPI_CHAR, 
 					NULL, NULL, NULL, MPI_CHAR, receiver, mpiComm);
                 	if (status != MPI_SUCCESS) {
@@ -344,7 +341,7 @@ void UpSyncCommunicator::allocateAndLinkGatherBuffer() {
 	displacements = new int[participants];
 	receiveCounts = new int[participants];
 
-	// both displacements and receiveCount vectors must have entries for everyone in the segment group
+	// both displacements and receiveCounts vectors must have entries for everyone in the segment group
 	for (int i = 0; i < participants; i++) {
 		displacements[i] = 0;
 		receiveCounts[i] = 0;
@@ -355,7 +352,7 @@ void UpSyncCommunicator::allocateAndLinkGatherBuffer() {
 		CommBuffer *buffer = remoteList->Nth(i);
 		buffer->setData(gatherBuffer + currentIndex);
 		
-		// note that in the gather mode there should be only one sender segment par communication buffer
+		// note that in the gather mode there should be only one sender segment per communication buffer
 		int senderSegment = buffer->getExchange()->getSender()->getSegmentTags()[0];
 		int senderRank = segmentGroup->getRank(senderSegment);
 		displacements[senderRank] = currentIndex;
@@ -520,7 +517,7 @@ void DownSyncCommunicator::allocateAndLinkScatterBuffer() {
 		CommBuffer *buffer = remoteList->Nth(i);
 		buffer->setData(scatterBuffer + currentIndex);
 		
-		// note that in the gather mode there should be only one receiver segment par communication buffer
+		// note that in the gather mode there should be only one receiver segment per communication buffer
 		int receiverSegment = buffer->getExchange()->getReceiver()->getSegmentTags()[0];
 		int receiverRank = segmentGroup->getRank(receiverSegment);
 		displacements[receiverRank] = currentIndex;
@@ -589,7 +586,12 @@ void CrossSyncCommunicator::sendData() {
 		vector<int> receiverSegments = buffer->getExchange()->getReceiver()->getSegmentTags();
 		for (int j = 0; j < receiverSegments.size(); j++) {
 			int segmentTag = receiverSegments.at(j);
-			if (segmentTag == localSegmentTag) continue;
+			// if data to be sent to a remote segment is also replicated locally then write the buffer in the local
+			// operating memory
+			if (segmentTag == localSegmentTag) {
+				buffer->writeData();
+				continue;
+			}
 
 			int receiver =segmentGroup->getRank(segmentTag);
 			char *data = buffer->getData();
