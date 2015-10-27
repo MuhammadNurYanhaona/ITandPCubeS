@@ -15,13 +15,16 @@ SegmentGroup::SegmentGroup(vector<int> segments) {
 
 void SegmentGroup::setupCommunicator() {
 
-        int segmentRank;
+        int segmentRank, segmentCount;
         MPI_Comm_rank(MPI_COMM_WORLD, &segmentRank);
+	MPI_Comm_size(MPI_COMM_WORLD, &segmentCount);
+        
+	int participants = segments.size();
+	if (participants == segmentCount) return;
 
         MPI_Group orig_group, new_group;
         MPI_Comm_group(MPI_COMM_WORLD, &orig_group);
 
-        int participants = segments.size();
         int *originalRanks = new int[participants];
         for (unsigned int i = 0; i < participants; i++) {
                 originalRanks[i] = segments.at(i);
