@@ -170,6 +170,9 @@ void DependencyArc::deriveSyncAndCommunicationRoots(PartitionHierarchy *hierarch
 	Space *sourceSpace = source->getSpace();
 	Space *destinationSpace = destination->getSpace();
 	communicationRoot = hierarchy->getCommonAncestor(sourceSpace, destinationSpace);
+	while (communicationRoot->getLocalStructure(varName) == NULL) {
+		communicationRoot = communicationRoot->getParent();
+	}
 	
 	syncRoot = NULL;
 	if ((dynamic_cast<SyncStage*>(source) != NULL) 
@@ -190,6 +193,9 @@ void DependencyArc::deriveSyncAndCommunicationRoots(PartitionHierarchy *hierarch
 
 		if (syncRoot != NULL) {
 			syncRoot = syncRoot->getParent();
+			while (syncRoot->getLocalStructure(varName) == NULL) {
+				syncRoot = syncRoot->getParent();	
+			}
 		}
 	}
 }
