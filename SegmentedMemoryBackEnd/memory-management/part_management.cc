@@ -101,13 +101,16 @@ void LpsContent::addPartIterators(Hashtable<PartIterator*> *partIteratorMap) {
 	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
 	DataItems *items = NULL;
 	while ((items = iterator.GetNextValue()) != NULL) {
-		PartIterator *iterator = items->createIterator();
-		int dimensions = items->getDimensions();
-		int partIdLevels = items->getPartitionConfig()->getPartIdLevels();
-		iterator->initiatePartIdTemplate(dimensions, partIdLevels);
-		std::ostringstream key;
-		key << "Space_" << id << "_Var_" << items->getName();
-		partIteratorMap->Enter(strdup(key.str().c_str()), iterator);
+		ScalarDataItems *scalar = dynamic_cast<ScalarDataItems*>(items);
+		if (scalar == NULL) {
+			PartIterator *iterator = items->createIterator();
+			int dimensions = items->getDimensions();
+			int partIdLevels = items->getPartitionConfig()->getPartIdLevels();
+			iterator->initiatePartIdTemplate(dimensions, partIdLevels);
+			std::ostringstream key;
+			key << "Space_" << id << "_Var_" << items->getName();
+			partIteratorMap->Enter(strdup(key.str().c_str()), iterator);
+		}
 	}
 }
 
