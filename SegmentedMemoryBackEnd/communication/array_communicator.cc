@@ -20,6 +20,8 @@ ReplicationSyncCommunicator::ReplicationSyncCommunicator(int localSegmentTag,
 	// should be only one confinement and only one data interchange configurtion in it for the current 
 	// segment to do communication for. Consequently, there should be exactly one communication buffer.
 	Assert(bufferList->NumElements() == 1);
+
+	this->commBufferList = bufferList;
 }
 
 void ReplicationSyncCommunicator::sendData() {
@@ -108,6 +110,8 @@ GhostRegionSyncCommunicator::GhostRegionSyncCommunicator(int localSegmentTag,
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	this->commBufferList = bufferList;
 }
 
 void GhostRegionSyncCommunicator::setupCommunicator() {
@@ -213,6 +217,8 @@ UpSyncCommunicator::UpSyncCommunicator(int localSegmentTag,
 	gatherBuffer = NULL;
 	displacements = NULL;
 	receiveCounts = NULL;
+
+	this->commBufferList = bufferList;
 }
 
 UpSyncCommunicator::~UpSyncCommunicator() {
@@ -380,6 +386,8 @@ DownSyncCommunicator::DownSyncCommunicator(int localSegmentTag,
 	scatterBuffer = NULL;
 	sendCounts = NULL;
 	displacements = NULL;
+
+	this->commBufferList = bufferList;
 }
 
 DownSyncCommunicator::~DownSyncCommunicator() {
@@ -536,7 +544,10 @@ CrossSyncCommunicator::CrossSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
                 int senderCount, 
 		int receiverCount, List<CommBuffer*> *bufferList) 
-		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {}
+		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {
+
+	this->commBufferList = bufferList;
+}
 
 void CrossSyncCommunicator::setupCommunicator() {
 	std::vector<int> *participants = getParticipantsTags();
