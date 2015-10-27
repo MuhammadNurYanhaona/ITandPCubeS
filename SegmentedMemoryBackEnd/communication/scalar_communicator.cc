@@ -107,7 +107,7 @@ ScalarUpSyncCommunicator::ScalarUpSyncCommunicator(int localSegmentTag,
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
                         senderSegmentTags, receiverSegmentTags,
                         dataSize) {
-	Assert(receiverSegmentTags->size() == 0);
+	Assert(receiverSegmentTags->size() == 1);
 }
 
 void ScalarUpSyncCommunicator::send() {
@@ -139,7 +139,7 @@ ScalarDownSyncCommunicator::ScalarDownSyncCommunicator(int localSegmentTag,
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
 			senderSegmentTags, receiverSegmentTags,
 			dataSize) {
-	Assert(senderSegmentTags->size() == 0);
+	Assert(senderSegmentTags->size() == 1);
 }
 
 void ScalarDownSyncCommunicator::send() {
