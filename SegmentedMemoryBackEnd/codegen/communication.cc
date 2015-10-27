@@ -247,13 +247,13 @@ void generateConfinementConstrConfigFn(std::ofstream &headerFile,
 	fnBody << indent << "int confinementLps = Space_" << commCharacter->getConfinementSpace()->getName();
 	fnBody << stmtSeparator << indent;
 	fnBody << "PartIdContainer *senderPartTree = NULL" << stmtSeparator;
-	fnBody << indent <<  "DataItems *senderDataItems = taskData->getDataItemsOfLps(\"Space";
+	fnBody << indent <<  "DataItems *senderDataItems = taskData->getDataItemsOfLps(\"";
 	fnBody << senderAllocatorLpsName << "\"" << paramSeparator;
 	fnBody << "\"" << varName << "\")" << stmtSeparator;
 	fnBody << indent << "if(senderDataItems != NULL) senderPartTree = ";
 	fnBody << "senderDataItems->getPartIdContainer()" << stmtSeparator;
 	fnBody << indent << "PartIdContainer *receiverPartTree = NULL" << stmtSeparator;
-	fnBody << indent << "DataItems *receiverDataItems = taskData->getDataItemsOfLps(\"Space";
+	fnBody << indent << "DataItems *receiverDataItems = taskData->getDataItemsOfLps(\"";
 	fnBody << receiverAllocatorLpsName << "\"" << paramSeparator;
 	fnBody << "\"" << varName << "\")" << stmtSeparator;
 	fnBody << indent << "if(receiverDataItems != NULL) receiverPartTree = ";
