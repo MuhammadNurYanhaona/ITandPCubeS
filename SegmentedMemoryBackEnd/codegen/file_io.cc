@@ -359,7 +359,9 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 			programFile << doubleIndent << "DataItems *" << dataItemName.str(); 
 			programFile << " = taskData->getDataItemsOfLps(\"" << lpsName << "\"" << paramSeparator;
 			programFile << "\"" << varName << "\")" << stmtSeparator;
-			programFile << doubleIndent << "if (" << dataItemName.str() << " != NULL) {\n";
+			programFile << doubleIndent << "if (" << dataItemName.str() << " != NULL";
+			programFile << " && segment->computeStagesInLps(Space_" << lpsName << ")";
+			programFile << ") {\n";
 
 			std::ostringstream configName;
 			configName << varName << "Space" << lpsName << "Config";
