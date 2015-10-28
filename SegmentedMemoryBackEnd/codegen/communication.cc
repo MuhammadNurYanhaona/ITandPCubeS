@@ -510,6 +510,12 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << indent << "int dataSize = sizeof(" << varType->getCType() << ")" << stmtSeparator;
 	fnBody << indent << "int localSegmentTag = localSegment->getPhysicalId()" << stmtSeparator;
 
+	// determine the number of PPUs (threads) within the current segment that will participate in the communication
+	fnBody << indent << "int localSenderPpus = localSegment->getPpuCountForLps(Space_";
+	fnBody << senderSyncLpsName << ")" << stmtSeparator;
+	fnBody << indent << "int localReceiverPpus = localSegment->getPpuCountForLps(Space_";
+	fnBody << receiverSyncLpsName << ")" << stmtSeparator;
+
 	// declare a communicator and instantiate it with appropriate communicator type
 	fnBody << '\n' << indent << "ScalarCommunicator *communicator = NULL" << stmtSeparator;
 
@@ -521,6 +527,8 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
 		fnBody << '\n' << indent << doubleIndent;
 		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
+		fnBody << '\n' << indent << doubleIndent;
+		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
 		fnBody << "dataSize)" << stmtSeparator;
 	}
 
@@ -531,8 +539,10 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 		fnBody << doubleIndent << "communicator = new ScalarReplicaSyncCommunicator(localSegmentTag";
 		fnBody << paramSeparator << '\n' << doubleIndent << doubleIndent;
 		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
+		fnBody << '\n' << doubleIndent << doubleIndent;
 		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
 		fnBody << '\n' << doubleIndent << doubleIndent;
+		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
 		fnBody << "dataSize)" << stmtSeparator;
 		fnBody << indent << "} else {\n";
 		fnBody << doubleIndent << "communicator = new ScalarUpSyncCommunicator(localSegmentTag";
@@ -540,6 +550,8 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
 		fnBody << '\n' << doubleIndent << doubleIndent;
 		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
+		fnBody << '\n' << doubleIndent << doubleIndent;
+		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
 		fnBody << "dataSize)" << stmtSeparator;
 		fnBody << indent << "}\n";
 	} 
@@ -550,15 +562,19 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 		fnBody << doubleIndent << "communicator = new ScalarReplicaSyncCommunicator(localSegmentTag";
 		fnBody << paramSeparator << '\n' << doubleIndent << doubleIndent;
 		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
+		fnBody << '\n' << doubleIndent << doubleIndent;
 		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
 		fnBody << '\n' << doubleIndent << doubleIndent;
+		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
 		fnBody << "dataSize)" << stmtSeparator;
 		fnBody << indent << "} else {\n";
 		fnBody << doubleIndent << "communicator = new ScalarDownSyncCommunicator(localSegmentTag";
 		fnBody << paramSeparator << '\n' << doubleIndent << doubleIndent;
 		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
+		fnBody << '\n' << doubleIndent << doubleIndent;
 		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
 		fnBody << '\n' << doubleIndent << doubleIndent;
+		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
 		fnBody << "dataSize)" << stmtSeparator;
 		fnBody << indent << "}\n";
 	} 
@@ -583,6 +599,9 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	const char *varName = commCharacter->getVarName();
 	const char *senderAllocatorLpsName = commCharacter->getSenderDataAllocatorSpace()->getName();
 	const char *receiverAllocatorLpsName = commCharacter->getReceiverDataAllocatorSpace()->getName();
+	const char *senderSyncLpsName = commCharacter->getSenderSyncSpace()->getName();
+	const char *receiverSyncLpsName = commCharacter->getReceiverSyncSpace()->getName();
+	
 	DataStructure *structure = rootLps->getStructure(varName);
 	ArrayType *varType = (ArrayType*) structure->getType();
 	const char *elementTypeName = varType->getTerminalElementType()->getCType();
@@ -638,11 +657,11 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << "senderDataParts" << paramSeparator << "receiverDataParts" << paramSeparator;
 	fnBody << "sizeof(" << elementTypeName << "))" << stmtSeparator << '\n';
 
-	// find out the number of sender and receiver side segments
-	fnBody << indent << "int senderCount = DataExchange::getTotalParticipantsCount(dataExchangeList, true)";
-	fnBody << stmtSeparator << indent;
-	fnBody << "int receiverCount = DataExchange::getTotalParticipantsCount(dataExchangeList, false)";
-	fnBody << stmtSeparator;
+	// find out the number of sender and receiver PPUs within current segment
+	fnBody << indent << "int localSenderPpus = localSegment->getPpuCountForLps(Space_";
+	fnBody << senderSyncLpsName << ")" << stmtSeparator;
+	fnBody << indent << "int localReceiverPpus = localSegment->getPpuCountForLps(Space_";
+	fnBody << receiverSyncLpsName << ")" << stmtSeparator << '\n';
 
 	// determine if the data structure has multiple versions; this will tell if we can preprocessed buffers that keep track
 	// of operating memory addresses to populate (and vice versa) elements of the communication buffer for a data exchange 
@@ -668,57 +687,24 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << indent << "}\n";
 
 	// check the type of synchronization and create a communicator appropriate for that type
-	
-	// for replication, ghost-region, and cross-LPS synchronization no extra logic beyond the type checking is needed
 	fnBody << '\n' << indent << "Communicator *communicator = NULL" << stmtSeparator;
 	SyncRequirement *syncRequirement = commCharacter->getSyncRequirement();
-	bool firstThreeTypes = false;
 	if (dynamic_cast<ReplicationSync*>(syncRequirement) != NULL) {
 		fnBody << indent << "communicator = new ReplicationSyncCommunicator(localSegmentTag";
-		firstThreeTypes = true;
 	} else if (dynamic_cast<GhostRegionSync*>(syncRequirement) != NULL) {
 		fnBody << indent << "communicator = new GhostRegionSyncCommunicator(localSegmentTag";
 		fnBody << "bufferList)" << stmtSeparator;
-		firstThreeTypes = true;
 	} else if (dynamic_cast<CrossPropagationSync*>(syncRequirement) != NULL) {
 		fnBody << indent << "communicator = new CrossSyncCommunicator(localSegmentTag";
-		firstThreeTypes = true;
+	} else if (dynamic_cast<UpPropagationSync*>(syncRequirement) != NULL) {
+		fnBody << indent << "communicator = new UpSyncCommunicator(localSegmentTag";
+	} else {
+		fnBody << indent << "communicator = new DownSyncCommunicator(localSegmentTag";
 	}
-	if (firstThreeTypes) {
-		fnBody << paramSeparator << '\n' << indent << doubleIndent;
-		fnBody << '"' << dependencyName << '"' << paramSeparator;
-		fnBody << "senderCount" << paramSeparator << "receiverCount" << paramSeparator;
-		fnBody << "bufferList)" << stmtSeparator;
-	}
-
-	// for up-sync if there is just one receiver then up-sync communicator is appropriate; when there is replication in the
-	// upper LPS giving rise to multiple receiver segments, a replication sync is better; similar logic is applicable for
-	// down-sync with multiple senders
-	else {
-		std::ostringstream newStmtPart;
-		newStmtPart  << "(localSegmentTag" << paramSeparator;
-		newStmtPart << '\n' << doubleIndent << doubleIndent;
-		newStmtPart << '"' << dependencyName << '"' << paramSeparator;
-		newStmtPart << "senderCount" << paramSeparator << "receiverCount" << paramSeparator;
-		newStmtPart << "bufferList)" << stmtSeparator;
-		if (dynamic_cast<UpPropagationSync*>(syncRequirement) != NULL) {
-			fnBody << indent << "if (receiverCount > 1) {\n";
-			fnBody << doubleIndent << "communicator = new ReplicationSyncCommunicator";
-			fnBody << newStmtPart.str() << stmtSeparator;
-			fnBody << indent << "} else {\n";
-			fnBody << doubleIndent << "communicator = new UpSyncCommunicator";
-			fnBody << newStmtPart.str() << stmtSeparator;
-			fnBody << indent << "}";
-		} else {
-			fnBody << indent << "if (senderCount > 1) {\n";
-			fnBody << doubleIndent << "communicator = new ReplicationSyncCommunicator";
-			fnBody << newStmtPart.str() << stmtSeparator;
-			fnBody << indent << "} else {\n";
-			fnBody << doubleIndent << "communicator = new DownSyncCommunicator";
-			fnBody << newStmtPart.str() << stmtSeparator;
-			fnBody << indent << "}";
-		}
-	} 
+	fnBody << paramSeparator << '\n' << indent << doubleIndent;
+	fnBody << '"' << dependencyName << '"' << paramSeparator;
+	fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
+	fnBody << "bufferList)" << stmtSeparator;
 
 	fnBody << indent << "return communicator" << stmtSeparator;
 	fnBody << "}\n";

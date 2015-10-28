@@ -25,7 +25,10 @@ class ScalarCommunicator : public Communicator {
 	ScalarCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
 		std::vector<int> *senderSegmentTags, 
-		std::vector<int> *receiverSegmentTags, int dataSize);
+		std::vector<int> *receiverSegmentTags,
+		int localSenderPpus,
+		int localReceiverPpus, 
+		int dataSize);
 	virtual ~ScalarCommunicator() {}
 
 	// before a data send/receive the memory address of the scalar variable should be copied into the communicator
@@ -68,7 +71,10 @@ class ScalarReplicaSyncCommunicator : public ScalarCommunicator {
 	ScalarReplicaSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
 		std::vector<int> *senderSegmentTags, 
-		std::vector<int> *receiverSegmentTags, int dataSize);
+		std::vector<int> *receiverSegmentTags, 
+		int localSenderPpus,
+		int localReceiverPpus, 
+		int dataSize);
 	void send();
 	void receive();
 };
@@ -80,7 +86,10 @@ class ScalarUpSyncCommunicator : public ScalarCommunicator {
 	ScalarUpSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
 		std::vector<int> *senderSegmentTags, 
-		std::vector<int> *receiverSegmentTags, int dataSize);
+		std::vector<int> *receiverSegmentTags, 
+		int localSenderPpus,
+		int localReceiverPpus, 
+		int dataSize);
 	void send();
 	void receive();
 };
@@ -93,7 +102,10 @@ class ScalarDownSyncCommunicator : public ScalarCommunicator {
 	ScalarDownSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
 		std::vector<int> *senderSegmentTag, 
-		std::vector<int> *receiverSegmentTags, int dataSize);
+		std::vector<int> *receiverSegmentTags, 
+		int localSenderPpus,
+		int localReceiverPpus, 
+		int dataSize);
 	void send();
 	void receive();
 };

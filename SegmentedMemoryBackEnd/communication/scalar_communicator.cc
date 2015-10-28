@@ -12,9 +12,12 @@ using namespace std;
 ScalarCommunicator::ScalarCommunicator(int localSegmentTag,
                 const char *dependencyName,
                 std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags, int dataSize) 
+                std::vector<int> *receiverSegmentTags, 
+		int localSenderPpus,
+                int localReceiverPpus,
+		int dataSize) 
 		: Communicator(localSegmentTag, dependencyName, 
-			senderSegmentTags->size(), receiverSegmentTags->size()) {
+			localSenderPpus, localReceiverPpus) {
 
 	this->dataSize = dataSize;
 	this->dataBuffer = NULL;
@@ -40,9 +43,14 @@ std::vector<int> *ScalarCommunicator::getParticipantsTags() {
 ScalarReplicaSyncCommunicator::ScalarReplicaSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
                 std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags, int dataSize) 
+                std::vector<int> *receiverSegmentTags, 
+		int localSenderPpus,
+                int localReceiverPpus,
+		int dataSize) 
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
-			senderSegmentTags, receiverSegmentTags,
+			senderSegmentTags, 
+			receiverSegmentTags,
+			localSenderPpus, localReceiverPpus, 
 			dataSize) {}
 
 void ScalarReplicaSyncCommunicator::send() {
@@ -103,10 +111,16 @@ void ScalarReplicaSyncCommunicator::receive() {
 ScalarUpSyncCommunicator::ScalarUpSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
                 std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags, int dataSize)
+                std::vector<int> *receiverSegmentTags,
+		int localSenderPpus,
+                int localReceiverPpus,
+		int dataSize) 
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
-                        senderSegmentTags, receiverSegmentTags,
-                        dataSize) {
+			senderSegmentTags, 
+			receiverSegmentTags,
+			localSenderPpus, localReceiverPpus, 
+			dataSize) {
+
 	Assert(receiverSegmentTags->size() == 1);
 }
 
@@ -135,10 +149,16 @@ void ScalarUpSyncCommunicator::receive() {
 ScalarDownSyncCommunicator::ScalarDownSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
                 std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags, int dataSize) 
+                std::vector<int> *receiverSegmentTags,
+		int localSenderPpus,
+                int localReceiverPpus,
+		int dataSize) 
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
-			senderSegmentTags, receiverSegmentTags,
+			senderSegmentTags, 
+			receiverSegmentTags,
+			localSenderPpus, localReceiverPpus, 
 			dataSize) {
+
 	Assert(senderSegmentTags->size() == 1);
 }
 

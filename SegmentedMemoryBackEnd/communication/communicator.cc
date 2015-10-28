@@ -53,17 +53,17 @@ void ReceiveBarrier::executeReceive() {
 
 Communicator::Communicator(int localSegmentTag, 
 		const char *dependencyName, 
-		int senderCount, int receiverCount) : CommBufferManager(dependencyName) {
+		int localSenderPpus, int localReceiverPpus) : CommBufferManager(dependencyName) {
 	
 	this->localSegmentTag = localSegmentTag;
 
-	if (senderCount > 0) {
-		sendBarrier = new SendBarrier(senderCount, this);
+	if (localSenderPpus > 0) {
+		sendBarrier = new SendBarrier(localSenderPpus, this);
 	} else {
 		sendBarrier = NULL;
 	}
-	if (receiverCount > 0) {
-		receiveBarrier = new ReceiveBarrier(receiverCount, this);
+	if (localReceiverPpus > 0) {
+		receiveBarrier = new ReceiveBarrier(localReceiverPpus, this);
 	} else {
 		receiveBarrier = NULL;
 	}

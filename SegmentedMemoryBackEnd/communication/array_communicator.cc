@@ -12,9 +12,10 @@ using namespace std;
 
 ReplicationSyncCommunicator::ReplicationSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, 
-		int receiverCount, List<CommBuffer*> *bufferList) 
-		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {
+                int localSenderPpus, 
+		int localReceiverPpus, List<CommBuffer*> *bufferList) 
+		: Communicator(localSegmentTag, 
+			dependencyName, localSenderPpus, localReceiverPpus) {
 
 	// Tn a replication sync scenario, the same data is shared among all participating segments. Thus there 
 	// should be only one confinement and only one data interchange configurtion in it for the current 
@@ -90,9 +91,10 @@ void ReplicationSyncCommunicator::receiveData() {
 
 GhostRegionSyncCommunicator::GhostRegionSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, 
-		int receiverCount, List<CommBuffer*> *bufferList) 
-		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {
+                int localSenderPpus, 
+		int localReceiverPpus, List<CommBuffer*> *bufferList) 
+		: Communicator(localSegmentTag, 
+			dependencyName, localSenderPpus, localReceiverPpus) {
 
 	// for ghost region sync, each buffer should have one sender segment and one receiver segment (they can be the same)
 	// the implementation does not support replication over ghost regions (probably that will never make sense either to
@@ -206,12 +208,21 @@ void GhostRegionSyncCommunicator::performTransfer() {
 
 UpSyncCommunicator::UpSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, 
-		int receiverCount, List<CommBuffer*> *bufferList) 
-		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {
+                int localSenderPpus, 
+		int localReceiverPpus, List<CommBuffer*> *bufferList) 
+		: Communicator(localSegmentTag, 
+			dependencyName, localSenderPpus, localReceiverPpus) {
 	
 	// there should be just one receiver in an up sync communicator
-	Assert(receiverCount == 1);
+	for (int i = 0; i < bufferList->NumElements(); i++) {
+		CommBuffer *buffer = bufferList->Nth(i);
+		Participant *receiver = buffer->getExchange()->getReceiver();
+		if (receiver->getSegmentTags().size() != 1) {
+			cout << "Segment " << localSegmentTag;
+			cout << ": there cannot be more than one receiver segment on up-sync\n";
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	commMode = UNKNOWN_COLLECTIVE;
 	gatherBuffer = NULL;
@@ -375,12 +386,21 @@ void UpSyncCommunicator::allocateAndLinkGatherBuffer() {
 
 DownSyncCommunicator::DownSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, 
-		int receiverCount, List<CommBuffer*> *bufferList) 
-		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {
+                int localSenderPpus, 
+		int localReceiverPpus, List<CommBuffer*> *bufferList) 
+		: Communicator(localSegmentTag, 
+			dependencyName, localSenderPpus, localReceiverPpus) {
 	
 	// there should be only one sender in a down sync communication
-	Assert(senderCount == 1);
+	for (int i = 0; i < bufferList->NumElements(); i++) {
+		CommBuffer *buffer = bufferList->Nth(i);
+		Participant *sender = buffer->getExchange()->getSender();
+		if (sender->getSegmentTags().size() != 1) {
+			cout << "Segment " << localSegmentTag;
+			cout << ": there cannot be more than one sender segment on down-sync\n";
+			exit(EXIT_FAILURE);
+		}
+	}
 	
 	commMode = UNKNOWN_COLLECTIVE;
 	scatterBuffer = NULL;
@@ -542,9 +562,10 @@ void DownSyncCommunicator::allocateAndLinkScatterBuffer() {
 
 CrossSyncCommunicator::CrossSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, 
-		int receiverCount, List<CommBuffer*> *bufferList) 
-		: Communicator(localSegmentTag, dependencyName, senderCount, receiverCount) {
+                int localSenderPpus, 
+		int localReceiverPpus, List<CommBuffer*> *bufferList) 
+		: Communicator(localSegmentTag, 
+			dependencyName, localSenderPpus, localReceiverPpus) {
 
 	this->commBufferList = bufferList;
 }

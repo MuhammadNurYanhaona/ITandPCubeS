@@ -61,7 +61,7 @@ class Communicator : public CommBufferManager {
 	// for a communicator within a group for MPI communications
 	SegmentGroup *segmentGroup;
   public:
-	Communicator(int localSegmentTag, const char *dependencyName, int senderCount, int receiverCount);
+	Communicator(int localSegmentTag, const char *dependencyName, int localSenderPpus, int localReceiverPpus);
 
 	// this function should be overriden to setup any platform specific communication resource, if needed 
 	virtual void setupCommunicator();

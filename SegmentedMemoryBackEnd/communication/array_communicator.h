@@ -23,7 +23,7 @@ class ReplicationSyncCommunicator : public Communicator {
   public:
 	ReplicationSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
-		int senderCount, int receiverCount, List<CommBuffer*> *bufferList);
+		int localSenderPpus, int localReceiverPpus, List<CommBuffer*> *bufferList);
 
 	void sendData();
         void receiveData();
@@ -37,7 +37,7 @@ class GhostRegionSyncCommunicator : public Communicator {
   public:
 	GhostRegionSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
-		int senderCount, int receiverCount, List<CommBuffer*> *bufferList);
+		int localSenderPpus, int localReceiverPpus, List<CommBuffer*> *bufferList);
 
 	// ghost region sync does not need a new MPI communicator; this this override is given to just register the segments
 	// as participants and use the default MPI communicator
@@ -69,7 +69,7 @@ class UpSyncCommunicator : public Communicator {
   public:
 	UpSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, int receiverCount, List<CommBuffer*> *bufferList);
+                int localSenderPpus, int localReceiverPpus, List<CommBuffer*> *bufferList);
 	~UpSyncCommunicator();
 	
 	// communicator setup needs to be extended to determine the mode of communication
@@ -100,7 +100,7 @@ class DownSyncCommunicator : public Communicator {
   public:
 	DownSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, int receiverCount, List<CommBuffer*> *bufferList);
+                int localSenderPpus, int localReceiverPpus, List<CommBuffer*> *bufferList);
 	~DownSyncCommunicator();
 	
 	// communicator setup needs to be extended to determine the mode of communication
@@ -123,9 +123,10 @@ class CrossSyncCommunicator : public Communicator {
   public:
 	CrossSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                int senderCount, int receiverCount, List<CommBuffer*> *bufferList);
+                int localSenderPpus, int localReceiverPpus, List<CommBuffer*> *bufferList);
 
-	// like ghost region sync, cross-sync does not need a new MPI communicator
+	// like ghost region sync, cross-sync does not need a new MPI communicator; so this override uses the default MPI
+	// communicator
 	void setupCommunicator();
 
 	void sendData();
