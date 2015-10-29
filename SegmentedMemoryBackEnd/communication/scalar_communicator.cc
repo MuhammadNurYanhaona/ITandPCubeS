@@ -125,7 +125,10 @@ ScalarUpSyncCommunicator::ScalarUpSyncCommunicator(int localSegmentTag,
 }
 
 void ScalarUpSyncCommunicator::send() {
+	
 	int receiverSegment = receiverSegmentTags->at(0);
+	if (receiverSegment == localSegmentTag) return;
+
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int receiver = segmentGroup->getRank(receiverSegment);
 	int status = MPI_Send(dataBuffer, dataSize, MPI_CHAR, receiver, 0, mpiComm);
