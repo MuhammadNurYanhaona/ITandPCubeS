@@ -4,6 +4,7 @@
 #include "../utils/list.h"
 #include "string.h"
 #include "../utils/string_utils.h"
+#include "../utils/common_utils.h"
 #include "../utils/hashtable.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
@@ -388,8 +389,12 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerF
 	functionBody << "int *count = new int[" << dimensionality << "]";
 	functionBody << statementSeparator;
 
-	// iterate over the dimension of the space and for each dimension pick an array partition to
-	// be used for partition-count calculation
+	// This list is needed to track the already applied partition arguments to the library function calls to
+	// avoid the same argument to appear multiple times in the generated count function
+	List<const char*> *paramList = new List<const char*>;
+
+	// iterate over the dimension of the space and for each dimension pick an array partition to be used for 
+	// partition-count calculation
 	for (int i = 1; i <= dimensionality; i++) {
 		Coordinate *coord = coordSys->getCoordinate(i);
 		List<Token*> *tokenList = coord->getTokenList();
@@ -418,12 +423,12 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerF
 			std::ostringstream fnCall;
 			fnCall << partFn->getName() << defaultPartitionFnSuffix;
 			
-			// dimension and the ppu count are two default parameters in the cout routine
-			// of any partition function.	
+			// dimension and the ppu count are two default parameters in the cout routine of any 
+			// partition function.	
 			fnCall << dimensionParamName.str() << parameterSeparator << defaultParameter;
 		
-			// Currently we only support one dividing argument par partition function. Later
-			// we may lift this restriction. Then the logic here will be different
+			// Currently we only support one dividing argument par partition function. Later we may 
+			// lift this restriction. Then the logic here will be different
 			Node *dividingArg = partFn->getArgsForDimension(arrayDim)->getDividingArg();
 			if (dividingArg != NULL) {
 				IntConstant *intConst = dynamic_cast<IntConstant*>(dividingArg);
@@ -434,21 +439,24 @@ List<PartitionParameterConfig*> *generateLPUCountFunction(std::ofstream &headerF
 				} else {
 					const char *paramName = ((Identifier *) dividingArg)->getName();
 					fnCall << parameterSeparator << paramName;
-					functionHeader << parameterSeparator << "int " << paramName;
-					// find the index of the parameter in partition section's argument
-					// list and store this information
-					bool paramFound = false;
-					for (int k = 0; k < partitionArgs->NumElements(); k++) {
-						const char *argName = partitionArgs->Nth(k)->getName();
-						if (strcmp(argName, paramName) == 0) {
-							paramConfig->partitionArgsIndexes->Append(k);
-							paramFound = true;
-							break;
+					if (!common_utils::isStringInList(paramName, paramList)) {
+						functionHeader << parameterSeparator << "int " << paramName;
+						// find the index of the parameter in partition section's argument
+						// list and store this information
+						bool paramFound = false;
+						for (int k = 0; k < partitionArgs->NumElements(); k++) {
+							const char *argName = partitionArgs->Nth(k)->getName();
+							if (strcmp(argName, paramName) == 0) {
+								paramConfig->partitionArgsIndexes->Append(k);
+								paramFound = true;
+								break;
+							}
+						} 
+						if (!paramFound) {
+							std::cout << "could not find matching argument in ";
+							std::cout << "partition section." << std::endl;
 						}
-					} 
-					if (!paramFound) {
-						std::cout << "could not find matching argument in ";
-						std::cout << "partition section." << std::endl;
+						paramList->Append(paramName);
 					}	
 				}
 			}
@@ -639,9 +647,11 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 					functionBody << parameterSeparator << intConst->getValue();
 				} else {
 					Identifier *arg = (Identifier*) dividingArg;
-					argNameList->Append(arg->getName());
 					functionBody << parameterSeparator << arg->getName();
-					functionHeader << parameterSeparator << "int " << arg->getName();
+					if (!common_utils::isStringInList(arg->getName(), argNameList)) {
+						argNameList->Append(arg->getName());
+						functionHeader << parameterSeparator << "int " << arg->getName();
+					}
 				}
 				if (partConfig->doesSupportGhostRegion()) {
 					// process front padding arg
@@ -656,9 +666,12 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 							functionBody << parameterSeparator << intConst->getValue();
 						} else {
 							Identifier *arg = (Identifier*) paddingArg;
-							argNameList->Append(arg->getName());
 							functionBody << parameterSeparator << arg->getName();
-							functionHeader << parameterSeparator << "int " << arg->getName();
+							if (!common_utils::isStringInList(arg->getName(), argNameList)) {
+								argNameList->Append(arg->getName());
+								functionHeader << parameterSeparator;
+								functionHeader << "int " << arg->getName();
+							}
 						}
 					}
 					// process back padding arg in exact same manner
@@ -671,9 +684,12 @@ List<int> *generateGetArrayPartForLPURoutine(Space *space,
 							functionBody << parameterSeparator << intConst->getValue();
 						} else {
 							Identifier *arg = (Identifier*) paddingArg;
-							argNameList->Append(arg->getName());
 							functionBody << parameterSeparator << arg->getName();
-							functionHeader << parameterSeparator << "int " << arg->getName();
+							if (!common_utils::isStringInList(arg->getName(), argNameList)) {
+								argNameList->Append(arg->getName());
+								functionHeader << parameterSeparator;
+								functionHeader << "int " << arg->getName();
+							}
 						}
 					}
 				}

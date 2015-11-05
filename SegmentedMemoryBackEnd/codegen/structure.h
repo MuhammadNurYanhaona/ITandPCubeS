@@ -54,10 +54,12 @@ class Dimension {
 };
 
 class Epoch {
-  public:
-	Epoch() { begin = 0; current = 0; }
+  public:	
 	int begin;
 	int current;
+  public:
+	Epoch() { begin = 0; current = 0; }
+	void advance() { current = current + 1; }
 };
 
 /* structure to demarcate the region of a dimension of an array that falls inside a single LPU */

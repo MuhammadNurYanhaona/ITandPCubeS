@@ -14,7 +14,7 @@ Program (args) {
 		lastRow = k + blockSize - 1
 		if (lastRow > max1) { lastRow = max1 }
 		range = new Range(min: k, max: lastRow)
-		execute("Transposed LU Factorization"; luEnv; Initialize: range)
+		execute("Transposed LU Factorization"; luEnv; Initialize: range; Partition: blockSize)
 		if (lastRow < max1) {
 			mMultEnv = new TaskEnvironment(name: "Subtract Matrix Multiply Result")
 			mMultEnv.a = luEnv.u[(lastRow + 1)...max1][k...lastRow]
@@ -54,14 +54,14 @@ Task "Transposed LU Factorization":
 		u, l: 2D Array of Real double-precision
 		p: 1D Array of Integer
 		pivot, k: Integer
-		l_row, p_column: 1D Array of Real double-precision
+		l_row, l_column, p_column: 1D Array of Real double-precision
 		t: Epoch
 		k_range: Range
 	Environment:
 		u, l: link
 		p: link-or-create
 	Initialize (k_range):
-		p.dimension = p_column.dimension = u.dimension1
+		p.dimension = l_column.dimension = p_column.dimension = u.dimension1
 		l_row.dimension = l.dimension2
 	Compute:
 		"Select Pivot" (Space B)
@@ -90,25 +90,29 @@ Task "Transposed LU Factorization":
                                 l_row[j] = l[k][j]
                         } for j in l and j > k
 		}
-		"Update Upper" (Space B) {
+		"Update Upper Rows Block" (Space B) {
 			do {    u[i][j] = u[i][j] - l_row[j] * u[i][k] 
                         } for i, j in u and i > k and i <= k_range.max and j > k
 		}
-		"Update Pivot Column" (Space A) {
-			"Retrieve Lower Part" (Space A) {
-				do {	p_column[i] = l[i][k]
+		"Update Upper Columns Block" (Space A) {
+			"Collect L Column Part" (Space B) {
+				do {    l_column[i] = l[i][k]
 				} for i in l and i >= k_range.min and i < k
 			}
-			"Update Upper Column" (Space B) {
-				do {	u[i][k] = u[i][k] - u[i][j] * p_column[j]
+			"Generate Pivot Column" (Space A) {
+				do { p_column[i] = l_column[i]
+				} for i in l_column and i >= k_range.min and i < k
+			}
+			"Update U Columns" (Space B) {
+				do {    u[i][k] = u[i][k] - u[i][j] * p_column[j]
 				} for i, j in u and i > k_range.max and j >= k_range.min and j < k
 			}
-		}
+		}	
 		Repeat: from "Select Pivot" for k in k_range
-	Partition:
-		Space A <un-partitioned> { p, p_column, l }
+	Partition (b):
+		Space A <un-partitioned> { p, p_column, l_column, l }
 		Space B <1D> divides Space A partitions {
-			u<dim1>, l<dim1>: stride()
+			u<dim1>, l<dim1>, l_column: block_stride(b)
 			l_row, p_column: replicated
 		} 
 

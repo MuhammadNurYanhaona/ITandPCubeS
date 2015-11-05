@@ -693,7 +693,6 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 		fnBody << indent << "communicator = new ReplicationSyncCommunicator(localSegmentTag";
 	} else if (dynamic_cast<GhostRegionSync*>(syncRequirement) != NULL) {
 		fnBody << indent << "communicator = new GhostRegionSyncCommunicator(localSegmentTag";
-		fnBody << "bufferList)" << stmtSeparator;
 	} else if (dynamic_cast<CrossPropagationSync*>(syncRequirement) != NULL) {
 		fnBody << indent << "communicator = new CrossSyncCommunicator(localSegmentTag";
 	} else if (dynamic_cast<UpPropagationSync*>(syncRequirement) != NULL) {

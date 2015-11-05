@@ -1,3 +1,18 @@
+Program (args) {         
+	stencilEnv = new TaskEnvironment(name: "Five Points Stencil")
+       
+	bind_input(stencilEnv, "plate", args.input_file)
+        bind_output(stencilEnv, "plate", args.output_file)
+
+	iterations = args.iterations
+	p = args.p
+	k = args.k
+	l = args.l
+	m = args.m
+	n = args.n
+        execute("Five Points Stencil"; stencilEnv; Initialize: iterations; Partition: p, k, l, m, n)
+}
+
 Task "Five Points Stencil":
 	Define:
 		plate: 2D Array of Real single-precision
@@ -7,27 +22,27 @@ Task "Five Points Stencil":
 		plate: link
 	Initialize (iterations):
 		total_iterations = iterations
-		t.begin = 1
 	Compute:
-		"Synchronize" (Space A) {
-			"Refine Estimate" (Space B) {
-				localRows = plate.local.dimension1.range
-				localCols = plate.local.dimension2.range
-				do { 
+		"Refine Global Estimate" (Space A) {
+			"Refine Local Estimate" (Space B) {
+				"Calculate Estimate" (Space B) {
+					localRows = plate.local.dimension1.range
+					localCols = plate.local.dimension2.range
 					do { 
 						plate[i][j] at (t)				\
-						  = 1/4 * (plate[i - 1][j] 			\
-						  + plate[i + 1][j] 				\
-						  + plate[i][j - 1]				\
-						  + plate[i][j + 1]) at (t - 1)
+						= 1/4 * (plate[i - 1][j] 			\
+						+ plate[i + 1][j] 				\
+						+ plate[i][j - 1]				\
+						+ plate[i][j + 1]) at (t - 1)
 					} for i, j in plate 					\
-					  and (i > localRows.min and i < localRows.max) 	\
-					  and (j > localCols.min and j < localCols.max) 
-				} while t.current % partition.n != 0
+					and (i > localRows.min and i < localRows.max) 		\
+					and (j > localCols.min and j < localCols.max)
+				}
+				Repeat: from "Calculate Estimate" while t.current % partition.n != 0
 			} 
-			Repeat: from "Refine Estimate" while t.current % partition.m != 0
-		} 
-		Repeat: from "Synchronize" while t.current < total_iterations
+			Repeat: from "Refine Local Estimate" while t.current % partition.m != 0
+		}
+		Repeat: from "Refine Global Estimate" while t.current < total_iterations
 	Partition (p, k, l, m, n):
 		Space A <1D> { 
 			plate: block_size(p) padding(m)
