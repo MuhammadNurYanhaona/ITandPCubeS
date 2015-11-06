@@ -276,6 +276,10 @@ class CompositeStage : public FlowStage {
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
 	
+	// this recursively goes down within the composite stage and returns the highest index of any stage nested
+	// in it
+	int getHighestNestedStageIndex();
+	
 	// composite stages do not have any synchronization dependencies of their own rather; they derive depend-
 	// encies from stages nested within them. The analyze-synchronization-needs routines is not enough for
 	// composite stages as all synchronization dependencies of nested stages are not resolved and available
@@ -287,7 +291,7 @@ class CompositeStage : public FlowStage {
 	// A composite stage by itself does not create any synchronization need. Rather it derives such needs
 	// from stages embedded within it. Here the logic is that if the update within a nested stage creates a
 	// dependency on some stage outside the composite stage boundary then it should be assigned to the 
-	// composite stage. Recursive applying this logic ensures that all synchronization needs fall in the
+	// composite stage. Recursive application of this logic ensures that all synchronization needs fall in the
  	// composite stage nesting in such a way that the updater and the receiver of that update are always 
 	// within the same composite stage. Before this recursive procedure is done, we need to ensure that all
 	// synchronization needs of nested stages along with their synchronization dependencies are set properly.
@@ -332,7 +336,7 @@ class CompositeStage : public FlowStage {
 
 	// this function is used by only the first composite stage (that represents the entire computation) and
 	// repeat cycles to initiate the counters that are used to track if an updater of need-to-be synchronized
-	// variable indeed did executed 
+	// variable indeed executed 
 	void declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingLevel);
 	
 	// Just like data dependencies that are dragged down to PPU level, shared data update signals need to be

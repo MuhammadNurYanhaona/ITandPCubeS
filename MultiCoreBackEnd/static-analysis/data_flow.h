@@ -226,6 +226,10 @@ class CompositeStage : public FlowStage {
 	void reorganizeDynamicStages();
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
+
+	// this recursively goes down within the composite stage and returns the highest index of any stage nested
+        // in it
+        int getHighestNestedStageIndex();
 	
 	// composite stages do not have any synchronization dependencies of their own rather; they derive depend-
 	// encies from stages nested within them. The analyze-synchronization-needs routines is not enough for

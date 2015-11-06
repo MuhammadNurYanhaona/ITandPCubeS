@@ -298,13 +298,12 @@ List<List<FlowStage*>*> *CompositeStage::getConsecutiveNonLPSCrossingStages() {
 		// current stage to any stage already within the group. If there is a dependency then create a
 		// new group. Note that this policy helps us to drag down LPU-LPU synchronization dependencies 
 		// as transition has been made between computation stages into PPU-PPU dependencies. 
-		//
-		// TODO: to clarify, we haven't implemented synchronization yet (Jan-29-2015) 
 		} else {
 			bool dependencyExists = false;
 			for (int j = 0; j < currentGroup->NumElements(); j++) {
 				FlowStage *earlierStage = currentGroup->Nth(j);
-				if (earlierStage->isDependentStage(stage)) {
+				if (earlierStage->isDependentStage(stage) 
+						|| stage->isDependentStage(earlierStage)) {
 					dependencyExists = true;
 					break;
 				}
@@ -551,6 +550,17 @@ void CompositeStage::analyzeSynchronizationNeeds() {
 	}
 }
 
+int CompositeStage::getHighestNestedStageIndex() {
+        int stageCount = stageList->NumElements();
+        FlowStage *lastStage = stageList->Nth(stageCount - 1);
+        CompositeStage *nestedCompositeStage = dynamic_cast<CompositeStage*>(lastStage);
+        if (nestedCompositeStage == NULL) {
+                return lastStage->getIndex();
+        } else {
+                return nestedCompositeStage->getHighestNestedStageIndex();
+        }
+}
+
 void CompositeStage::analyzeSynchronizationNeedsForComposites() {	
 	
 	// evaluate synchronization requirements and dependencies within its nested composite stages
@@ -564,7 +574,7 @@ void CompositeStage::analyzeSynchronizationNeedsForComposites() {
 	
 	// get the first and last flow index within the group to know the boundary of this composite stage
 	int beginIndex = stageList->Nth(0)->getIndex();
-	int endIndex = stageList->Nth(stageList->NumElements() - 1)->getIndex();
+	int endIndex = getHighestNestedStageIndex();
 	
 	// now start extracting boundary crossing synchronizations out
 	synchronizationReqs = new StageSyncReqs(this);
@@ -611,7 +621,7 @@ void CompositeStage::deriveSynchronizationDependencies() {
 
 	// get the first and last flow index within the group to know the boundary of this composite stage
 	int beginIndex = stageList->Nth(0)->getIndex();
-	int endIndex = stageList->Nth(stageList->NumElements() - 1)->getIndex();
+	int endIndex = getHighestNestedStageIndex();
 	
 	// then check those stage and draw out any synchronization dependencies they have due to changes made in
 	// stages outside this composite stage as the dependencies of the current composite stage itself.
