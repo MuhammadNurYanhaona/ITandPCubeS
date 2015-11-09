@@ -47,6 +47,9 @@ namespace string_utils {
 
 	// break a long line into multiple lines without compromising the content
 	const char *breakLongLine(int indent, std::string originalLine);
+
+	// determine if a list of string contains a particular string
+        bool contains(List<const char*> *list, const char *str);
 }
 
 #endif

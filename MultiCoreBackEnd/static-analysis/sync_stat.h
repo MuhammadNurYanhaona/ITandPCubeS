@@ -127,6 +127,7 @@ class VariableSyncReqs {
 	List<SyncRequirement*> *getSyncList() { return syncList; }
 	const char *getVarName() { return varName; }   
 	void print(int indent);		
+	void deactivateRedundantSyncReqs();
 };
 
 // This class holds synchronization requirements on different variables due to the execution of a single
@@ -149,6 +150,7 @@ class StageSyncReqs {
 	bool isDependentStage(FlowStage *suspectedDependentStage);
 	List<SyncRequirement*> *getAllSyncReqirements();
 	List<SyncRequirement*> *getAllNonSignaledSyncReqs();
+	void removeRedundencies();
 	void print(int indent);		
 };
 

@@ -3,8 +3,11 @@
 #include "data_access.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../utils/binary_search.h"
+#include "../utils/string_utils.h"
 #include "../semantics/task_space.h"
 
+#include <vector>
 #include <iostream>
 #include <sstream>
 #include <fstream>
@@ -168,6 +171,134 @@ void VariableSyncReqs::addSyncRequirement(SyncRequirement *syncReq) {
 	syncList->Append(syncReq);
 }
 
+void VariableSyncReqs::deactivateRedundantSyncReqs() {
+
+        FlowStage *updater = syncList->Nth(0)->getDependencyArc()->getSource();
+        int updaterIndex = updater->getIndex();
+
+        std::vector<int> precedingDependentIndexes;
+        std::vector<DependencyArc*> precedingDependents;
+        std::vector<int> succeedingDependentIndexes;
+        std::vector<DependencyArc*> succeedingDependents;
+
+        // first separate the dependencies into two groups: those that goes back from the updater stage and those that goes forward
+        // to some future stage
+        for (int i = 0; i < syncList->NumElements(); i++) {
+                DependencyArc* arc = syncList->Nth(i)->getDependencyArc();
+                FlowStage *dependent = arc->getDestination();
+                int dependentIndex = dependent->getIndex();
+
+                if (dependentIndex < updaterIndex) {
+                        int location = binsearch::locatePointOfInsert(precedingDependentIndexes, dependentIndex);
+                        precedingDependents.insert(precedingDependents.begin() + location, arc);
+                        precedingDependentIndexes.insert(precedingDependentIndexes.begin()
+                                        + location, dependentIndex);
+                } else {
+                        int location = binsearch::locatePointOfInsert(succeedingDependentIndexes, dependentIndex);
+                        succeedingDependents.insert(succeedingDependents.begin() + location, arc);
+                        succeedingDependentIndexes.insert(succeedingDependentIndexes.begin()
+                                        + location, dependentIndex);
+                }
+        }
+
+        // for list of successor dependents, if there are two of them that execute in the same LPS, deactivate the second without
+        // further investigation
+        List<const char*> *consideredLpsList = new List<const char*>;
+        std::vector<DependencyArc*> filteredSuccessors;
+        for (int i = 0; i < succeedingDependents.size(); i++) {
+                DependencyArc *arc = succeedingDependents.at(i);
+                FlowStage *dependent = arc->getDestination();
+                const char *lpsOfDependent = dependent->getSpace()->getName();
+                if (string_utils::contains(consideredLpsList, lpsOfDependent)) {
+                        arc->deactivate();
+                } else {
+                        consideredLpsList->Append(lpsOfDependent);
+                        filteredSuccessors.push_back(arc);
+                }
+        }
+
+        // For list of predecessor dependents, if there are two of them that execute in the same LPS, the second one can be 
+        // deactivated if the common container stage of <updater, second-dependent> and that of <updaer, first-dependent> is within
+        // the same repeat cycle. Otherwise, the first one needs not be signaled but both dependencies should be active.
+        consideredLpsList->clear();
+        std::vector<DependencyArc*> candidatePredecessors;
+        List<DependencyArc*> *nearestDependentsByLpses = new List<DependencyArc*>;
+        for (int i = 0; i < precedingDependents.size(); i++) {
+                DependencyArc *arc = precedingDependents.at(i);
+                FlowStage *dependent = arc->getDestination();
+                Space *lpsOfDependent = dependent->getSpace();
+                const char *lpsName = lpsOfDependent->getName();
+                if (string_utils::contains(consideredLpsList, lpsName)) {
+                        DependencyArc *lastArc = NULL;
+                        int lastArcIndex = 0;
+                        for (int j = 0; j < nearestDependentsByLpses->NumElements(); j++) {
+                                DependencyArc *candidate = nearestDependentsByLpses->Nth(j);
+                                if (candidate->getDestination()->getSpace() == lpsOfDependent) {
+                                        lastArc = candidate;
+                                        lastArcIndex = j;
+                                        break;
+                                }
+                        }
+                        FlowStage *earlierDependent = lastArc->getDestination();
+                        FlowStage *commonParent1 = updater->getNearestCommonAncestor(dependent);
+                        FlowStage *commonParent2 = updater->getNearestCommonAncestor(earlierDependent);
+                        if (commonParent1 == commonParent2
+                                        || commonParent1->getRepeatIndex() == commonParent2->getRepeatIndex()) {
+                                arc->deactivate();
+                        } else {
+                                lastArc->signal();
+                                nearestDependentsByLpses->RemoveAt(lastArcIndex);
+                                nearestDependentsByLpses->InsertAt(arc, lastArcIndex);
+                                candidatePredecessors.push_back(arc);
+                        }
+                } else {
+                        consideredLpsList->Append(lpsName);
+                        nearestDependentsByLpses->Append(arc);
+                        candidatePredecessors.push_back(arc);
+                }
+        }
+
+        // Finally, a successor dependent can lead to the annulling of a predecessor dependent if the former is in a closer or the
+        // same repeat nesting group with the updater than the latter is (again both must execute in the same LPS). Otherwise, the 
+        // successor dependency needs not be signaled.  
+        std::vector<DependencyArc*> filteredPredecessors;
+        for (int i = 0; i < candidatePredecessors.size(); i++) {
+                DependencyArc *arc = candidatePredecessors.at(i);
+                FlowStage *dependent = arc->getDestination();
+                Space *lpsOfDependent = dependent->getSpace();
+                DependencyArc *successorArc = NULL;
+                for (int j = 0; j < filteredSuccessors.size(); j++) {
+                        if (filteredSuccessors.at(j)->getDestination()->getSpace() == lpsOfDependent) {
+                                successorArc = filteredSuccessors.at(j);
+                                break;
+                        }
+                }
+                if (successorArc != NULL) {
+                        FlowStage *laterDependent = successorArc->getDestination();
+                        FlowStage *commonParent1 = updater->getNearestCommonAncestor(dependent);
+                        FlowStage *commonParent2 = updater->getNearestCommonAncestor(laterDependent);
+                        if (commonParent1 == commonParent2
+                                        || commonParent1->getRepeatIndex() <= commonParent2->getRepeatIndex()) {
+                                arc->deactivate();
+                        } else {
+                                successorArc->signal();
+                                filteredPredecessors.push_back(arc);
+                        }
+                } else {
+                        filteredPredecessors.push_back(arc);
+                }
+        }
+
+        // Keep only the active sync requirements in the updated sync list
+        List<SyncRequirement*> *filteredList = new List<SyncRequirement*>;
+        for (int i = 0; i < syncList->NumElements(); i++) {
+                SyncRequirement *syncReq = syncList->Nth(i);
+                if (syncReq->isActive()) filteredList->Append(syncReq);
+        }
+        syncList = filteredList;
+}
+                     
+
 void VariableSyncReqs::print(int indent) {
 	for (int i = 0; i < indent; i++) std::cout << '\t';
 	std::cout << "Variable: " << varName << std::endl;
@@ -222,6 +353,13 @@ bool StageSyncReqs::isDependentStage(FlowStage *suspectedDependentStage) {
 		}	
 	}
 	return false;
+}
+
+void StageSyncReqs::removeRedundencies() {
+        List<VariableSyncReqs*> *varSyncList = getVarSyncList();
+        for (int i = 0; i < varSyncList->NumElements(); i++) {
+                varSyncList->Nth(i)->deactivateRedundantSyncReqs();
+        }
 }
 
 void StageSyncReqs::print(int indent) {

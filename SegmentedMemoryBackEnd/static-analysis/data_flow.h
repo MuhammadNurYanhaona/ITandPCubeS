@@ -62,6 +62,7 @@ class FlowStage {
 	Space *space;
 	Hashtable<VariableAccess*> *accessMap;
 	Expr *executeCond;  
+	FlowStage *parent;	
 	
 	// Index indicates the position of a flow stage compared to other stages and group No specifies its container 
 	// stage's, if exists, index. Finally, repeat index is the index of the closest repeat  cycle then encircles 
@@ -85,6 +86,8 @@ class FlowStage {
 	int getRepeatIndex() { return repeatIndex; }
 	const char *getName() { return name; }
 	void setName(const char *name) { this->name = name; }
+	void setParent(FlowStage *parent) { this->parent = parent; }
+	FlowStage *getParent() { return parent; }
 	Space *getSpace() { return space; }
 	Hashtable<VariableAccess*> *getAccessMap() { return accessMap; }
 	void setAccessMap(Hashtable<VariableAccess*> *accessMap) { this->accessMap = accessMap; }
@@ -112,6 +115,10 @@ class FlowStage {
 	// to implement recursion. For other stages default implementation works, which just assign the passed
 	// arguments. 
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
+
+	// This is used to determine the closest ancestor flow stage of the current stage and the argument stage. It
+	// is used to determine what dependency links are redundant.
+	FlowStage *getNearestCommonAncestor(FlowStage *other);
 
 	// This virtual method is added so that loader sync stages for dynamic spaces can be put inside composite 
 	// stages protected by activation conditions alongside their compute stages. The normal flow construction
@@ -265,7 +272,7 @@ class CompositeStage : public FlowStage {
 	bool isStageListEmpty();
 	Space *getLastNonSyncStagesSpace();
 	FlowStage *getLastNonSyncStage();
-	void setStageList(List<FlowStage*> *stageList) { this->stageList = stageList; }
+	void setStageList(List<FlowStage*> *stageList);
 	List<FlowStage*> *getStageList() { return stageList; }
 	void addSyncStagesBeforeExecution(FlowStage *nextStage, List<FlowStage*> *stageList);
 	virtual void addSyncStagesOnReturn(List<FlowStage*> *stageList);

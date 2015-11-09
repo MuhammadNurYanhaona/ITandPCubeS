@@ -29,6 +29,7 @@ FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	this->name = NULL;
 	this->synchronizationReqs = NULL;
 	syncDependencies = new StageSyncDependencies(this);
+	this->parent = NULL;
 }
 
 void FlowStage::mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap) {
@@ -118,6 +119,20 @@ int FlowStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int c
 	this->repeatIndex = currentRepeatCycle;
 	return currentIndex + 1;
 }
+
+FlowStage *FlowStage::getNearestCommonAncestor(FlowStage *other) {
+       	FlowStage *first = this;
+       	FlowStage *second = other;
+       	while (first->index != second->index) {
+       		if (first->index > second->index) {
+                       first = first->parent;
+               	} else if (second->index > first->index) {
+                       second = second->parent;
+       		}
+	}
+	return first;
+}
+
 
 List<const char*> *FlowStage::filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap) {
 	if (accessMap == NULL) {
@@ -214,7 +229,8 @@ void FlowStage::analyzeSynchronizationNeeds() {
 			syncReq->setDependencyArc(arc);
 			synchronizationReqs->addVariableSyncReq(varName, syncReq, true);
 		}
-	} 	
+	}
+	synchronizationReqs->removeRedundencies(); 	
 }
 
 StageSyncReqs *FlowStage::getAllSyncRequirements() { return synchronizationReqs; }

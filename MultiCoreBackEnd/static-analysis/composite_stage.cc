@@ -25,6 +25,7 @@ CompositeStage::CompositeStage(int index, Space *space, Expr *executeCond) : Flo
 
 void CompositeStage::addStageAtBeginning(FlowStage *stage) {
 	stageList->InsertAt(stage, 0);
+	stage->setParent(this);
 }
 
 void CompositeStage::addStageAtEnd(FlowStage *stage) {
@@ -33,14 +34,23 @@ void CompositeStage::addStageAtEnd(FlowStage *stage) {
 	if (syncStage != NULL) {
 		syncStage->setIndex(stageList->NumElements());
 	}
+	stage->setParent(this);
 }
 
 void CompositeStage::insertStageAt(int index, FlowStage *stage) {
 	stageList->InsertAt(stage, index);
 	stage->setIndex(index);
+	stage->setParent(this);
 }
 
 void CompositeStage::removeStageAt(int stageIndex) { stageList->RemoveAt(stageIndex); }
+
+void CompositeStage::setStageList(List<FlowStage*> *stageList) { 
+        this->stageList = stageList;
+        for (int i = 0; i < stageList->NumElements(); i++) {
+		stageList->Nth(i)->setParent(this);
+	} 
+}
 
 bool CompositeStage::isStageListEmpty() {
 	return getLastNonSyncStage() == NULL;

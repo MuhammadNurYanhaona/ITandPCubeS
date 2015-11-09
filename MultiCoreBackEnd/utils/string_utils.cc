@@ -161,3 +161,11 @@ const char* string_utils::breakLongLine(int indent, std::string originalLine) {
 	}
 	return strdup(stream.str().c_str());
 }
+
+bool string_utils::contains(List<const char*> *list, const char *str) {
+        for (int i = 0; i < list->NumElements(); i++) {
+                const char *str2 = list->Nth(i);
+                if (strcmp(str, str2) == 0) return true;
+        }
+        return false;
+}
