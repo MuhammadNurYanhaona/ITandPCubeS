@@ -242,7 +242,7 @@ void generateConfinementConstrConfigFn(std::ofstream &headerFile,
 	fnBody << indent << "int receiverLps = Space_" << receiverSyncLpsName << stmtSeparator; 
 	fnBody << indent << "DataItemConfig *receiverDataConfig = partConfigMap->Lookup(";
 	fnBody << '\n' << indent << doubleIndent << "\"";
-	fnBody << varName << "Space" << senderAllocatorLpsName << "Config"<< "\")->";
+	fnBody << varName << "Space" << receiverAllocatorLpsName << "Config"<< "\")->";
 	fnBody << "generateStateFulVersion()" << stmtSeparator;
 	fnBody << indent << "int confinementLps = Space_" << commCharacter->getConfinementSpace()->getName();
 	fnBody << stmtSeparator << indent;
