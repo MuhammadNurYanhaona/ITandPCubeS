@@ -84,26 +84,29 @@ void generateDistributionTreeFnForStructure(const char *varName,
 		const char *lpsName = lps->getName();
 		fnBody << "\n";
 		fnBody << tripleIndent << "//generating parts for: " << lpsName << "\n";
-		fnBody << tripleIndent << "partConfig = configMap->Lookup(\"";
+		fnBody << tripleIndent << "if (segment->computeStagesInLps(Space_" << lpsName << ")) {\n";
+		fnBody << quadIndent << "partConfig = configMap->Lookup(\"";
 		fnBody << varName << "Space" << lpsName << "Config" << "\")" << stmtSeparator;
-		fnBody << tripleIndent << "partId = partConfig->generatePartIdTemplate()" << stmtSeparator;
-		fnBody << tripleIndent << "dataItemConfig = partConfig->generateStateFulVersion()";
-		fnBody << stmtSeparator << tripleIndent;
+		fnBody << quadIndent << "partId = partConfig->generatePartIdTemplate()" << stmtSeparator;
+		fnBody << quadIndent << "dataItemConfig = partConfig->generateStateFulVersion()";
+		fnBody << stmtSeparator << quadIndent;
 		fnBody << "dimOrder = dataItemConfig->generateDimOrderVector()" << stmtSeparator;	
 		
 		// generate the LPU Ids for the current LPS and Thread combination and retrieve data part IDs from LPU IDs
-		fnBody << tripleIndent << "while((lpuId = thread->getNextLpuId(";
+		fnBody << std::endl << quadIndent << "while((lpuId = thread->getNextLpuId(";
 		fnBody << "Space_" << lpsName << paramSeparator;
+		fnBody << std::endl << quadIndent << doubleIndent;
 		fnBody << "Space_" << rootLps->getName() << paramSeparator;
 		fnBody << "lpuId)) != INVALID_ID) {\n";
-		fnBody << quadIndent << "List<int*> *lpuIdChain = thread->getLpuIdChainWithoutCopy(";
-		fnBody << std::endl << quadIndent << doubleIndent;
+		fnBody << quadIndent << indent << "List<int*> *lpuIdChain = thread->getLpuIdChainWithoutCopy(";
+		fnBody << std::endl << quadIndent << tripleIndent;
 		fnBody << "Space_" << lpsName << paramSeparator;
 		fnBody << "Space_" << rootLps->getName() << ")" << stmtSeparator;
-		fnBody << quadIndent << "partConfig->generatePartId(lpuIdChain" << paramSeparator;
+		fnBody << quadIndent << indent << "partConfig->generatePartId(lpuIdChain" << paramSeparator;
 		fnBody << "partId)"  << stmtSeparator;
-		fnBody << quadIndent << "rootContainer->insertPart(*dimOrder" << paramSeparator;
+		fnBody << quadIndent << indent << "rootContainer->insertPart(*dimOrder" << paramSeparator;
 		fnBody << "segmentTag" << paramSeparator << "partId)" << stmtSeparator;
+		fnBody << quadIndent << "}\n";
 		fnBody << tripleIndent << "}\n";
 	}	
 
