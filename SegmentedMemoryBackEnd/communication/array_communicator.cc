@@ -120,6 +120,8 @@ void GhostRegionSyncCommunicator::setupCommunicator() {
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
+	*logFile << "Setup done for Ghost-region Sync Communicator for " << dependencyName < "\n";
+	logFile->flush();
 }
 
 void GhostRegionSyncCommunicator::performTransfer() {
@@ -244,6 +246,9 @@ void UpSyncCommunicator::setupCommunicator() {
 	
 	Communicator::setupCommunicator();
 
+	*logFile << "setting up the mode for up-sync communicator for " << dependencyName << "\n";
+	logFile->flush();
+
 	CommBuffer *buffer = commBufferList->Nth(0);
 	int receiverSegment = buffer->getExchange()->getReceiver()->getSegmentTags()[0]; 
 	if (receiverSegment == localSegmentTag) {
@@ -273,6 +278,9 @@ void UpSyncCommunicator::setupCommunicator() {
 		}
 		commMode = (gather == 1) ? GATHER_V : SEND_RECEIVE;
 	}
+	
+	*logFile << "mode setup done for up-sync communicator for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 void UpSyncCommunicator::sendData() {
@@ -422,6 +430,9 @@ void DownSyncCommunicator::setupCommunicator() {
 	
 	Communicator::setupCommunicator();
 	
+	*logFile << "setting up the mode for down-sync communicator for " << dependencyName << "\n";
+	logFile->flush();
+	
 	int senderTag = commBufferList->Nth(0)->getExchange()->getSender()->getSegmentTags()[0];
 	if (senderTag == localSegmentTag) {
 		int scatter = (commBufferList->NumElements() > 1) ? 1 : 0;
@@ -449,6 +460,9 @@ void DownSyncCommunicator::setupCommunicator() {
 		}
 		commMode = (scatter == 1) ? SCATTER_V : BROADCAST;
 	}
+	
+	*logFile << "mode setup done for down-sync communicator for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 void DownSyncCommunicator::sendData() {
@@ -574,6 +588,8 @@ void CrossSyncCommunicator::setupCommunicator() {
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
+	*logFile << "Setup done for Cross-Sync Communicator for " << dependencyName < "\n";
+	logFile->flush();
 }
  
 void CrossSyncCommunicator::sendData() {

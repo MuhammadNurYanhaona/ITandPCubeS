@@ -568,7 +568,9 @@ bool TaskGenerator::generateCommunicators(std::ofstream &stream) {
 	stream << "mySegment" << paramSeparator;
 	stream << '\n' << indent << doubleIndent;
 	stream << "segmentList" << paramSeparator << "taskData" << paramSeparator << "&taskGlobals";
-	stream << paramSeparator << "configMap" << paramSeparator << "distributionMap)" << stmtSeparator;
+	stream << paramSeparator << "configMap" << paramSeparator << "distributionMap"; 
+	stream << '\n' << indent << doubleIndent;
+	stream << paramSeparator << "logFile)" << stmtSeparator;
 
 	// finally assign the communicator map to the threads of the current segment
 	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";

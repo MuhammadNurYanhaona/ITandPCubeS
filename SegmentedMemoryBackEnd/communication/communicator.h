@@ -19,6 +19,9 @@
 #include "comm_buffer.h"
 #include "mpi_group.h"
 
+#include <iostream>
+#include <fstream>
+
 class Communicator;
 
 /* Barrier class that is used to implement bulk synchronization during sending data
@@ -60,8 +63,11 @@ class Communicator : public CommBufferManager {
 	ReceiveBarrier *receiveBarrier;
 	// for a communicator within a group for MPI communications
 	SegmentGroup *segmentGroup;
+	// a stream for logging events on the communicator
+	std::ofstream *logFile;
   public:
 	Communicator(int localSegmentTag, const char *dependencyName, int localSenderPpus, int localReceiverPpus);
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 
 	// this function should be overriden to setup any platform specific communication resource, if needed 
 	virtual void setupCommunicator();

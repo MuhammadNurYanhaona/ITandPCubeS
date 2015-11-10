@@ -71,9 +71,13 @@ Communicator::Communicator(int localSegmentTag,
 }
 
 void Communicator::setupCommunicator() {
+	*logFile << "Setting up communicator for " << dependencyName << "\n";
+	logFile->flush();
         std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         segmentGroup->setupCommunicator();
         delete participants;
+	*logFile << "Setup done for communicator for " << dependencyName << "\n";
+	logFile->flush();
 }
 

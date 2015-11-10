@@ -794,7 +794,8 @@ void generateCommunicatorMapFn(const char *headerFileName,
 	fnHeader << '\n' << doubleIndent << "TaskData *taskData" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "TaskGlobals *taskGlobals" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
-	fnHeader << "\n" << doubleIndent << "PartDistributionMap *distributionMap)";
+	fnHeader << "\n" << doubleIndent << "PartDistributionMap *distributionMap" << paramSeparator;
+	fnHeader << "\n" << doubleIndent << "std::ofstream &logFile)";
 
 	fnBody << "{\n\n";
 
@@ -829,6 +830,7 @@ void generateCommunicatorMapFn(const char *headerFileName,
 		}
 		fnBody << ")" << stmtSeparator;
 		fnBody << indent << "if (communicator" << i << " != NULL) {\n";
+		fnBody << doubleIndent << "communicator" << i <<  "->setLogFile(&logFile)" << stmtSeparator;
 		fnBody << doubleIndent << "communicator" << i << "->setupCommunicator()" << stmtSeparator;
 		fnBody << doubleIndent << "communicatorMap->Enter(\"" << dependencyName << "\"" << paramSeparator;
 		fnBody << "communicator" << i << ")" << stmtSeparator;
