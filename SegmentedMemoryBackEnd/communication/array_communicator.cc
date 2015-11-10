@@ -588,7 +588,7 @@ void CrossSyncCommunicator::setupCommunicator() {
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
-	*logFile << "Setup done for Cross-Sync Communicator for " << dependencyName < "\n";
+	*logFile << "Setup done for Cross-Sync Communicator for " << dependencyName << "\n";
 	logFile->flush();
 }
  
