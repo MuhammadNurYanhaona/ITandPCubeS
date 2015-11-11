@@ -63,14 +63,17 @@ class Communicator : public CommBufferManager {
 	ReceiveBarrier *receiveBarrier;
 	// for a communicator within a group for MPI communications
 	SegmentGroup *segmentGroup;
+	// the list of segments interacting for this communicator; this is needed to set up the segment group
+	std::vector<int> *participantSegments;
 	// a stream for logging events on the communicator
 	std::ofstream *logFile;
   public:
 	Communicator(int localSegmentTag, const char *dependencyName, int localSenderPpus, int localReceiverPpus);
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
+	void setParticipants(std::vector<int> *participants) { this->participantSegments = participants; }
 
 	// this function should be overriden to setup any platform specific communication resource, if needed 
-	virtual void setupCommunicator();
+	virtual void setupCommunicator(bool includeNonInteractingSegments);
 
 	// These are the implementation of send and receive functions from the communication-buffer manager class. The logic is
 	// to just wait on the relevent barrier whose shouldWait() and releaseFunction() invoke other functions in this class to

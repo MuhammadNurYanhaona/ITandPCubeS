@@ -70,13 +70,17 @@ Communicator::Communicator(int localSegmentTag,
 	iterationNo = 0;
 }
 
-void Communicator::setupCommunicator() {
+void Communicator::setupCommunicator(bool includeNonInteractingSegments) {
 	*logFile << "Setting up communicator for " << dependencyName << "\n";
 	logFile->flush();
-        std::vector<int> *participants = getParticipantsTags();
-        segmentGroup = new SegmentGroup(*participants);
-        segmentGroup->setupCommunicator();
-        delete participants;
+	if (includeNonInteractingSegments) {
+        	segmentGroup = new SegmentGroup(*participantSegments);
+	} else {
+		std::vector<int> *interactingParticipants = getParticipantsTags();
+        	segmentGroup = new SegmentGroup(*interactingParticipants);
+		delete interactingParticipants;
+	}
+        segmentGroup->setupCommunicator(*logFile);
 	*logFile << "Setup done for communicator for " << dependencyName << "\n";
 	logFile->flush();
 }

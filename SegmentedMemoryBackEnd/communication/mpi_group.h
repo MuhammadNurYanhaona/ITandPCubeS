@@ -6,6 +6,7 @@
 #include <mpi.h>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 class SegmentGroup {
@@ -15,7 +16,7 @@ class SegmentGroup {
         MPI_Comm mpiCommunicator;
   public:
         SegmentGroup(std::vector<int> segments);
-        void setupCommunicator();
+        void setupCommunicator(std::ofstream &log);
         MPI_Comm getCommunicator() { return mpiCommunicator; }
         int getRank(int segmentId);
         void describe(std::ostream &stream);

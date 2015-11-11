@@ -361,6 +361,10 @@ bool DataExchange::isIntraSegmentExchange(int localSegmentTag) {
 	return true;
 }
 
+bool DataExchange::involvesLocalSegment(int localSegmentTag) {
+	return sender->hasSegmentTag(localSegmentTag) || receiver->hasSegmentTag(localSegmentTag);
+}
+
 void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList) {
 	for (int i = 0; i < seqList->NumElements(); i++) {
 		cout << "Sequence #" << i << ":\n";
@@ -458,6 +462,10 @@ List<DataExchange*> *CrossSegmentInteractionSpec::generateReceiveExchanges() {
 	List<Participant*> *localReceiverList = new List<Participant*>;
 	localReceiverList->Append(localReceiver);
 	return Confinement::generateDataExchangeList(remoteSenders, localReceiverList);
+}
+
+List<DataExchange*> *CrossSegmentInteractionSpec::generateRemoteExchanges() {
+	return Confinement::generateDataExchangeList(remoteSenders, remoteReceivers);
 }
 
 void CrossSegmentInteractionSpec::describe(int indentLevel, std::ostream &stream) {
@@ -688,6 +696,12 @@ List<DataExchange*> *Confinement::getAllDataExchanges() {
 	if (remoteReceives != NULL) {
 		dataExchangeList->AppendAll(remoteReceives);
 		delete remoteReceives;
+	}
+
+	List<DataExchange*> *nonLocalTransfers = remoteInteractions->generateRemoteExchanges();
+	if (nonLocalTransfers != NULL) {
+		dataExchangeList->AppendAll(nonLocalTransfers);
+		delete nonLocalTransfers;
 	}
 
 	// Compacting is done only for non-local data exchanges as there should be no two data local data exchanges that

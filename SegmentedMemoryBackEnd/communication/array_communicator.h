@@ -41,7 +41,7 @@ class GhostRegionSyncCommunicator : public Communicator {
 
 	// ghost region sync does not need a new MPI communicator; this this override is given to just register the segments
 	// as participants and use the default MPI communicator
-	void setupCommunicator();
+	void setupCommunicator(bool includeNonInteractingSegments);
 
 	void sendData() { performTransfer(); }
         void receiveData() {}
@@ -73,7 +73,7 @@ class UpSyncCommunicator : public Communicator {
 	~UpSyncCommunicator();
 	
 	// communicator setup needs to be extended to determine the mode of communication
-	void setupCommunicator();
+	void setupCommunicator(bool includeNonInteractingSegments);
 
 	void sendData();
         void receiveData();
@@ -104,7 +104,7 @@ class DownSyncCommunicator : public Communicator {
 	~DownSyncCommunicator();
 	
 	// communicator setup needs to be extended to determine the mode of communication
-	void setupCommunicator();
+	void setupCommunicator(bool includeNonInteractingSegments);
 
 	void sendData();
         void receiveData();
@@ -127,7 +127,7 @@ class CrossSyncCommunicator : public Communicator {
 
 	// like ghost region sync, cross-sync does not need a new MPI communicator; so this override uses the default MPI
 	// communicator
-	void setupCommunicator();
+	void setupCommunicator(bool includeNonInteractingSegments);
 
 	void sendData();
         void receiveData();

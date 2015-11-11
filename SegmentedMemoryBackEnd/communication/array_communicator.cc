@@ -116,7 +116,7 @@ GhostRegionSyncCommunicator::GhostRegionSyncCommunicator(int localSegmentTag,
 	this->commBufferList = bufferList;
 }
 
-void GhostRegionSyncCommunicator::setupCommunicator() {
+void GhostRegionSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
@@ -242,9 +242,9 @@ UpSyncCommunicator::~UpSyncCommunicator() {
 	}
 }
 
-void UpSyncCommunicator::setupCommunicator() {
+void UpSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 	
-	Communicator::setupCommunicator();
+	Communicator::setupCommunicator(includeNonInteractingSegments);
 
 	*logFile << "setting up the mode for up-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
@@ -426,9 +426,9 @@ DownSyncCommunicator::~DownSyncCommunicator() {
 	}
 }
 
-void DownSyncCommunicator::setupCommunicator() {
+void DownSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 	
-	Communicator::setupCommunicator();
+	Communicator::setupCommunicator(includeNonInteractingSegments);
 	
 	*logFile << "setting up the mode for down-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
@@ -584,7 +584,7 @@ CrossSyncCommunicator::CrossSyncCommunicator(int localSegmentTag,
 	this->commBufferList = bufferList;
 }
 
-void CrossSyncCommunicator::setupCommunicator() {
+void CrossSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;

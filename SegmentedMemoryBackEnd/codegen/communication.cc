@@ -84,7 +84,7 @@ void generateDistributionTreeFnForStructure(const char *varName,
 		const char *lpsName = lps->getName();
 		fnBody << "\n";
 		fnBody << tripleIndent << "//generating parts for: " << lpsName << "\n";
-		fnBody << tripleIndent << "if (segment->computeStagesInLps(Space_" << lpsName << ")) {\n";
+		fnBody << tripleIndent << "if (thread->isValidPpu(Space_" << lpsName << ")) {\n";
 		fnBody << quadIndent << "partConfig = configMap->Lookup(\"";
 		fnBody << varName << "Space" << lpsName << "Config" << "\")" << stmtSeparator;
 		fnBody << quadIndent << "partId = partConfig->generatePartIdTemplate()" << stmtSeparator;
@@ -671,11 +671,27 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	int versionCount = structure->getVersionCount();
 	const char *bufferTypePrefix = (versionCount > 1) ? "" : "Preprocessed";
 
-	// instantiate a list of communication buffers; and add virtual/physical communication buffers into it for data exchanges
+	// instantiate a list of communication buffers to add virtual/physical communication buffers into it for data exchanges
 	// based on whether or not the exchange demands cross-segments communication 
 	fnBody << indent << "List<CommBuffer*> *bufferList = new List<CommBuffer*>" << stmtSeparator;
-	fnBody << indent << "for (int i = 0; i < dataExchangeList->NumElements(); i++) {\n";
+	// also instanciate a vector for tracking all segments that do communication for the current data dependency within the
+	// confinements that are relevant to the current segment
+	fnBody << indent << "std::vector<int> *participantTags = new std::vector<int>" << stmtSeparator;
+	fnBody << indent << "for (int i = 0; i < dataExchangeList->NumElements(); i++) {\n\n";
 	fnBody << doubleIndent << "DataExchange *exchange = dataExchangeList->Nth(i)" << stmtSeparator;
+	// put the participant segments in the participants list and skip this data exchange if the local segment is not 
+	// participating in the data exchange
+	fnBody << doubleIndent << "std::vector<int> senderTags";
+	fnBody << " = exchange->getSender()->getSegmentTags()" << stmtSeparator;
+	fnBody << doubleIndent << "binsearch::addThoseNotExist(participantTags" << paramSeparator;
+	fnBody << "&senderTags)" << stmtSeparator;
+	fnBody << doubleIndent << "std::vector<int> receiverTags";
+	fnBody << " = exchange->getReceiver()->getSegmentTags()" << stmtSeparator;
+	fnBody << doubleIndent << "binsearch::addThoseNotExist(participantTags" << paramSeparator;
+	fnBody << "&receiverTags)" << stmtSeparator;
+	fnBody << doubleIndent << "if (!exchange->involvesLocalSegment(localSegmentTag)) continue"; 
+	fnBody << stmtSeparator << "\n";
+	// otherwise continue and create an appropriate communication buffer for the exchange and add that in the list of buffers
 	fnBody << doubleIndent << "CommBuffer *buffer = NULL" << stmtSeparator;
 	fnBody << doubleIndent << "if (exchange->isIntraSegmentExchange(localSegmentTag)) {\n";
 	fnBody << tripleIndent << "buffer = new " << bufferTypePrefix << "VirtualCommBuffer(";
@@ -707,6 +723,7 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << '"' << dependencyName << '"' << paramSeparator;
 	fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
 	fnBody << "bufferList)" << stmtSeparator;
+	fnBody << indent << "communicator->setParticipants(participantTags)" << stmtSeparator;
 
 	fnBody << indent << "return communicator" << stmtSeparator;
 	fnBody << "}\n";
@@ -808,7 +825,8 @@ void generateCommunicatorMapFn(const char *headerFileName,
 	for (int i = 0; i < commCharacterList->NumElements(); i++) {
 		
 		CommunicationCharacteristics *commCharacter = commCharacterList->Nth(i);
-		const char *dependencyName = commCharacter->getSyncRequirement()->getDependencyArc()->getArcName();
+		SyncRequirement *syncReq = commCharacter->getSyncRequirement();
+		const char *dependencyName = syncReq->getDependencyArc()->getArcName();
 		const char *varName = commCharacter->getVarName();
 		DataStructure *structure = rootLps->getStructure(varName);
 		Type *varType = structure->getType();
@@ -831,7 +849,22 @@ void generateCommunicatorMapFn(const char *headerFileName,
 		fnBody << ")" << stmtSeparator;
 		fnBody << indent << "if (communicator" << i << " != NULL) {\n";
 		fnBody << doubleIndent << "communicator" << i <<  "->setLogFile(&logFile)" << stmtSeparator;
-		fnBody << doubleIndent << "communicator" << i << "->setupCommunicator()" << stmtSeparator;
+		fnBody << doubleIndent << "communicator" << i;
+		if (array == NULL) {
+			// scalar communicator needs not to bother about segments that they do not directly interact with
+			fnBody << "->setupCommunicator(false)";
+		} else {
+			// for arrays, only up-propagation and down-propagation syncs need to be mindfull of communications
+			// among other segments because of the collective mode of communication
+			UpPropagationSync *upSync = dynamic_cast<UpPropagationSync*>(syncReq);
+			DownPropagationSync *downSync = dynamic_cast<DownPropagationSync*>(syncReq);
+			if (upSync != NULL || downSync != NULL) {
+				fnBody << "->setupCommunicator(true)";
+			} else {
+				fnBody << "->setupCommunicator(false)";
+			}
+		}
+		fnBody << stmtSeparator;
 		fnBody << doubleIndent << "communicatorMap->Enter(\"" << dependencyName << "\"" << paramSeparator;
 		fnBody << "communicator" << i << ")" << stmtSeparator;
 		fnBody << indent << "}\n";	

@@ -293,15 +293,9 @@ std::vector<int> *CommBufferManager::getParticipantsTags() {
 		CommBuffer *buffer = commBufferList->Nth(i);
 		DataExchange *exchange = buffer->getExchange();
 		std::vector<int> senderTags = exchange->getSender()->getSegmentTags();
-		for (int j = 0; j < senderTags.size(); j++) {
-			int currentTag = senderTags.at(j);
-			binsearch::insertIfNotExist(participantTags, currentTag);
-		}
+		binsearch::addThoseNotExist(participantTags, &senderTags);
 		std::vector<int> receiverTags = exchange->getReceiver()->getSegmentTags();
-		for (int j = 0; j < receiverTags.size(); j++) {
-			int currentTag = receiverTags.at(j);
-			binsearch::insertIfNotExist(participantTags, currentTag);
-		}
+		binsearch::addThoseNotExist(participantTags, &receiverTags);
 	}
 	return participantTags;
 }

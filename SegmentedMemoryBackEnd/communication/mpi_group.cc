@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <vector>
 #include "mpi_group.h"
@@ -13,7 +14,7 @@ SegmentGroup::SegmentGroup(vector<int> segments) {
         mpiCommunicator = MPI_COMM_WORLD;
 }
 
-void SegmentGroup::setupCommunicator() {
+void SegmentGroup::setupCommunicator(std::ofstream &log) {
 
         int segmentRank, segmentCount;
         MPI_Comm_rank(MPI_COMM_WORLD, &segmentRank);

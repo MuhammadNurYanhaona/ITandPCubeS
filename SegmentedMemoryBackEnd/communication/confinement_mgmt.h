@@ -196,6 +196,9 @@ class DataExchange {
 	// buffer type selection at a particular context. 
 	bool isIntraSegmentExchange(int localSegmentTag);
 
+	// This tells if the data exchange has the current segment as either sender or receiver, or none
+	bool involvesLocalSegment(int localSegmentTag);
+
 	// These two functions are used to reduce the number of data exchanges when some of them are exchanging the
 	// same data but between different sender-receiver pair. The first function compares if the data contents are
 	// the same for two data exchanges and the second function adds the segment tags from the second pair to the
@@ -233,6 +236,7 @@ class CrossSegmentInteractionSpec {
 
 	List<DataExchange*> *generateSendExchanges();
 	List<DataExchange*> *generateReceiveExchanges();
+	List<DataExchange*> *generateRemoteExchanges();
 
 	Participant *getRemoteSender(int listIndex) { return remoteSenders->Nth(listIndex); }
 	Participant *getRemoteReceiver(int listIndex) { return remoteReceivers->Nth(listIndex); }
