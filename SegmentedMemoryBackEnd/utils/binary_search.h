@@ -58,7 +58,7 @@ namespace binsearch {
 		return false;
 	}
 	
-	inline bool addThoseNotExist(std::vector<int> *destination, std::vector<int> *source) {
+	inline void addThoseNotExist(std::vector<int> *destination, std::vector<int> *source) {
 		for (int i = 0; i < source->size(); i++) {
 			insertIfNotExist(destination, source->at(i));
 		}
