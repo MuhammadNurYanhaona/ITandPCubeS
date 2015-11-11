@@ -289,8 +289,6 @@ void UpSyncCommunicator::sendData() {
 	// sender segment
 	List<CommBuffer*> *sendBuffers = getSortedList(false);
 	CommBuffer *sendBuffer = sendBuffers->Nth(0);
-	char *data = sendBuffer->getData();
-	int bufferSize = sendBuffer->getBufferSize();
 	DataExchange *exchange = sendBuffer->getExchange();
 
 	// for the local data transfer case, just write data from buffer to operating memory as reading has been already 
@@ -298,6 +296,8 @@ void UpSyncCommunicator::sendData() {
 	if (exchange->getReceiver()->hasSegmentTag(localSegmentTag)) {
 		sendBuffer->writeData();
 	} else {
+		char *data = sendBuffer->getData();
+		int bufferSize = sendBuffer->getBufferSize();
 		MPI_Comm mpiComm = segmentGroup->getCommunicator();
 		int participants = segmentGroup->getParticipantsCount();
 		int receiverSegment = exchange->getReceiver()->getSegmentTags()[0];
