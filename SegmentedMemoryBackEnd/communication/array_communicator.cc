@@ -120,7 +120,7 @@ void GhostRegionSyncCommunicator::setupCommunicator(bool includeNonInteractingSe
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
-	*logFile << "Setup done for Ghost-region Sync Communicator for " << dependencyName < "\n";
+	*logFile << "\tSetup done for Ghost-region Sync Communicator for " << dependencyName < "\n";
 	logFile->flush();
 }
 
@@ -246,7 +246,7 @@ void UpSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 	
 	Communicator::setupCommunicator(includeNonInteractingSegments);
 
-	*logFile << "setting up the mode for up-sync communicator for " << dependencyName << "\n";
+	*logFile << "\tsetting up the mode for up-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
 
 	CommBuffer *buffer = commBufferList->Nth(0);
@@ -279,7 +279,7 @@ void UpSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 		commMode = (gather == 1) ? GATHER_V : SEND_RECEIVE;
 	}
 	
-	*logFile << "mode setup done for up-sync communicator for " << dependencyName << "\n";
+	*logFile << "\tmode setup done for up-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
 }
 
@@ -430,7 +430,7 @@ void DownSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments)
 	
 	Communicator::setupCommunicator(includeNonInteractingSegments);
 	
-	*logFile << "setting up the mode for down-sync communicator for " << dependencyName << "\n";
+	*logFile << "\tsetting up the mode for down-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
 	
 	int senderTag = commBufferList->Nth(0)->getExchange()->getSender()->getSegmentTags()[0];
@@ -461,7 +461,7 @@ void DownSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments)
 		commMode = (scatter == 1) ? SCATTER_V : BROADCAST;
 	}
 	
-	*logFile << "mode setup done for down-sync communicator for " << dependencyName << "\n";
+	*logFile << "\tmode setup done for down-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
 }
 
@@ -588,7 +588,7 @@ void CrossSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
-	*logFile << "Setup done for Cross-Sync Communicator for " << dependencyName << "\n";
+	*logFile << "\tSetup done for Cross-Sync Communicator for " << dependencyName << "\n";
 	logFile->flush();
 }
  
@@ -597,7 +597,7 @@ void CrossSyncCommunicator::sendData() {
 	List<CommBuffer*> *localBuffers = new List<CommBuffer*>;
 	List<CommBuffer*> *remoteBuffers = new List<CommBuffer*>;
 
-	seperateLocalAndRemoteBuffers(localSegmentTag,localBuffers, remoteBuffers);
+	seperateLocalAndRemoteBuffers(localSegmentTag, localBuffers, remoteBuffers);
 	
 	// write the local buffers into operating memory; as in other cases, reading has been done already in some earlier function call
 	for (int i = 0; i < localBuffers->NumElements(); i++) {
@@ -607,7 +607,20 @@ void CrossSyncCommunicator::sendData() {
 
 	// issue asynchronous receives first, when applicable
 	MPI_Request *receiveRequests = NULL;
-	List<CommBuffer*> *remoteReceives = getSortedList(true, remoteBuffers);
+	// Note that in some receiver buffers, the current segment may be listed as sender among the group of possible senders. This 
+	// happens when the sender side of the cross-sync has replication somewhere in the partition hierarchy. Therefore, the current
+	// segment may be sending data to itself or receiving updates from some other segment for a replicated data part. If the send
+	// is invoked by the current segment, as it has been done here, then the assumption is that the current segment has updated the
+	// replicated data. Hence, communication buffers having the current segment as a possible sender should be removed from the
+	// list before issuing remote receives. 
+	List<CommBuffer*> *activeReceives = getSortedList(true, remoteBuffers);
+	List<CommBuffer*> *remoteReceives = new List<CommBuffer*>;
+	for (int i = 0; i < activeReceives->NumElements(); i++) {
+		CommBuffer *buffer = activeReceives->Nth(i);
+		if (!buffer->isSendActivated()) {
+			remoteReceives->Append(buffer);
+		}
+	}
 	int receiveCount = remoteReceives->NumElements();
 	if (receiveCount > 0) {
 		receiveRequests = issueAsyncReceives(remoteReceives);		
@@ -631,6 +644,7 @@ void CrossSyncCommunicator::sendData() {
 	int requestIndex = 0;
 	for (int i = 0; i < remoteSends->NumElements(); i++) {
 		CommBuffer *buffer = remoteSends->Nth(i);
+		int bufferTag = buffer->getBufferTag();
 		vector<int> receiverSegments = buffer->getExchange()->getReceiver()->getSegmentTags();
 		for (int j = 0; j < receiverSegments.size(); j++) {
 			int segmentTag = receiverSegments.at(j);
@@ -644,7 +658,8 @@ void CrossSyncCommunicator::sendData() {
 			int receiver =segmentGroup->getRank(segmentTag);
 			char *data = buffer->getData();
 			int bufferSize = buffer->getBufferSize();
-			int status = MPI_Isend(data, bufferSize, MPI_CHAR, receiver, 0, mpiComm, &sendRequests[requestIndex]);
+			int status = MPI_Isend(data, bufferSize, MPI_CHAR, 
+					receiver, bufferTag, mpiComm, &sendRequests[requestIndex]);
 			if (status != MPI_SUCCESS) {
 				cout << "Segment " << localSegmentTag << ": could not issue asynchronous send\n";
 				exit(EXIT_FAILURE);
@@ -675,6 +690,7 @@ void CrossSyncCommunicator::sendData() {
 
 	delete remoteBuffers;
 	delete remoteSends;
+	delete activeReceives;
 	delete remoteReceives;
 	if (receiveCount > 0) delete[] receiveRequests;
 	delete[] sendRequests;
@@ -719,18 +735,10 @@ MPI_Request *CrossSyncCommunicator::issueAsyncReceives(List<CommBuffer*> *remote
 
 	for (int i = 0; i < remoteReceiveBuffers->NumElements(); i++) {
 		CommBuffer *buffer = remoteReceiveBuffers->Nth(i);
-
-		// Notice that the assumption here is that there is only one sender par buffer. This needs to be changed for a more
-		// flexible implementation as there might be replication in-between the two LPSes getting synchronized through this
-		// communicator. A flexible implementation should somehow setup tags for different buffers and the receiver should 
-		// wait on the tag (using specific tag combined with MPI_ANY_SOURCE sender) of the buffer instead of on a particular
-		// sender segment.
-		int senderSegment = buffer->getExchange()->getSender()->getSegmentTags()[0];
-		int sender = segmentGroup->getRank(senderSegment);
-
+		int bufferTag = buffer->getBufferTag();
 		int bufferSize = buffer->getBufferSize();
 		char *data = buffer->getData();
-		int status = MPI_Irecv(data, bufferSize, MPI_CHAR, sender, 0, mpiComm, &receiveRequests[i]);
+		int status = MPI_Irecv(data, bufferSize, MPI_CHAR, MPI_ANY_SOURCE, bufferTag, mpiComm, &receiveRequests[i]);
                 if (status != MPI_SUCCESS) {
                 	cout << "Segment " << localSegmentTag << ": could not issue asynchronous receive\n";
 			exit(EXIT_FAILURE);

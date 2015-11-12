@@ -819,6 +819,9 @@ void generateCommunicatorMapFn(const char *headerFileName,
 	// instantiate a communicator map
 	fnBody << indent << "Hashtable<Communicator*> *communicatorMap = new Hashtable<Communicator*>";
 	fnBody << stmtSeparator;
+	
+	// determine the number of segments in the machine to be used for setting up communication buffer tags
+	fnBody << indent << "int segmentCount = Total_Threads / Threads_Per_Segment" << stmtSeparator << "\n";
 
 	// iterate over the list of communication characteristics and invoke appropriate function to create a communicator
 	// each entry in the list
@@ -849,6 +852,8 @@ void generateCommunicatorMapFn(const char *headerFileName,
 		fnBody << ")" << stmtSeparator;
 		fnBody << indent << "if (communicator" << i << " != NULL) {\n";
 		fnBody << doubleIndent << "communicator" << i <<  "->setLogFile(&logFile)" << stmtSeparator;
+		fnBody << doubleIndent << "communicator" << i << "->setupBufferTags(" << i + 1;
+		fnBody << paramSeparator << "segmentCount)" << stmtSeparator;
 		fnBody << doubleIndent << "communicator" << i;
 		if (array == NULL) {
 			// scalar communicator needs not to bother about segments that they do not directly interact with

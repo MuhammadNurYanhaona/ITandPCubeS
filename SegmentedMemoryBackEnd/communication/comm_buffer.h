@@ -73,12 +73,16 @@ class CommBuffer {
 	// right part and the right location for update within it
 	DataItemConfig *senderDataConfig;
 	DataItemConfig *receiverDataConfig;
+	
+	// a buffer identifier to be used as tag for communications if needed
+	int bufferTag;
   public:
 	CommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	virtual ~CommBuffer() {}
 	DataExchange *getExchange() { return dataExchange; }
 	int getBufferSize() { return elementCount * elementSize; }
 	int compareTo(CommBuffer *other, bool forReceive);
+	int getBufferTag() { return bufferTag; }
 	
 	// should be overriden by buffer types that has a physical storage for holding data; the default is to through a 
 	// fault
@@ -96,6 +100,9 @@ class CommBuffer {
 	// these two functions tell if the current segment is sending data, receiving data, or both
 	bool isSendActivated();
 	bool isReceiveActivated();
+
+	// function to setup the buffer tag
+	void setBufferTag(int prefix, int digitsForSegment);
   protected:
 	ExchangeIterator *getIterator() { return new ExchangeIterator(dataExchange); }
 };

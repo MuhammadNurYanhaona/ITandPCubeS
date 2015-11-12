@@ -4,6 +4,7 @@
 #include "communicator.h"
 #include <iostream>
 #include <cstdlib>
+#include <sstream>
 
 //-------------------------------------------------------------- Send Barrier ------------------------------------------------------------/
 
@@ -68,10 +69,22 @@ Communicator::Communicator(int localSegmentTag,
 		receiveBarrier = NULL;
 	}
 	iterationNo = 0;
+	communicatorId = 0;
+}
+
+void Communicator::setupBufferTags(int communicatorId, int totalSegmentsInMachine) {
+	this->communicatorId = communicatorId;
+	std::ostringstream digitStr;
+	digitStr << totalSegmentsInMachine;
+	int digitsForSegmentId = digitStr.str().length();
+	for (int i = 0; i < commBufferList->NumElements(); i++) {
+		CommBuffer *buffer = commBufferList->Nth(i);
+		buffer->setBufferTag(communicatorId, digitsForSegmentId);
+	}
 }
 
 void Communicator::setupCommunicator(bool includeNonInteractingSegments) {
-	*logFile << "Setting up communicator for " << dependencyName << "\n";
+	*logFile << "\tSetting up communicator for " << dependencyName << "\n";
 	logFile->flush();
 	if (includeNonInteractingSegments) {
         	segmentGroup = new SegmentGroup(*participantSegments);
@@ -81,7 +94,7 @@ void Communicator::setupCommunicator(bool includeNonInteractingSegments) {
 		delete interactingParticipants;
 	}
         segmentGroup->setupCommunicator(*logFile);
-	*logFile << "Setup done for communicator for " << dependencyName << "\n";
+	*logFile << "\tSetup done for communicator for " << dependencyName << "\n";
 	logFile->flush();
 }
 

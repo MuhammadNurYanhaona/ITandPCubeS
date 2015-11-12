@@ -67,10 +67,16 @@ class Communicator : public CommBufferManager {
 	std::vector<int> *participantSegments;
 	// a stream for logging events on the communicator
 	std::ofstream *logFile;
+	// a communicator Id to be used as tag if needed
+	int communicatorId;
   public:
 	Communicator(int localSegmentTag, const char *dependencyName, int localSenderPpus, int localReceiverPpus);
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	void setParticipants(std::vector<int> *participants) { this->participantSegments = participants; }
+
+	// sets up the tags in each communication buffer that will be used during MPI communications in some communicator types; it
+	// also assign the communicator an ID which can also be used as a tag in some contexts
+	void setupBufferTags(int communicatorId, int totalSegmentsInMachine);
 
 	// this function should be overriden to setup any platform specific communication resource, if needed 
 	virtual void setupCommunicator(bool includeNonInteractingSegments);

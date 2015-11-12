@@ -8,6 +8,8 @@
 #include "../utils/binary_search.h"
 
 #include <iostream>
+#include <iomanip>
+#include <sstream>
 #include <cstdlib>
 #include <vector>
 #include <cstring>
@@ -31,6 +33,8 @@ CommBuffer::CommBuffer(DataExchange *exchange, SyncConfig *syncConfig) {
 	receiverTree = confinementConfig->getReceiverPartTree();
 	senderDataConfig = confinementConfig->getSenderConfig();
 	receiverDataConfig = confinementConfig->getReceiverConfig();
+
+	bufferTag = 0;
 }
 
 bool CommBuffer::isSendActivated() {
@@ -53,6 +57,19 @@ char *CommBuffer::getData() {
 void CommBuffer::setData(char *data) {
 	std::cout << "buffer content reference cannot be set in all communication buffer types";
 	std::exit(EXIT_FAILURE);
+}
+
+void CommBuffer::setBufferTag(int prefix, int digitsForSegment) {
+	
+	int firstSenderTag = dataExchange->getSender()->getSegmentTags().at(0);
+	int firstReceiverTag = dataExchange->getReceiver()->getSegmentTags().at(0);
+
+	ostringstream ostream;
+	ostream << prefix;
+	ostream << std::setfill('0') << std::setw(digitsForSegment) << firstSenderTag;
+	ostream << std::setfill('0') << std::setw(digitsForSegment) << firstReceiverTag;
+	istringstream istream(ostream.str());
+	istream >> this->bufferTag;
 }
 
 //---------------------------------------------- Pre-processed Communication Buffer ----------------------------------------------/
