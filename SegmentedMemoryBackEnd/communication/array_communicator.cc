@@ -26,6 +26,9 @@ ReplicationSyncCommunicator::ReplicationSyncCommunicator(int localSegmentTag,
 }
 
 void ReplicationSyncCommunicator::sendData() {
+
+	*logFile << "\tReplication-sync communicator is sending data for " << dependencyName << "\n";
+	logFile->flush();
 	
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
         int participants = segmentGroup->getParticipantsCount();
@@ -49,10 +52,16 @@ void ReplicationSyncCommunicator::sendData() {
                 cout << "Segment " << localSegmentTag << ": could not broadcast replicated update\n";
                 exit(EXIT_FAILURE);
         }
+	
+	*logFile << "\tReplication-sync communicator sent data for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 void ReplicationSyncCommunicator::receiveData() {
 	
+	*logFile << "\tReplication-sync communicator is waiting for data for " << dependencyName << "\n";
+	logFile->flush();
+
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
         int participants = segmentGroup->getParticipantsCount();
 
@@ -84,6 +93,9 @@ void ReplicationSyncCommunicator::receiveData() {
 			exit(EXIT_FAILURE);
 		}
 	}
+	
+	*logFile << "\tReplication-sync communicator received data for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 
@@ -125,6 +137,9 @@ void GhostRegionSyncCommunicator::setupCommunicator(bool includeNonInteractingSe
 }
 
 void GhostRegionSyncCommunicator::performTransfer() {
+	
+	*logFile << "\tGhost-sync communicator is communicating data for " << dependencyName << "\n";
+	logFile->flush();
 	
 	List<CommBuffer*> *localBufferList = new List<CommBuffer*>;
 	List<CommBuffer*> *remoteBufferList = new List<CommBuffer*>;
@@ -204,6 +219,9 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	delete remoteReceiveBuffers;
 	delete[] recvRequests;
 	delete[] sendRequests;
+	
+	*logFile << "\tGhost-sync communicator sent-received data for " << dependencyName << "\n";
+	logFile->flush();
 }	
 
 //----------------------------------------------------------- Up Sync Communicator ------------------------------------------------------------/
@@ -285,6 +303,9 @@ void UpSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 
 void UpSyncCommunicator::sendData() {
 	
+	*logFile << "\tUp-sync communicator is sending data for " << dependencyName << "\n";
+	logFile->flush();
+	
 	// note that the logic of confinement and upward sync enforce that there is just one communication buffer in each
 	// sender segment
 	List<CommBuffer*> *sendBuffers = getSortedList(false);
@@ -318,9 +339,15 @@ void UpSyncCommunicator::sendData() {
                 	}
 		}
 	}
+	
+	*logFile << "\tUp-sync communicator sent data for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 void UpSyncCommunicator::receiveData() {
+
+	*logFile << "\tUp-sync communicator is waiting for data for " << dependencyName << "\n";
+	logFile->flush();
 
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int myRank = segmentGroup->getRank(localSegmentTag);
@@ -344,6 +371,9 @@ void UpSyncCommunicator::receiveData() {
                         exit(EXIT_FAILURE);
                 }
 	}
+	
+	*logFile << "\tUp-sync communicator received data for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 void UpSyncCommunicator::allocateAndLinkGatherBuffer() {
@@ -467,6 +497,9 @@ void DownSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments)
 
 void DownSyncCommunicator::sendData() {
 
+	*logFile << "\tDown-sync communicator is sending data for " << dependencyName << "\n";
+	logFile->flush();
+	
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int myRank = segmentGroup->getRank(localSegmentTag);
 
@@ -499,9 +532,15 @@ void DownSyncCommunicator::sendData() {
                         exit(EXIT_FAILURE);
                 }
 	}
+	
+	*logFile << "\tDown-sync communicator sent data for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 void DownSyncCommunicator::receiveData() {
+	
+	*logFile << "\tDown-sync communicator is waiting for data for " << dependencyName << "\n";
+	logFile->flush();
 
 	// there will be one communication buffer per receiver regardless of the communication mode on a down-sync as there is
 	// just one sender
@@ -526,6 +565,9 @@ void DownSyncCommunicator::receiveData() {
                         exit(EXIT_FAILURE);
                 }
 	}
+
+	*logFile << "\tDown-sync communicator received data for " << dependencyName << "\n";
+	logFile->flush();
 } 
 
 void DownSyncCommunicator::allocateAndLinkScatterBuffer() {
@@ -594,6 +636,9 @@ void CrossSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments
  
 void CrossSyncCommunicator::sendData() {
 
+	*logFile << "\tCross-sync communicator is sending (and receiving) data for " << dependencyName << "\n";
+	logFile->flush();
+	
 	List<CommBuffer*> *localBuffers = new List<CommBuffer*>;
 	List<CommBuffer*> *remoteBuffers = new List<CommBuffer*>;
 
@@ -694,9 +739,15 @@ void CrossSyncCommunicator::sendData() {
 	delete remoteReceives;
 	if (receiveCount > 0) delete[] receiveRequests;
 	delete[] sendRequests;
+	
+	*logFile << "\tCross-sync communicator sent (and received) data for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 void CrossSyncCommunicator::receiveData() {
+
+	*logFile << "\tCross-sync communicator is waiting for data for " << dependencyName << "\n";
+	logFile->flush();
 	
 	List<CommBuffer*> *localBuffers = new List<CommBuffer*>;
 	List<CommBuffer*> *remoteBuffers = new List<CommBuffer*>;
@@ -725,6 +776,9 @@ void CrossSyncCommunicator::receiveData() {
 	delete remoteBuffers;
 	delete remoteReceives;
 	if (receiveCount > 0) delete[] receiveRequests;
+	
+	*logFile << "\tCross-sync communicator received data for " << dependencyName << "\n";
+	logFile->flush();
 }
 
 MPI_Request *CrossSyncCommunicator::issueAsyncReceives(List<CommBuffer*> *remoteReceiveBuffers) {
