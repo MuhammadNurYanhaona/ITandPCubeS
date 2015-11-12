@@ -129,7 +129,7 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFileName,
 
 void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
                 const char *programFileName, const char *initials, 
-		MappingNode *mappingRoot, bool involvesSynchronization) {
+		MappingNode *mappingRoot, bool involvesSynchronization, int communicatorCount) {
 
 	std::cout << "Generating the thread::run function for the task\n";
 	
@@ -184,6 +184,15 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 		programFile << "\n\t// initialize thread's sync primitives holder data structure\n";
 		programFile << "\tThreadSyncPrimitive *threadSync = ";
 		programFile << "getSyncPrimitives(threadState->getThreadIds());\n";
+	}
+
+	// if the task involves communications then create communicator counter variables for each data dependency
+	// requiring communication
+	if (communicatorCount > 0) {
+		programFile << "\n\t// create a counter variables for communicators\n";
+		for (int i = 0; i < communicatorCount; i++) {
+			programFile << "\tint commCounter" << i << " = 0;\n";
+		}
 	}
 
 	// create a local part-dimension object for probable array dimension based range or assignment expressions

@@ -26,6 +26,7 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFile,
 /* function definition for generating the thread::run function */
 void generateThreadRunFunction(TaskDef *taskDef, const char *headerFile,
 		const char *programFile, const char *initials,
-		MappingNode *mappingRoot, bool involvesSynchronization);	
+		MappingNode *mappingRoot, bool involvesSynchronization, 
+		int communicatorCount);	
 
 #endif

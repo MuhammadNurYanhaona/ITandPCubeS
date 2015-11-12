@@ -162,8 +162,9 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	List<CommunicationCharacteristics*> *commCharacterList 
 			= generateFnsForConfinementConstrConfigs(headerFile, 
 					programFile, taskDef, pcubesConfig);
+	int communicatorCount = commCharacterList->NumElements();
 	generateAllDataExchangeFns(headerFile, programFile, taskDef, commCharacterList);
-	if (commCharacterList->NumElements() > 0) {
+	if (communicatorCount > 0) {
 		generateAllCommunicators(headerFile, programFile, taskDef, commCharacterList);
 		generateCommunicatorMapFn(headerFile, programFile, taskDef, commCharacterList);
 	}
@@ -187,7 +188,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// generate run function for threads
 	generateThreadRunFunction(taskDef, headerFile, 
 			programFile, initials, mappingConfig, 
-			syncManager->involvesSynchronization());
+			syncManager->involvesSynchronization(), communicatorCount);
 
 	// generate data structure and functions for Pthreads
 	generateArgStructForPthreadRunFn(taskDef->getName(), headerFile);

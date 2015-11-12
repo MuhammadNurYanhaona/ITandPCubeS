@@ -759,14 +759,19 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 	// Write the code for forwards communication requirements.
 	for (int i = 0; i < forwardDependencies->NumElements(); i++) {
 		SyncRequirement *comm = forwardDependencies->Nth(i);
+		int commIndex = comm->getIndex();
 		Space *dependentLps = comm->getDependentLps();
 		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << dependentLps->getName();
 		stream << ")) {\n";
-		stream << indentStr.str() << '\t' << "Communicator *communicator = threadState->getCommunicator(\"";
+		stream << indentStr.str() << indent << "Communicator *communicator = threadState->getCommunicator(\"";
 		stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
-		stream << indentStr.str() << '\t' << "communicator->receive(REQUESTING_COMMUNICATION";
-		stream << paramSeparator << "repeatIteration)" << stmtSeparator; 
+		stream << indentStr.str() << indent << "communicator->receive(REQUESTING_COMMUNICATION";
+		stream << paramSeparator << "commCounter" << commIndex << ")" << stmtSeparator; 
 		stream << indentStr.str() << "}\n";
+
+		// the counter should be advanced regardless of this PPU's participation in communication to keep the counter
+		// value uniform across all PPUs and segments
+		stream << indentStr.str() << "commCounter" << commIndex << "++" << stmtSeparator;
 	}
 
 	// write the code for backword sync requirements within an if block
@@ -774,16 +779,21 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 		stream << indentStr.str() << "if (repeatIteration > 0) {\n";
 		for (int i = 0; i < backwardDependencies->NumElements(); i++) {
 			SyncRequirement *comm = backwardDependencies->Nth(i);
+			int commIndex = comm->getIndex();
 			Space *dependentLps = comm->getDependentLps();
-			stream << indentStr.str() << "\tif (threadState->isValidPpu(Space_" << dependentLps->getName();
+			stream << indentStr.str() << indent; 
+			stream << "if (threadState->isValidPpu(Space_" << dependentLps->getName();
 			stream << ")) {\n";
-			stream << indentStr.str() << "\t\t";
+			stream << indentStr.str() << doubleIndent;
 			stream << "Communicator *communicator = threadState->getCommunicator(\"";
 			stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
-			stream << indentStr.str() << "\t\t";
+			stream << indentStr.str() << doubleIndent;
 			stream << "communicator->receive(REQUESTING_COMMUNICATION";
-			stream << paramSeparator << "repeatIteration)" << stmtSeparator; 
-			stream << indentStr.str() << "\t}\n";
+			stream << paramSeparator << "commCounter" << commIndex << ")" << stmtSeparator; 
+			stream << indentStr.str() << indent << "}\n";
+
+			// again the counter is advanced outside the if condition to keep it in sync with all other PPUs
+			stream << indentStr.str() << indent << "commCounter" << commIndex << "++" << stmtSeparator;
 		}
 		stream << indentStr.str() << "}\n";
 	}
@@ -979,6 +989,7 @@ void CompositeStage::generateDataSendsForGroup(std::ofstream &stream, int indent
 	for (int i = 0; i < commRequirements->NumElements(); i++) {
 		
 		SyncRequirement *currentComm = commRequirements->Nth(i);
+		int commIndex = currentComm->getIndex();
 		const char *counterVarName = currentComm->getDependencyArc()->getArcName();
 		
 		// check if the current PPU is a valid candidate for signaling update
@@ -996,9 +1007,11 @@ void CompositeStage::generateDataSendsForGroup(std::ofstream &stream, int indent
 		// it should only report that it has reached this particular execution point.
 		stream << indentStr.str() << indent << "if (" << counterVarName << " > 0) {\n";
 		stream << indentStr.str() << doubleIndent << "communicator->send(";
-		stream << "REQUESTING_COMMUNICATION" << paramSeparator << "repeatIteration)" << stmtSeparator;
+		stream << "REQUESTING_COMMUNICATION" << paramSeparator;
+		stream << "commCounter" << commIndex <<  ")" << stmtSeparator;
 		stream << indentStr.str() << indent << "} else communicator->send(";
-		stream << "PASSIVE_REPORTING" << paramSeparator << "repeatIteration)" << stmtSeparator;
+		stream << "PASSIVE_REPORTING" << paramSeparator;
+		stream << "commCounter" << commIndex << ")" << stmtSeparator;
 		
 		// then reset the counter	 
 		stream << indentStr.str() << indent << counterVarName << " = 0" << stmtSeparator;

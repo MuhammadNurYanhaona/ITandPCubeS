@@ -41,6 +41,7 @@ SyncRequirement::SyncRequirement(const char *syncTypeName) {
 	this->dependentLps = NULL;
 	this->waitingComputation = NULL;
 	this->arc = NULL;
+	this->index = -1;
 }
 
 void SyncRequirement::print(int indent) {

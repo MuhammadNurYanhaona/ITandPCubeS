@@ -872,7 +872,10 @@ void generateCommunicatorMapFn(const char *headerFileName,
 		fnBody << stmtSeparator;
 		fnBody << doubleIndent << "communicatorMap->Enter(\"" << dependencyName << "\"" << paramSeparator;
 		fnBody << "communicator" << i << ")" << stmtSeparator;
-		fnBody << indent << "}\n";	
+		fnBody << indent << "}\n";
+
+		// at this time set up the index for the sync requirement to maintain a runtime counter for its usage
+		syncReq->setIndex(i);	
 	}
 
 	// return the map

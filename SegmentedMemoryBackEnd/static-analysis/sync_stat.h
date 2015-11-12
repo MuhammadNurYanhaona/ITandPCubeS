@@ -76,6 +76,11 @@ class SyncRequirement {
 	Space *dependentLps;
 	FlowStage *waitingComputation;
 	DependencyArc *arc;
+	
+	// This a property used for code generation. It is needed to maintain and update a counter this 
+	// dependency. The current value of that counter determines how many times the synch primitive or 
+	// the communicator for this dependency has been used before.
+	int index;
   public:
 	SyncRequirement(const char *syncTypeName);
 	virtual ~SyncRequirement() {}
@@ -87,6 +92,8 @@ class SyncRequirement {
 	FlowStage *getWaitingComputation() { return waitingComputation; }
 	void setDependencyArc(DependencyArc *arc) { this->arc = arc; }
 	DependencyArc *getDependencyArc() { return arc; }
+	void setIndex(int index) { this->index = index; }
+	int getIndex() { return index; }
 	bool isActive() { return arc->isActive(); }
 	void deactivate() { arc->deactivate(); }
 	void signal() { arc->signal(); }	
