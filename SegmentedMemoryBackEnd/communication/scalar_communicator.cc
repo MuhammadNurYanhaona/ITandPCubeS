@@ -55,8 +55,8 @@ ScalarReplicaSyncCommunicator::ScalarReplicaSyncCommunicator(int localSegmentTag
 
 void ScalarReplicaSyncCommunicator::send() {
 	
-	*logFile << "\tScalar replica communicator is sending data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar replica communicator is sending data for " << dependencyName << "\n";
+	//logFile->flush();
 	
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int participants = segmentGroup->getParticipantsCount();	
@@ -77,14 +77,14 @@ void ScalarReplicaSyncCommunicator::send() {
 		exit(EXIT_FAILURE);
 	}
 	
-	*logFile << "\tScalar replica communicator sent data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar replica communicator sent data for " << dependencyName << "\n";
+	//logFile->flush();
 }
 
 void ScalarReplicaSyncCommunicator::receive() {
 	
-	*logFile << "\tScalar replica communicator is waiting for data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar replica communicator is waiting for data for " << dependencyName << "\n";
+	//logFile->flush();
 
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int participants = segmentGroup->getParticipantsCount();	
@@ -114,8 +114,8 @@ void ScalarReplicaSyncCommunicator::receive() {
 		}
 	}
 
-	*logFile << "\tScalar replica communicator received data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar replica communicator received data for " << dependencyName << "\n";
+	//logFile->flush();
 }
 
 //-------------------------------------------------------- Scalar Up Sync Communicator --------------------------------------------------/
@@ -138,8 +138,8 @@ ScalarUpSyncCommunicator::ScalarUpSyncCommunicator(int localSegmentTag,
 
 void ScalarUpSyncCommunicator::send() {
 	
-	*logFile << "\tScalar up-sync communicator is sending data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar up-sync communicator is sending data for " << dependencyName << "\n";
+	//logFile->flush();
 
 	int receiverSegment = receiverSegmentTags->at(0);
 	if (receiverSegment == localSegmentTag) return;
@@ -152,14 +152,14 @@ void ScalarUpSyncCommunicator::send() {
 		exit(EXIT_FAILURE);
 	}
 	
-	*logFile << "\tScalar up-sync communicator sent data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar up-sync communicator sent data for " << dependencyName << "\n";
+	//logFile->flush();
 }
 
 void ScalarUpSyncCommunicator::receive() {
 
-	*logFile << "\tScalar up-sync communicator is waiting for data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar up-sync communicator is waiting for data for " << dependencyName << "\n";
+	//logFile->flush();
 	
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int status = MPI_Recv(dataBuffer, dataSize, MPI_CHAR, MPI_ANY_SOURCE, 0, mpiComm, MPI_STATUS_IGNORE);
@@ -167,8 +167,9 @@ void ScalarUpSyncCommunicator::receive() {
 		cout << "could not receive update message from unknown sub-source\n";
 		exit(EXIT_FAILURE);
 	}
-	*logFile << "\tScalar up-sync communicator received data for " << dependencyName << "\n";
-	logFile->flush();
+
+	//*logFile << "\tScalar up-sync communicator received data for " << dependencyName << "\n";
+	//logFile->flush();
 }
 
 //------------------------------------------------------- Scalar Down Sync Communicator -------------------------------------------------/
@@ -191,8 +192,8 @@ ScalarDownSyncCommunicator::ScalarDownSyncCommunicator(int localSegmentTag,
 
 void ScalarDownSyncCommunicator::send() {
 	
-	*logFile << "\tScalar down-sync communicator is sending data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar down-sync communicator is sending data for " << dependencyName << "\n";
+	//logFile->flush();
 
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int rank = segmentGroup->getRank(localSegmentTag);
@@ -202,14 +203,14 @@ void ScalarDownSyncCommunicator::send() {
 		exit(EXIT_FAILURE);
 	}
 
-	*logFile << "\tScalar down-sync communicator sent data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar down-sync communicator sent data for " << dependencyName << "\n";
+	//logFile->flush();
 }
         
 void ScalarDownSyncCommunicator::receive() {
 	
-	*logFile << "\tScalar down-sync communicator is waiting for data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar down-sync communicator is waiting for data for " << dependencyName << "\n";
+	//logFile->flush();
 	
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
 	int broadcastingSegment = senderSegmentTags->at(0);
@@ -220,7 +221,7 @@ void ScalarDownSyncCommunicator::receive() {
 		exit(EXIT_FAILURE);
 	}
 	
-	*logFile << "\tScalar down-sync communicator received data for " << dependencyName << "\n";
-	logFile->flush();
+	//*logFile << "\tScalar down-sync communicator received data for " << dependencyName << "\n";
+	//logFile->flush();
 }
 
