@@ -39,7 +39,7 @@ bool ReceiveBarrier::shouldWait(SignalType signal, int iterationNo) {
 }
 
 void ReceiveBarrier::releaseFunction(int activeSignalsCount) {
-	if (communicator->shouldReceive(activeSignalsCount)) {
+	if (communicator->shouldReceive(activeSignalsCount, iterationNo)) {
 		executeReceive();
 	}
 }

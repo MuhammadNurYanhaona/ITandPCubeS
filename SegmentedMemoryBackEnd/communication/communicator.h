@@ -93,14 +93,16 @@ class Communicator : public CommBufferManager {
 
 	// By default, a PPU requesting a data reception only waits if the data has not been received yet for the iteration the
 	// PPU is currently in.
-	virtual bool shouldWaitOnReceive(SignalType receiveSignal, int iteration) { return iteration == iterationNo; }
+	virtual bool shouldWaitOnReceive(SignalType receiveSignal, int iteration) { return true; }
 
 	// By default, there must be at least one PPU that has reported that it has someting to send for the send barrier to execute
 	// send in its release function
 	virtual bool shouldSend(int sendRequestsCount) { return sendRequestsCount > 0; }
 	
 	// By default, any PPU waiting for data reception flags the need for issuing date receive on the communicator
-	virtual bool shouldReceive(int receiveRequestsCount) { return true; }
+	virtual bool shouldReceive(int receiveRequestsCount, int iteration) { 
+		return (iteration == iterationNo && receiveRequestsCount > 0); 
+	}
 	
 	// The two functions to be implemented by subclasses to do the actual platform specific data send and receive operations
 	virtual void sendData() = 0;
