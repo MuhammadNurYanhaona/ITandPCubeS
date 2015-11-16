@@ -15,8 +15,10 @@ using namespace std;
 
 SuperPart::SuperPart(List<int*> *partId, int dataDimensions) {
 	this->partId = new List<int*>;
+	Assert(this->partId != NULL && dataDimensions > 0);
 	for (int i = 0; i < partId->NumElements(); i++) {
 		int *idAtLevel = new int[dataDimensions];
+		Assert(idAtLevel != NULL);
 		for (int d = 0; d < dataDimensions; d++) {
 			idAtLevel[d] = partId->Nth(i)[d];
 		}
@@ -62,6 +64,7 @@ PartIterator *PartIdContainer::getIterator() {
 		container = ((PartListContainer *) container)->getNestedContainerAtIndex(0);
 	}
 	PartIterator *iterator = new PartIterator(partIdSteps);
+	Assert(iterator != NULL);
 	iterator->initiate(this);
 	return iterator;
 }
@@ -115,21 +118,27 @@ List<List<int*>*> *PartIdContainer::getAllPartIdsAtLevel(int levelNo,
 		int dataDimensions, List<int*> *partIdUnderConstruct, int previousLevel) {
 
 	if (levelNo != level) return NULL;
+	
+	Assert(dataDimensions > 0);
 	if (level != previousLevel) {
 		partIdUnderConstruct->Append(new int[dataDimensions]);
 	}
 
 	List<List<int*>*> *partIdList = new List<List<int*>*>;
+	Assert(partIdList != NULL);
 	int *lastLevelId = partIdUnderConstruct->Nth(partIdUnderConstruct->NumElements() - 1);
+	Assert(lastLevelId != NULL);
 	for (unsigned int i = 0; i < partArray.size(); i++) {
 		lastLevelId[dimNo] = partArray.at(i);
 
 		// note that here new part Ids have been generated afresh as the recursive process corrupts the
 		// partIdUnderConstruct list as it jumps from branch to branch in the part-hierarchy
 		List<int*> *partId = new List<int*>;
+		Assert(partId != NULL);
 		for (int l = 0; l < partIdUnderConstruct->NumElements(); l++) {
 			int *idAtLevel = partIdUnderConstruct->Nth(l);
 			int *newIdAtLevel = new int[dataDimensions];
+			Assert(newIdAtLevel != NULL);
 			for (int d = 0; d < dataDimensions; d++) {
 				newIdAtLevel[d] = idAtLevel[d];
 			}
@@ -163,7 +172,9 @@ bool PartContainer::insertPartId(List<int*> *partId,
 	int currentId = partId->Nth(level)[dimNo];
 	int insertIndex = binsearch::locatePointOfInsert(partArray, currentId);
 	partArray.insert(partArray.begin() + insertIndex, currentId);
-	dataPartList.insert(dataPartList.begin() + insertIndex, new SuperPart(partId, dataDimensions));
+	SuperPart *superPart = new SuperPart(partId, dataDimensions);
+	Assert(superPart != NULL);
+	dataPartList.insert(dataPartList.begin() + insertIndex, superPart);
 	return true;
 }
         
@@ -186,8 +197,11 @@ void PartContainer::replacePartAtIndex(SuperPart *repacement, int index) {
 
 void PartContainer::foldContainer(List<PartFolding*> *fold) {
 	List<Range*> *rangeList = new List<Range*>;
+	Assert(rangeList != NULL);
 	if (partArray.size() > 0) {
-		rangeList->Append(new Range(partArray[0]));
+		Range *range = new Range(partArray[0]);
+		Assert(range != NULL);
+		rangeList->Append(range);
 	}
 	int lastIndex = 0;
 	for (unsigned int i = 1; i < partArray.size(); i++) {
@@ -195,13 +209,17 @@ void PartContainer::foldContainer(List<PartFolding*> *fold) {
 		if (rangeList->Nth(lastIndex)->max == partId - 1) {
 			rangeList->Nth(lastIndex)->max = partId;
 		} else {
-			rangeList->Append(new Range(partId));
+			Range *range = new Range(partId);
+			Assert(range != NULL);
+			rangeList->Append(range);
 			lastIndex++;
 		}
 	}
 	while(rangeList->NumElements() > 0) {
 		Range *range = rangeList->Nth(0);
-		fold->Append(new PartFolding(range, dimNo, level));
+		PartFolding *partFolding = new PartFolding(range, dimNo, level);
+		Assert(partFolding != NULL);
+		fold->Append(partFolding);
 		rangeList->RemoveAt(0);
 		delete range;
 	}
@@ -277,6 +295,7 @@ bool PartListContainer::insertPartId(List<int*> *partId,
 		} else {
 			nextContainer = new PartContainer(dimOrder[position]);
 		}
+		Assert(nextContainer != NULL);
 		nextLevelContainers.insert(nextLevelContainers.begin() + insertIndex, nextContainer);
 		nextContainer->insertPartId(partId, dataDimensions, dimOrder, position);
 		return true;
@@ -315,6 +334,7 @@ SuperPart *PartListContainer::getPart(List<int*> *partId, PartIterator *iterator
 void PartListContainer::foldContainer(List<PartFolding*> *fold) {
 	for (unsigned int i = 0; i < partArray.size(); i++) {
 		PartFolding *contentFold = new PartFolding(partArray[i], dimNo, level);
+		Assert(contentFold != NULL);
 		nextLevelContainers[i]->foldContainer(contentFold->getDescendants());
 		int foldedEntries = fold->NumElements();
 		if (foldedEntries > 0) {
@@ -362,6 +382,7 @@ List<List<int*>*> *PartListContainer::getAllPartIdsAtLevel(int levelNo, int data
 		List<int*> *partIdUnderConstruct, int previousLevel) {
 
 	List<List<int*>*> *partIdList = new List<List<int*>*>;
+	Assert(partIdList != NULL);
 	if (level == levelNo) {
 		PartIdContainer *sampleChild = nextLevelContainers.at(0);
 		if (sampleChild->getLevel() != levelNo) {
@@ -371,6 +392,7 @@ List<List<int*>*> *PartListContainer::getAllPartIdsAtLevel(int levelNo, int data
 	}
 
 	if (level != previousLevel) {
+		Assert(dataDimensions > 0);
 		partIdUnderConstruct->Append(new int[dataDimensions]);
 	}
 	int *lastIdLevel = partIdUnderConstruct->Nth(partIdUnderConstruct->NumElements() - 1);
@@ -455,6 +477,7 @@ void PartIterator::initiate(PartIdContainer *topContainer) {
 
 void PartIterator::initiatePartIdTemplate(int dataDimensions, int idLevels) {
 	partIdTemplate = new List<int*>(idLevels);
+	Assert(partIdTemplate != NULL && idLevels > 0);
 	for (int i = 0; i < idLevels; i++) {
 		partIdTemplate->Append(new int[dataDimensions]);
 	}

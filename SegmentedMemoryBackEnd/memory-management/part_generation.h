@@ -16,6 +16,7 @@
 #include <vector>	
 
 #include "../utils/list.h"
+#include "../utils/utility.h"
 #include "../codegen/structure.h"
 #include "../partition-lib/partition.h"
 
@@ -143,7 +144,11 @@ class ReplicationConfig : public DimPartitionConfig {
 	int pickPartCount(int *lpuCount) { return 1; }
 	int getPartsCount(Dimension parentDimension) { return 1; }
 	Dimension getPartDimension(int partId, Dimension parentDimension) { return parentDimension; }		
-	PartitionInstr *getPartitionInstr() { return new VoidInstr(); }
+	PartitionInstr *getPartitionInstr() { 
+		PartitionInstr *instr = new VoidInstr();
+		Assert(instr != NULL);
+		return instr; 
+	}
 };
 
 /* configuration subclass corresponding to 'block_size' partition function; it takes a 'size' parameter */
@@ -187,7 +192,11 @@ class StrideConfig : public DimPartitionConfig {
 	int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
 			List<int> *partCountList, 
 			List<Dimension*> *partDimensionList);
-	PartitionInstr *getPartitionInstr() { return new StrideInstr(ppuCount); }
+	PartitionInstr *getPartitionInstr() { 
+		PartitionInstr *instr = new StrideInstr(ppuCount);
+		Assert(instr != NULL);
+		return instr; 
+	}
 };
 
 /* configuration subclass for 'block_stride' partition function that takes a 'block_size' parameter */

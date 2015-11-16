@@ -18,6 +18,7 @@ DataItems::DataItems(const char *name, int dimensionality, int epochCount) {
 	this->epochCount = epochCount;
 	this->ready = false;
 	this->dimConfigList = new List<DimPartitionConfig*>;
+	Assert(this->dimConfigList != NULL);
 	this->partitionConfig = NULL;
 	this->partsList = NULL;
 }
@@ -32,6 +33,7 @@ void DataItems::addDimPartitionConfig(int dimensionId, DimPartitionConfig *dimCo
 void DataItems::generatePartitionConfig() {
 	Assert(dimConfigList->NumElements() == dimensionality);
 	partitionConfig = new DataPartitionConfig(dimensionality, dimConfigList);
+	Assert(partitionConfig != NULL);
 	ready = true;
 }
 
@@ -88,6 +90,7 @@ void *ScalarDataItems::getVariable(int version) {
 LpsContent::LpsContent(int id) {
 	this->id = id;
 	this->dataItemsMap = new Hashtable<DataItems*>;
+	Assert(this->dataItemsMap != NULL);
 }
 
 void LpsContent::advanceItemEpoch(const char *varName) {
@@ -116,7 +119,10 @@ void LpsContent::addPartIterators(Hashtable<PartIterator*> *partIteratorMap) {
 
 //------------------------------------------------------------- Task Data ----------------------------------------------------------------/
 
-TaskData::TaskData() { lpsContentMap = new Hashtable<LpsContent*>; }
+TaskData::TaskData() { 
+	lpsContentMap = new Hashtable<LpsContent*>; 
+	Assert(lpsContentMap != NULL);
+}
 
 void TaskData::addLpsContent(const char *lpsId, LpsContent *content) { 
 	if (content != NULL) {
@@ -137,6 +143,7 @@ void TaskData::advanceItemEpoch(const char *lpsId, const char *varName) {
 
 Hashtable<PartIterator*> *TaskData::generatePartIteratorMap() {
 	Hashtable<PartIterator*> *map = new Hashtable<PartIterator*>;
+	Assert(map != NULL);
 	Iterator<LpsContent*> iterator = lpsContentMap->GetIterator();
 	LpsContent *lpsContent = NULL;
 	while ((lpsContent = iterator.GetNextValue()) != NULL) {

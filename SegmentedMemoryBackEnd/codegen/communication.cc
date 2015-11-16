@@ -60,8 +60,9 @@ void generateDistributionTreeFnForStructure(const char *varName,
 	
 	// first create the root of the distribution tree
 	fnBody << indent;
-	fnBody<< "BranchingContainer *rootContainer = new BranchingContainer(0, LpsDimConfig())";
+	fnBody << "BranchingContainer *rootContainer = new BranchingContainer(0, LpsDimConfig())";
 	fnBody << stmtSeparator;
+	fnBody << indent << "Assert(rootContainer != NULL)" << stmtSeparator;
 
 	// iterate over all segments
 	fnBody << indent << "for (int i = 0; i < segmentList->NumElements(); i++) {\n";
@@ -196,6 +197,7 @@ void generateFnForDistributionMap(std::ofstream &headerFile,
 	
 	fnBody << "{\n\n";
 	fnBody << indent << "PartDistributionMap *distributionMap = new PartDistributionMap()" << stmtSeparator;
+	fnBody << indent << "Assert(distributionMap != NULL)" << stmtSeparator;
 	for (int i = 0 ; i < varList->NumElements(); i++) {
 		const char *varName = varList->Nth(i);
 		fnBody << indent << "distributionMap->setDistributionForVariable(\"";
@@ -280,6 +282,7 @@ void generateConfinementConstrConfigFn(std::ofstream &headerFile,
 	fnBody << '\n' << indent << doubleIndent;
 	fnBody << "distributionTree)" << stmtSeparator;
 
+	fnBody << indent << "Assert(confinementConfig != NULL)" << stmtSeparator;
 	fnBody << indent << "return confinementConfig" << stmtSeparator;
 	fnBody << "}\n";
 
@@ -397,6 +400,7 @@ void generateFnForDataExchanges(std::ofstream &headerFile,
 
 	// instanciate a new list for data exchanges and pick up exchanges in it by traversing individual confinements
 	fnBody << indent << "List<DataExchange*> *dataExchangeList = new List<DataExchange*>" << stmtSeparator;
+	fnBody << indent << "Assert(dataExchangeList != NULL)" << stmtSeparator;
 	fnBody << indent << "for (int i = 0; i < confinementList->NumElements(); i++) {\n";
 	fnBody << doubleIndent << "Confinement *confinement = confinementList->Nth(i)" << stmtSeparator;
 	fnBody << doubleIndent << "List<DataExchange*> *confinementExchanges = confinement->getAllDataExchanges()";
@@ -500,7 +504,9 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 
 	// then create two vectors of participating segments in the sender and receiver sides
 	fnBody << '\n' << indent << "std::vector<int> *senderTags = new std::vector<int>" << stmtSeparator;
+	fnBody << indent << "Assert(senderTags != NULL)" << stmtSeparator;
 	fnBody << indent << "std::vector<int> *receiverTags = new std::vector<int>" << stmtSeparator;
+	fnBody << indent << "Assert(receiverTags != NULL)" << stmtSeparator;
 	fnBody << '\n' << indent << "for (int i = 0; i < segmentList->NumElements(); i++) {\n";
 	fnBody << doubleIndent << "SegmentState *segment = segmentList->Nth(i)" << stmtSeparator;
 	fnBody << doubleIndent << "if (segment->computeStagesInLps(Space_" << senderSyncLpsName << "))\n";
@@ -582,7 +588,8 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 		fnBody << indent << "}\n";
 	} 
 
-	// set up the data buffer reference in the communicator for the scalar
+	// check if the allocation was successful and set up the data buffer reference in the communicator for the scalar
+	fnBody << indent << "Assert(communicator != NULL)" << stmtSeparator;
 	fnBody << indent << "communicator->setDataBufferReference(&(taskGlobals->" << varName << "))" << stmtSeparator;
 
 	fnBody << indent << "return communicator" << stmtSeparator;
@@ -658,7 +665,8 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << indent << "SyncConfig *syncConfig = new SyncConfig(ccConfig" << paramSeparator;
 	fnBody << '\n' << indent << doubleIndent;
 	fnBody << "senderDataParts" << paramSeparator << "receiverDataParts" << paramSeparator;
-	fnBody << "sizeof(" << elementTypeName << "))" << stmtSeparator << '\n';
+	fnBody << "sizeof(" << elementTypeName << "))" << stmtSeparator;
+	fnBody << indent << "Assert(syncConfig != NULL)" << stmtSeparator << '\n';
 
 	// find out the number of sender and receiver PPUs within current segment
 	fnBody << indent << "int localSenderPpus = localSegment->getPpuCountForLps(Space_";
@@ -674,9 +682,11 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	// instantiate a list of communication buffers to add virtual/physical communication buffers into it for data exchanges
 	// based on whether or not the exchange demands cross-segments communication 
 	fnBody << indent << "List<CommBuffer*> *bufferList = new List<CommBuffer*>" << stmtSeparator;
+	fnBody << indent << "Assert(bufferList != NULL)" << stmtSeparator;
 	// also instanciate a vector for tracking all segments that do communication for the current data dependency within the
 	// confinements that are relevant to the current segment
 	fnBody << indent << "std::vector<int> *participantTags = new std::vector<int>" << stmtSeparator;
+	fnBody << indent << "Assert(participantTags != NULL)" << stmtSeparator;
 	fnBody << indent << "for (int i = 0; i < dataExchangeList->NumElements(); i++) {\n\n";
 	fnBody << doubleIndent << "DataExchange *exchange = dataExchangeList->Nth(i)" << stmtSeparator;
 	// put the participant segments in the participants list and skip this data exchange if the local segment is not 
@@ -702,6 +712,7 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << "exchange" << paramSeparator;
 	fnBody << "syncConfig" << ")" << stmtSeparator;
 	fnBody << doubleIndent << "}\n";
+	fnBody << doubleIndent << "Assert(buffer != NULL)" << stmtSeparator;
 	fnBody << doubleIndent << "bufferList->Append(buffer)" << stmtSeparator;
 	fnBody << indent << "}\n";
 
@@ -723,6 +734,7 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << '"' << dependencyName << '"' << paramSeparator;
 	fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
 	fnBody << "bufferList)" << stmtSeparator;
+	fnBody << indent << "Assert(communicator != NULL)" << stmtSeparator;
 	fnBody << indent << "communicator->setParticipants(participantTags)" << stmtSeparator;
 
 	fnBody << indent << "return communicator" << stmtSeparator;
@@ -819,6 +831,7 @@ void generateCommunicatorMapFn(const char *headerFileName,
 	// instantiate a communicator map
 	fnBody << indent << "Hashtable<Communicator*> *communicatorMap = new Hashtable<Communicator*>";
 	fnBody << stmtSeparator;
+	fnBody << indent << "Assert(communicatorMap != NULL)" << stmtSeparator;
 	
 	// determine the number of segments in the machine to be used for setting up communication buffer tags
 	fnBody << indent << "int segmentCount = Total_Threads / Threads_Per_Segment" << stmtSeparator << "\n";

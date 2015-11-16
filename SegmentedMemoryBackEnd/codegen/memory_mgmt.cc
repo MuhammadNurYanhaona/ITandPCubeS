@@ -40,6 +40,7 @@ void genRoutineForDataPartConfig(std::ofstream &headerFile,
 	int dimensionCount = array->getDimensionality();
 	programFile << indent << "List<DimPartitionConfig*> *dimensionConfigs";
 	programFile << " = new List<DimPartitionConfig*>" << stmtSeparator;
+	programFile << indent << "Assert(dimensionConfigs != NULL)" << stmtSeparator;
 
 	for (int i = 0; i < dimensionCount; i++) {
 		PartitionFunctionConfig *partitionConfig = array->getPartitionSpecForDimension(i + 1);
@@ -348,7 +349,8 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 			programFile << varName << "DimOrder[0])" << stmtSeparator; 
 			programFile << indent << "else " << varName;
 			programFile << "Container = new PartListContainer(";
-			programFile << varName << "DimOrder[0])" << stmtSeparator; 
+			programFile << varName << "DimOrder[0])" << stmtSeparator;
+			programFile << indent << "Assert(" << varName << "Container != NULL)" << stmtSeparator; 
 		
 			// create a blank part Id template reference
 			programFile << indent << "List<int*> *" << varName << "PartId = ";
@@ -459,6 +461,7 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 
 	// create a task data object
 	functionBody << indent << "TaskData *taskData = new TaskData()" << stmtSeparator;
+	functionBody << indent << "Assert(taskData != NULL)" << stmtSeparator;
 	
 	// iterate all LPSes and create LPS Content instance in each that has any data structure to allocate 
 	Space *root = hierarchy->getRootSpace();

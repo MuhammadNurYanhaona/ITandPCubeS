@@ -44,7 +44,8 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	// write implementations for the three functions needed to do structure specific reading
 	headerFile << indent << "void begin() {\n";
 	headerFile << doubleIndent << "stream = new TypedInputStream<" << elementType->getCType() << ">";
-	headerFile << "(fileName)" << stmtSeparator;  
+	headerFile << "(fileName)" << stmtSeparator;
+	headerFile << doubleIndent << "Assert(stream != NULL)" << stmtSeparator;  
 	headerFile << doubleIndent << "stream->open()" << stmtSeparator;
 	headerFile << indent << "}\n";
 	headerFile << indent << "void terminate() {\n";
@@ -99,7 +100,8 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << indent << "void begin() {\n";
 	headerFile << doubleIndent << "stream = new TypedOutputStream<" << elementType->getCType() << ">";
 	headerFile << "(fileName" << paramSeparator << "getDimensionList()" << paramSeparator;
-	headerFile << "writerId == 0)" << stmtSeparator;  
+	headerFile << "writerId == 0)" << stmtSeparator;
+	headerFile << doubleIndent << "Assert(stream != NULL)" << stmtSeparator;  
 	headerFile << doubleIndent << "stream->open()" << stmtSeparator;
 	headerFile << indent << "}\n";
 	headerFile << indent << "void terminate() {\n";
@@ -262,6 +264,7 @@ void generateRoutineForDataInitialization(const char *headerFileName, const char
 			programFile << "(" << "config" << paramSeparator << std::endl << doubleIndent << tripleIndent; 
 			programFile << dataItemName.str() << "->getPartsList()" << paramSeparator;
 			programFile << "fileName" << ")" << stmtSeparator;
+			programFile << tripleIndent << "Assert(reader != NULL)" << stmtSeparator;
 
 			// do the reading
 			programFile << tripleIndent << "reader->processParts()" << stmtSeparator;
@@ -378,6 +381,8 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 			programFile << std::endl << doubleIndent << tripleIndent;
 			programFile << dataItemName.str() << "->getPartsList()" << paramSeparator;
 			programFile << "fileName" << ")" << stmtSeparator;
+			programFile << tripleIndent << "Assert(writer != NULL)" << stmtSeparator;
+
 			programFile << tripleIndent << "writer->processParts()" << stmtSeparator;
 				
 			programFile << doubleIndent << "}\n";		

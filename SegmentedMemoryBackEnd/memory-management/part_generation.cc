@@ -49,6 +49,7 @@ DimensionMetadata *DimPartitionConfig::generateDimMetadata(List<int> *partIdList
 	Dimension parentDimension = getDimensionFromParent(partIdList, position);
 
 	DimensionMetadata *metadata = new DimensionMetadata();
+	Assert(metadata != NULL);
 	metadata->partDimension = getPartDimension(partId, parentDimension);
 	
 	metadata->paddings[0] = 0;
@@ -72,6 +73,7 @@ void DimPartitionConfig::getHierarchicalDimensionAndPartCountInfo(List<Dimension
 
 	int partId = partIdList->Nth(position);
 	Dimension *dimension = new Dimension();
+	Assert(dimension != NULL);
 	if (position == 0) {
 		*dimension = getPartDimension(partId, dataDimension);
 		dimensionList->Append(dimension);
@@ -153,6 +155,7 @@ int BlockSizeConfig::getEffectiveRearPadding(int partId, Dimension parentDimensi
 PartitionInstr *BlockSizeConfig::getPartitionInstr() {
 	int size = partitionArgs[0];
 	BlockSizeInstr *instr = new BlockSizeInstr(size);
+	Assert(instr != NULL);
 	instr->setPadding(paddings[0], paddings[1]);
 	return instr;
 }
@@ -211,6 +214,7 @@ int BlockCountConfig::getEffectiveRearPadding(int partId, Dimension parentDimens
 PartitionInstr *BlockCountConfig::getPartitionInstr() {
 	int count = partitionArgs[0];
 	BlockCountInstr *instr = new BlockCountInstr(count);
+	Assert(instr != NULL);
 	instr->setPadding(paddings[0], paddings[1]);
 	return instr;
 }
@@ -325,7 +329,9 @@ int BlockStrideConfig::getOriginalIndex(int partIndex, int position, List<int> *
 
 PartitionInstr *BlockStrideConfig::getPartitionInstr() {
 	int blockSize = partitionArgs[0];
-	return new BlockStrideInstr(ppuCount, blockSize); 
+	PartitionInstr *instr = new BlockStrideInstr(ppuCount, blockSize);
+	Assert(instr != NULL);
+	return instr; 
 }
 
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
@@ -350,6 +356,7 @@ void DataPartitionConfig::setParent(DataPartitionConfig *parent, int parentJump)
 void DataPartitionConfig::configureDimensionOrder() {
 	
 	this->dimensionOrder = new std::vector<DimConfig>;
+	Assert(this->dimensionOrder != NULL);
 	if (parent != NULL) {
 		std::vector<DimConfig> *parentOrder = parent->getDimensionOrder();
 		for (int i = 0; i < parentOrder->size(); i++) {
@@ -395,12 +402,16 @@ std::vector<DimConfig> *DataPartitionConfig::getDimensionOrder() {
 
 PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) {
 	
+	Assert(dimensionCount > 0);
 	Dimension *partDimensions = new Dimension[dimensionCount];
+	Assert(partDimensions != NULL);
 
 	int *padding = new int[dimensionCount * 2];
+	Assert(padding != NULL);
 	for (int i = 0; i < dimensionCount; i++) {
 
 		List<int> *dimIdList = new List<int>;
+		Assert(dimIdList != NULL);
 		for (int j = 0; j < partIdList->NumElements(); j++) {
 			int *partId = partIdList->Nth(j);
 			dimIdList->Append(partId[i]);
@@ -417,11 +428,13 @@ PartMetadata *DataPartitionConfig::generatePartMetadata(List<int*> *partIdList) 
 	}
 
 	PartMetadata *metadata = new PartMetadata(dimensionCount, partIdList, partDimensions, padding);
+	Assert(metadata != NULL);
 	return metadata;
 }
 
 List<int*> *DataPartitionConfig::generatePartId(List<int*> *lpuIds) {
 	List<int*> *partId = new List<int*>;
+	Assert(partId != NULL);
 	int position = lpuIds->NumElements() - 1;
 	generatePartId(lpuIds, position, partId);
 	return partId;
@@ -446,6 +459,7 @@ int DataPartitionConfig::getPartIdLevels() {
 List<int*> *DataPartitionConfig::generatePartIdTemplate() {
 	int levels = getPartIdLevels();
 	List<int*> *templateId = new List<int*>(levels);
+	Assert(templateId != NULL && dimensionCount > 0);
 	for (int i = 0; i < levels; i++) {
 		templateId->Append(new int[dimensionCount]);
 	}
@@ -454,6 +468,7 @@ List<int*> *DataPartitionConfig::generatePartIdTemplate() {
 
 List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int backsteps) {
 	List<int*> *partId = new List<int*>;
+	Assert(partId != NULL);
 	int position = lpuIds->NumElements() - 1;
 	int steps = 0;
 	DataPartitionConfig *lastConfig = this;
@@ -467,7 +482,9 @@ List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int
 }
 
 DataPartsList *DataPartitionConfig::generatePartList(int epochCount) {
+	Assert(dimensionCount > 0);
 	Dimension *dataDimensions = new Dimension[dimensionCount];
+	Assert(dataDimensions != NULL);
 	bool hasPadding = false;
 	for (int d = 0; d < dimensionCount; d++) {
 		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
@@ -475,8 +492,10 @@ DataPartsList *DataPartitionConfig::generatePartList(int epochCount) {
 		hasPadding = hasPadding || dimConfig->hasPadding();
 	}
 	ListMetadata *listMetadata = new ListMetadata(dimensionCount, dataDimensions);
+	Assert(listMetadata != NULL);
 	listMetadata->setPadding(hasPadding);
 	DataPartsList *dataPartsList = new DataPartsList(listMetadata, epochCount);
+	Assert(dataPartsList != NULL);
 	return dataPartsList;
 }
 
@@ -490,6 +509,7 @@ void DataPartitionConfig::generatePartId(List<int*> *lpuIds, int position,
 	int *partIdForLpu = NULL;
 	if (!updateExistingPartId) {
 		partIdForLpu = new int[dimensionCount];
+		Assert(partIdForLpu != NULL && dimensionCount > 0);
 	} else {
 		partIdForLpu = partId->Nth(updatePoint);
 	}
@@ -515,6 +535,7 @@ int DataPartitionConfig::getPartsCountAlongDimension(int dimensionNo, Dimension 
 void DataPartitionConfig::updatePartDimensionInfo(List<int*> *partIdList, int *lpuCounts, PartDimension *partDimension) {
 	for (int i = 0; i < dimensionCount; i++) {
 		List<int> *dimIdList = new List<int>;
+		Assert(dimIdList != NULL);
 		for (int j = 0; j < partIdList->NumElements(); j++) {
 			int *partId = partIdList->Nth(i);
 			dimIdList->Append(partId[i]);
@@ -546,11 +567,13 @@ void DataPartitionConfig::updatePartDimensionInfo(int *lpuId,
 
 ListMetadata *DataPartitionConfig::generatePartListMetadata(List<List<int*>*> *partIds) {
 	List<PartMetadata*> *partMetadataList = new List<PartMetadata*>;
+	Assert(partMetadataList != NULL);
 	for (int i = 0; i < partIds->NumElements(); i++) {
 		List<int*> *partIdList = partIds->Nth(i);
 		partMetadataList->Append(generatePartMetadata(partIdList));
 	}
 	Dimension *dataDimensions = new Dimension[dimensionCount];
+	Assert(dataDimensions != NULL && dimensionCount > 0);
 	bool hasPadding = false;
 	for (int d = 0; d < dimensionCount; d++) {
 		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(d);
@@ -558,6 +581,7 @@ ListMetadata *DataPartitionConfig::generatePartListMetadata(List<List<int*>*> *p
 		hasPadding = hasPadding || dimConfig->hasPadding();
 	}
 	ListMetadata *listMetadata = new ListMetadata(dimensionCount, dataDimensions);
+	Assert(listMetadata != NULL);
 	listMetadata->setPadding(hasPadding);
 	return listMetadata;
 }
@@ -571,6 +595,7 @@ DataItemConfig *DataPartitionConfig::generateStateFulVersion() {
 		current = current->parent;
 	}
 	DataItemConfig *dataItemConfig = new DataItemConfig(dimensionCount, levelCount);
+	Assert(dataItemConfig != NULL);
 	
 	for (int i = 0; i < dimensionCount; i++) {
 		Dimension dataDimension = dimensionConfigs->Nth(i)->getDataDimension();

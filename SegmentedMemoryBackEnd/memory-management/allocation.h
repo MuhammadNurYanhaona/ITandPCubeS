@@ -13,6 +13,7 @@
 #include "part_tracking.h"
 #include "part_generation.h"
 #include "../utils/list.h"
+#include "../utils/utility.h"
 #include "../codegen/structure.h"
 
 /* This class holds all information to identify a part of a data structure configured for a particular LPS and
@@ -79,7 +80,9 @@ class DataPart {
 	}
 	template <class type> static void allocate(DataPart *dataPart) {
 		int size = dataPart->metadata->getSize();
+		Assert(size > 0);
 		dataPart->data = new type[size];
+		Assert(dataPart->data != NULL);
                 char *charData = reinterpret_cast<char*>(dataPart->data);
                 int charSize = size * sizeof(type) / sizeof(char);
                 for (int i = 0; i < charSize; i++) {
@@ -150,9 +153,11 @@ class DataPartsList {
 		while ((part = iterator->getCurrentPart()) != NULL) {
 			List<int*> *partId = part->getPartId();
 			PartLocator *partLocator = new PartLocator(partId, dimensions, listIndex);
+			Assert(partLocator != NULL);
 			iterator->replaceCurrentPart(partLocator);
 			for (int t = 0; t < epochCount; t++) {
 				DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId));
+				Assert(dataPart != NULL);
 				DataPart::allocate<type>(dataPart);
 				dataPartsList->partLists[t]->Append(dataPart);
 			}

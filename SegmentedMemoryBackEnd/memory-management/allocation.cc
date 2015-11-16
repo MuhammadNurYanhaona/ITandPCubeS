@@ -54,7 +54,9 @@ DataPartsList::DataPartsList(ListMetadata *metadata, int epochCount) {
 	this->partContainer = NULL;
 	this->metadata = metadata;
 	this->epochCount = epochCount;
+	Assert(epochCount > 0);
 	this->partLists = new List<DataPart*>*[epochCount];
+	Assert(this->partLists != NULL);
 	for (int i = 0; i < epochCount; i++) {
 		partLists[i] = NULL;
 	}
@@ -64,6 +66,7 @@ DataPartsList::DataPartsList(ListMetadata *metadata, int epochCount) {
 void DataPartsList::allocateLists(int capacity) {
 	for (int i = 0; i < epochCount; i++) {
 		partLists[i] = new List<DataPart*>(capacity);
+		Assert(partLists[i] != NULL);
 	}
 }
 

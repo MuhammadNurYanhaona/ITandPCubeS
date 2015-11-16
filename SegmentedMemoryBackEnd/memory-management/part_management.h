@@ -71,13 +71,17 @@ class ScalarDataItems : public DataItems {
   public:
 	ScalarDataItems(const char *name, int epochCount);
 	template <class type> static void allocate(ScalarDataItems *items) {
+		Assert(items->epochCount > 0);
 		items->variableList = (void **) new type*[items->epochCount];
+		Assert(items->variableList != NULL);
+		int size = sizeof(type) / sizeof(char);
+		Assert(size > 0);
 		for (int i = 0; i < items->epochCount; i++) {
 			type *version = new type;
+			Assert(version != NULL);
 			items->variableList[i] = (void*) version;
 			// zero initialize the version
 			char *charVersion = reinterpret_cast<char*>(version);
-			int size = sizeof(type) / sizeof(char);
 			for (int i = 0; i < size; i++) {
 				charVersion[i] = 0;
 			}

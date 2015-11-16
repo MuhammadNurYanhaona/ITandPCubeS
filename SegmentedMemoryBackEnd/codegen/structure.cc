@@ -1,4 +1,5 @@
 #include "structure.h"
+#include "../utils/utility.h"
 #include <iostream>
 #include <fstream>
 #include <stdlib.h>
@@ -124,6 +125,7 @@ void ThreadIds::print(std::ofstream &stream) {
 
 int *ThreadIds::getAllPpuCounts() {
 	int *counts = new int[lpsCount];
+	Assert(counts != NULL && lpsCount > 0);
 	for (int i = 0; i < lpsCount; i++) counts[i] = ppuIds[i].ppuCount;
 	return counts;
 }
