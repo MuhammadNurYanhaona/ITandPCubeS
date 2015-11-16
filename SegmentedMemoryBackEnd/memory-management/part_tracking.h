@@ -85,6 +85,9 @@ class PartIdContainer {
 	// This is very expensive operation. It constructs and iterator and does a full traversal of the part-container
 	// hierarchy to retrieves the part count. Therefore it should be used with great care.
 	int getPartCount();
+	// A cheap operation to check if the container is empty. Often this can be used to skip some calls to the costly
+	// getPartCount() function
+	bool isEmpty() { return partArray.size() == 0; }
 	// function to be used by generated code to insert potential new part-Ids in the container
 	bool insertPartId(List<int*> *partId, int dataDimensions, std::vector<DimConfig> dimOrder) {
 		return insertPartId(partId, dataDimensions, dimOrder, 0);

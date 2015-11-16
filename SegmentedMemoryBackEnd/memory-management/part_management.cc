@@ -49,6 +49,7 @@ DataPartitionConfig *DataItems::getPartitionConfig() {
 
 PartIterator *DataItems::createIterator() {
 	Assert(partsList != NULL);
+	if (partsList->isInvalid()) return NULL;
 	return partsList->createIterator();
 }
 
@@ -107,6 +108,8 @@ void LpsContent::addPartIterators(Hashtable<PartIterator*> *partIteratorMap) {
 		ScalarDataItems *scalar = dynamic_cast<ScalarDataItems*>(items);
 		if (scalar == NULL) {
 			PartIterator *iterator = items->createIterator();
+			if (iterator == NULL) continue;
+
 			int dimensions = items->getDimensions();
 			int partIdLevels = items->getPartitionConfig()->getPartIdLevels();
 			iterator->initiatePartIdTemplate(dimensions, partIdLevels);

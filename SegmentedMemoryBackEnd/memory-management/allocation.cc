@@ -61,6 +61,7 @@ DataPartsList::DataPartsList(ListMetadata *metadata, int epochCount) {
 		partLists[i] = NULL;
 	}
 	this->epochHead = 0;
+	this->invalid = false;
 }
 
 void DataPartsList::allocateLists(int capacity) {

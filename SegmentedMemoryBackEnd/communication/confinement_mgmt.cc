@@ -768,10 +768,10 @@ List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstruction
 	vector<LpsDimConfig> *confinementVector = config->backwardTruncateDimVector(confinementLevel, senderVector);
 	List<Confinement*> *confinementList = new List<Confinement*>;
 
-	// any of the part-tracking-tree can be NULL indicating that the executing segment has no portion of the data
-	// structure
+	// any of the part-tracking-tree can be NULL/empty indicating that the executing segment has no portion of the 
+	// data structure
 	PartIdContainer *senderTree = config->getSenderPartTree();
-	if (senderTree != NULL) {
+	if (senderTree != NULL && !senderTree->isEmpty()) {
 		List<List<int*>*> *partIdList = senderTree->getAllPartIdsAtLevel(confinementLevel, dataDimensions);
 		for (int i = 0; i < partIdList->NumElements(); i++) {
 			List<int*> *containerId = partIdList->Nth(i);
@@ -786,7 +786,7 @@ List<Confinement*> *Confinement::generateAllConfinements(ConfinementConstruction
 	// tree processing has already returned all confinement roots
 	PartIdContainer *receiverTree = config->getReceiverPartTree();
 	int confinementsFoundBefore = confinementList->NumElements();
-	if (!config->isIntraContrainerSync() && receiverTree != NULL) {
+	if (!config->isIntraContrainerSync() && receiverTree != NULL && !receiverTree->isEmpty()) {
 		List<List<int*>*> *partIdList = receiverTree->getAllPartIdsAtLevel(confinementLevel, dataDimensions);
 		for (int i = 0; i < partIdList->NumElements(); i++) {
 			List<int*> *containerId = partIdList->Nth(i);

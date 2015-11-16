@@ -133,6 +133,8 @@ class DataPartsList {
 	List<DataPart*> **partLists;
 	// a variable to keep track of the head of the circular array 
 	int epochHead;
+	// a flag to indicate that this part list is empty and acting as a placeholder only
+	bool invalid;
   public:
 	DataPartsList(ListMetadata *metadata, int epochCount);
 	
@@ -143,42 +145,50 @@ class DataPartsList {
 		
 		dataPartsList->partContainer = partContainer;
 		int partCount = partContainer->getPartCount();
-		dataPartsList->allocateLists(partCount);
+		if (partCount > 0) {
+			dataPartsList->allocateLists(partCount);
+			dataPartsList->invalid = false;
 
-		PartIterator *iterator = partContainer->getIterator();
-		int dimensions = dataPartsList->metadata->getDimensions();
-		int epochCount = dataPartsList->epochCount;
-		SuperPart *part = NULL;
-		int listIndex = 0;
-		while ((part = iterator->getCurrentPart()) != NULL) {
-			List<int*> *partId = part->getPartId();
-			PartLocator *partLocator = new PartLocator(partId, dimensions, listIndex);
-			Assert(partLocator != NULL);
-			iterator->replaceCurrentPart(partLocator);
-			for (int t = 0; t < epochCount; t++) {
-				DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId));
-				Assert(dataPart != NULL);
-				DataPart::allocate<type>(dataPart);
-				dataPartsList->partLists[t]->Append(dataPart);
+			PartIterator *iterator = partContainer->getIterator();
+			int dimensions = dataPartsList->metadata->getDimensions();
+			int epochCount = dataPartsList->epochCount;
+			SuperPart *part = NULL;
+			int listIndex = 0;
+			while ((part = iterator->getCurrentPart()) != NULL) {
+				List<int*> *partId = part->getPartId();
+				PartLocator *partLocator = new PartLocator(partId, dimensions, listIndex);
+				Assert(partLocator != NULL);
+				iterator->replaceCurrentPart(partLocator);
+				for (int t = 0; t < epochCount; t++) {
+					DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId));
+					Assert(dataPart != NULL);
+					DataPart::allocate<type>(dataPart);
+					dataPartsList->partLists[t]->Append(dataPart);
+				}
+				listIndex++;
+				iterator->advance();
 			}
-			listIndex++;
-			iterator->advance();
+		} else {
+			dataPartsList->invalid = true;
 		}
 	}
 
 	// allocate all part lists for different epoch versions
 	void allocateLists(int capacity);
-	// each PPU-controller within a segment should get an iterator for each data part list that to be used 
-	// later for part searching
+	// each PPU-controller within a segment should get an iterator for each data part list that to be used later for 
+	// part searching
 	PartIterator *createIterator() { return partContainer->getIterator(); }
-	DataPart *getPart(List<int*> *partId, PartIterator *iterator);
-	DataPart *getPart(List<int*> *partId, int epoch, PartIterator *iterator);	
 	// moves the head of the circular array one step ahead
 	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }
-	inline int getEpochCount() { return epochCount; }
+
+
+	DataPart *getPart(List<int*> *partId, PartIterator *iterator);
+	DataPart *getPart(List<int*> *partId, int epoch, PartIterator *iterator);	
 	inline List<DataPart*> *getCurrentList() { return partLists[epochHead]; }
 	inline ListMetadata *getMetadata() { return metadata; }
 	PartIdContainer *getPartContainer() { return partContainer; }
+	inline int getEpochCount() { return epochCount; }
+	bool isInvalid() { return invalid; }
 };
 
 #endif

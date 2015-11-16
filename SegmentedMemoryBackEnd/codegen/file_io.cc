@@ -248,7 +248,8 @@ void generateRoutineForDataInitialization(const char *headerFileName, const char
 			programFile << doubleIndent << "DataItems *" << dataItemName.str(); 
 			programFile << " = taskData->getDataItemsOfLps(\"" << lpsName << "\"" << paramSeparator;
 			programFile << "\"" << varName << "\")" << stmtSeparator;
-			programFile << doubleIndent << "if (" << dataItemName.str() << " != NULL) {\n";
+			programFile << doubleIndent << "if (" << dataItemName.str() << " != NULL "; 
+			programFile << "&& !" << dataItemName.str() << "->isEmpty()) {\n";
 
 			// retrieve the partition configuration object for the structure in the LPS
 			std::ostringstream configName;
@@ -363,6 +364,7 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 			programFile << " = taskData->getDataItemsOfLps(\"" << lpsName << "\"" << paramSeparator;
 			programFile << "\"" << varName << "\")" << stmtSeparator;
 			programFile << doubleIndent << "if (" << dataItemName.str() << " != NULL";
+			programFile << " && !" << dataItemName.str() << "->isEmpty()";
 			programFile << " && segment->computeStagesInLps(Space_" << lpsName << ")";
 			programFile << ") {\n";
 

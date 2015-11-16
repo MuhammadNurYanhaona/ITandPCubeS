@@ -57,6 +57,7 @@ int PartIdContainer::getCurrentLevelIndexOfExistingPart(List<int*> *partId) {
 }
 
 PartIterator *PartIdContainer::getIterator() {
+	if (partArray.size() == 0) return NULL;
 	PartIdContainer *container = this;
 	int partIdSteps = 1;
 	while (dynamic_cast<PartListContainer*>(container) != NULL) {
@@ -95,6 +96,7 @@ void PartIdContainer::postProcess() {
 }
 
 int PartIdContainer::getPartCount() {
+	if (partArray.size() == 0) return 0;
 	PartIterator *iterator = getIterator();
 	int count = 0;
 	while (iterator->getCurrentPart() != NULL) {

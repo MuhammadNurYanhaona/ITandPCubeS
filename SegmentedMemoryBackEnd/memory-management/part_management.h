@@ -54,6 +54,7 @@ class DataItems {
 	DataPart *getDataPart(List<int*> *partidList, int epoch, PartIterator *iterator);
 	List<DataPart*> *getAllDataParts();
 	PartIdContainer *getPartIdContainer() { return partsList->getPartContainer(); }
+	bool isEmpty() { return partsList == NULL || partsList->isInvalid(); }
 	virtual void advanceEpoch() { partsList->advanceEpoch(); }
 };
 
