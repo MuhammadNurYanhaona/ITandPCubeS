@@ -716,6 +716,10 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << doubleIndent << "bufferList->Append(buffer)" << stmtSeparator;
 	fnBody << indent << "}\n";
 
+	// if there is no buffer in the buffer list then this segment does not participate in dependency resolution at all; thus
+	// returns a NULL communicator in that case
+	fnBody << indent << "if (bufferList->NumElements() == 0) return NULL" << stmtSeparator;
+
 	// check the type of synchronization and create a communicator appropriate for that type
 	fnBody << '\n' << indent << "Communicator *communicator = NULL" << stmtSeparator;
 	SyncRequirement *syncRequirement = commCharacter->getSyncRequirement();
