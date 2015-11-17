@@ -132,7 +132,7 @@ void GhostRegionSyncCommunicator::setupCommunicator(bool includeNonInteractingSe
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
-	*logFile << "\tSetup done for Ghost-region Sync Communicator for " << dependencyName < "\n";
+	*logFile << "\tNo setup was needed for Ghost-region Sync Communicator for " << dependencyName < "\n";
 	logFile->flush();
 }
 
@@ -630,7 +630,7 @@ void CrossSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
-	*logFile << "\tSetup done for Cross-Sync Communicator for " << dependencyName << "\n";
+	*logFile << "\tNo setup was needed for Cross-Sync Communicator for " << dependencyName << "\n";
 	logFile->flush();
 }
  

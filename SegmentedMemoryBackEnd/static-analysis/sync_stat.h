@@ -64,6 +64,13 @@ class CommunicationCharacteristics {
 	Space *getReceiverDataAllocatorSpace() { return receiverDataAllocatorSpace; }
 	void setSyncRequirement(SyncRequirement *syncRequirement);
 	SyncRequirement *getSyncRequirement();
+	
+	// A code generation helper routine------------------------------------------------------------------
+	// indicates if the underlying communication mechanism implementing the characteristics specified here
+	// can be benefited from allocating group resources (for example, the groups of segments interacting 
+	// with one-another) as opposed to using a single resource set for all segments
+	bool shouldAllocateGroupResources();
+	
 };
 
 // This is the common super-class to encode the sync requirement to a single computation stage in a single 

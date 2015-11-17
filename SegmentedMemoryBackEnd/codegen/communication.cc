@@ -889,16 +889,18 @@ void generateCommunicatorMapFn(const char *headerFileName,
 		fnBody << stmtSeparator;
 		fnBody << doubleIndent << "communicatorMap->Enter(\"" << dependencyName << "\"" << paramSeparator;
 		fnBody << "communicator" << i << ")" << stmtSeparator;
-		fnBody << indent << "} else {\n";
-		
+
 		// if the current segment does not participate in communication for the underlying dependency then exclude
 		// it from any communication resource setup that needs participation from all segments (both communicating
-		// and non communicating) by invoking a static function in the communicator class.		
-		fnBody << doubleIndent << "Communicator::excludeOwnselfFromCommunication(";
-		fnBody << '"' << dependencyName << '"' << paramSeparator;
-		fnBody << '\n' << quadIndent;
-		fnBody << "localSegment->getPhysicalId()" << paramSeparator;
-		fnBody << "logFile)" << stmtSeparator;
+		// and non communicating) by invoking a static function in the communicator class.
+		if (commCharacter->shouldAllocateGroupResources()) {		
+			fnBody << indent << "} else {\n";
+			fnBody << doubleIndent << "Communicator::excludeOwnselfFromCommunication(";
+			fnBody << '"' << dependencyName << '"' << paramSeparator;
+			fnBody << '\n' << quadIndent;
+			fnBody << "localSegment->getPhysicalId()" << paramSeparator;
+			fnBody << "logFile)" << stmtSeparator;
+		}
 		fnBody << indent << "}\n";
 
 		// at this time set up the index for the sync requirement to maintain a runtime counter for its usage
