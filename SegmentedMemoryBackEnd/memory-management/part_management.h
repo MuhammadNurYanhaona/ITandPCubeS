@@ -111,6 +111,7 @@ class LpsContent {
 	inline DataItems *getDataItems(const char *varName) { return dataItemsMap->Lookup(varName); }
 	void advanceItemEpoch(const char *varName);
 	void addPartIterators(Hashtable<PartIterator*> *partIteratorMap);
+	bool hasValidDataItems();
 };
 
 /* This class holds all data structure informations and references regarding different LPSes of a task */
@@ -127,6 +128,10 @@ class TaskData {
 	// that it will use to efficiently identify data-parts for its LPUs and to avoid unnecessary
 	// memory allocation/de-allocation during part generation and identification processes.
 	Hashtable<PartIterator*> *generatePartIteratorMap();
+
+	// This tells if the current segment contains data to be used in computations of a particular LPS.
+	// If there is no data then there is no thread in the segment that does computation for that LPS.
+	bool hasDataForLps(const char *lpsId);
 };
 
 #endif

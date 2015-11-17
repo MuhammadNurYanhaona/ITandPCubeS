@@ -11,45 +11,66 @@ using namespace std;
 
 ScalarCommunicator::ScalarCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags, 
 		int localSenderPpus,
                 int localReceiverPpus,
 		int dataSize) 
 		: Communicator(localSegmentTag, dependencyName, 
 			localSenderPpus, localReceiverPpus) {
-
 	this->dataSize = dataSize;
 	this->dataBuffer = NULL;
-	this->senderSegmentTags = senderSegmentTags;
-	this->receiverSegmentTags = receiverSegmentTags;
-	
-	std::vector<int> *participants = getParticipantsTags();
-	active = participants->size() > 1;
-	delete participants;
+	this->hasLocalSender = localSenderPpus > 0;
+	this->hasLocalReceiver = localReceiverPpus > 0;
+	this->active = false;
 }
 
-std::vector<int> *ScalarCommunicator::getParticipantsTags() {
-	std::vector<int> *participants = new std::vector<int>(*senderSegmentTags);
-	for (int i = 0; i < receiverSegmentTags->size(); i++) {
-		int tag = receiverSegmentTags->at(i);
-		binsearch::insertIfNotExist(participants, tag);
+void ScalarCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
+	
+	*logFile << "\tSetting up scalar communicator for " << dependencyName << "\n";
+	logFile->flush();
+
+	segmentGroup = new SegmentGroup();
+	segmentGroup->discoverGroupAndSetupCommunicator(*logFile);
+	int participants = segmentGroup->getParticipantsCount();
+
+	if (participants > 1) {
+		this->active = true;
+		
+		int mySendReceiveConfig[2];
+		mySendReceiveConfig[0] = hasLocalSender ? 1 : 0;
+		mySendReceiveConfig[1] = hasLocalReceiver ? 1 : 0;
+		
+		int myRank = segmentGroup->getRank(localSegmentTag);
+		MPI_Comm mpiComm = segmentGroup->getCommunicator();
+		int *sendReceiveConfigs = new int[participants * 2];
+		int status = MPI_Allgather(mySendReceiveConfig, 2, MPI_INT, sendReceiveConfigs, 2, MPI_INT, mpiComm);
+		if (status != MPI_SUCCESS) {
+			*logFile << "Could not determine who will be sending and receiving updates\n";
+			logFile->flush();
+			exit(EXIT_FAILURE);	
+		}
+		for (int i = 0; i < participants; i++) {
+			int segmentTag = segmentGroup->getSegment(i);
+			if (sendReceiveConfigs[i * 2] == 1) {
+				senderSegmentTags.push_back(segmentTag);
+			}
+			if (sendReceiveConfigs[i * 2 + 1] == 1) {
+				receiverSegmentTags.push_back(segmentTag);
+			}
+		}
 	}
-	return participants;
+	
+	*logFile << "\tSetup done for scalar communicator " << dependencyName << "\n";
+	logFile->flush();
 }
 
 //----------------------------------------------------- Scalar Replica Sync Communicator ------------------------------------------------/
 
 ScalarReplicaSyncCommunicator::ScalarReplicaSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags, 
 		int localSenderPpus,
                 int localReceiverPpus,
 		int dataSize) 
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
-			senderSegmentTags, 
-			receiverSegmentTags,
 			localSenderPpus, localReceiverPpus, 
 			dataSize) {}
 
@@ -122,26 +143,19 @@ void ScalarReplicaSyncCommunicator::receive() {
 
 ScalarUpSyncCommunicator::ScalarUpSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags,
 		int localSenderPpus,
                 int localReceiverPpus,
 		int dataSize) 
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
-			senderSegmentTags, 
-			receiverSegmentTags,
 			localSenderPpus, localReceiverPpus, 
-			dataSize) {
-
-	Assert(receiverSegmentTags->size() == 1);
-}
+			dataSize) {}
 
 void ScalarUpSyncCommunicator::send() {
 	
 	//*logFile << "\tScalar up-sync communicator is sending data for " << dependencyName << "\n";
 	//logFile->flush();
 
-	int receiverSegment = receiverSegmentTags->at(0);
+	int receiverSegment = receiverSegmentTags.at(0);
 	if (receiverSegment == localSegmentTag) return;
 
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
@@ -176,19 +190,12 @@ void ScalarUpSyncCommunicator::receive() {
 
 ScalarDownSyncCommunicator::ScalarDownSyncCommunicator(int localSegmentTag,
                 const char *dependencyName,
-                std::vector<int> *senderSegmentTags,
-                std::vector<int> *receiverSegmentTags,
 		int localSenderPpus,
                 int localReceiverPpus,
 		int dataSize) 
 		: ScalarCommunicator(localSegmentTag, dependencyName, 
-			senderSegmentTags, 
-			receiverSegmentTags,
 			localSenderPpus, localReceiverPpus, 
-			dataSize) {
-
-	Assert(senderSegmentTags->size() == 1);
-}
+			dataSize) {}
 
 void ScalarDownSyncCommunicator::send() {
 	
@@ -213,7 +220,7 @@ void ScalarDownSyncCommunicator::receive() {
 	//logFile->flush();
 	
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
-	int broadcastingSegment = senderSegmentTags->at(0);
+	int broadcastingSegment = senderSegmentTags.at(0);
 	int broadcaster = segmentGroup->getRank(broadcastingSegment);
 	int status = MPI_Bcast(dataBuffer, dataSize, MPI_CHAR, broadcaster, mpiComm);
 	if (status != MPI_SUCCESS) {

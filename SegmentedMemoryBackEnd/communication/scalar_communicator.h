@@ -16,16 +16,17 @@ class ScalarCommunicator : public Communicator {
 	char *dataBuffer;
 	// size of the scalar variable in terms of number of characters
 	int dataSize;
-	// identifiers of the segments participating in the data synchronization
-	std::vector<int> *senderSegmentTags;
-	std::vector<int> *receiverSegmentTags;
 	// the communicator is not active when there is none except the current segment participating in synchronization
 	bool active;
+	// tags of sender and receiver segments
+	std::vector<int> senderSegmentTags;
+	std::vector<int> receiverSegmentTags;
+	// temporary variables needed to determine the tags of sender and receiver segments
+	bool hasLocalSender;
+	bool hasLocalReceiver;
   public:
 	ScalarCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
-		std::vector<int> *senderSegmentTags, 
-		std::vector<int> *receiverSegmentTags,
 		int localSenderPpus,
 		int localReceiverPpus, 
 		int dataSize);
@@ -35,9 +36,9 @@ class ScalarCommunicator : public Communicator {
 	// using this funtion
 	void setDataBufferReference(void *dataBuffer) { this->dataBuffer = reinterpret_cast<char*>(dataBuffer); }
 
-	// participant tags computation needs to be updated for scalar synchronization as it does not involve examination
-	// of communication buffers
-	std::vector<int> *getParticipantsTags();
+	// MPI communicator setup process should be updated for scaler IT communicators as they do not involve processing
+	// of communication buffers in search of participating segments  
+	void setupCommunicator(bool includeNonInteractingSegments);
 
 	// there is no buffer preparation or post-processing for scalar variables
 	void prepareBuffersForSend() {}
@@ -70,8 +71,6 @@ class ScalarReplicaSyncCommunicator : public ScalarCommunicator {
   public:
 	ScalarReplicaSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
-		std::vector<int> *senderSegmentTags, 
-		std::vector<int> *receiverSegmentTags, 
 		int localSenderPpus,
 		int localReceiverPpus, 
 		int dataSize);
@@ -85,8 +84,6 @@ class ScalarUpSyncCommunicator : public ScalarCommunicator {
   public:
 	ScalarUpSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
-		std::vector<int> *senderSegmentTags, 
-		std::vector<int> *receiverSegmentTags, 
 		int localSenderPpus,
 		int localReceiverPpus, 
 		int dataSize);
@@ -101,8 +98,6 @@ class ScalarDownSyncCommunicator : public ScalarCommunicator {
   public:
 	ScalarDownSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
-		std::vector<int> *senderSegmentTag, 
-		std::vector<int> *receiverSegmentTags, 
 		int localSenderPpus,
 		int localReceiverPpus, 
 		int dataSize);

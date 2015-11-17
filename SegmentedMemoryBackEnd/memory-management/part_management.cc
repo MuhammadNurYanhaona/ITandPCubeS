@@ -120,6 +120,17 @@ void LpsContent::addPartIterators(Hashtable<PartIterator*> *partIteratorMap) {
 	}
 }
 
+bool LpsContent::hasValidDataItems() {
+	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
+	DataItems *items = NULL;
+	while ((items = iterator.GetNextValue()) != NULL) {
+		ScalarDataItems *scalar = dynamic_cast<ScalarDataItems*>(items);
+		if (scalar != NULL) return true;
+		if (!items->isEmpty()) return true;
+	}
+	return false;
+}
+
 //------------------------------------------------------------- Task Data ----------------------------------------------------------------/
 
 TaskData::TaskData() { 
@@ -153,6 +164,12 @@ Hashtable<PartIterator*> *TaskData::generatePartIteratorMap() {
 		lpsContent->addPartIterators(map);
 	}
 	return map;
+}
+
+bool TaskData::hasDataForLps(const char *lpsId) {
+	LpsContent *lpsContent = lpsContentMap->Lookup(lpsId);
+	if (lpsContent == NULL) return false;
+	return lpsContent->hasValidDataItems();
 }
 
 

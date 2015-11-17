@@ -487,6 +487,7 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	
 	fnHeader << "getCommunicatorFor_" << dependencyName << "(SegmentState *localSegment" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "List<SegmentState*> *segmentList" << paramSeparator;
+	fnHeader << '\n' << doubleIndent << "TaskData *taskData" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "TaskGlobals *taskGlobals)";
 
 	fnBody << "{\n\n";
@@ -498,23 +499,9 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	const char *receiverSyncLpsName = commCharacter->getReceiverSyncSpace()->getName();
 	
 	// first check if the current synchronization is relevent to the segment executing this code; if not then return NULL
-	fnBody << indent << "if (!localSegment->computeStagesInLps(Space_" << senderSyncLpsName << ")";
-	fnBody << '\n' << indent << doubleIndent << "&& !localSegment->computeStagesInLps(Space_";
-	fnBody << receiverSyncLpsName << ")) return NULL" << stmtSeparator;
+	fnBody << indent << "if (!taskData->hasDataForLps(\"" << senderSyncLpsName << "\") ";
+	fnBody << "&& !taskData->hasDataForLps(\"" << receiverSyncLpsName << "\")) return NULL" << stmtSeparator;
 
-	// then create two vectors of participating segments in the sender and receiver sides
-	fnBody << '\n' << indent << "std::vector<int> *senderTags = new std::vector<int>" << stmtSeparator;
-	fnBody << indent << "Assert(senderTags != NULL)" << stmtSeparator;
-	fnBody << indent << "std::vector<int> *receiverTags = new std::vector<int>" << stmtSeparator;
-	fnBody << indent << "Assert(receiverTags != NULL)" << stmtSeparator;
-	fnBody << '\n' << indent << "for (int i = 0; i < segmentList->NumElements(); i++) {\n";
-	fnBody << doubleIndent << "SegmentState *segment = segmentList->Nth(i)" << stmtSeparator;
-	fnBody << doubleIndent << "if (segment->computeStagesInLps(Space_" << senderSyncLpsName << "))\n";
-	fnBody << tripleIndent << "senderTags->push_back(segment->getPhysicalId())" << stmtSeparator;
-	fnBody << doubleIndent << "if (segment->computeStagesInLps(Space_" << receiverSyncLpsName << "))\n";
-	fnBody << tripleIndent << "receiverTags->push_back(segment->getPhysicalId())" << stmtSeparator;
-	fnBody << indent << "}\n";
-	
 	// determine the size of the scalar variable and the tag of the local segment
 	fnBody << indent << "int dataSize = sizeof(" << varType->getCType() << ")" << stmtSeparator;
 	fnBody << indent << "int localSegmentTag = localSegment->getPhysicalId()" << stmtSeparator;
@@ -528,65 +515,19 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	// declare a communicator and instantiate it with appropriate communicator type
 	fnBody << '\n' << indent << "ScalarCommunicator *communicator = NULL" << stmtSeparator;
 
-	// for replication-sync creates a communicator of that type without further consideration 
+	// instantiate a communicator of appropriate type 
 	SyncRequirement *syncRequirement = commCharacter->getSyncRequirement();
 	if (dynamic_cast<ReplicationSync*>(syncRequirement) != NULL) {
 		fnBody << indent << "communicator = new ScalarReplicaSyncCommunicator(localSegmentTag";
-		fnBody << paramSeparator << '\n' << indent << doubleIndent;
-		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
-		fnBody << '\n' << indent << doubleIndent;
-		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
-		fnBody << '\n' << indent << doubleIndent;
-		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
-		fnBody << "dataSize)" << stmtSeparator;
+	} else if (dynamic_cast<UpPropagationSync*>(syncRequirement) != NULL) {
+		fnBody << indent << "communicator = new ScalarUpSyncCommunicator(localSegmentTag";
+	} else {
+		fnBody << indent << "communicator = new ScalarDownSyncCommunicator(localSegmentTag";
 	}
-
-	// for up-sync, we should have a up sync communicator only when the number of receivers is 1; otherwise a replication
-	// sync should be used as the update needs to be propagated to multiple segments from some unknown segment
-	else if (dynamic_cast<UpPropagationSync*>(syncRequirement) != NULL) {
-		fnBody << indent << "if (receiverTags->size() > 1) {\n";
-		fnBody << doubleIndent << "communicator = new ScalarReplicaSyncCommunicator(localSegmentTag";
-		fnBody << paramSeparator << '\n' << doubleIndent << doubleIndent;
-		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
-		fnBody << "dataSize)" << stmtSeparator;
-		fnBody << indent << "} else {\n";
-		fnBody << doubleIndent << "communicator = new ScalarUpSyncCommunicator(localSegmentTag";
-		fnBody << paramSeparator << '\n' << doubleIndent << doubleIndent;
-		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
-		fnBody << "dataSize)" << stmtSeparator;
-		fnBody << indent << "}\n";
-	} 
-	
-	// for down-sync, we need a replica synchronizer when there might be multiple senders
-	else if (dynamic_cast<DownPropagationSync*>(syncRequirement) != NULL) {
-		fnBody << indent << "if (senderTags->size() > 1) {\n";
-		fnBody << doubleIndent << "communicator = new ScalarReplicaSyncCommunicator(localSegmentTag";
-		fnBody << paramSeparator << '\n' << doubleIndent << doubleIndent;
-		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
-		fnBody << "dataSize)" << stmtSeparator;
-		fnBody << indent << "} else {\n";
-		fnBody << doubleIndent << "communicator = new ScalarDownSyncCommunicator(localSegmentTag";
-		fnBody << paramSeparator << '\n' << doubleIndent << doubleIndent;
-		fnBody << '"' << dependencyName <<  '"' << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "senderTags" << paramSeparator << "receiverTags" << paramSeparator;
-		fnBody << '\n' << doubleIndent << doubleIndent;
-		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
-		fnBody << "dataSize)" << stmtSeparator;
-		fnBody << indent << "}\n";
-	} 
+	fnBody << paramSeparator << '\n' << indent << doubleIndent;
+	fnBody << '"' << dependencyName <<  '"' << paramSeparator;
+	fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
+	fnBody << "dataSize)" << stmtSeparator;
 
 	// check if the allocation was successful and set up the data buffer reference in the communicator for the scalar
 	fnBody << indent << "Assert(communicator != NULL)" << stmtSeparator;
@@ -858,6 +799,7 @@ void generateCommunicatorMapFn(const char *headerFileName,
 			fnBody << "localSegment" << paramSeparator;
 			fnBody << '\n' << indent << doubleIndent;
 			fnBody << "segmentList" << paramSeparator;
+			fnBody << "taskData" << paramSeparator;
 			fnBody << "taskGlobals";
 		} else {
 			fnBody << "localSegment" << paramSeparator;

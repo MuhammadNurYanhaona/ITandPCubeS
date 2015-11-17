@@ -765,8 +765,10 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 		stream << ")) {\n";
 		stream << indentStr.str() << indent << "Communicator *communicator = threadState->getCommunicator(\"";
 		stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
-		stream << indentStr.str() << indent << "communicator->receive(REQUESTING_COMMUNICATION";
+		stream << indentStr.str() << indent << "if (communicator != NULL) {\n";
+		stream << indentStr.str() << doubleIndent << "communicator->receive(REQUESTING_COMMUNICATION";
 		stream << paramSeparator << "commCounter" << commIndex << ")" << stmtSeparator; 
+		stream << indentStr.str() << indent << "}\n";
 		stream << indentStr.str() << "}\n";
 
 		// the counter should be advanced regardless of this PPU's participation in communication to keep the counter
@@ -787,9 +789,11 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 			stream << indentStr.str() << doubleIndent;
 			stream << "Communicator *communicator = threadState->getCommunicator(\"";
 			stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
-			stream << indentStr.str() << doubleIndent;
+			stream << indentStr.str() << doubleIndent << "if (communicator != NULL) {\n";
+			stream << indentStr.str() << tripleIndent;
 			stream << "communicator->receive(REQUESTING_COMMUNICATION";
 			stream << paramSeparator << "commCounter" << commIndex << ")" << stmtSeparator; 
+			stream << indentStr.str() << doubleIndent << "}\n";
 			stream << indentStr.str() << indent << "}\n";
 
 			// again the counter is advanced outside the if condition to keep it in sync with all other PPUs
@@ -1001,17 +1005,20 @@ void CompositeStage::generateDataSendsForGroup(std::ofstream &stream, int indent
 		stream << indentStr.str() << indent;
 		stream << "Communicator *communicator = threadState->getCommunicator(\"";
 		stream << currentComm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
+		stream << indentStr.str() << indent << "if (communicator != NULL) {\n";
 		
 		// If the counter variable for the sync has been updated then the current PPU controller
 		// has data to send so it should indicate that fact in its call to the communicator. Otherwise
 		// it should only report that it has reached this particular execution point.
-		stream << indentStr.str() << indent << "if (" << counterVarName << " > 0) {\n";
-		stream << indentStr.str() << doubleIndent << "communicator->send(";
+		stream << indentStr.str() << doubleIndent << "if (" << counterVarName << " > 0) {\n";
+		stream << indentStr.str() << tripleIndent << "communicator->send(";
 		stream << "REQUESTING_COMMUNICATION" << paramSeparator;
 		stream << "commCounter" << commIndex <<  ")" << stmtSeparator;
-		stream << indentStr.str() << indent << "} else communicator->send(";
+		stream << indentStr.str() << doubleIndent << "} else communicator->send(";
 		stream << "PASSIVE_REPORTING" << paramSeparator;
 		stream << "commCounter" << commIndex << ")" << stmtSeparator;
+
+		stream << indentStr.str() << indent << "}\n";
 		
 		// then reset the counter	 
 		stream << indentStr.str() << indent << counterVarName << " = 0" << stmtSeparator;

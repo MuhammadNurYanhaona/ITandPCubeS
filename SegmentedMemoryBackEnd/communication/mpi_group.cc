@@ -8,6 +8,46 @@
 
 using namespace std;
 
+SegmentGroup::SegmentGroup() {
+        mpiCommunicator = MPI_COMM_NULL;
+}
+
+void SegmentGroup::discoverGroupAndSetupCommunicator(std::ofstream &log) {
+	
+	// determine the global process rank of the current segment
+	int segmentRank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &segmentRank);
+	
+	// first try to create a new communicator by having all participating segments trying to split the default
+	// communicator using a single color; non-participating segments will call the exclude function
+	int color = 0;
+	int status = MPI_Comm_split(MPI_COMM_WORLD, color, segmentRank, &mpiCommunicator);
+	if (status != MPI_SUCCESS) {
+		log << "\tcould not create a new communicator for the group\n";
+		log.flush();
+		exit(EXIT_FAILURE);
+	}
+	
+        int groupRank, groupSize;
+        MPI_Comm_rank(mpiCommunicator, &groupRank);
+        MPI_Comm_size(mpiCommunicator, &groupSize);
+
+	// allocate and populate an array holding the ranks of all participating segments of the new communicator
+        int participantRanks[groupSize];
+        status = MPI_Allgather(&segmentRank, 1, MPI_INT, participantRanks, 1, MPI_INT, mpiCommunicator);
+	if (status != MPI_SUCCESS) {
+		log << "\tcould not gather rank information of segments in the new communicator\n";
+		log.flush();
+		exit(EXIT_FAILURE);
+	}
+	
+	// populate the segments and segmentRanks vectors for later use
+	for (int i = 0; i < groupSize; i++) {
+		segments.push_back(participantRanks[i]);
+		segmentRanks.push_back(i);
+	}
+}
+
 SegmentGroup::SegmentGroup(vector<int> segments) {
         this->segments = vector<int>(segments);
         this->segmentRanks = vector<int>(segments);
