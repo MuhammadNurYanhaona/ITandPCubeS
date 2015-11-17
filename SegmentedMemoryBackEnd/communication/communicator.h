@@ -113,6 +113,13 @@ class Communicator : public CommBufferManager {
 	// Receive, on the other hand, increases the iteration number of the communicator to avoid PPUs reporting later on to get
 	// halted on the receive-barrier.
 	virtual void afterReceive() { iterationNo++; }
+
+	// Some communication mechanisms, for example MPI, requires that even the non-participating segments should explicitly say
+	// that they will not be communicating for proper communication resources (e.g., groups, channel) setup. Therefore, this
+	// function is provided to exclude the current segment when other segments that will interact calls the setupCommunicator
+	// function.
+	static void excludeOwnselfFromCommunication(const char *dependencyName, 
+		int localSegmentTag, std::ofstream &logFile);
 };
 
 

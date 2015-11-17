@@ -98,3 +98,12 @@ void Communicator::setupCommunicator(bool includeNonInteractingSegments) {
 	logFile->flush();
 }
 
+void Communicator::excludeOwnselfFromCommunication(const char *dependencyName, 
+		int localSegmentTag, std::ofstream &logFile) {
+	logFile << "\tExcluding myself from dependency " << dependencyName << "\n";
+	logFile.flush();
+	SegmentGroup::excludeSegmentFromGroupSetup(localSegmentTag, logFile);
+	logFile << "\tExcluded myself from dependency " << dependencyName << "\n";
+	logFile.flush();
+}
+

@@ -23,34 +23,27 @@ void SegmentGroup::setupCommunicator(std::ofstream &log) {
 	int participants = segments.size();
 	if (participants == segmentCount) return;
 
-        MPI_Group orig_group, new_group;
-        MPI_Comm_group(MPI_COMM_WORLD, &orig_group);
-
-        int *originalRanks = new int[participants];
-        for (unsigned int i = 0; i < participants; i++) {
-                originalRanks[i] = segments.at(i);
-        }
-
-        MPI_Group_incl(orig_group, participants, originalRanks, &new_group);
-        MPI_Comm_create(MPI_COMM_WORLD, new_group, &mpiCommunicator);
+	// the ID of the communicator group is the ID of the first segment; this gives individual groups their unique IDs
+	int color = segments.at(0);
+	int status = MPI_Comm_split(MPI_COMM_WORLD, color, segmentRank, &mpiCommunicator);
+	if (status != MPI_SUCCESS) {
+		log << "\tcould not create a new communicator for the group\n";
+		log.flush();
+		exit(EXIT_FAILURE);
+	}
 
         int groupRank;
         MPI_Comm_rank(mpiCommunicator, &groupRank);
 
+	// at setup time, each segment in the current group should retrieve the group ranks of all other segments to be 
+	// able to contact them later by their group Ids.
         int participantRanks[participants];
-        int status = MPI_Allgather(&segmentRank, 1, MPI_INT, 
-                        participantRanks, 1, MPI_INT, mpiCommunicator);
-
-        if (status == MPI_ERR_COMM) {
-                cout << "invalid communicator\n";
-                exit(EXIT_FAILURE);
-        } else if (status == MPI_ERR_COUNT) {
-                cout << "invalid data element count\n";
-                exit(EXIT_FAILURE);
-        } else if (status == MPI_ERR_BUFFER) {
-                cout << "invalid buffer\n";
-                exit(EXIT_FAILURE);
-        }
+        status = MPI_Allgather(&segmentRank, 1, MPI_INT, participantRanks, 1, MPI_INT, mpiCommunicator);
+	if (status != MPI_SUCCESS) {
+		log << "\tcould not gather rank information of segments in the new communicator\n";
+		log.flush();
+		exit(EXIT_FAILURE);
+	}
 
         for (int rank = 0; rank < participants; rank++) {
                 int segmentTag = participantRanks[rank];
@@ -78,4 +71,14 @@ void SegmentGroup::describe(std::ostream &stream) {
                 stream << '\t' << "Segment Id: " << segments.at(i) << ", ";
                 stream << "Group Rank:" << segmentRanks.at(i) << "\n";
         }
+}
+
+void SegmentGroup::excludeSegmentFromGroupSetup(int segmentId, std::ofstream &log) {
+	MPI_Comm nullComm;
+	int status = MPI_Comm_split(MPI_COMM_WORLD, MPI_UNDEFINED, segmentId, &nullComm);
+	if (status != MPI_SUCCESS) {
+		log << '\t' << segmentId << ": could not exclude myself from the restricted communicator\n";
+		log.flush();
+		exit(EXIT_FAILURE);
+	}
 }

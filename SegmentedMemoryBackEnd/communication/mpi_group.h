@@ -21,6 +21,7 @@ class SegmentGroup {
         int getRank(int segmentId);
         void describe(std::ostream &stream);
 	int getParticipantsCount() { return segments.size(); }
+	static void excludeSegmentFromGroupSetup(int segmentId, std::ofstream &log);
 };
 
 #endif
