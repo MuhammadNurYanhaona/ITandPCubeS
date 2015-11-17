@@ -512,6 +512,11 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << indent << "int localReceiverPpus = localSegment->getPpuCountForLps(Space_";
 	fnBody << receiverSyncLpsName << ")" << stmtSeparator;
 
+	// if there is no local sender or receiver PPU then again this communicator is not meaningful for the current segment
+	fnBody << indent << "if(!localSegment->computeStagesInLps(Space_" << senderSyncLpsName << ") ";
+	fnBody << '\n' << tripleIndent << "&& !localSegment->computeStagesInLps(Space_";
+	fnBody << receiverSyncLpsName << ")) return NULL" << stmtSeparator;
+
 	// declare a communicator and instantiate it with appropriate communicator type
 	fnBody << '\n' << indent << "ScalarCommunicator *communicator = NULL" << stmtSeparator;
 
