@@ -401,8 +401,16 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
         programFile << "- (start.tv_sec + start.tv_usec / 1000000.0)) - timeConsumedSoFar" << stmtSeparator;
 	programFile << indent << "logFile << \"Computation time: \" << computationTime";
 	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
-	programFile << indent << "timeConsumedSoFar += readingTime" << stmtSeparator;
+	programFile << indent << "timeConsumedSoFar += computationTime" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+	
+	// memory allocation and communicator setup time should be included in the actual computation time as for a hand-written
+	// code those overheads should be insignifant -- the same is not true for file I/0, which should be proportionally costly
+	programFile << indent << "double compAndOverheadTime = timeConsumedSoFar - readingTime" << stmtSeparator;
+	programFile << indent << "logFile << \"Computation + overhead time: \" << compAndOverheadTime";
+	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+	
 	
 	// write environmental data structures into output files if instructed by the coordinator program through output bindings
 	programFile << indent << "// storing outputs in files\n"; 
