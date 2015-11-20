@@ -22,9 +22,11 @@
 
 #include <sstream>
 
-enum ArithmaticOperator { ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS, LEFT_SHIFT, RIGHT_SHIFT, POWER };
-enum LogicalOperator { AND, OR, NOT, EQ, NE, GT, LT, GTE, LTE };
-enum ReductionOperator { SUM, PRODUCT, MAX, MIN, AVG, MAX_ENTRY, MIN_ENTRY };
+enum ArithmaticOperator { 	ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS, 
+				LEFT_SHIFT, RIGHT_SHIFT, POWER, 
+				BITWISE_AND, BITWISE_XOR, BITWISE_OR};
+enum LogicalOperator {		AND, OR, NOT, EQ, NE, GT, LT, GTE, LTE };
+enum ReductionOperator { 	SUM, PRODUCT, MAX, MIN, AVG, MAX_ENTRY, MIN_ENTRY };
 
 class TaskDef;
 class FieldAccess;

@@ -1,0 +1,6 @@
+"Radix Sort" {
+	// syntax LPS ':' PPS
+	Space A: 3	// CPU
+	Space B: 1	// hyperthreads
+}
+

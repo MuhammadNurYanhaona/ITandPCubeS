@@ -173,6 +173,9 @@ void ArithmaticExpr::PrintChildren(int indentLevel) {
 		case LEFT_SHIFT: printf("<<"); break;
 		case RIGHT_SHIFT: printf(">>"); break;
 		case POWER: printf("**"); break;
+		case BITWISE_AND: printf("&"); break;
+		case BITWISE_XOR: printf("^"); break;
+		case BITWISE_OR: printf("|"); break;
 	}
 	left->Print(indentLevel + 1);
 	right->Print(indentLevel + 1);
@@ -204,6 +207,15 @@ void ArithmaticExpr::resolveType(Scope *scope, bool ignoreFailure) {
 			|| rightType == Type::charType
 			|| rightType == Type::errorType)) {
 		ReportError::UnsupportedOperand(right, rightType, "arithmatic expression", ignoreFailure);
+	}
+
+	if (op == BITWISE_AND || op == BITWISE_OR || op == BITWISE_XOR) {
+		if ((leftType != NULL && !(leftType == Type::intType || leftType == Type::errorType))
+				|| (rightType != NULL && !(rightType == Type::intType 
+					|| rightType == Type::errorType))) {
+			ReportError::UnsupportedOperand(right, 
+					rightType, "arithmatic expression", ignoreFailure);
+		}
 	}
 
 	if (leftType != NULL && rightType != NULL) {
@@ -266,6 +278,9 @@ void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int 
 			case MODULUS: stream << ' ' << '%' << ' '; break;
 			case LEFT_SHIFT: stream <<" << "; break;
 			case RIGHT_SHIFT: stream << " >> "; break;
+			case BITWISE_AND: stream << " & "; break;
+			case BITWISE_XOR: stream << " ^ "; break;
+			case BITWISE_OR: stream << " | "; break;
 			default: break;
 		}
 		right->translate(stream, indentLevel, currentLineLength, space);

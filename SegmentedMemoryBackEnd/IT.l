@@ -39,7 +39,7 @@ static void DoBeforeEachAction();
 %x COPY
 %option stack
 
-OPERATOR          ([-+/*%=.,;:!<>()[\]{}])
+OPERATOR          ([-+/*%=.,;:!<>()[\]{}&^|])
 SINGLE_COMMENT    ("//"[^\n]*)
 comment_line      ("//"[^\n]*\n)
 

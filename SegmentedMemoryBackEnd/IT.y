@@ -117,6 +117,9 @@ void yyerror(const char *msg); // standard error-handling routine
 %right REDUCE
 %left O_OR
 %left O_AND
+%left '|'
+%left '^'
+%left '&'
 %left O_EQ O_NE
 %left '<' '>' O_LTE O_GTE
 %left O_SB_RANGE
@@ -366,6 +369,9 @@ expr		: expr '+' expr					{ $$ = new ArithmaticExpr($1, ADD, $3, @2); }
 		| expr O_LSH expr				{ $$ = new ArithmaticExpr($1, LEFT_SHIFT, $3, @2); }
 		| expr O_RSH expr				{ $$ = new ArithmaticExpr($1, RIGHT_SHIFT, $3, @2); }
 		| expr O_POWER expr				{ $$ = new ArithmaticExpr($1, POWER, $3, @2); }
+                | expr '&' expr                                 { $$ = new ArithmaticExpr($1, BITWISE_AND, $3, @2); }
+                | expr '^' expr                                 { $$ = new ArithmaticExpr($1, BITWISE_XOR, $3, @2); }
+                | expr '|' expr                                 { $$ = new ArithmaticExpr($1, BITWISE_OR, $3, @2); }
 		| expr '<' expr					{ $$ = new LogicalExpr($1, LT, $3, @2); }
 		| expr '>' expr					{ $$ = new LogicalExpr($1, GT, $3, @2); }
 		| expr O_OR expr				{ $$ = new LogicalExpr($1, OR, $3, @2); }
