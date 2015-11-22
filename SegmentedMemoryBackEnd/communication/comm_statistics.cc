@@ -74,13 +74,13 @@ void CommStatistics::logStatistics(int indentation, std::ofstream &logFile) {
 	for (int i = 0; i < commDependencyNames->NumElements(); i++) {
 		const char *dependency = commDependencyNames->Nth(i);
 		logFile << indent.str() << "Dependency: " << dependency << ":\n";
-		logFile << indent.str() << indent << "Confinements processing time: ";
+		logFile << indent.str() << '\t' << "Confinements processing time: ";
 		logFile << *(confinementConstrTimeMap->Lookup(dependency)) << "\n";
-		logFile << indent.str() << indent << "Buffer setup time: ";
+		logFile << indent.str() << '\t' << "Buffer setup time: ";
 		logFile << *(bufferSetupTimeMap->Lookup(dependency)) << "\n";
-		logFile << indent.str() << indent << "Communication resources setup time: ";
+		logFile << indent.str() << '\t' << "Communication resources setup time: ";
 		logFile << *(commResourcesSetupTimeMap->Lookup(dependency)) << "\n";
-		logFile << indent.str() << indent << "Communication time: ";
+		logFile << indent.str() << '\t' << "Communication time: ";
 		logFile << *(communicationTimeMap->Lookup(dependency)) << "\n";
 	}	
 }
