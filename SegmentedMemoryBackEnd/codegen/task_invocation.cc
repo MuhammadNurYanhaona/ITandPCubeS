@@ -411,6 +411,11 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	
+	// if the task involves communications then log the detailed runtime of communication related activities
+	if (communicatorsGenerated) {
+		programFile << indent << "commStat->logStatistics(2" << paramSeparator << "logFile)" << stmtSeparator;
+		programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+	}
 	
 	// write environmental data structures into output files if instructed by the coordinator program through output bindings
 	programFile << indent << "// storing outputs in files\n"; 

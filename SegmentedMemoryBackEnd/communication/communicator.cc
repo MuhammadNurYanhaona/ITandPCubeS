@@ -1,10 +1,13 @@
 #include "../utils/list.h"
 #include "../runtime/comm_barrier.h"
 #include "comm_buffer.h"
+#include "comm_statistics.h"
 #include "communicator.h"
 #include <iostream>
 #include <cstdlib>
 #include <sstream>
+#include <time.h>
+#include <sys/time.h>
 
 //-------------------------------------------------------------- Send Barrier ------------------------------------------------------------/
 
@@ -23,9 +26,15 @@ void SendBarrier::releaseFunction(int activeSignalsCount) {
 }
 
 void SendBarrier::executeSend() {
+	struct timeval start;
+        gettimeofday(&start, NULL);
 	communicator->prepareBuffersForSend();
 	communicator->sendData();
 	communicator->afterSend();
+	struct timeval end;
+        gettimeofday(&end, NULL);
+	CommStatistics *commStat = communicator->getCommStat();
+	commStat->addCommunicationTime(communicator->getName(), start, end);
 }
 
 //------------------------------------------------------------- Receive Barrier ----------------------------------------------------------/
@@ -45,9 +54,15 @@ void ReceiveBarrier::releaseFunction(int activeSignalsCount) {
 }
 
 void ReceiveBarrier::executeReceive() {
+	struct timeval start;
+        gettimeofday(&start, NULL);
 	communicator->receiveData();
 	communicator->processBuffersAfterReceive();
 	communicator->afterReceive();
+	struct timeval end;
+        gettimeofday(&end, NULL);
+	CommStatistics *commStat = communicator->getCommStat();
+	commStat->addCommunicationTime(communicator->getName(), start, end);
 }
 
 //-------------------------------------------------------------- Communicator ------------------------------------------------------------/
@@ -70,6 +85,7 @@ Communicator::Communicator(int localSegmentTag,
 	}
 	iterationNo = 0;
 	communicatorId = 0;
+	commStat = NULL;
 }
 
 void Communicator::setupBufferTags(int communicatorId, int totalSegmentsInMachine) {
@@ -84,8 +100,12 @@ void Communicator::setupBufferTags(int communicatorId, int totalSegmentsInMachin
 }
 
 void Communicator::setupCommunicator(bool includeNonInteractingSegments) {
+	
 	*logFile << "\tSetting up communicator for " << dependencyName << "\n";
 	logFile->flush();
+	
+	struct timeval start;
+        gettimeofday(&start, NULL);
 	if (includeNonInteractingSegments) {
         	segmentGroup = new SegmentGroup(*participantSegments);
 	} else {
@@ -94,6 +114,10 @@ void Communicator::setupCommunicator(bool includeNonInteractingSegments) {
 		delete interactingParticipants;
 	}
         segmentGroup->setupCommunicator(*logFile);
+	struct timeval end;
+        gettimeofday(&end, NULL);
+	commStat->addCommResourcesSetupTime(dependencyName, start, end);
+
 	*logFile << "\tSetup done for communicator for " << dependencyName << "\n";
 	logFile->flush();
 }

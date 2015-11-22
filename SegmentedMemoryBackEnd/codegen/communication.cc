@@ -488,9 +488,13 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	fnHeader << "getCommunicatorFor_" << dependencyName << "(SegmentState *localSegment" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "List<SegmentState*> *segmentList" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "TaskData *taskData" << paramSeparator;
+	fnHeader << '\n' << doubleIndent << "CommStatistics *commStat" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "TaskGlobals *taskGlobals)";
 
 	fnBody << "{\n\n";
+	
+	// enlist an entry for this communicator in the communication-statistics collector
+	fnBody << indent << "commStat->enlistDependency(\"" << dependencyName << "\")" << stmtSeparator;
 
 	const char *varName = commCharacter->getVarName();
 	DataStructure *structure = rootLps->getStructure(varName);
@@ -537,6 +541,7 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	// check if the allocation was successful and set up the data buffer reference in the communicator for the scalar
 	fnBody << indent << "Assert(communicator != NULL)" << stmtSeparator;
 	fnBody << indent << "communicator->setDataBufferReference(&(taskGlobals->" << varName << "))" << stmtSeparator;
+	fnBody << indent << "communicator->setCommStat(commStat)" << stmtSeparator;
 
 	fnBody << indent << "return communicator" << stmtSeparator;
 	fnBody << "}\n";
@@ -571,9 +576,13 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnHeader << "getCommunicatorFor_" << dependencyName << "(SegmentState *localSegment" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "TaskData *taskData" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
+	fnHeader << '\n' << doubleIndent << "CommStatistics *commStat" << paramSeparator;
 	fnHeader << "\n" << doubleIndent << "PartDistributionMap *distributionMap)";
 
 	fnBody << "{\n\n";
+
+	// enlist an entry for this communicator in the communication-statistics collector
+	fnBody << indent << "commStat->enlistDependency(\"" << dependencyName << "\")" << stmtSeparator;
 
 	// create confinement configuration object for the dependency first
 	fnBody << indent << "int localSegmentTag = localSegment->getPhysicalId()" << stmtSeparator;
@@ -584,6 +593,8 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << '\n' << tripleIndent << "distributionMap)" << stmtSeparator;
 	
 	// then retrieve all data exchanges applicable for the current segments for this dependency
+	fnBody << indent << "struct timeval start" << stmtSeparator;
+        fnBody << indent << "gettimeofday(&start, NULL)" << stmtSeparator;
 	fnBody << indent << "List<DataExchange*> *dataExchangeList = getDataExchangeListFor_";
 	fnBody << dependencyName << "(taskData" << paramSeparator;
 	fnBody << '\n' << tripleIndent << "partConfigMap" << paramSeparator;
@@ -594,6 +605,12 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	// this data dependency
 	fnBody << indent << "if (dataExchangeList == NULL || dataExchangeList->NumElements() == 0) return NULL";
 	fnBody << stmtSeparator << '\n';
+
+	// otherwise log the time spent on creating the data exchange list
+	fnBody << indent << "struct timeval middle" << stmtSeparator;
+        fnBody << indent << "gettimeofday(&middle, NULL)" << stmtSeparator;
+	fnBody << indent << "commStat->addConfinementConstrTime(\"" << dependencyName << "\"" << paramSeparator;
+	fnBody << "start" << paramSeparator << "middle)" << stmtSeparator;
 
 	// create a synchronization configuration object so that would be created buffers can coordinate with operating memory
 	fnBody << indent << "DataPartsList *senderDataParts = NULL" << stmtSeparator;
@@ -666,6 +683,12 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	// returns a NULL communicator in that case
 	fnBody << indent << "if (bufferList->NumElements() == 0) return NULL" << stmtSeparator;
 
+	// otherwise log the time spent on creating the communication buffers
+	fnBody << indent << "struct timeval end" << stmtSeparator;
+        fnBody << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
+	fnBody << indent << "commStat->addBufferSetupTime(\"" << dependencyName << "\"" << paramSeparator;
+	fnBody << "middle" << paramSeparator << "end)" << stmtSeparator;
+
 	// check the type of synchronization and create a communicator appropriate for that type
 	fnBody << '\n' << indent << "Communicator *communicator = NULL" << stmtSeparator;
 	SyncRequirement *syncRequirement = commCharacter->getSyncRequirement();
@@ -686,6 +709,7 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << "bufferList)" << stmtSeparator;
 	fnBody << indent << "Assert(communicator != NULL)" << stmtSeparator;
 	fnBody << indent << "communicator->setParticipants(participantTags)" << stmtSeparator;
+	fnBody << indent << "communicator->setCommStat(commStat)" << stmtSeparator;
 
 	fnBody << indent << "return communicator" << stmtSeparator;
 	fnBody << "}\n";
@@ -774,6 +798,7 @@ void generateCommunicatorMapFn(const char *headerFileName,
 	fnHeader << '\n' << doubleIndent << "TaskGlobals *taskGlobals" << paramSeparator;
 	fnHeader << '\n' << doubleIndent << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
 	fnHeader << "\n" << doubleIndent << "PartDistributionMap *distributionMap" << paramSeparator;
+	fnHeader << "\n" << doubleIndent << "CommStatistics *commStat" << paramSeparator;
 	fnHeader << "\n" << doubleIndent << "std::ofstream &logFile)";
 
 	fnBody << "{\n\n";
@@ -805,12 +830,14 @@ void generateCommunicatorMapFn(const char *headerFileName,
 			fnBody << '\n' << indent << doubleIndent;
 			fnBody << "segmentList" << paramSeparator;
 			fnBody << "taskData" << paramSeparator;
+			fnBody << "commStat" << paramSeparator;
 			fnBody << "taskGlobals";
 		} else {
 			fnBody << "localSegment" << paramSeparator;
 			fnBody << '\n' << indent << doubleIndent;
 			fnBody << "taskData" << paramSeparator;
 			fnBody << "partConfigMap" << paramSeparator;
+			fnBody << "commStat" << paramSeparator;
 			fnBody << "distributionMap";
 		}
 		fnBody << ")" << stmtSeparator;

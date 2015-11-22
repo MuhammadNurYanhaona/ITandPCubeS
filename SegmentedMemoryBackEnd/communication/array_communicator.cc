@@ -267,6 +267,9 @@ void UpSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 	*logFile << "\tsetting up the mode for up-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
 
+	struct timeval start;
+        gettimeofday(&start, NULL);
+
 	CommBuffer *buffer = commBufferList->Nth(0);
 	int receiverSegment = buffer->getExchange()->getReceiver()->getSegmentTags()[0]; 
 	if (receiverSegment == localSegmentTag) {
@@ -296,6 +299,10 @@ void UpSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 		}
 		commMode = (gather == 1) ? GATHER_V : SEND_RECEIVE;
 	}
+
+	struct timeval end;
+        gettimeofday(&end, NULL);
+        commStat->addCommResourcesSetupTime(dependencyName, start, end);
 	
 	*logFile << "\tmode setup done for up-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
@@ -463,6 +470,9 @@ void DownSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments)
 	*logFile << "\tsetting up the mode for down-sync communicator for " << dependencyName << "\n";
 	logFile->flush();
 	
+	struct timeval start;
+        gettimeofday(&start, NULL);
+
 	int senderTag = commBufferList->Nth(0)->getExchange()->getSender()->getSegmentTags()[0];
 	if (senderTag == localSegmentTag) {
 		int scatter = (commBufferList->NumElements() > 1) ? 1 : 0;
@@ -490,6 +500,10 @@ void DownSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments)
 		}
 		commMode = (scatter == 1) ? SCATTER_V : BROADCAST;
 	}
+	
+	struct timeval end;
+        gettimeofday(&end, NULL);
+        commStat->addCommResourcesSetupTime(dependencyName, start, end);
 	
 	*logFile << "\tmode setup done for down-sync communicator for " << dependencyName << "\n";
 	logFile->flush();

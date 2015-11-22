@@ -28,6 +28,9 @@ void ScalarCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 	*logFile << "\tSetting up scalar communicator for " << dependencyName << "\n";
 	logFile->flush();
 
+	struct timeval start;
+        gettimeofday(&start, NULL);
+
 	segmentGroup = new SegmentGroup();
 	segmentGroup->discoverGroupAndSetupCommunicator(*logFile);
 	int participants = segmentGroup->getParticipantsCount();
@@ -58,6 +61,10 @@ void ScalarCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
 			}
 		}
 	}
+
+	struct timeval end;
+        gettimeofday(&end, NULL);
+        commStat->addCommResourcesSetupTime(dependencyName, start, end);
 	
 	*logFile << "\tSetup done for scalar communicator " << dependencyName << "\n";
 	logFile->flush();

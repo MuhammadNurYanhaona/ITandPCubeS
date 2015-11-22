@@ -208,6 +208,7 @@ class CommBufferManager {
 	~CommBufferManager();
 	void setCommBufferList(List<CommBuffer*> *commBufferList) { this->commBufferList = commBufferList; }
 	void addCommBuffer(CommBuffer *buffer) { commBufferList->Append(buffer); }
+	const char *getName() { return dependencyName; }
 
 	// two functions to pre and post process communication buffers before a send and after a receive respectively
 	// these basically read and write the communication buffers

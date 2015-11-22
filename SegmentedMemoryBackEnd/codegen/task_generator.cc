@@ -559,6 +559,9 @@ bool TaskGenerator::generateCommunicators(std::ofstream &stream) {
 
 	std::cout << "\tGenerating code for initializing communicators map\n";
 	stream << std::endl << indent << "// initializing communicators map\n";	
+
+	// create a communication statistics object to record time spent on different aspects of communication
+	stream << indent << "CommStatistics *commStat = new CommStatistics()" << stmtSeparator;
 	
 	// first generate a distribution map for data shared among multiple segments
 	stream << indent << "PartDistributionMap *distributionMap = generateDistributionMap(";
@@ -570,8 +573,8 @@ bool TaskGenerator::generateCommunicators(std::ofstream &stream) {
 	stream << '\n' << indent << doubleIndent;
 	stream << "segmentList" << paramSeparator << "taskData" << paramSeparator << "&taskGlobals";
 	stream << paramSeparator << "configMap" << paramSeparator << "distributionMap"; 
-	stream << '\n' << indent << doubleIndent;
-	stream << paramSeparator << "logFile)" << stmtSeparator;
+	stream << paramSeparator << '\n' << indent << doubleIndent;
+	stream << "commStat" << paramSeparator << "logFile)" << stmtSeparator;
 
 	// finally assign the communicator map to the threads of the current segment
 	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";

@@ -17,6 +17,7 @@
 #include "../utils/list.h"
 #include "../runtime/comm_barrier.h"
 #include "comm_buffer.h"
+#include "comm_statistics.h"
 #include "mpi_group.h"
 
 #include <iostream>
@@ -69,10 +70,14 @@ class Communicator : public CommBufferManager {
 	std::ofstream *logFile;
 	// a communicator Id to be used as tag if needed
 	int communicatorId;
+	// a reference to the communication-statistics gatherer object to log time spent on this communicator
+	CommStatistics *commStat;
   public:
 	Communicator(int localSegmentTag, const char *dependencyName, int localSenderPpus, int localReceiverPpus);
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	void setParticipants(std::vector<int> *participants) { this->participantSegments = participants; }
+	void setCommStat(CommStatistics *commStat) { this->commStat = commStat; }
+	CommStatistics *getCommStat() { return commStat; }
 
 	// sets up the tags in each communication buffer that will be used during MPI communications in some communicator types; it
 	// also assign the communicator an ID which can also be used as a tag in some contexts
