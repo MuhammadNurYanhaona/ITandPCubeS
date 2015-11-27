@@ -45,6 +45,9 @@ class CommStatistics {
 	
 	// function to be used at program's end to log the total time spent on different communication dependencies
 	void logStatistics(int indentation, std::ofstream &logFile);
+
+	// function to find the overall time the task spent on communication 
+	double getTotalCommunicationTime();
   private:
 	void recordTiming(Hashtable<double*> *map, const char *dependency, 
 			struct timeval &start, struct timeval &end);	

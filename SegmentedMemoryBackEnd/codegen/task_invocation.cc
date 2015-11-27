@@ -415,6 +415,12 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	if (communicatorsGenerated) {
 		programFile << indent << "commStat->logStatistics(2" << paramSeparator << "logFile)" << stmtSeparator;
 		programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
+		programFile << indent << "double commTime = commStat->getTotalCommunicationTime()" << stmtSeparator;
+		programFile << indent << "logFile << \"Total communication time: \" << commTime";
+        	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
+		programFile << indent << "logFile << \"Computation without communication time: \"";
+		programFile << " << computationTime - commTime << \" Seconds\" << std::endl" << stmtSeparator;
+		programFile << std::endl;
 	}
 	
 	// write environmental data structures into output files if instructed by the coordinator program through output bindings

@@ -85,6 +85,15 @@ void CommStatistics::logStatistics(int indentation, std::ofstream &logFile) {
 	}	
 }
 
+double CommStatistics::getTotalCommunicationTime() {
+	double communicationTime = 0.0;
+	for (int i = 0; i < commDependencyNames->NumElements(); i++) {
+		const char *dependency = commDependencyNames->Nth(i);
+		communicationTime += *(communicationTimeMap->Lookup(dependency));
+	}
+	return communicationTime;
+}
+
 void CommStatistics::recordTiming(Hashtable<double*> *map, const char *dependency, 
                 struct timeval &start, 
 		struct timeval &end) {
