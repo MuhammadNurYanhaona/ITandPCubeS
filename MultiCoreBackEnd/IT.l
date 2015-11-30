@@ -38,6 +38,7 @@ static void DoBeforeEachAction();
 %s PROGRAM
 %x COPY
 %option stack
+%option noyywrap
 
 OPERATOR          ([-+/*%=.,;:!<>()[\]{}&^|])
 SINGLE_COMMENT    ("//"[^\n]*)

@@ -58,7 +58,7 @@ LEXFLAGS = -d
 YACCFLAGS = -dvty
 
 # Link with standard c library, math library, and lex library
-LIBS = -lc -lm -lfl -pthread
+LIBS = -lc -lm -pthread
 
 # Link with POSIX thread library
 BUILD_LIBS = -pthread
