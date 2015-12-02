@@ -3,7 +3,6 @@
 	// syntax LPS ':' PPS
 	Space A: 4	// Node
 	Space B: 2	// Cores
-	Space C: 2	// Cores
-	Space D: 1	// hyperthreads
+	Space C: 1	// hyperthreads
 }
 

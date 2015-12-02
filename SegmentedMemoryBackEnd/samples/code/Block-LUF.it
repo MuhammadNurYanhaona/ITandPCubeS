@@ -4,7 +4,7 @@ Program (args) {
         bind_output(lufEnv, "u", args.output_file_1)
         bind_output(lufEnv, "l", args.output_file_2)
         bind_output(lufEnv, "p", args.output_file_3)
-	execute("Block LU Factorization"; lufEnv; Partition: args.block_size)
+        execute("Block LU Factorization"; lufEnv; Partition: args.block_size)
 }
 
 Task "Block LU Factorization":
@@ -101,15 +101,13 @@ Task "Block LU Factorization":
 					l_block[row][j] = l[i][j] 
 				} for i, j in l and i >= row_range.min and i <= row_range.max and j > row_range.max
 			}
-			"Subtract LU Blocks From U Section" (Space C) {
-				"Block MM_Multiply Subtract" (Space D) {
-					do {	do { total = reduce ("sum", u_block[i][m] * l_block[m][j]) 
-						} for m in u_block
-						u[i][j] = u[i][j] - total
-					} for i, j in u and i > row_range.max and j > row_range.max
-				}
-				Repeat: from "Block MM_Multiply Subtract" foreach Space D sub-partition
+			"Block MM_Multiply Subtract" (Space C) {
+				do {	do { total = reduce ("sum", u_block[i][m] * l_block[m][j]) 
+					} for m in u_block
+					u[i][j] = u[i][j] - total
+				} for i, j in u and i > row_range.max and j > row_range.max
 			}
+			Repeat: from "Block MM_Multiply Subtract" foreach Space C sub-partition
 		}
 		Repeat: from "Compute L and U Block" for r in a.dimension1.range step block_size 		
 	Partition(b):
@@ -120,10 +118,7 @@ Task "Block LU Factorization":
 			a<dim2>, u<dim1>, u_block<dim1>, l<dim1>, l_column: block_stride(b)
 			l_row, p_column, l_block: replicated 
 		}
-		Space C <1D> divides Space A partitions {
-			u, u_block: block_stride(b)
-		}
-		Space D <2D> divides Space C partitions {
+		Space C <2D> divides Space B partitions {
 			u: block_size(b, b)
 			u_block: block_size(b), replicated
 			l_block: replicated, block_size(b)	
