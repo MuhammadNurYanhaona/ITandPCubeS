@@ -341,6 +341,16 @@ bool ArrayDataStructure::isReordered(Space *comparisonBound) {
 	} else return false;
 }
 
+bool ArrayDataStructure::isReorderedAfter(Space *allocatorSpace) {
+	if (this->space == allocatorSpace) return false;
+	if (isLocallyReordered()) return true;
+        if (source == NULL) return false;
+	ArrayDataStructure *sourceArray = (ArrayDataStructure*) source;
+	if (source->getSpace()->isParentSpace(allocatorSpace)) {
+		return sourceArray->isReorderedAfter(allocatorSpace);		
+	} else return false;
+}
+
 bool ArrayDataStructure::isSingleEntryInDimension(int dimensionNo) {
 	for (int i = 0; i < afterPartitionDimensions->NumElements(); i++) {
 		if (afterPartitionDimensions->Nth(i) == dimensionNo) return false;
@@ -760,7 +770,7 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 			bool reordered = false; 
 			if (lastAllocation != NULL) {
 				Space *allocatingSpace = lastAllocation->getSpace();
-				reordered = array->isReordered(allocatingSpace);	
+				reordered = array->isReorderedAfter(allocatingSpace);
 			}
 
 			// even if the array has not been reordered since last allocation, if its 

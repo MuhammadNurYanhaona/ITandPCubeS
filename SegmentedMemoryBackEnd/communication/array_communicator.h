@@ -92,6 +92,10 @@ class DownSyncCommunicator : public Communicator {
   protected:
 	// after the communicator setup the mode should be either broadcast or scater_v
 	CommMode commMode;
+
+	// a flag denoting if the sender side of the communicator is replicated; if YES then one of many will do the data 
+	// send each time the communicator is used and there will be an extra step to determine who is the current sender
+	bool replicated;
 	
 	// three variables to be used for scatter_v communication  
 	char *scatterBuffer;
@@ -114,7 +118,19 @@ class DownSyncCommunicator : public Communicator {
   private:
 	// just like in the case of gather-buffer setup in the up-sync-communicator, a scatter-buffer setup is needed for
 	// this communicator when scatter_v is used as the form of collective communication 
-	void allocateAndLinkScatterBuffer();	
+	void allocateAndLinkScatterBuffer();
+
+	// this function is needed, in particular, when the sender LPS of the underlying dependency has replication in it;
+	// then the sender with lowest segment tag setup the communication mode 
+	int getFirstSenderInCommunicator();
+
+	// In the replicated mode; all co-operating segments first should identify the sender segment for the current use
+	// of the communicator. They invoke this function for this purpose. 
+	int discoverSender(bool sendingData);
+
+	// this function is used by the sender segment in the scatter_v communication mode to update its local receive buffer
+	// directly without going through the MPI layer
+	void updateLocalBufferPart();	
 };
 
 // communicator class for the scenario where LPUs of two different LPSes that are not hierarchically related needs to be

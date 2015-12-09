@@ -282,10 +282,16 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		Space *allocatorLps = array->getAllocator();
 		const char *allocatorLpsName = allocatorLps->getName();	
 		bool allocatedElsewhere = (allocatorLps != lps);
+		int allocationJump = 0;
 		if (allocatedElsewhere) {
 			programFile << indent << "List<int*> *lpuIdChain = threadState->getLpuIdChainWithoutCopy(";
 			programFile << "Space_" << allocatorLpsName << paramSeparator;
-			programFile << "Space_" << lps->getRoot()->getName() << ")" << stmtSeparator;  
+			programFile << "Space_" << lps->getRoot()->getName() << ")" << stmtSeparator;
+			Space *currentSpace = lps;
+			while (currentSpace != allocatorLps) {
+				allocationJump++;
+				currentSpace = currentSpace->getParent();
+			}   
 		}
 		
 		// retrieve the iterator reference for the part and from it a template part-Id object
@@ -297,8 +303,16 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 
 		// retrieve the hierarchical part Id of the array for current LPU so that the storage instance can 
 		// be identified
-               	programFile << doubleIndent << varName << "Config->generatePartId(lpuIdChain" << paramSeparator;
-		programFile << "partId)" << stmtSeparator; 
+		if (!allocatedElsewhere) {
+               		programFile << doubleIndent << varName;
+			programFile << "Config->generatePartId(lpuIdChain" << paramSeparator;
+			programFile << "partId)" << stmtSeparator;
+		} else {
+               		programFile << doubleIndent << varName;
+			programFile << "Config->generateSuperPartId(lpuIdChain" << paramSeparator;
+			programFile << allocationJump << paramSeparator;
+			programFile << "partId)" << stmtSeparator;
+		}
 
 		// retrieve the data items list
 		programFile << doubleIndent << "DataItems *" << varName << "Items = taskData->getDataItemsOfLps(";

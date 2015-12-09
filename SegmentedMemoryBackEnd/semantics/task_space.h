@@ -235,6 +235,9 @@ class ArrayDataStructure : public DataStructure {
 	// into account all dimensions of the array
 	bool isReordered(Space *comparisonBound);
 	bool isLocallyReordered();
+	// This function is needed to determine if an array needs to be allocated again. The logic is if there
+	// is a reordering of the array after last allocation then the variable should be allocated again. 
+	bool isReorderedAfter(Space *allocatorSpace);
 	// This is used to determine if we need to have a for loop to iterate over the entries along a given
 	// dimension of the array
 	bool isSingleEntryInDimension(int dimensionNo);

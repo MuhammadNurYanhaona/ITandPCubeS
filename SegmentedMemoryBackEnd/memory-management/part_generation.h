@@ -279,8 +279,10 @@ class DataPartitionConfig {
 	// a larger part from an ancestor LPS. Therefore, at runtime the identity of that ancestor part 
 	// needs to be calculated as opposed to the smaller subpart the LPU refers to. This method provides
 	// that functionality. Here the second parameter indicates how many lpuIds should be skipped from 
-	// the rear to reach the desired ancestor.
-	List<int*> *generateSuperPartIdList(List<int*> *lpuIds, int backsteps);  
+	// the rear to reach the desired ancestor. The third parameter is used when an already allocated
+	// list for the part ID should be updated. If it is null then the function creates a new part ID
+	// list and returns it. 
+	List<int*> *generateSuperPartId(List<int*> *lpuIds, int backsteps, List<int*> *idTemplate = NULL);  
 
 	// function to generate the list of data parts (see allocation.h) from the partition configuration;
 	// note that the data parts list returned by this function is unusable until memory allocations has

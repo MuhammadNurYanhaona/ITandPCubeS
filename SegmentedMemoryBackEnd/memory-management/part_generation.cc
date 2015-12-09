@@ -466,9 +466,18 @@ List<int*> *DataPartitionConfig::generatePartIdTemplate() {
 	return templateId;
 }
 
-List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int backsteps) {
-	List<int*> *partId = new List<int*>;
+List<int*> *DataPartitionConfig::generateSuperPartId(List<int*> *lpuIds, int backsteps, List<int*> *idTemplate) {
+	
+	List<int*> *partId = NULL;
+	bool updateOnTemplate = false;
+	if (idTemplate != NULL) {
+		partId = idTemplate;
+		updateOnTemplate = true;
+	} else {
+		partId = new List<int*>;
+	}
 	Assert(partId != NULL);
+
 	int position = lpuIds->NumElements() - 1;
 	int steps = 0;
 	DataPartitionConfig *lastConfig = this;
@@ -477,7 +486,8 @@ List<int*> *DataPartitionConfig::generateSuperPartIdList(List<int*> *lpuIds, int
 		lastConfig = lastConfig->parent;
 		steps++;
 	}
-	lastConfig->generatePartId(lpuIds, position, partId);
+
+	lastConfig->generatePartId(lpuIds, position, partId, updateOnTemplate);
 	return partId;
 }
 
