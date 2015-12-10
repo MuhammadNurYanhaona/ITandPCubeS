@@ -486,8 +486,14 @@ List<int*> *DataPartitionConfig::generateSuperPartId(List<int*> *lpuIds, int bac
 		lastConfig = lastConfig->parent;
 		steps++;
 	}
+	Assert(position >= 0);
 
-	lastConfig->generatePartId(lpuIds, position, partId, updateOnTemplate);
+	if (updateOnTemplate) {
+		int partIdSteps = idTemplate->NumElements();
+		lastConfig->generatePartId(lpuIds, position, partId, true, partIdSteps - 1);
+	} else {
+		lastConfig->generatePartId(lpuIds, position, partId);
+	}
 	return partId;
 }
 

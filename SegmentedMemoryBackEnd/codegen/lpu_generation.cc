@@ -277,16 +277,13 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// that the future developers should investigate for optimization or even for a better design.
 		programFile << indent << "if (taskData != NULL) {\n";
 
-		// determine what LPS allocates the array; if it is different than the current LPS then get the
-		// LPU-Id-chain for that LPS
+		// determine what LPS allocates the array; if it is different than the current LPS then determine the
+		// number of steps need to be traced back to generate the ID for the allocated part
 		Space *allocatorLps = array->getAllocator();
 		const char *allocatorLpsName = allocatorLps->getName();	
 		bool allocatedElsewhere = (allocatorLps != lps);
 		int allocationJump = 0;
 		if (allocatedElsewhere) {
-			programFile << indent << "List<int*> *lpuIdChain = threadState->getLpuIdChainWithoutCopy(";
-			programFile << "Space_" << allocatorLpsName << paramSeparator;
-			programFile << "Space_" << lps->getRoot()->getName() << ")" << stmtSeparator;
 			Space *currentSpace = lps;
 			while (currentSpace != allocatorLps) {
 				allocationJump++;
