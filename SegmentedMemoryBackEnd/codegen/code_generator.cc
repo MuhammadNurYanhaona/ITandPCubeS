@@ -154,7 +154,8 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 	}
 	if (!segmentationFound) segmentedPpsIndex = 0;
 	int threadsPerSegment = 1;
-	if (highestUnpartitionedPpsId > lowestPpsId && segmentedPpsIndex > lowestPpsId) {
+	int segmentedPpsId = pcubesConfig->Nth(segmentedPpsIndex)->id;
+	if (highestUnpartitionedPpsId > lowestPpsId && segmentedPpsId > lowestPpsId) {
 		for (int i = segmentedPpsIndex + 1; i < pcubesConfig->NumElements(); i++) {
 			PPS_Definition *pps = pcubesConfig->Nth(i);
 			if (pps->id >= highestUnpartitionedPpsId) continue;
