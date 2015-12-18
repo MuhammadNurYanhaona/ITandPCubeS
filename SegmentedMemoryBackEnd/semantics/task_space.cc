@@ -750,7 +750,8 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 		variableList = lps->getLocallyUsedArrayNames();
 		for (int i = 0; i < variableList->NumElements(); i++) {
 			DataStructure *variable = lps->getLocalStructure(variableList->Nth(i));
-			if (!variable->getUsageStat()->isAccessed()) continue;
+			LPSVarUsageStat *stat = variable->getUsageStat();
+			if (!(stat->isAccessed() || stat->isReduced())) continue;
 			
 			// if there are boundary overlappings among the partitions of the array
 			// in this LPS then memory need to be allocated for this variable

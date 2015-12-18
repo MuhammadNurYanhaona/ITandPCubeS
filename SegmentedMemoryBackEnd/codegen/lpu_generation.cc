@@ -264,7 +264,8 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 
 		// if the variable is not accessed in the LPS then there is no need for updating the underlying
 		// pointer reference to data
-		if (!array->getUsageStat()->isAccessed()) continue;
+		LPSVarUsageStat *usageStat = array->getUsageStat();
+		if (!(usageStat->isAccessed() || usageStat->isReduced())) continue;
 
 		// TODO note that a segmented PPU may need to determine the LPU Ids of LPUs multiplexed to other 
 		// segmented PPUs for the sake of communication. Now the process of retrieving LPU ids involves
