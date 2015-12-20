@@ -3,6 +3,9 @@
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/sync_stat.h"
 #include "../utils/list.h"
+#include "../utils/decorator_utils.h"
+#include "../utils/code_constant.h"
+#include "../utils/string_utils.h"
 
 #include <cstdlib>
 #include <deque>
@@ -65,14 +68,12 @@ void SyncManager::generateSyncPrimitives() {
 		std::string stmtSeparator = ";\n";
 		std::ofstream stream;
         	stream.open (headerFile, std::ofstream::out | std::ofstream::app);
-        	if (stream.is_open()) {
-                	stream << "/*-----------------------------------------------------------------------------------\n";
-                	stream << "global synchronization primitives\n";
-                	stream << "------------------------------------------------------------------------------------*/\n";
-        	} else {
+        	if (!stream.is_open()) {
                 	std::cout << "Unable to open output header file to write sync primitives";
                 	std::exit(EXIT_FAILURE);
         	}
+		const char *message = "global synchronization primitives";
+		decorator::writeSectionHeader(stream, message);
 
 		stream << std::endl;	
 		for (int i = 0; i < taskSyncList->NumElements() ; i++) {
@@ -84,13 +85,12 @@ void SyncManager::generateSyncPrimitives() {
 			// we mentioned elsewhere that we need two primitives per update as current implementation of sync
 			// primitives does not take into account reader-to-writer okay-to-update-again signals
 			stream << "static RS *" << sync->getSyncName() << "s["; 
-			stream << "Space_" << syncOwner->getName() << "_Threads]";
+			stream << "Space_" << syncOwner->getName() << "_Threads_Per_Segment]";
 			stream << stmtSeparator;
 			stream << "static Barrier *" << sync->getReverseSyncName() << "s[";
-			stream << "Space_" << syncOwner->getName() << "_Threads]";
+			stream << "Space_" << syncOwner->getName() << "_Threads_Per_Segment]";
 			stream << stmtSeparator;
 		}
-		stream << std::endl;	
 		stream.close();
 	}
 }
@@ -107,32 +107,29 @@ void SyncManager::generateSyncInitializerFn() {
 
         	hfStream.open (headerFile, std::ofstream::out | std::ofstream::app);
         	pfStream.open (programFile, std::ofstream::out | std::ofstream::app);
-        	if (hfStream.is_open() && pfStream.is_open()) {
-			std::ostringstream stream;
-                	stream << "/*-----------------------------------------------------------------------------------\n";
-                	stream << "Initializer function for global synchronization primitives\n";
-                	stream << "------------------------------------------------------------------------------------*/\n";
-			hfStream << stream.str();
-			pfStream << stream.str();
-        	} else {
+        	if (!(hfStream.is_open() && pfStream.is_open())) {
                 	std::cout << "Unable to open output file(s) to write global sync primitive initializer function";
                 	std::exit(EXIT_FAILURE);
 		}
 
-		hfStream << "void initializeSyncPrimitives()" << stmtSeparator;
+		const char *message = "Initializer function for global synchronization primitives";
+		decorator::writeSectionHeader(hfStream, message);
+		decorator::writeSectionHeader(pfStream, message);
+		
+		hfStream << std::endl << "void initializeSyncPrimitives()" << stmtSeparator << std::endl;
 		hfStream.close();
 
 		pfStream << std::endl;
-		pfStream << "void " << initials << "::initializeSyncPrimitives() {\n";
+		pfStream << "void " << initials << "::initializeSyncPrimitives() {\n\n";
 		for (int i = 0; i < taskSyncList->NumElements() ; i++) {
 			SyncRequirement *sync = taskSyncList->Nth(i);
 			Space *syncOwner = sync->getSyncOwner();
 			Space *syncSpan = sync->getSyncSpan();
 			pfStream << indent;
-			pfStream << "for (int i = 0; i < Space_" << syncOwner->getName() << "_Threads; i++) {\n";
+			pfStream << "for (int i = 0; i < Space_" << syncOwner->getName() << "_Threads_Per_Segment; i++) {\n";
 			pfStream << doubleIndent << "int participants = ";
-			pfStream << "Space_" << syncSpan->getName() << "_Threads";
-			pfStream << " / Space_" << syncOwner->getName() << "_Threads;";
+			pfStream << "Space_" << syncSpan->getName() << "_Threads_Per_Segment";
+			pfStream << " / Space_" << syncOwner->getName() << "_Threads_Per_Segment";
 			pfStream << stmtSeparator << doubleIndent;
 			pfStream << sync->getSyncName() << "s[i] = new RS(participants)";
 			pfStream << stmtSeparator << doubleIndent;
@@ -141,8 +138,6 @@ void SyncManager::generateSyncInitializerFn() {
 			pfStream << indent << "}\n";
 		}	
 		pfStream << "}\n";
-		pfStream << std::endl;
-		
 		pfStream.close();
 	}
 }
@@ -154,14 +149,14 @@ void SyncManager::generateSyncStructureForThreads() {
 		std::string indent = "\t";
 		std::ofstream stream;
         	stream.open (headerFile, std::ofstream::out | std::ofstream::app);
-        	if (stream.is_open()) {
-                	stream << "/*-----------------------------------------------------------------------------------\n";
-                	stream << "data structure and function for initializing thread's sync primitives\n";
-                	stream << "------------------------------------------------------------------------------------*/\n";
-        	} else {
+        	if (!stream.is_open()) {
                 	std::cout << "Unable to open output header file to write sync data structure for threads";
                 	std::exit(EXIT_FAILURE);
         	}
+
+                const char *message = "data structure and function for initializing thread's sync primitives";
+		decorator::writeSectionHeader(stream, message);		
+
 		stream << std::endl;
 		stream << "class ThreadSyncPrimitive {\n";
 		stream << "  public:\n";
@@ -184,34 +179,45 @@ void SyncManager::generateFnForThreadsSyncStructureInit() {
 		std::string indent = "\t";
 		std::ofstream stream;
         	stream.open (programFile, std::ofstream::out | std::ofstream::app);
-        	if (stream.is_open()) {
-                	stream << "/*-----------------------------------------------------------------------------------\n";
-                	stream << "function for initializing thread's sync primitives\n";
-                	stream << "------------------------------------------------------------------------------------*/\n";
-        	} else {
+        	if (!stream.is_open()) {
                 	std::cout << "Unable to open program file to generate thread's sync primitive initializer function";
                 	std::exit(EXIT_FAILURE);
         	}
+                	
+		const char *message = "function for initializing thread's sync primitives";
+		decorator::writeSectionHeader(stream, message);
 		stream << std::endl;
 
 		stream << "ThreadSyncPrimitive *" << initials << "::";
-		stream << "getSyncPrimitives(ThreadIds *threadIds) {\n";
+		stream << "getSyncPrimitives(ThreadIds *threadIds) {\n\n";
 		stream << indent << "ThreadSyncPrimitive *threadSync = new ThreadSyncPrimitive()" << stmtSeparator;
+
+		List<const char*> *lpsWithGroupIdCalculated = new List<const char*>;
 		for (int i = 0; i < taskSyncList->NumElements() ; i++) {
+			
 			SyncRequirement *sync = taskSyncList->Nth(i);
 			Space *syncOwner = sync->getSyncOwner();
+			const char *syncOwnerName = syncOwner->getName();
+			
+			if (!string_utils::contains(lpsWithGroupIdCalculated, syncOwnerName)) {
+				lpsWithGroupIdCalculated->Append(syncOwnerName);
+				
+				stream << std::endl;
+				stream << indent << "int space" << syncOwnerName << "Group = ";
+				stream << "threadIds->ppuIds[Space_" << syncOwnerName << "].groupId % ";
+				stream << "Space_" << syncOwnerName << "_Threads_Per_Segment";
+				stream << stmtSeparator;
+			}
+						
 			stream << indent << "threadSync->" << sync->getSyncName();
 			stream << " = " << sync->getSyncName() << "s[";
-			stream << std::endl << indent << indent << indent;
-			stream << "threadIds->ppuIds[Space_" << syncOwner->getName();
-			stream << "].groupId]" << stmtSeparator;	
+			stream << "space" << syncOwnerName << "Group]" << stmtSeparator;	
 			stream << indent << "threadSync->" << sync->getReverseSyncName();
 			stream << " = " << sync->getReverseSyncName() << "s[";
-			stream << std::endl << indent << indent << indent;
-			stream << "threadIds->ppuIds[Space_" << syncOwner->getName();
-			stream << "].groupId]" << stmtSeparator;	
+			stream << "space" << syncOwnerName << "Group]" << stmtSeparator;	
 		}
-		stream << indent << "return threadSync" << stmtSeparator;
+
+		stream << std::endl << indent << "return threadSync" << stmtSeparator;
 		stream << "}";
 		stream << std::endl << std::endl;
 		stream.close();

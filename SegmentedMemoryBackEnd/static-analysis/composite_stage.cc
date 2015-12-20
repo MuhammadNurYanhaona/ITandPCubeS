@@ -381,7 +381,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 	}
 
 	// Check if there is any activating condition attached with this container stage. If there is such a
-	// condition then the stages inside should be executed only if the active condition evaluates to true.
+	// condition then the stages inside should be executed only if the activating condition evaluates to true.
 	if (executeCond != NULL) {
 		
 		// first get a hold of the LPU reference
@@ -469,7 +469,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		//-------------------------------------------------------------------------------------------------
 		// If there is any reactivating condition that need be checked before we let the flow of control 
 		// enter the nested stages then we wait for those condition clearance.
-		genSimplifiedWaitingForReactivationCode(stream, nextIndentation, syncSignals);
+		genSimplifiedWaitingForReactivationCode(stream, nextIndentation, updateSignals);
 		//-------------------------------------------------------------------------------------------------
 
 		// Sync stages -- not synchronization dependencies -- that dictate additional data movement 

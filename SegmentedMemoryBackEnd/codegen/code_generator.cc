@@ -74,7 +74,6 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
         if (programFile.is_open()) {
 		const char *header = "thread count constants";
 		decorator::writeSectionHeader(programFile, header);
-		programFile << std::endl;
 	} else {
 		std::cout << "Unable to open output program file";
 		std::exit(EXIT_FAILURE);
@@ -104,8 +103,13 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 			}
 		}
 	}
-
+	
+	const char *sysConstMsg = "System Constants";
+	decorator::writeSubsectionHeader(programFile, sysConstMsg);
+	
 	// compute the total number of threads participating on each PPS starting from the root PPS
+	List<int> *lpsThreadCounts = new List<int>;
+	List<const char*> *lpsNames = new List<const char*>;
         nodeQueue.push_back(mappingRoot);
         while (!nodeQueue.empty()) {
                 MappingNode *node = nodeQueue.front();
@@ -127,6 +131,8 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 		}
 		programFile << "const int Space_" << lps->getName() << "_Threads = ";
 		programFile << threadCount << stmtSeparator;
+		lpsNames->Append(lps->getName());
+		lpsThreadCounts->Append(threadCount);
 	}	
 	
 	// compute the total number of threads that will participate in computing for the task
@@ -141,6 +147,9 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 	}
 	programFile << "const int Total_Threads = " << totalThreads << stmtSeparator;
 
+	const char *sgConstMsg = "Segment Constants";
+	decorator::writeSubsectionHeader(programFile, sgConstMsg);
+	
 	// determine how many threads can operate within each memory segment
 	int segmentedPpsIndex = 0;
 	bool segmentationFound = false;
@@ -164,6 +173,20 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 		}
 	}
 	programFile << "const int Threads_Per_Segment = " << threadsPerSegment << stmtSeparator;
+	int totalSegments = totalThreads / threadsPerSegment;
+	programFile << "const int Total_Segments = " << totalSegments << stmtSeparator;
+	
+	// determine the total number of threads per segment for different LPSes
+	for (int i = 0; i < lpsNames->NumElements(); i++) {
+		const char *lpsName = lpsNames->Nth(i);
+		int lpsThreads = lpsThreadCounts->Nth(i);
+		int lpsThreadsInSegment = std::max(1, lpsThreads / totalSegments);
+		programFile << "const int Space_" << lpsName << "_Threads_Per_Segment = ";
+		programFile << lpsThreadsInSegment << stmtSeparator;
+	} 
+
+	const char *hwConstMsg = "Hardware Constants";
+	decorator::writeSubsectionHeader(programFile, hwConstMsg);
 	
 	// determine the number of threads attached par core to understand how to do thread affinity management
 	int coreSpaceId = pcubesConfig->Nth(0)->id;
