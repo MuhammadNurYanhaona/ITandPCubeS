@@ -55,7 +55,7 @@ void DataPartSpec::initPartTraversalReference(vector<int> *dataIndex, vector<Xfo
 char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, vector<int> *partIndex, int dataItemSize) {
 
 	int partNo = partLocator->getPartListIndex();
-	List<DataPart*> *partList = dataParts->getCurrentList();
+	List<DataPart*> *partList = dataParts->getPartList();
 	DataPart *dataPart = partList->Nth(partNo);
 	Dimension *partDimensions = dataPart->getMetadata()->getBoundary();
 

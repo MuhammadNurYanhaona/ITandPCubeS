@@ -15,6 +15,7 @@
 #include "../utils/list.h"
 #include "../utils/utility.h"
 #include "../codegen/structure.h"
+#include <vector>
 
 /* This class holds all information to identify a part of a data structure configured for a particular LPS and
    to determine how to access/manipulate its content appropriately
@@ -67,34 +68,50 @@ class PartLocator : public SuperPart {
 	inline int getPartListIndex() { return partListIndex; }
 };
 
-/* This class holds the metadata and actual memory allocation for a part of a data structure
-*/
+/* This class holds the metadata and actual memory allocation for a part of a data structure */
 class DataPart {
   protected:
+	// a reference to part dimensions and other metadata information 
 	PartMetadata *metadata;
-	void *data;
+	// Epoch dependent data structures will have multiple copies, one per epoch, of each part stored within a 
+	// PPU. So the epoch count is needed, which is by default set to 1.
+	int epochCount;
+	// a variable to keep track of the head of the circular array 
+	int epochHead;
+	// a circular array of allocation units, one for each epoch version
+	std::vector<void*> *dataVersions;
   public:
-	DataPart(PartMetadata *metadata) { 
-		this->metadata = metadata;
-		this->data = NULL; 
-	}
+	DataPart(PartMetadata *metadata, int epochCount);
+
+	// because this is a templated function, its implementation needs to be in the header file
 	template <class type> static void allocate(DataPart *dataPart) {
 		int size = dataPart->metadata->getSize();
 		Assert(size > 0);
-		dataPart->data = new type[size];
-		Assert(dataPart->data != NULL);
-                char *charData = reinterpret_cast<char*>(dataPart->data);
-                int charSize = size * sizeof(type) / sizeof(char);
-                for (int i = 0; i < charSize; i++) {
-                        charData[i] = 0;
-                }
+		int versionCount = dataPart->epochCount; 
+		std::vector<void*> *dataVersions = dataPart->dataVersions;
+		for (int i = 0; i < versionCount; i++) {
+			void *data = new type[size];
+			Assert(data != NULL);
+			char *charData = reinterpret_cast<char*>(data);
+			int charSize = size * sizeof(type) / sizeof(char);
+			for (int i = 0; i < charSize; i++) {
+				charData[i] = 0;
+			}
+			dataVersions->push_back(data);
+		}
 	}
+
 	inline PartMetadata *getMetadata() { return metadata; }
-	void *getData() { return data; }	
+
+	// returns the memory reference of the allocation unit at the current epoch-head
+	void *getData();
+	// returns the memory reference of the allocation unit for a specific epoch version
+	void *getData(int epoch);
+	// moves the head of the circular array one step ahead
+        inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }	
 };
 
-/* This class provides generic information about all the parts of an LPS data structure that a segment holds
-*/
+/* This class provides generic information about all the parts of an LPS data structure that a segment holds */
 class ListMetadata {
   protected:
 	// dimensionality of the data structure
@@ -117,22 +134,20 @@ class ListMetadata {
    is called a list, an instance can hold multiple lists for epoch dependent data structure where there will be 
    one version of the list for each epoch. Note that, a new data parts list should be created within a PPU for a
    data if there is none already, there is a reordering of data since the last LPS configuration been used for 
-   allocation, or a new LPS using the data is found along a path in the partition hierarchy that is not related
-   to any other LPSes the data has been allocated for. Any LPS that does not use the data in any computation 
-   should maintain a reference to the list of its nearest decendent or ancestor LPS.  
+   allocation, or a new LPS using the data is found along a path in the partition hierarchy that is not related to 
+   any other LPSes the data has been allocated for. Any LPS that does not use the data in any computation should 
+   maintain a reference to the list of its nearest decendent or ancestor LPS.  
 */
 class DataPartsList {
   protected:
+	// a reference to the data structure dimensions and other metadata information
+	ListMetadata *metadata;	  
 	// part-id-tracking container to be used for quick identification of data parts by part-ids
 	PartIdContainer *partContainer;
-	ListMetadata *metadata;	  
-	// Epoch dependent data structures will have multiple copies, one per epoch, of each part stored within a 
-	// PPU. So the epoch count is needed, which is by default set to 1.
-	int epochCount;
 	// a circular array of data-part-list; there is one list per epoch 
-	List<DataPart*> **partLists;
-	// a variable to keep track of the head of the circular array 
-	int epochHead;
+	List<DataPart*> *partList;
+	// a tracking variable for determining the number of epochs each part of this list has
+	int epochCount;
 	// a flag to indicate that this part list is empty and acting as a placeholder only
 	bool invalid;
   public:
@@ -146,7 +161,7 @@ class DataPartsList {
 		dataPartsList->partContainer = partContainer;
 		int partCount = partContainer->getPartCount();
 		if (partCount > 0) {
-			dataPartsList->allocateLists(partCount);
+			dataPartsList->partList = new List<DataPart*>(partCount);
 			dataPartsList->invalid = false;
 
 			PartIterator *iterator = partContainer->getIterator();
@@ -154,17 +169,16 @@ class DataPartsList {
 			int epochCount = dataPartsList->epochCount;
 			SuperPart *part = NULL;
 			int listIndex = 0;
+
 			while ((part = iterator->getCurrentPart()) != NULL) {
 				List<int*> *partId = part->getPartId();
 				PartLocator *partLocator = new PartLocator(partId, dimensions, listIndex);
 				Assert(partLocator != NULL);
 				iterator->replaceCurrentPart(partLocator);
-				for (int t = 0; t < epochCount; t++) {
-					DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId));
-					Assert(dataPart != NULL);
-					DataPart::allocate<type>(dataPart);
-					dataPartsList->partLists[t]->Append(dataPart);
-				}
+				DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId), epochCount);
+				Assert(dataPart != NULL);
+				DataPart::allocate<type>(dataPart);
+				dataPartsList->partList->Append(dataPart);
 				listIndex++;
 				iterator->advance();
 			}
@@ -172,23 +186,17 @@ class DataPartsList {
 			dataPartsList->invalid = true;
 		}
 	}
+	
+	inline ListMetadata *getMetadata() { return metadata; }
+	inline PartIdContainer *getPartContainer() { return partContainer; }
+	inline int getEpochCount() { return epochCount; }
+	inline List<DataPart*> *getPartList() { return partList; }
+	inline bool isInvalid() { return invalid; }
+	DataPart *getPart(List<int*> *partId, PartIterator *iterator);
 
-	// allocate all part lists for different epoch versions
-	void allocateLists(int capacity);
 	// each PPU-controller within a segment should get an iterator for each data part list that to be used later for 
 	// part searching
 	PartIterator *createIterator() { return partContainer->getIterator(); }
-	// moves the head of the circular array one step ahead
-	inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }
-
-
-	DataPart *getPart(List<int*> *partId, PartIterator *iterator);
-	DataPart *getPart(List<int*> *partId, int epoch, PartIterator *iterator);	
-	inline List<DataPart*> *getCurrentList() { return partLists[epochHead]; }
-	inline ListMetadata *getMetadata() { return metadata; }
-	PartIdContainer *getPartContainer() { return partContainer; }
-	inline int getEpochCount() { return epochCount; }
-	bool isInvalid() { return invalid; }
 };
 
 #endif

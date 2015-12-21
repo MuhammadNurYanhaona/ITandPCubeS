@@ -307,55 +307,49 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 		int epochCount = structure->getVersionCount() + 1;
 		const char *varName = structure->getName();
 	
+		// currently scalar and list data structures are directly allocated and maintained in the Task- 
+		// Globals object; so we skip allocating them 	
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
-		if (array == NULL) {
-			programFile << indent << "ScalarDataItems *" << varName << " = ";
-			programFile << "new ScalarDataItems(\"" << varName << "\"" << paramSeparator;
-			programFile << epochCount << ")" << stmtSeparator;
-			programFile << indent<< "ScalarDataItems::allocate";
-			programFile << "<" << type->getCType() << ">(" << varName << ")" << stmtSeparator;
-		} else {
-			int dimensionCount = array->getDimensionality();
-			programFile << indent << "DataItems *" << varName << " = new DataItems(";
-			programFile << '"' << varName << '"' << paramSeparator;
-			programFile << dimensionCount << paramSeparator;
-			programFile << epochCount << ")" << stmtSeparator;
+		if (array == NULL) continue;
 
-			// retrieve the partition config object
-			programFile << indent << "DataPartitionConfig *" << varName << "Config = ";
-			programFile << "partConfigMap->Lookup(";
-			programFile << '"' << varName << "Space" << lpsName << "Config" << '"' << ")";
-			programFile << stmtSeparator;
-			programFile << indent << varName << "->setPartitionConfig(" << varName;
-			programFile << "Config" << ")" << stmtSeparator;
+		int dimensionCount = array->getDimensionality();
+		programFile << indent << "DataItems *" << varName << " = new DataItems(";
+		programFile << '"' << varName << '"' << paramSeparator;
+		programFile << dimensionCount << ")" << stmtSeparator;
 
-			// create an uninitialized data-parts-list object
-			programFile << indent << "DataPartsList *" << varName << "Parts = ";
-			programFile << varName << "Config->generatePartList(" << epochCount;
-			programFile << ")" << stmtSeparator;
-			programFile << indent << varName << "->setPartsList(";
-			programFile << varName << "Parts)" << stmtSeparator; 
+		// retrieve the partition config object
+		programFile << indent << "DataPartitionConfig *" << varName << "Config = ";
+		programFile << "partConfigMap->Lookup(";
+		programFile << '"' << varName << "Space" << lpsName << "Config" << '"' << ")";
+		programFile << stmtSeparator;
+		programFile << indent << varName << "->setPartitionConfig(" << varName;
+		programFile << "Config" << ")" << stmtSeparator;
 
-			// retrieve the dimension order instance for data parts from the configuration object
-			programFile << indent << "std::vector<DimConfig> " << varName << "DimOrder = *(";
-			programFile << varName << "Config->getDimensionOrder())" << stmtSeparator;
+		// create an uninitialized data-parts-list object
+		programFile << indent << "DataPartsList *" << varName << "Parts = ";
+		programFile << varName << "Config->generatePartList(" << epochCount;
+		programFile << ")" << stmtSeparator;
+		programFile << indent << varName << "->setPartsList(";
+		programFile << varName << "Parts)" << stmtSeparator; 
 
-			// create a part-container that will aid the data-parts-list in parts searching and 
-			// management
-			programFile << indent << "PartIdContainer *" << varName << "Container = NULL";
-			programFile << stmtSeparator;
-			programFile << indent << "if (" << varName << "DimOrder.size() == 1) " << varName;
-			programFile << "Container = new PartContainer(";
-			programFile << varName << "DimOrder[0])" << stmtSeparator; 
-			programFile << indent << "else " << varName;
-			programFile << "Container = new PartListContainer(";
-			programFile << varName << "DimOrder[0])" << stmtSeparator;
-			programFile << indent << "Assert(" << varName << "Container != NULL)" << stmtSeparator; 
-		
-			// create a blank part Id template reference
-			programFile << indent << "List<int*> *" << varName << "PartId = ";
-			programFile << varName << "Config->generatePartIdTemplate()" << stmtSeparator;
-		}
+		// retrieve the dimension order instance for data parts from the configuration object
+		programFile << indent << "std::vector<DimConfig> " << varName << "DimOrder = *(";
+		programFile << varName << "Config->getDimensionOrder())" << stmtSeparator;
+
+		// create a part-container that will aid the data-parts-list in parts searching and management
+		programFile << indent << "PartIdContainer *" << varName << "Container = NULL";
+		programFile << stmtSeparator;
+		programFile << indent << "if (" << varName << "DimOrder.size() == 1) " << varName;
+		programFile << "Container = new PartContainer(";
+		programFile << varName << "DimOrder[0])" << stmtSeparator; 
+		programFile << indent << "else " << varName;
+		programFile << "Container = new PartListContainer(";
+		programFile << varName << "DimOrder[0])" << stmtSeparator;
+		programFile << indent << "Assert(" << varName << "Container != NULL)" << stmtSeparator; 
+	
+		// create a blank part Id template reference
+		programFile << indent << "List<int*> *" << varName << "PartId = ";
+		programFile << varName << "Config->generatePartIdTemplate()" << stmtSeparator;
 
 		// add the data item in the LPS content
 		programFile << indent << "space" << lpsName << "Content->addDataItems(";
@@ -476,6 +470,11 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
                 }
                 if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
 		if (!lps->allocateStructures()) continue;
+
+		// The Root LPS allocates all scalars and lists data structures. The current implementation
+		// allocates and maintains those references directly on the TaskGlobals data structure. Thus
+		// we skip allocating for the root	 
+		if (lps == root) continue;
 		
 		programFile << std::endl;
 		genRoutineForLpsContent(headerFile, programFile, initials, lps, root);

@@ -12,10 +12,9 @@
 
 //--------------------------------------------------------------- Data Items ---------------------------------------------------------------/
 
-DataItems::DataItems(const char *name, int dimensionality, int epochCount) {
+DataItems::DataItems(const char *name, int dimensionality) {
 	this->name = name;
 	this->dimensionality = dimensionality;
-	this->epochCount = epochCount;
 	this->ready = false;
 	this->dimConfigList = new List<DimPartitionConfig*>;
 	Assert(this->dimConfigList != NULL);
@@ -58,32 +57,9 @@ DataPart *DataItems::getDataPart(List<int*> *partIdList, PartIterator *iterator)
 	return partsList->getPart(partIdList, iterator);
 }
 
-DataPart *DataItems::getDataPart(List<int*> *partIdList, int epoch, PartIterator *iterator) {
-	Assert(partsList != NULL);
-	return partsList->getPart(partIdList, epoch, iterator);
-}
-        
 List<DataPart*> *DataItems::getAllDataParts() {
 	Assert(partsList != NULL);
-	return partsList->getCurrentList();
-}
-
-//---------------------------------------------------------- Scalar Data Items -------------------------------------------------------------/
-
-ScalarDataItems::ScalarDataItems(const char *name, int epochCount) : DataItems(name, 0, epochCount) {
-	variableList = NULL;
-	epochHead = 0;
-}
-
-void *ScalarDataItems::getVariable() { 
-	Assert(ready);
-	return variableList[epochHead]; 
-}
-        
-void *ScalarDataItems::getVariable(int version) {
-	Assert(ready);
-	int versionEpoch = (epochHead - version) % epochCount;
-	return variableList[versionEpoch];
+	return partsList->getPartList();
 }
 
 //------------------------------------------------------------ LPS Content ----------------------------------------------------------------/
@@ -94,29 +70,19 @@ LpsContent::LpsContent(int id) {
 	Assert(this->dataItemsMap != NULL);
 }
 
-void LpsContent::advanceItemEpoch(const char *varName) {
-	DataItems *dataItems = dataItemsMap->Lookup(varName);
-	if (dataItems != NULL) {
-		dataItems->advanceEpoch();
-	}
-}
-
 void LpsContent::addPartIterators(Hashtable<PartIterator*> *partIteratorMap) {
 	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
 	DataItems *items = NULL;
 	while ((items = iterator.GetNextValue()) != NULL) {
-		ScalarDataItems *scalar = dynamic_cast<ScalarDataItems*>(items);
-		if (scalar == NULL) {
-			PartIterator *iterator = items->createIterator();
-			if (iterator == NULL) continue;
+		PartIterator *iterator = items->createIterator();
+		if (iterator == NULL) continue;
 
-			int dimensions = items->getDimensions();
-			int partIdLevels = items->getPartitionConfig()->getPartIdLevels();
-			iterator->initiatePartIdTemplate(dimensions, partIdLevels);
-			std::ostringstream key;
-			key << "Space_" << id << "_Var_" << items->getName();
-			partIteratorMap->Enter(strdup(key.str().c_str()), iterator);
-		}
+		int dimensions = items->getDimensions();
+		int partIdLevels = items->getPartitionConfig()->getPartIdLevels();
+		iterator->initiatePartIdTemplate(dimensions, partIdLevels);
+		std::ostringstream key;
+		key << "Space_" << id << "_Var_" << items->getName();
+		partIteratorMap->Enter(strdup(key.str().c_str()), iterator);
 	}
 }
 
@@ -124,8 +90,6 @@ bool LpsContent::hasValidDataItems() {
 	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
 	DataItems *items = NULL;
 	while ((items = iterator.GetNextValue()) != NULL) {
-		ScalarDataItems *scalar = dynamic_cast<ScalarDataItems*>(items);
-		if (scalar != NULL) return true;
 		if (!items->isEmpty()) return true;
 	}
 	return false;
@@ -148,11 +112,6 @@ DataItems *TaskData::getDataItemsOfLps(const char *lpsId, const char *varName) {
 	LpsContent *lpsContent = lpsContentMap->Lookup(lpsId);
 	if (lpsContent == NULL) return NULL;
 	else return lpsContent->getDataItems(varName);
-}
-
-void TaskData::advanceItemEpoch(const char *lpsId, const char *varName) {
-	LpsContent *lpsContent = lpsContentMap->Lookup(lpsId);
-	lpsContent->advanceItemEpoch(varName);
 }
 
 Hashtable<PartIterator*> *TaskData::generatePartIteratorMap() {

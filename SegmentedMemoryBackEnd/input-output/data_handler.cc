@@ -34,7 +34,7 @@ void PartInfo::clear() {
 
 PartHandler::PartHandler(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig) {
 	this->fileName = fileName;
-	this->dataParts = partsList->getCurrentList();
+	this->dataParts = partsList->getPartList();
 	this->partConfig = partConfig;
 	this->currentPart = NULL;
 	this->currentPartInfo = NULL;
