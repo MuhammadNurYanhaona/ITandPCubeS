@@ -21,6 +21,8 @@
 
 //-------------------------------------------------- Flow Stage ----------------------------------------------------------/
 
+FlowStage *FlowStage::CurrentFlowStage = NULL;
+
 FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	this->index = index;
 	this->space = space;
@@ -31,6 +33,7 @@ FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	this->synchronizationReqs = NULL;
 	syncDependencies = new StageSyncDependencies(this);
 	this->parent = NULL;
+	this->epochDependentVarList = new List<const char*>;
 }
 
 void FlowStage::mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap) {
@@ -495,7 +498,23 @@ void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 }
 
 void ExecutionStage::performEpochUsageAnalysis() {
+	FlowStage::CurrentFlowStage = this;
 	code->analyseEpochDependencies(space);
+}
+
+void ExecutionStage::print(int indent) {
+	FlowStage::print(indent);
+	if (epochDependentVarList->NumElements() != 0) {
+		for (int i = 0; i <= indent; i++) {
+			std::cout << '\t';
+		}
+		std::cout << "Epoch Dependent Variables: ";
+		for (int i = 0; i < epochDependentVarList->NumElements(); i++) {
+			if (i != 0) std::cout << ", ";
+			std::cout << epochDependentVarList->Nth(i);
+		}
+		std::cout << "\n";
+	}
 }
 
 void ExecutionStage::translateCode(std::ofstream &stream) {

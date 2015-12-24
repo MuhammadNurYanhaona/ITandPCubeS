@@ -54,6 +54,9 @@ namespace string_utils {
 
 	// determine if a list of string contains a particular string
 	bool contains(List<const char*> *list, const char *str);
+
+	// compute the union of two lists and assign the result to the first list
+	void combineLists(List<const char*> *list1, List<const char*> *list2);
 }
 
 #endif

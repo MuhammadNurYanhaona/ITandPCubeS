@@ -18,6 +18,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cstdlib>
 
 //------------------------------------------------ Composite Stage -------------------------------------------------------/
 
@@ -95,27 +96,41 @@ void CompositeStage::addSyncStagesBeforeExecution(FlowStage *nextStage, List<Flo
 		for (int i = 1; i < spaceTransitionChain->NumElements(); i++) {
 			Space *oldSpace = spaceTransitionChain->Nth(i - 1);
 			Space *newSpace = spaceTransitionChain->Nth(i);
+
 			if (oldSpace->isParentSpace(newSpace)) {
-				// new space is higher in the space hierarchy; so an exit from the old space 
-				// should be recorded along with an entry to the new space
+				
+				// new space is higher in the space hierarchy; so an exit from the old space should be recorded 
+				// along with an entry to the new space
 				SpaceEntryCheckpoint *oldCheckpoint = SpaceEntryCheckpoint::getCheckpoint(oldSpace);
 				SyncStage *oldEntrySyncStage = oldCheckpoint->getEntrySyncStage();
 				Hashtable<VariableAccess*> *accessLogs = getAccessLogsForSpaceInIndexLimit(oldSpace,
                         			stageList, oldCheckpoint->getStageIndex(), 
 						nextStageIndex - 1, true);
-				// If there is an entry sync stage for the old space then we need to populate
-				// its accessMap currectly.
+
+				// If there is an entry sync stage for the old space then we need to populate its accessMap 
+				// currectly.
 				if (oldEntrySyncStage != NULL) {
 					SyncStageGenerator::populateAccessMapOfEntrySyncStage(oldEntrySyncStage, accessLogs);
 				}
-				// generate and add to the list all possible sync stages that are required due
-				// to the exit from the old space
+
+				// if some data structures in the old space have overlapping boundary regions among their parts
+				// and some of those data structures have been modified, a ghost regions sync is needed that 
+				// operate on the old space as overlapping boundaries should be synchronized at each space exit
+				SyncStage *reappearanceSync = 
+						SyncStageGenerator::generateReappearanceSyncStage(oldSpace, accessLogs);
+				if (reappearanceSync != NULL) {
+					addStageAtEnd(reappearanceSync);
+				}
+				
+				// generate and add to the list all possible sync stages that are required due to the exit from 
+				// the old space
 				SpaceEntryCheckpoint::removeACheckpoint(oldSpace);
 				List<SyncStage*> *exitSyncs = SyncStageGenerator::generateExitSyncStages(oldSpace, accessLogs);
 				for (int i = 0; i < exitSyncs->NumElements(); i++) {
 					SyncStage *exitSyncStage = exitSyncs->Nth(i);
 					addStageAtEnd(exitSyncStage);
 				}
+		
 				// generate and add any potential return sync stage to the new space
 				accessLogs = getAccessLogsForReturnToSpace(newSpace, stageList, nextStageIndex - 1);
 				SyncStage *returnSync = SyncStageGenerator::generateReturnSyncStage(newSpace, accessLogs);
@@ -123,9 +138,9 @@ void CompositeStage::addSyncStagesBeforeExecution(FlowStage *nextStage, List<Flo
 					addStageAtEnd(returnSync);
 				}
 			} else if (newSpace->isParentSpace(oldSpace)) {
-				// Old space is higher in the space hierarchy; so an entry to the new space
-				// should be recorded. The entry sync stage here, if present, is just a place holder.
-				// Later on during exit its accessLog is filled with appropriate data
+				// Old space is higher in the space hierarchy; so an entry to the new space should be recorded. 
+				// The entry sync stage here, if present, is just a place holder. Later on during exit its 
+				// accessLog is filled with appropriate data
 				SyncStage *entrySyncStage = SyncStageGenerator::generateEntrySyncStage(newSpace);
 				SpaceEntryCheckpoint *checkpoint = 
 						SpaceEntryCheckpoint::addACheckpointIfApplicable(newSpace, nextStageIndex);
@@ -133,19 +148,11 @@ void CompositeStage::addSyncStagesBeforeExecution(FlowStage *nextStage, List<Flo
 				if (entrySyncStage != NULL) {
 					addStageAtEnd(entrySyncStage);
 				}
-			} else if (oldSpace == newSpace) {
-				// transition is made from some computation of the same space to another; we
-				// may need to synchronize overlapping boundary regions of data structures
-				FlowStage *lastStageOnSpace = getLastNonSyncStage();
-				Hashtable<VariableAccess*>  *accessLogs = lastStageOnSpace->getAccessMap();
-				SyncStage *reappearanceSync = 
-						SyncStageGenerator::generateReappearanceSyncStage(newSpace, accessLogs);
-				if (reappearanceSync != NULL) {
-					addStageAtEnd(reappearanceSync);
-				}
-			} else {
-				printf("We should never have a disjoint space transition chain\n");
-				exit(1);
+			} else if (oldSpace != newSpace) {
+				std::cout << "We should never have a disjoint space transition chain\n";
+				std::cout << "Old Space " << oldSpace->getName() << '\n';
+				std::cout << "New Space " << newSpace->getName() << '\n';
+				std::exit(EXIT_FAILURE);
 			}
 		}
 	}
@@ -160,25 +167,37 @@ void CompositeStage::addSyncStagesOnReturn(List<FlowStage*> *stageList) {
 	
 	int lastStageIndex = getLastNonSyncStage()->getIndex();
 	for (int i = 1; i < spaceTransitionChain->NumElements(); i++) {
-        	Space *oldSpace = spaceTransitionChain->Nth(i - 1);
+        	
+		Space *oldSpace = spaceTransitionChain->Nth(i - 1);
         	Space *newSpace = spaceTransitionChain->Nth(i);
+
 		SpaceEntryCheckpoint *oldCheckpoint = SpaceEntryCheckpoint::getCheckpoint(oldSpace);
                 SyncStage *oldEntrySyncStage = oldCheckpoint->getEntrySyncStage();
                 Hashtable<VariableAccess*> *accessLogs = getAccessLogsForSpaceInIndexLimit(oldSpace,
                 		stageList, oldCheckpoint->getStageIndex(), lastStageIndex, true);
-                // If there is an entry sync stage for the old space then we need to populate
-                // its accessMap currectly.
+
+                // If there is an entry sync stage for the old space then we need to populate its accessMap currectly.
                 if (oldEntrySyncStage != NULL) {
                 	SyncStageGenerator::populateAccessMapOfEntrySyncStage(oldEntrySyncStage, accessLogs);
                 }
-                // generate and add to the list all possible sync stages that are required due
-                // to the exit from the old space
+
+		// if some data structures in the old space have overlapping boundary regions among their parts and some of 
+		// those data structures have been modified, a ghost regions sync is needed that operate on the old space as 
+		// overlapping boundaries should be synchronized at each space exit
+		SyncStage *reappearanceSync = 
+				SyncStageGenerator::generateReappearanceSyncStage(oldSpace, accessLogs);
+		if (reappearanceSync != NULL) {
+			addStageAtEnd(reappearanceSync);
+		}
+
+                // generate and add to the list all possible sync stages that are required due to the exit from the old space
                 SpaceEntryCheckpoint::removeACheckpoint(oldSpace);
                 List<SyncStage*> *exitSyncs = SyncStageGenerator::generateExitSyncStages(oldSpace, accessLogs);
                 for (int i = 0; i < exitSyncs->NumElements(); i++) {
                 	SyncStage *exitSyncStage = exitSyncs->Nth(i);
                 	addStageAtEnd(exitSyncStage);
                 }
+
                 // generate and add any potential return sync stage to the new space
                 accessLogs = getAccessLogsForReturnToSpace(newSpace, stageList, lastStageIndex);
                 SyncStage *returnSync = SyncStageGenerator::generateReturnSyncStage(newSpace, accessLogs);
@@ -207,7 +226,10 @@ void CompositeStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 
 void CompositeStage::performEpochUsageAnalysis() {
 	for (int i = 0; i < stageList->NumElements(); i++) {
-		stageList->Nth(i)->performEpochUsageAnalysis();
+		FlowStage *stage = stageList->Nth(i);
+		stage->performEpochUsageAnalysis();
+		List<const char*> *stageEpochList = stage->getEpochDependentVarList();
+		string_utils::combineLists(epochDependentVarList, stageEpochList);
 	}
 }
 
@@ -1217,17 +1239,6 @@ RepeatCycle::RepeatCycle(int index, Space *space, RepeatCycleType type, Expr *ex
 	this->repeatCond = executeCond;
 }
 
-void RepeatCycle::addSyncStagesOnReturn(List<FlowStage*> *stageList) {
-	CompositeStage::addSyncStagesOnReturn(stageList);
-	// For repeat cycles iterating on a space that has data structures with overlapped/ghost regions, extra
-	// reappearance sync may be needed. Therefore, repeat cycle overrides this method and add an additional
-	// clause.
-        SyncStage *reappearanceSync = SyncStageGenerator::generateReappearanceSyncStage(space, accessMap);
-        if (reappearanceSync != NULL) {
-        	addStageAtEnd(reappearanceSync);
-        }
-}
-
 // Here we do the dependency analysis twice to take care of any new dependencies that may arise due to the
 // return from the last stage of repeat cycle to the first one. Note that the consequence of this double iteration
 // may seems to be addition of superfluous dependencies when we have nesting of repeat cycles. However that should
@@ -1241,6 +1252,7 @@ void RepeatCycle::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 
 void RepeatCycle::performEpochUsageAnalysis() {
 	CompositeStage::performEpochUsageAnalysis();
+	FlowStage::CurrentFlowStage = this;
 	if (repeatCond != NULL) repeatCond->setEpochVersions(space, 0);
 }
 

@@ -391,6 +391,13 @@ void EpochExpr::setEpochVersions(Space *space, int oldEpochValue) {
 
 List<FieldAccess*> *EpochExpr::getTerminalFieldAccesses() { return root->getTerminalFieldAccesses(); }
 
+void EpochExpr::translate(std::ostringstream &stream, int indentLevel,
+                        int currentLineLength, Space *space) { 
+	stream << "(";
+	root->translate(stream, indentLevel, currentLineLength, space);
+	stream << ")"; 
+}
+
 //---------------------------------------------- Assignment Expression ------------------------------------------------/
 
 AssignmentExpr::AssignmentExpr(Expr *l, Expr *r, yyltype loc) : Expr(loc) {

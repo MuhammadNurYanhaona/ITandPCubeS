@@ -35,6 +35,7 @@ class Expr : public Stmt {
         void checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 		resolveType(executionScope, ignoreTypeFailures);
 	}
+
 	// As IT uses static typing with type inference, a single pass over the abstract syntax tree is not
 	// sufficient to determine the types of all variables. An impressive solution would be to do recursive
 	// type resolving until no new type can be resolved for IT. We did a simpler solution where, we first
@@ -48,6 +49,7 @@ class Expr : public Stmt {
 	Type *getType() { return type; }
 	
 	//-----------------------------------------------------------------------Helper functions for static analysis
+	
 	// This function decides, as its name suggests, the global variables been accessed by the expression.
 	// It can track assignment of global array reference assignments to some local variables and then 
 	// indirect changes to the global array through that local reference. This analysis is required to 
@@ -56,16 +58,16 @@ class Expr : public Stmt {
 			TaskGlobalReferences *globalReferences) {
 		return new Hashtable<VariableAccess*>;
 	}
+
 	// This function finds out the root object within which an element been accessed or modified by some
 	// expression. It makes sense only for array-access and field-access type expression. The function is
 	// however added to the common expression class to simply some recursive array/field access finding
  	// process.
 	virtual const char *getBaseVarName() { return NULL; }
+
 	// The following two functions are used to determine what version number to be used for epoch dependent
 	// variables in any particular expression. They also update the epoch counter in the LPS referene if
-	// an epoch dependent variable is task-global (currently we only take care of this case as having 
-	// multiple versions for local variables found in computation stages, since they are not retained 
-	// across executions). 
+	// an epoch dependent variable is task-global.
 	void analyseEpochDependencies(Space *space) { setEpochVersions(space, 0); }
 	virtual void setEpochVersions(Space *space, int epoch) {}
 	
@@ -323,7 +325,7 @@ class EpochExpr : public Expr {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	void translate(std::ostringstream &stream, int indentLevel, 
-			int currentLineLength, Space *space) { stream << "\"epoch-expr\""; }
+			int currentLineLength, Space *space);
 };
 
 class FieldAccess : public Expr {

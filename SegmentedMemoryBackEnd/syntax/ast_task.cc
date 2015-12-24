@@ -824,8 +824,22 @@ void RepeatControl::setExecutionSpace(Space *space, PartitionHierarchy *partitio
 		if (executionSpaceCap != space && !space->isParentSpace(executionSpaceCap)) {
 			ReportError::RepeatLoopAdvanceImposssible(GetLocation(), 
 					space->getName(), executionSpaceCap->getName());
-		}	
-		executionSpace = space;
+		}
+		// If the suggested execution space for the repeat loop has data structures with overlapping partitions
+		// then we try to assign the repeat loop a space higher than the one suggested. This is because we need
+		// do synchronize the overlapping regions among partitions in each iteration of the repeat loop. The 
+		// subsequent static analyis part that implants the boundary synchronizing stages within the computation
+		// flow checks against an exit from spaces with overlapping partitions to do the stage augmentation.
+		if (executionSpaceCap == space) {	
+			executionSpace = space;
+		} else {
+			List<const char*> *overlaps = space->getLocalDataStructuresWithOverlappedPartitions();
+			if (overlaps != NULL && overlaps->NumElements() > 0) {
+				executionSpace = space->getParent();
+			} else {
+				executionSpace = space;
+			}
+		}
 	}
 }
 

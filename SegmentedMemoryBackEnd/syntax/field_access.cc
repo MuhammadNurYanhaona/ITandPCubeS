@@ -4,12 +4,13 @@
 #include "ast_type.h"
 
 #include "../utils/list.h"
-#include "string.h"
+#include "../utils/string_utils.h"
 #include "../semantics/symbol.h"
 #include "../semantics/task_space.h"
 #include "errors.h"
 
 #include "../utils/hashtable.h"
+#include "../static-analysis/data_flow.h"
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/loop_index.h"
 #include "../codegen/name_transformer.h"
@@ -17,6 +18,7 @@
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
+#include <string.h>
 
 //-------------------------------------------------- Field Access -----------------------------------------------------/
 
@@ -217,6 +219,14 @@ void FieldAccess::setEpochVersions(Space *space, int epoch) {
 		DataStructure *structure = space->getStructure(field->getName());
 		if (structure != NULL) {
 			structure->updateVersionCount(epoch);
+			const char *globalVarName = structure->getName();
+			if (epoch > 0) {
+				List<const char*> *stageEpochList 
+						= FlowStage::CurrentFlowStage->getEpochDependentVarList();
+				if (!string_utils::contains(stageEpochList, globalVarName)) {
+					stageEpochList->Append(globalVarName);
+				}
+			}
 		}
 	} else base->setEpochVersions(space, epoch);
 }
@@ -283,7 +293,11 @@ void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int cur
 	} else {
 		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
 		const char *fieldName = field->getName();
-		stream << transformer->getTransformedName(fieldName, metadata, local);
+		const char *transformedName = transformer->getTransformedName(fieldName, metadata, local);
+		stream << transformedName;
+		if (epochVersion > 0) {
+			stream << "_lag_" << epochVersion;
+		}
 	}
 }
 

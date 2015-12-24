@@ -45,9 +45,8 @@ enum SyncStageType { Entrance, Exit, Return, Reappearance };
 enum SyncMode { Load, Load_And_Configure, Ghost_Region_Update, Restore };
 
 /*	Repeat Cycles can be of two types
-	Subpartition_Repeat: repeat one or more execution stage for all sub-partitions of sub-partitioned
-			     variables of a space. Not that variables that are not sub-partitioned will 
-			     be loaded once.
+	Subpartition_Repeat: repeat one or more execution stage for all sub-partitions of sub-partitioned variables of 
+			     a space. Not that variables that are not sub-partitioned will be loaded once.
 	Conditional_Repeat: is a generic loop condition based repeat of execution stages
 */
 enum RepeatCycleType { Subpartition_Repeat, Conditional_Repeat };
@@ -75,6 +74,15 @@ class FlowStage {
 	DataDependencies *dataDependencies;
 	StageSyncReqs *synchronizationReqs;
 	StageSyncDependencies *syncDependencies;
+
+	// This list stores data structures used in epoch expressions inside the subflow/computation represented by 
+	// this flow stage. This information is later used to advance appropriate data structures' epoch version after
+	// the execution of the flow stage.
+	List<const char*> *epochDependentVarList;
+  public:
+	// a static reference to be used, if needed, during analysis the content of a flow stage to find out the stage
+	// confining the locus of analysis; currently this has been used for epoch dependency analysis only
+	static FlowStage *CurrentFlowStage;
   public:
 	FlowStage(int index, Space *space, Expr *executeCond);
 	virtual ~FlowStage() {};
@@ -89,6 +97,7 @@ class FlowStage {
 	void setParent(FlowStage *parent) { this->parent = parent; }
 	FlowStage *getParent() { return parent; }
 	Space *getSpace() { return space; }
+	List<const char*> *getEpochDependentVarList() { return epochDependentVarList; }
 	Hashtable<VariableAccess*> *getAccessMap() { return accessMap; }
 	void setAccessMap(Hashtable<VariableAccess*> *accessMap) { this->accessMap = accessMap; }
 	void mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap);
@@ -235,6 +244,7 @@ class ExecutionStage : public FlowStage {
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
 	void performEpochUsageAnalysis();
+	void print(int indent);
 
 	// helper method for generating back-end code
 	void translateCode(std::ofstream &stream);
@@ -389,7 +399,6 @@ class RepeatCycle : public CompositeStage {
 	Hashtable<VariableAccess*> *repeatConditionAccessMap;
   public:
 	RepeatCycle(int index, Space *space, RepeatCycleType type, Expr *executeCond);
-	void addSyncStagesOnReturn(List<FlowStage*> *stageList);
 	void setRepeatConditionAccessMap(Hashtable<VariableAccess*> *map) { repeatConditionAccessMap = map; }
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void performEpochUsageAnalysis();

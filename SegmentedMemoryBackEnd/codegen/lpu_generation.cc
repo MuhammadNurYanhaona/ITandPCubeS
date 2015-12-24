@@ -276,7 +276,7 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// For now, we are using the absense of a valid task-data reference as an indicator for metadata
 		// only LPUs. This process should be changed alongside an update to the LPU generation process
 		// that the future developers should investigate for optimization or even for a better design.
-		programFile << indent << "if (taskData != NULL) {\n";
+		programFile << '\n' << indent << "if (taskData != NULL) {\n";
 
 		// determine what LPS allocates the array; if it is different than the current LPS then determine the
 		// number of steps need to be traced back to generate the ID for the allocated part
@@ -335,13 +335,9 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// in the LPU too
 		int versionCount = array->getLocalVersionCount();
 		for (int j = 1; j <= versionCount; j++) {
-			programFile << doubleIndent << varName << "Part = ";
-			programFile << varName << "Items->getDataPart(partId" << paramSeparator;
-			programFile << j << paramSeparator;
-			programFile << "iterator)" << stmtSeparator;
 			programFile << doubleIndent << "lpu->" << varName << "_lag_" << j << " = ";
 			programFile << "(" << elemType->getCType() << "*) ";
-			programFile << varName << "Part->getData()" << stmtSeparator;
+			programFile << varName << "Part->getData(" << j << ")" << stmtSeparator;
 		}
 		programFile << indent << "}\n";
 	}
