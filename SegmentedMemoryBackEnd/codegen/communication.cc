@@ -638,9 +638,10 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << receiverSyncLpsName << ")" << stmtSeparator << '\n';
 
 	// determine if the data structure has multiple versions; this will tell if we can preprocessed buffers that keep track
-	// of operating memory addresses to populate (and vice versa) elements of the communication buffer for a data exchange 
+	// of operating memory addresses to populate (and vice versa) elements of the communication buffer for a data exchange
+	// note that the default version count is 0 
 	int versionCount = structure->getVersionCount();
-	const char *bufferTypePrefix = (versionCount > 1) ? "" : "Preprocessed";
+	const char *bufferTypePrefix = (versionCount > 0) ? "" : "Preprocessed";
 
 	// instantiate a list of communication buffers to add virtual/physical communication buffers into it for data exchanges
 	// based on whether or not the exchange demands cross-segments communication 

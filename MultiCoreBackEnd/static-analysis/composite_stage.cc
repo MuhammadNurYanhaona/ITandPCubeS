@@ -469,6 +469,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// iterates over LPUs of the LPS under concern inside its body if it does not use LPS dependent 
 		// variables in repeat evaluation process. Otherwise, it should follow the normal code generation
 		// procedure followed for other stages 
+		bool groupIsLpsIndRepeat = false;
 		if (currentGroup->NumElements() == 1) {
 			FlowStage *stage = currentGroup->Nth(0);
 			RepeatCycle *repeatCycle = dynamic_cast<RepeatCycle*>(stage);
@@ -480,24 +481,27 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 				repeatCycle->generateInvocationCode(stream, nextIndentation, space);
 				// reset the repeat cycle's LPS to the previous one once code generation is done
 				repeatCycle->changeSpace(repeatSpace);
-				continue;
+				groupIsLpsIndRepeat = true;
 			}	
 		}
-		Space *groupSpace = currentGroup->Nth(0)->getSpace();
-		// if the LPS of the group is not the same of this one then we need to consider LPS entry, i.e.,
-		// include a while loop for the group to traverse over the LPUs
-		if (groupSpace != space) {
-			// create a local composite flow stage to apply the logic of this function recursively
-			CompositeStage *tempStage = new CompositeStage(-1, groupSpace, NULL);
-			tempStage->setStageList(currentGroup);
-			tempStage->generateInvocationCode(stream, nextIndentation, space);
-			delete tempStage;
-		// otherwise the current LPU of this composite stage will suffice and we execute all the nested
-		// stages one after one.	 
-		} else {
-			for (int j = 0; j < currentGroup->NumElements(); j++) {
-				FlowStage *stage = currentGroup->Nth(j);
-				stage->generateInvocationCode(stream, nextIndentation, space);
+
+		if (!groupIsLpsIndRepeat) {
+			Space *groupSpace = currentGroup->Nth(0)->getSpace();
+			// if the LPS of the group is not the same of this one then we need to consider LPS entry, 
+			// i.e., include a while loop for the group to traverse over the LPUs
+			if (groupSpace != space) {
+				// create a local composite stage to apply the logic of this function recursively
+				CompositeStage *tempStage = new CompositeStage(-1, groupSpace, NULL);
+				tempStage->setStageList(currentGroup);
+				tempStage->generateInvocationCode(stream, nextIndentation, space);
+				delete tempStage;
+			// otherwise the current LPU of this composite stage will suffice and we execute all the 
+			// nested stages one after one.	 
+			} else {
+				for (int j = 0; j < currentGroup->NumElements(); j++) {
+					FlowStage *stage = currentGroup->Nth(j);
+					stage->generateInvocationCode(stream, nextIndentation, space);
+				}
 			}
 		}
 

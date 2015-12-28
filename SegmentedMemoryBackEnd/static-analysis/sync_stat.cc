@@ -53,6 +53,7 @@ SyncRequirement::SyncRequirement(const char *syncTypeName) {
 	this->waitingComputation = NULL;
 	this->arc = NULL;
 	this->index = -1;
+	counterRequirement = true;
 }
 
 void SyncRequirement::print(int indent) {

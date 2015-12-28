@@ -509,7 +509,8 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// there should be a special checking for repeat loops. Repeat loops will have the while loop that
 		// iterates over LPUs of the LPS under concern inside its body if it does not use LPS dependent 
 		// variables in repeat evaluation process. Otherwise, it should follow the normal code generation
-		// procedure followed for other stages 
+		// procedure followed for other stages
+		bool groupIsLpsIndRepeat = false; 
 		if (currentGroup->NumElements() == 1) {
 			FlowStage *stage = currentGroup->Nth(0);
 			RepeatCycle *repeatCycle = dynamic_cast<RepeatCycle*>(stage);
@@ -521,24 +522,27 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 				repeatCycle->generateInvocationCode(stream, nextIndentation, space);
 				// reset the repeat cycle's LPS to the previous one once code generation is done
 				repeatCycle->changeSpace(repeatSpace);
-				continue;
+				groupIsLpsIndRepeat = true;
 			}	
 		}
-		Space *groupSpace = currentGroup->Nth(0)->getSpace();
-		// if the LPS of the group is not the same of this one then we need to consider LPS entry, i.e.,
-		// include a while loop for the group to traverse over the LPUs
-		if (groupSpace != space) {
-			// create a local composite flow stage to apply the logic of this function recursively
-			CompositeStage *tempStage = new CompositeStage(-1, groupSpace, NULL);
-			tempStage->setStageList(currentGroup);
-			tempStage->generateInvocationCode(stream, nextIndentation, space);
-			delete tempStage;
-		// otherwise the current LPU of this composite stage will suffice and we execute all the nested
-		// stages one after one.	 
-		} else {
-			for (int j = 0; j < currentGroup->NumElements(); j++) {
-				FlowStage *stage = currentGroup->Nth(j);
-				stage->generateInvocationCode(stream, nextIndentation, space);
+
+		if (!groupIsLpsIndRepeat) {
+			Space *groupSpace = currentGroup->Nth(0)->getSpace();
+			// if the LPS of the group is not the same of this one then we need to consider LPS entry, 
+			// i.e., include a while loop for the group to traverse over the LPUs
+			if (groupSpace != space) {
+				// create a local composite stage to apply the logic of this function recursively
+				CompositeStage *tempStage = new CompositeStage(-1, groupSpace, NULL);
+				tempStage->setStageList(currentGroup);
+				tempStage->generateInvocationCode(stream, nextIndentation, space);
+				delete tempStage;
+			// otherwise the current LPU of this composite stage will suffice and we execute all the 
+			// nested stages one after one.	 
+			} else {
+				for (int j = 0; j < currentGroup->NumElements(); j++) {
+					FlowStage *stage = currentGroup->Nth(j);
+					stage->generateInvocationCode(stream, nextIndentation, space);
+				}
 			}
 		}
 
@@ -756,7 +760,7 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 	// dependencies. On the other hand, if the source stage executes earlier than the dependent stage then it applies
 	// always, i.e., it is independent of any loop iteration, if exists, that sorrounds the composite stage.
 	// Therefore, we use following two lists to partition the list of communication requirements into forward and
-	// backword dependencies. 
+	// backward dependencies. 
 	List<SyncRequirement*> *forwardDependencies = new List<SyncRequirement*>;
 	List<SyncRequirement*> *backwardDependencies = new List<SyncRequirement*>;
 
@@ -843,9 +847,9 @@ void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, 
 	// dependencies. On the other hand, if the source stage executes earlier than the dependent stage then it applies
 	// always, i.e., it is independent of any loop iteration, if exists, that sorrounds the composite stage.
 	// Therefore, we use following two lists to partition the list of synchronization requirements into forward and
-	// backword dependencies. 
+	// backward dependencies. 
 	List<SyncRequirement*> *forwardSyncs = new List<SyncRequirement*>;
-	List<SyncRequirement*> *backwordSyncs = new List<SyncRequirement*>;
+	List<SyncRequirement*> *backwardSyncs = new List<SyncRequirement*>;
 
 	for (int i = 0; i < syncDependencies->NumElements(); i++) {
 		SyncRequirement *sync = syncDependencies->Nth(i);
@@ -855,7 +859,7 @@ void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, 
 		FlowStage *destination = arc->getDestination();
 		if (source->getIndex() < destination->getIndex()) {
 			forwardSyncs->Append(sync);
-		} else backwordSyncs->Append(sync);
+		} else backwardSyncs->Append(sync);
 	}
 
 	std::ostringstream indentStr;
@@ -879,10 +883,10 @@ void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, 
 	}
 
 	// write the code for backword sync requirements within an if block
-	if (backwordSyncs->NumElements() > 0) {
+	if (backwardSyncs->NumElements() > 0) {
 		stream << indentStr.str() << "if (repeatIteration > 0) {\n";
-		for (int i = 0; i < backwordSyncs->NumElements(); i++) {
-			SyncRequirement *sync = backwordSyncs->Nth(i);
+		for (int i = 0; i < backwardSyncs->NumElements(); i++) {
+			SyncRequirement *sync = backwardSyncs->Nth(i);
 			Space *dependentLps = sync->getDependentLps();
 			stream << indentStr.str() << "\tif (threadState->isValidPpu(Space_" << dependentLps->getName();
 			stream << ")) {\n";
@@ -1029,21 +1033,35 @@ void CompositeStage::generateDataSendsForGroup(std::ofstream &stream, int indent
 		stream << currentComm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
 		stream << indentStr.str() << indent << "if (communicator != NULL) {\n";
 		
-		// If the counter variable for the sync has been updated then the current PPU controller
-		// has data to send so it should indicate that fact in its call to the communicator. Otherwise
-		// it should only report that it has reached this particular execution point.
-		stream << indentStr.str() << doubleIndent << "if (" << counterVarName << " > 0) {\n";
-		stream << indentStr.str() << tripleIndent << "communicator->send(";
-		stream << "REQUESTING_COMMUNICATION" << paramSeparator;
-		stream << "commCounter" << commIndex <<  ")" << stmtSeparator;
-		stream << indentStr.str() << doubleIndent << "} else communicator->send(";
-		stream << "PASSIVE_REPORTING" << paramSeparator;
-		stream << "commCounter" << commIndex << ")" << stmtSeparator;
+		// Check if the current communication is conditional, i.e., it only gets signaled by threads that
+		// executed a certain execution flow-stage. In that case, there will be a counter variable set to a
+		// non-zero value. For communication signals issued by compiler injected sync-stages, there will be
+		// no such counter variable. 
+		bool needCounter = currentComm->getCounterRequirement();
+		
+		if (needCounter) {
+			// If the counter variable for the sync has been updated then the current PPU controller has 
+			// data to send so it should indicate that fact in its call to the communicator. Otherwise
+			// it should only report that it has reached this particular execution point.
+			stream << indentStr.str() << doubleIndent << "if (" << counterVarName << " > 0) {\n";
+			stream << indentStr.str() << tripleIndent << "communicator->send(";
+			stream << "REQUESTING_COMMUNICATION" << paramSeparator;
+			stream << "commCounter" << commIndex <<  ")" << stmtSeparator;
+			stream << indentStr.str() << doubleIndent << "} else communicator->send(";
+			stream << "PASSIVE_REPORTING" << paramSeparator;
+			stream << "commCounter" << commIndex << ")" << stmtSeparator;
+		} else {
+			stream << indentStr.str() << doubleIndent << "communicator->send(";
+			stream << "REQUESTING_COMMUNICATION" << paramSeparator;
+			stream << "commCounter" << commIndex <<  ")" << stmtSeparator;
+		}
 
 		stream << indentStr.str() << indent << "}\n";
 		
-		// then reset the counter	 
-		stream << indentStr.str() << indent << counterVarName << " = 0" << stmtSeparator;
+		// then reset the counter
+		if (needCounter) {	 
+			stream << indentStr.str() << indent << counterVarName << " = 0" << stmtSeparator;
+		}
 		stream << indentStr.str() << "}\n";
 	}
 }
@@ -1194,9 +1212,18 @@ void CompositeStage::genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &
 		
 		SyncRequirement *currentSync = syncRequirements->Nth(i);
 		const char *counterVarName = currentSync->getDependencyArc()->getArcName();
+	
+		// Check if the current synchronization is conditional, i.e., it only gets signaled by threads that
+		// executed a certain execution flow-stage. In that case, there will be a counter variable set to a
+		// non-zero value. For synchronization signal issued by compiler injected sync-stages, there will be
+		// no such counter variable. 
+		bool needCounter = currentSync->getCounterRequirement();
 		
+		stream << indent.str() << "if (";
 		// check if the concerned update did take place
-		stream << indent.str() << "if (" << counterVarName << " > 0 && ";
+		if (needCounter) {
+			stream << counterVarName << " > 0 && ";
+		}
 		// also check if the current PPU is a valid candidate for signaling update
 		FlowStage *sourceStage = currentSync->getDependencyArc()->getSource();
 		Space *signalingLps = sourceStage->getSpace();
@@ -1209,9 +1236,11 @@ void CompositeStage::genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &
 		if (signalSource->getRepeatIndex() > 0) stream << "repeatIteration";
 		else stream << "0";
 		stream << ")" << stmtSeparator;
-		// then reset the counter	 
-		stream << indent.str() << '\t';
-		stream << counterVarName << " = 0" << stmtSeparator;
+		// then reset the counter
+		if (needCounter) {	 
+			stream << indent.str() << '\t';
+			stream << counterVarName << " = 0" << stmtSeparator;
+		}
 
 		// the waiting is in an else block coupled with the signaling if block as the current implementation
 		// of synchronization primitives does not support the PPU (or PPUs) in the signaling block to also be

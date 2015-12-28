@@ -157,6 +157,7 @@ void LogicalExpr::setEpochVersions(Space *space, int epoch) {
 }
 
 void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
+	stream << "(";
 	if (left != NULL) {
 		left->translate(stream, indentLevel, currentLineLength, space);
 	}
@@ -172,6 +173,7 @@ void LogicalExpr::translate(std::ostringstream &stream, int indentLevel, int cur
 		case LTE: stream << " <= "; break;
 	}
 	right->translate(stream, indentLevel, currentLineLength, space);
+	stream << ")";
 }
 
 List<FieldAccess*> *LogicalExpr::getTerminalFieldAccesses() {

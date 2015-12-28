@@ -15,13 +15,17 @@ Program (args) {
 
 Task "Five Points Stencil":
 	Define:
-		plate: 2D Array of Real single-precision
+		plate: 2D Array of Real double-precision
 		t: Epoch
-		total_iterations: Integer
+		local_rf, global_rf, total_rf: Range
+		iteration_1, iteration_2, iteration_3: Integer
 	Environment:
 		plate: link
 	Initialize (iterations):
-		total_iterations = iterations
+		total_rf.min = local_rf.min = global_rf.min = 0
+		total_rf.max = ((iterations + partition.m - 1) / partition.m) - 1
+		global_rf.max = ((partition.m + partition.n - 1) / partition.n) - 1
+		local_rf.max = partition.n - 1
 	Compute:
 		"Refine Global Estimate" (Space A) {
 			"Refine Local Estimate" (Space B) {
@@ -38,11 +42,11 @@ Task "Five Points Stencil":
 					and (i > localRows.min and i < localRows.max) 		\
 					and (j > localCols.min and j < localCols.max)
 				}
-				Repeat: from "Calculate Estimate" while t.current % partition.n != 0
+				Repeat: from "Calculate Estimate" for iteration_1 in local_rf
 			} 
-			Repeat: from "Refine Local Estimate" while t.current % partition.m != 0
+			Repeat: from "Refine Local Estimate" for iteration_2 in global_rf
 		}
-		Repeat: from "Refine Global Estimate" while t.current < total_iterations
+		Repeat: from "Refine Global Estimate" for iteration_3 in total_rf
 	Partition (p, k, l, m, n):
 		Space A <1D> { 
 			plate: block_size(p) padding(m)

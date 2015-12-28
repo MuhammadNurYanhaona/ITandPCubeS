@@ -9,6 +9,7 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
+#include "../utils/code_constant.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
@@ -471,6 +472,15 @@ void SyncStage::analyzeSynchronizationNeeds() {
 			synchronizationReqs->addVariableSyncReq(varName, ghostRegion, true);
 		}
 	}
+
+	// indicates that the synchronization requirements registered by the stage do not need any execution 
+	// counter to be activated
+	if (synchronizationReqs != NULL) {
+		List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
+		for (int i = 0; i < syncList->NumElements(); i++) {
+			syncList->Nth(i)->setCounterRequirement(false);
+		}
+	}
 }
 
 void SyncStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
@@ -597,33 +607,116 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
 	
 	// write the indent
-	std::ostringstream indent;
-	for (int i = 0; i < indentation; i++) indent << '\t';
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentation; i++) indentStr << '\t';
 	std::ostringstream nextIndent;
-	nextIndent << indent.str();
+	nextIndent << indentStr.str();
 
-	// TODO logic for handling stages with reduction operation need to be investigated further. For now
-	// we are not using the group entry restriction as reductions are converted into sequential traversal
-	// of underlying array(s). Therefore the if block is commented out below.
+	// TODO logic for handling stages with reduction operation need to be investigated further. For now we are 
+	// not using the group entry restriction as reductions are converted into sequential traversal of underlying 
+	// array(s). Therefore the if block is commented out below.
 	//
-	// if this is not a group entry execution stage then add a condition ensure that a PPU with only
-	// valid ID corresponding to this stage's LPS should go on executing the code
+	// if this is not a group entry execution stage then add a condition ensure that a PPU with only valid ID 
+	// corresponding to this stage's LPS should go on executing the code
 	// if (!isGroupEntry()) {
-		nextIndent << '\t';
-		stream << indent.str() << "if (threadState->isValidPpu(Space_" << space->getName();
+		nextIndent << indent;
+		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << space->getName();
 		stream << ")) {\n";
 	// }
+	
+	// if the flow-stage's body involves epoch expressions then we have to advance the epoch versions of related
+	// data structures   
+	if (epochDependentVarList->NumElements() > 0) {
+		stream << nextIndent.str() << "{ // advancing epoch versions of relevant data structures\n";
+
+		// retrieve common properties that will be needed to do data structure version updates and later LPU
+		// reference refreshing
+		const char *lpsName = space->getName();
+		stream << nextIndent.str() << "TaskData *taskData = ";
+		stream << "threadState->getTaskData()" << stmtSeparator;
+		stream << nextIndent.str() << "Hashtable<DataPartitionConfig*> ";
+		stream << "*partConfigMap = threadState->getPartConfigMap()" << stmtSeparator;
+
+		for (int i = 0; i < epochDependentVarList->NumElements(); i++) {
+			const char *varName = epochDependentVarList->Nth(i);
+			DataStructure *structure = space->getStructure(varName);
+			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+
+			// version count is by default 0; thus we add 1 here
+			int versions = structure->getLocalVersionCount() + 1;
+			if (array == NULL) {
+				// for a scalar variable's version update we need to swap values with older versions
+				// of the same variable directly inside the thread-globals object
+				stream << nextIndent.str() << indent;
+				stream << "{ // epoch advancement for " << varName << "\n";
+
+				// swapping must be done from the rear end; otherwise, intermediate values will get
+				// corrupted in the process
+				for (int v = versions - 1; v > 0; v--) {
+					stream << nextIndent.str() << indent << "taskGlobals->" << varName;
+					stream << "_lag_" << v << " = taskGlobals->" << varName;
+					if (v > 1) { stream << "_lag_" << (v - 1); }
+					stream << stmtSeparator;
+				}				
+
+				stream << nextIndent.str() << indent << "}\n";
+			} else {
+				// for an array, we need to identify the data part Id from the LPU Id then retrieve 
+				// the data-part object and rotate its memory-allocation cylinder to do the version 
+				// update
+				stream << nextIndent.str() << indent;
+				stream << "{ // epoch advancement for " << varName << "\n";
+
+				stream << nextIndent.str() << indent << "List<int*> *lpuIdChain = ";
+				stream << "threadState->getLpuIdChainWithoutCopy(";
+				stream << '\n' << nextIndent.str() << tripleIndent;
+				stream << "Space_" << lpsName;
+				Space *rootSpace = space->getRoot(); 
+				stream << paramSeparator << "Space_" << rootSpace->getName() << ")";
+				stream << stmtSeparator;
+				stream << nextIndent.str() << indent << "DataPartitionConfig *config = ";
+				stream << "partConfigMap->Lookup(\"";
+				stream << varName << "Space" << lpsName << "Config\")" << stmtSeparator;
+				stream << nextIndent.str() << indent << "PartIterator *iterator = ";
+				stream << "threadState->getIterator(Space_" << lpsName << paramSeparator;  
+				stream << '\"' << varName << "\")" << stmtSeparator;
+				stream << nextIndent.str() << indent << "List<int*> *partId = ";
+				stream << "iterator->getPartIdTemplate()" << stmtSeparator;
+				stream << nextIndent.str() << indent << "config->generatePartId(lpuIdChain";
+				stream << paramSeparator << "partId)" << stmtSeparator;
+				stream << nextIndent.str() << indent << "DataItems *items = ";
+				stream << "taskData->getDataItemsOfLps(\"" << lpsName; 
+				stream << "\"" << paramSeparator << "\"" << varName << "\")" << stmtSeparator;
+				stream << nextIndent.str() << indent << "DataPart *dataPart = ";
+				stream << "items->getDataPart(partId" << paramSeparator;
+				stream << "iterator)" << stmtSeparator;
+				stream << nextIndent.str() << indent << "dataPart->advanceEpoch()" << stmtSeparator;
+	
+				stream << nextIndent.str() << indent << "}\n";
+			}	
+		}
+		// after epoch advancement, the LPU reference needs to be updated so that different data structure 
+		// versions are in appropriate properties of the LPU
+		stream << nextIndent.str() << "generateSpace" << lpsName << "Lpu(";
+		stream << "threadState" << paramSeparator << "partConfigMap" << paramSeparator;
+		stream << "taskData)" << stmtSeparator;
+		stream << nextIndent.str() << "space" << lpsName << "Lpu = (Space" << lpsName << "_LPU*) ";
+		stream << "threadState->getCurrentLpu(Space_" << lpsName << ")" << stmtSeparator;
+		
+		stream << nextIndent.str() << "}\n";	
+	}
 
 	// invoke the related method with current LPU parameter
 	stream << nextIndent.str() << "// invoking user computation\n";
 	stream << nextIndent.str();
 	stream << "int stage" << index << "Executed = ";
-	stream << name << "(space" << space->getName() << "Lpu, ";
+	stream << name << "(space" << space->getName() << "Lpu" << paramSeparator;
 	// along with other default arguments
-	stream << '\n' << nextIndent.str() << "\t\tarrayMetadata,";
-	stream << '\n' << nextIndent.str() << "\t\ttaskGlobals,";
-	stream << '\n' << nextIndent.str() << "\t\tthreadLocals, partition,";
-	stream << '\n' << nextIndent.str() << "threadState->threadLog);\n";
+	stream << '\n' << nextIndent.str() << doubleIndent << "arrayMetadata" << paramSeparator;
+	stream << '\n' << nextIndent.str() << doubleIndent << "taskGlobals" << paramSeparator;
+	stream << '\n' << nextIndent.str() << doubleIndent << "threadLocals" << paramSeparator;
+	stream << "partition" << paramSeparator << '\n' << nextIndent.str();
+	stream << doubleIndent << "threadState->threadLog)" << stmtSeparator;
 
 	// then update all synchronization counters that depend on the execution of this stage for their activation
 	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
@@ -638,10 +731,10 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	stream << name << "\", Space_" << space->getName() << ");\n";
 	----------------------------------------------------------*/ 	
 	
-	// Again the condition below is commented out as we are not using the group-entrance logic properly
-	// close the if condition if applicable
+	// Again the condition below is commented out as we are not using the group-entrance logic properly close the 
+	// if condition if applicable
 	// if (!isGroupEntry()) {
-		stream << indent.str() << "}\n";
+		stream << indentStr.str() << "}\n";
 	// }
 }
 

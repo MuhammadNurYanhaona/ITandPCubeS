@@ -269,6 +269,7 @@ Hashtable<VariableAccess*> *ArithmaticExpr::getAccessedGlobalVariables(TaskGloba
 
 void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 	if (op != POWER) {
+		stream << "(";
 		left->translate(stream, indentLevel, currentLineLength, space);
 		switch (op) {
 			case ADD: stream << " + "; break;
@@ -284,11 +285,13 @@ void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int 
 			default: break;
 		}
 		right->translate(stream, indentLevel, currentLineLength, space);
+		stream << ")";
 	} else {
 		stream << "pow(";
 		left->translate(stream, indentLevel, currentLineLength, space);
 		stream << ", ";
 		right->translate(stream, indentLevel, currentLineLength, space);
+		stream << ")";
 	}
 }
 

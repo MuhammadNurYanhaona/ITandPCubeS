@@ -85,9 +85,16 @@ class SyncRequirement {
 	DependencyArc *arc;
 	
 	// This a property used for code generation. It is needed to maintain and update a counter this 
-	// dependency. The current value of that counter determines how many times the synch primitive or 
-	// the communicator for this dependency has been used before.
+	// dependency. The current value of that counter determines how many times the synch primitive or the 
+	// communicator for this dependency has been used before.
 	int index;
+
+	// Most synchronizations/communications get issued due to the execution of some flow-stage that does
+	// computation. A counter variable indicates the flow-stage did execute and thus their is a need of
+	// data sync/communication with other stages in such a case. When the synchronization/communication
+	// is due to some compiler injected sync-stage, however, their is no conditional execution and there
+	// is no need for a counter variable either. Following variable distinguishes between these two cases.   
+	bool counterRequirement;
   public:
 	SyncRequirement(const char *syncTypeName);
 	virtual ~SyncRequirement() {}
@@ -107,6 +114,8 @@ class SyncRequirement {
 	virtual void print(int indent);
 	void writeDescriptiveComment(std::ofstream &stream, bool forDependent);
 	const char *getSyncName();
+	void setCounterRequirement(bool requirement) { this->counterRequirement = requirement; }
+	bool getCounterRequirement() { return counterRequirement; }
 
 	// This is a function to aid code generation for synchronization. It decides in which LPS should the 
 	// sync primitives belong to and returns that LPS to the caller.
