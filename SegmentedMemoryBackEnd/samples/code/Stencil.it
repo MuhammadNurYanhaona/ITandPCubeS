@@ -34,7 +34,7 @@ Task "Five Points Stencil":
 					localCols = plate.local.dimension2.range
 					do { 
 						plate[i][j] at (t)				\
-						= 1/4 * (plate[i - 1][j] 			\
+						= 0.25 * (plate[i - 1][j] 			\
 						+ plate[i + 1][j] 				\
 						+ plate[i][j - 1]				\
 						+ plate[i][j + 1]) at (t - 1)
