@@ -416,7 +416,6 @@ IntervalSeq *BlockCountInstr::getPaddinglessIntervalForRange(Range idRange) {
 	int begin = parentDim.range.min + idRange.min * size;
 	int length = (idRange.max < count - 1)
 			? size * (idRange.max - idRange.min + 1) : parentDim.range.max - begin + 1;
-	std::cout << "length: " << length << "\n";
 	return new IntervalSeq(begin, length, length, 1);
 }
 
