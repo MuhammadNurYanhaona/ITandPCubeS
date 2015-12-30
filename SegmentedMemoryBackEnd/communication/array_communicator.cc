@@ -154,6 +154,13 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	}
 	delete localBufferList;
 
+	if (remoteBufferList->NumElements() == 0) {
+                delete remoteBufferList;
+                //*logFile << "\tGhost-sync communicator locally exchanged data for " << dependencyName << "\n";
+                //logFile->flush();
+                return;
+        }
+
 	MPI_Comm mpiComm = segmentGroup->getCommunicator();
         int participants = segmentGroup->getParticipantsCount();
         int myRank = segmentGroup->getRank(localSegmentTag);
@@ -168,7 +175,10 @@ void GhostRegionSyncCommunicator::performTransfer() {
 		char *data = buffer->getData();
 		DataExchange *exchange = buffer->getExchange();
 		Participant *sender = exchange->getSender();
-		int senderSegment = sender->getSegmentTags()[0];
+		vector<int> senderTags = sender->getSegmentTags();
+		Assert(senderTags.size() == 1);
+		int senderSegment = senderTags[0];
+		Assert(senderSegment != localSegmentTag);
 		int senderRank = segmentGroup->getRank(senderSegment);	
 		int status = MPI_Irecv(data, bufferSize, MPI_CHAR, senderRank, 0, mpiComm, &recvRequests[i]);
                 if (status != MPI_SUCCESS) {
@@ -188,9 +198,12 @@ void GhostRegionSyncCommunicator::performTransfer() {
 		char *data = buffer->getData();
 		DataExchange *exchange = buffer->getExchange();
 		Participant *receiver = exchange->getReceiver();
-		int receiverSegment = receiver->getSegmentTags()[0];
+		vector<int> receiverTags = receiver->getSegmentTags();
+		Assert(receiverTags.size() == 1);
+		int receiverSegment = receiverTags[0];
+		Assert(receiverSegment != localSegmentTag);
 		int receiverRank = segmentGroup->getRank(receiverSegment);	
-		int status = MPI_Isend(data, bufferSize, MPI_CHAR, receiverRank, 0, mpiComm, &recvRequests[i]);
+		int status = MPI_Isend(data, bufferSize, MPI_CHAR, receiverRank, 0, mpiComm, &sendRequests[i]);
                 if (status != MPI_SUCCESS) {
                 	cout << "Segment " << localSegmentTag << ": could not issue asynchronous send\n";
 			exit(EXIT_FAILURE);

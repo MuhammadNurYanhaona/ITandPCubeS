@@ -49,9 +49,9 @@ Task "Five Points Stencil":
 		Repeat: from "Refine Global Estimate" for iteration_3 in total_rf
 	Partition (p, k, l, m, n):
 		Space A <1D> { 
-			plate: block_size(p) padding(m)
+			plate: block_count(p) padding(m)
 		}
 		Space B <2D> divides Space A partitions { 
-			plate: block_size(k, l) padding(n, n)
+			plate: block_count(k, l) padding(n, n)
 		}
 
