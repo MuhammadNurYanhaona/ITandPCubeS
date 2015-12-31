@@ -64,8 +64,8 @@ void *DataPart::getData() {
 }
 
 void *DataPart::getData(int epoch) {
-	int versionIndex = (epochHead - epoch) % epochCount;
-	return dataVersions->at(epochHead);
+	int versionIndex = (epochHead + epoch) % epochCount;
+	return dataVersions->at(versionIndex);
 }
 
 //---------------------------------------------------------------- Data Parts List -------------------------------------------------------------/
