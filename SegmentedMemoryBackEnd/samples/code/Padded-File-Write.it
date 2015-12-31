@@ -1,0 +1,35 @@
+Program (args) {         
+	pfwEnv = new TaskEnvironment(name: "Padded File Write")
+        bind_output(pfwEnv, "plate", args.output_file)
+	length = args.length
+	k = args.k
+	l = args.l
+	m = args.m
+	n = args.n
+        execute("Padded File Write"; pfwEnv; Initialize: length; Partition: k, l, m, n)
+}
+
+Task "Padded File Write":
+	Define:
+		plate: 2D Array of Integer
+		count: Integer 
+	Environment:
+		plate: create		
+	Initialize (length):
+		plate.dimension1.range.min = 0
+		plate.dimension1.range.max = length - 1
+		plate.dimension2 = plate.dimension1
+		count = partition.l 
+	Compute:
+		"Color Plate" (Space B) {
+			color = lpuId[0] * count + lpuId[1]
+			do { plate[i][j] = color } for i, j in plate 
+		}
+	Partition (k, l, m, n):
+		Space A <1D> { 
+			plate: block_count(k) padding(m)
+		}
+		Space B <2D> divides Space A partitions { 
+			plate: block_count(l, l) padding(n, n)
+		}
+
