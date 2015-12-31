@@ -172,7 +172,7 @@ Dimension BlockCountConfig::getPartDimension(int partId, Dimension parentDimensi
 	
 	int count = getPartsCount(parentDimension);
 	int size = parentDimension.length / count;
-	int begin = partId * size;
+	int begin = parentDimension.range.min + partId * size;
 	int length = (partId < count - 1) ? size : parentDimension.range.max - begin + 1;
 
 	if (paddings[0] > 0) {
@@ -195,7 +195,7 @@ int BlockCountConfig::getEffectiveFrontPadding(int partId, Dimension parentDimen
 	if (paddings[0] == 0) return 0;
 	int count = getPartsCount(parentDimension);
 	int size = parentDimension.length / count;
-	int begin = partId * size;
+	int begin = parentDimension.range.min + partId * size;
 	int paddedBegin = std::max(parentDimension.range.min, begin - paddings[0]);
 	return begin - paddedBegin;
 }
@@ -204,7 +204,7 @@ int BlockCountConfig::getEffectiveRearPadding(int partId, Dimension parentDimens
 	if (paddings[1] == 0) return 0;
 	int count = getPartsCount(parentDimension);
 	int size = parentDimension.length / count;
-	int begin = partId * size;
+	int begin = parentDimension.range.min + partId * size;
 	int length = (partId < count - 1) ? size : parentDimension.range.max - begin + 1;
 	int end = begin + length - 1;
 	int paddedEnd = std::min(parentDimension.range.max, end + paddings[1]);
