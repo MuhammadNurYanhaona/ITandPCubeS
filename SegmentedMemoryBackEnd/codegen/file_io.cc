@@ -94,6 +94,9 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << "partsList" << paramSeparator << "fileName" << paramSeparator << "partConfig) {\n";
 	headerFile << doubleIndent << "this->partConfig = partConfig" << stmtSeparator;
 	headerFile << doubleIndent << "this->stream = NULL" << stmtSeparator;
+	if (array->doesGenerateOverlappingParts()) {
+		headerFile << doubleIndent << "setNeedToExcludePadding(true)" << stmtSeparator;
+	}
 	headerFile << indent << "}\n"; 
 
 	// write implementations for the four functions needed to do structure specific writing

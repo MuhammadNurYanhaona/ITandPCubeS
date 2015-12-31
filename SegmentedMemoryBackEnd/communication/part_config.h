@@ -67,6 +67,10 @@ class DataItemConfig {
 	std::vector<LpsDimConfig> *generateDimOrderVector();
 	// this version is needed to traverse/use the part-container-tree which is specific to a particular LPS chain
 	std::vector<DimConfig> *generateDimOrderVectorWithoutLps();
+
+	// this is used to configure the data-item-configuration object for generating interval descriptions for the core
+	// content of any data part 
+	void disablePaddingInAllLevels();
 };
 
 #endif /* PART_CONFIG_H_ */

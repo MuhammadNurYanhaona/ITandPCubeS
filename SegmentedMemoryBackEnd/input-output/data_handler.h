@@ -7,6 +7,7 @@
 #include "../memory-management/allocation.h"
 #include "../memory-management/part_generation.h"
 #include "../utils/list.h"
+#include "../utils/interval.h"
 #include "../codegen/structure.h"
 	
 /* This is just a helper class to retain hierarchical information about a data part while IO is ongoing. Every element
@@ -18,13 +19,25 @@ class PartInfo {
 	List<List<Dimension*>*> *partDimensions;
 	List<List<int>*> *partCounts;
 	List<List<int>*> *partIdList;
+	
+	// This property holds a mathematical description of the content of the data part that originally belongs to
+	// it -- regions that are overlapped paddings originally coming from some other data part does not belong to
+	// the current part is excluded in this description. It is only used when padding exclusion is required.
+	List<MultidimensionalIntervalSeq*> *contentDescription;
+	
 	PartInfo() {
 		partDimensions = new List<List<Dimension*>*>;
 		partCounts = new List<List<int>*>;
 		partIdList = new List<List<int>*>;
+		contentDescription = NULL;
 	}
 	~PartInfo() { clear(); }
 	void clear();
+	void generateContentDescription(DataPartitionConfig *partConfig);
+
+	// returns true if the data/cell index is not from an overlapped padding region of the data part; returns false
+	// otherwise
+	bool isDataIndexInCorePart(List<int> *dataIndex);
 };
 
 /* common base class that embodies routines needed for both reading and writing data parts */
@@ -35,14 +48,25 @@ class PartHandler {
 	DataPartitionConfig *partConfig;
 	int dataDimensionality;
 	Dimension *dataDimensions;
+	
 	// two supporting variables to keep track of what part is been currently under process and its metadata
 	DataPart *currentPart;
 	PartInfo *currentPartInfo;
+	
 	// a supporting variable that is used to represent a file location (actual data index) of a particular element
 	// in a data part to avoid creating a new list each time we do a data part to file location transformation
-	List<int> *currentDataIndex; 
+	List<int> *currentDataIndex;
+ 
+	// Since some IT partition functions support boundary overlappings in terms of padding, data parts generated 
+	// using them may have regions that does not belong them originally. Particularly when writing content to a
+	// file, only the regions owned by the data part under consideration should be copied into the file. Since 
+	// it adds some validation overhead when processing each cell of a data part, we have this boolen flag field
+	// to indicate when padding exclusion should be bothered with.
+	bool needToExcludePadding;
   public:
 	PartHandler(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig);
+	void setNeedToExcludePadding(bool stat) { needToExcludePadding = stat; }
+	bool doesNeedToExcludePadding() { return needToExcludePadding; }
 	
 	// this routine iterates the data section of all parts one-by-one for reading/writing   
 	void processParts();

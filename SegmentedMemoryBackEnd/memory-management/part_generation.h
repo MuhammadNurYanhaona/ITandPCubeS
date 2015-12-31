@@ -97,9 +97,7 @@ class DimPartitionConfig {
 	// into smaller dimensions along the partition hierarchy of a task to reach a particular data part 
 	// identified by the last argument. Along the way this process also calculate the number of partitions
 	// in each point of divisioning. This function has been added to support file IO operation that needs
-	// a data part index to file location transformation in the absense of accurate interval description 
-	// of translated data. TODO once we figure out how to describe all hierarchical intervals, we wont need
-	// this function and associate mechanism of index transformation 
+	// a data part index to file location transformation.
 	void getHierarchicalDimensionAndPartCountInfo(List<Dimension*> *dimensionList, 
 			List<int> *partCountsList, 
 			int position, List<int> *partIdList);
@@ -107,10 +105,7 @@ class DimPartitionConfig {
 	// Similar to the above, this function has been added to aid file I/O. It returns the original index of
 	// a data point along a dimension that might be reordered one or more time due to the use of reordering
 	// partition functions. The process of getting back the original index from a transformed one works 
-	// recursively backward from lower parts to upper parts. TODO once we figure out how to form accurate
-	// interval description for hierarchical partitions, we can do the mapping of data part index to file
-	// location much efficiently by investigating the interval description. At that time we may remove this
-	// function. Finally, only the reordering dim-partition-config subclasses need to override this method.
+	// recursively backward from lower parts to upper parts.
 	virtual int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
 			List<int> *partCountList, 
 			List<Dimension*> *partDimensionList);

@@ -90,6 +90,9 @@ public:
 	int getNextIndex(IntervalState *state);
 
 	bool isEqual(IntervalSeq *other);
+
+	// returns true if the interval sequence contains the point; otherwise returns false
+	bool contains(int point);
 };
 
 /* A multidimensional sequence of intervals to represent multidimensional data structure parts
@@ -120,15 +123,18 @@ public:
 	// precede the argument sequence, 1 if the argument sequence should lead, and 0 if their ordering does not matter.
 	int compareTo(MultidimensionalIntervalSeq *other);
 
+	// returns true if the interval sequence contains the multidimensional point; otherwise returns false
+	bool contains(List<int> *point);
+
 	// function to generate a list of multidimensional interval sequences as a cross-product of lists of one-
 	// dimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalSeqs(int dimensionality,
-			List<List<IntervalSeq*>*> *intervalSeqLists);
+				List<List<IntervalSeq*>*> *intervalSeqLists);
 private:
 	// a recursive helper routine to generate multidimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(int dimensionality,
-			List<List<IntervalSeq*>*> *intervalSeqLists,
-			std::vector<IntervalSeq*> *constructionInProgress);
+				List<List<IntervalSeq*>*> *intervalSeqLists,
+				std::vector<IntervalSeq*> *constructionInProgress);
 };
 
 /* This is an auxiliary class to be used by multidimensional interval sequence iterator to keep track of the progress

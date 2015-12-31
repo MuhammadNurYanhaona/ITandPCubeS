@@ -90,6 +90,9 @@ class IntervalSeq {
 	int getNextIndex(IntervalState *state);
 
 	bool isEqual(IntervalSeq *other);
+
+	// returns true if the interval sequence contains the point; otherwise returns false
+	bool contains(int point);
 };
 
 /* A multidimensional sequence of intervals to represent multidimensional data structure parts
@@ -119,6 +122,9 @@ class MultidimensionalIntervalSeq {
 	// assumed to have the same number of dimensions in this comparison. It returns -1 if the current sequence should
 	// precede the argument sequence, 1 if the argument sequence should lead, and 0 if their ordering does not matter.
 	int compareTo(MultidimensionalIntervalSeq *other);
+
+	// returns true if the interval sequence contains the multidimensional point; otherwise returns false
+	bool contains(List<int> *point);
 
 	// function to generate a list of multidimensional interval sequences as a cross-product of lists of one-
 	// dimensional interval sequences

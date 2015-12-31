@@ -4,7 +4,10 @@
 #include "../memory-management/allocation.h"
 #include "../memory-management/part_generation.h"
 #include "../utils/list.h"
+#include "../utils/interval.h"
 #include "../codegen/structure.h"
+#include "../communication/part_config.h"
+#include "../partition-lib/partition.h"
 
 //--------------------------------------------------------------- Part Info --------------------------------------------------------------/
 
@@ -28,6 +31,82 @@ void PartInfo::clear() {
 		partIdList->RemoveAt(0);
 		delete partIdListInfo;
 	}
+
+	if (contentDescription != NULL) {
+		while (contentDescription->NumElements() > 0) {
+			MultidimensionalIntervalSeq *seq = contentDescription->Nth(0);
+			contentDescription->RemoveAt(0);
+			delete seq;
+		}
+		delete contentDescription;
+	}
+}
+
+void PartInfo::generateContentDescription(DataPartitionConfig *partConfig) {
+	
+	DataItemConfig *statefulConfig = partConfig->generateStateFulVersion();
+	int dimensionality = statefulConfig->getDimensionality();
+	statefulConfig->disablePaddingInAllLevels();
+	int levels = statefulConfig->getLevels();
+	List<List<IntervalSeq*>*> *dimensionalIntervalDesc = new List<List<IntervalSeq*>*>;
+
+	bool generationFailed = false;	
+	for (int d = 0; d < dimensionality; d++) {
+
+		// prepare the dimension configurations and populate a hierarchical ID range to be used for interval
+		// description generation
+		List<Range> *idRangeList = new List<Range>;
+		List<int> *dimIdList = partIdList->Nth(d);
+		for (int l = 0; l < levels; l++) {
+			int id = dimIdList->Nth(l);
+			Range idRange = Range(id);
+			// set the parent dimension information that the partition instruction at current level 
+			// divides and the parts count
+                	statefulConfig->adjustDimensionAndPartsCountAtLevel(l, d);
+                	// this is probably not needed for correct interval description generation
+                	statefulConfig->setPartIdAtLevel(l, d, id);
+			idRangeList->Append(idRange);
+		}
+
+		// generate a list of linear interval sequences as the description for current dimension of the part 
+		PartitionInstr *instr = statefulConfig->getInstruction(levels - 1, d);
+		List<IntervalSeq*> *intervalSeqList = new List<IntervalSeq*>;
+		instr->getIntervalDescForRangeHierarchy(idRangeList, intervalSeqList);
+
+		// if any dimensional description is empty then the total part is composed of overlapping regions 
+		// from other data parts (this can happens in partitions with multi-level paddings)
+		if (intervalSeqList->NumElements() == 0) {
+			generationFailed = true;
+			break;
+		}
+		
+		dimensionalIntervalDesc->Append(intervalSeqList);
+		delete idRangeList;	
+	}
+	
+	if (generationFailed) {
+		contentDescription = NULL;
+	} else {
+		contentDescription = MultidimensionalIntervalSeq::generateIntervalSeqs(dimensionality, 
+				dimensionalIntervalDesc);
+	}
+
+	// delete the lists holding 1D interval sequences but not the sequences themselves as they remain as parts
+        // of the multidimensional interval sequences
+        while (dimensionalIntervalDesc->NumElements() > 0) {
+                List<IntervalSeq*> *oneDSeqList = dimensionalIntervalDesc->Nth(0);
+                dimensionalIntervalDesc->RemoveAt(0);
+                delete oneDSeqList;
+        }
+        delete dimensionalIntervalDesc;
+	delete statefulConfig;
+}
+
+bool PartInfo::isDataIndexInCorePart(List<int> *dataIndex) { 
+	for (int i = 0; i < contentDescription->NumElements(); i++) {
+		if (contentDescription->Nth(i)->contains(dataIndex)) return true;
+	}
+	return false; 
 }
 
 //------------------------------------------------------------- Part Handler -------------------------------------------------------------/
@@ -42,6 +121,7 @@ PartHandler::PartHandler(DataPartsList *partsList, const char *fileName, DataPar
 	ListMetadata *metadata = partsList->getMetadata();
 	this->dataDimensionality = metadata->getDimensions();
 	this->dataDimensions = metadata->getBoundary();
+	this->needToExcludePadding = false;
 }
 
 List<Dimension*> *PartHandler::getDimensionList() {
@@ -78,6 +158,8 @@ void PartHandler::processParts() {
 		DataPart *dataPart = dataParts->Nth(i);
 		this->currentPart = dataPart;
 		calculateCurrentPartInfo();
+		
+		if (needToExcludePadding && currentPartInfo->contentDescription == NULL) continue;
 	
 		PartMetadata *metadata = dataPart->getMetadata();
 		Dimension *partDimensions = metadata->getBoundary();
@@ -111,6 +193,10 @@ void PartHandler::calculateCurrentPartInfo() {
 		currentPartInfo->partCounts->Append(dimCountList);
 		currentPartInfo->partDimensions->Append(dimList);
 	}
+	
+	if (needToExcludePadding) {
+		currentPartInfo->generateContentDescription(partConfig);
+	}
 }
 
 void PartHandler::processPart(Dimension *partDimensions, int currentDimNo, List<int> *partialIndex) {
@@ -121,9 +207,11 @@ void PartHandler::processPart(Dimension *partDimensions, int currentDimNo, List<
 		if (currentDimNo < dataDimensionality - 1) {
 			processPart(partDimensions, currentDimNo + 1, partialIndex);	
 		} else {
-			int storeIndex = getStorageIndex(partialIndex, partDimensions);
 			List<int> *dataIndex = getDataIndex(partialIndex);
-			processElement(dataIndex, storeIndex, partStore);
+			if (!needToExcludePadding || currentPartInfo->isDataIndexInCorePart(dataIndex)) {
+				int storeIndex = getStorageIndex(partialIndex, partDimensions);
+				processElement(dataIndex, storeIndex, partStore);
+			}
 		}
 		partialIndex->RemoveAt(currentDimNo);
 	}

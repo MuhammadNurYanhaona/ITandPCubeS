@@ -301,6 +301,13 @@ int ArrayDataStructure::getDimensionality() {
 	} else return sourceDimensions->NumElements();
 }
 
+bool ArrayDataStructure::doesGenerateOverlappingParts() {
+	if (hasOverlappingsAmongPartitions()) return true;
+	if (source == NULL) return false;
+	ArrayDataStructure *parentArray = (ArrayDataStructure *) source;
+	return parentArray->doesGenerateOverlappingParts();
+}
+
 bool ArrayDataStructure::isDimensionReordered(int dimensionNo, Space *comparisonBound) {
 	if (isDimensionLocallyReordered(dimensionNo)) return true;
 	if (this->space == comparisonBound) return false;

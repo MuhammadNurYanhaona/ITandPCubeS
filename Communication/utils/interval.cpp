@@ -364,6 +364,15 @@ bool IntervalSeq::isEqual(IntervalSeq *other) {
 			&& this->count 	== other->count);
 }
 
+bool IntervalSeq::contains(int point) {
+	if (point < begin) return false;
+	int interval = (point - begin) / period;
+	if (count <= interval) return false;
+	int intervalBegin = interval * period + begin;
+	int intervalEnd = intervalBegin + length - 1;
+	return (intervalBegin <= point) && (point <= intervalEnd);
+}
+
 //-------------------------------------------------- Multidimensional Interval Sequence  ------------------------------------------------/
 
 MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
@@ -471,6 +480,15 @@ int MultidimensionalIntervalSeq::compareTo(MultidimensionalIntervalSeq *other) {
 		}
 	}
 	return 0;
+}
+
+bool MultidimensionalIntervalSeq::contains(List<int> *point) {
+	for (int i = 0; i < dimensionality; i++) {
+		IntervalSeq *dimensionalSeq = intervals[i];
+		int indexAlongDimension = point->Nth(i);
+		if (!dimensionalSeq->contains(indexAlongDimension)) return false;
+	}
+	return true;
 }
 
 void MultidimensionalIntervalSeq::draw() {

@@ -223,6 +223,11 @@ class ArrayDataStructure : public DataStructure {
 	bool isPartitionedAlongDimensionEarlier(int dimensionNo);
 	int getDimensionality();
 
+	// This function is primarily needed for file I/O to determines if data parts generated for the array
+	// have overlappings of regions due to padding in anywhere in their partition hierarchy. The padding
+	// regions are generally skipped during file writes.
+	bool doesGenerateOverlappingParts();
+
 	// Since some partition functions results in reordering array dimensions if data is been copied down
 	// to ensure that each partition work over a sequential block of memory, during code generation we
 	// need to know if any indexing on an array needs to be transformed from original to reordered index

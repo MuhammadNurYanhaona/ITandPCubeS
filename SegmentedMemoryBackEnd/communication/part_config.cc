@@ -127,3 +127,14 @@ vector<DimConfig> *DataItemConfig::generateDimOrderVectorWithoutLps() {
 	}
 	return dimOrderVector;
 }
+
+void DataItemConfig::disablePaddingInAllLevels() {
+	int dimensionality = dataDimensions.size();
+	for (int levelNo = 0; levelNo < levels; levelNo++) {
+		PartitionConfig *currentConfig = partitionConfigs[levelNo];
+		for (int dimNo = 0; dimNo < dimensionality; dimNo++) {
+			PartitionInstr *instr = currentConfig->getInstruction(dimNo);
+			instr->setExcludePaddingFlag(true);
+		}
+	}
+}
