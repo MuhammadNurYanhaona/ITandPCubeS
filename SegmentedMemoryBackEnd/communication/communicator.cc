@@ -88,6 +88,19 @@ Communicator::Communicator(int localSegmentTag,
 	commStat = NULL;
 }
 
+void Communicator::describe(int indentation) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+	*logFile << indent.str() << "Communicator for " << dependencyName << ":\n";
+	*logFile << indent.str() << '\t' << "Total Communication Buffers: ";
+	*logFile << commBufferList->NumElements() << "\n";
+	for (int i = 0; i < commBufferList->NumElements(); i++) {
+		*logFile << indent.str() << "\tBuffer #" << i + 1 << ":\n";
+		CommBuffer *buffer = commBufferList->Nth(i);
+		buffer->describe(*logFile, indentation + 1);
+	}
+}
+
 void Communicator::setupBufferTags(int communicatorId, int totalSegmentsInMachine) {
 	this->communicatorId = communicatorId;
 	std::ostringstream digitStr;

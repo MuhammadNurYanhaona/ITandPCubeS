@@ -267,25 +267,29 @@ DataExchange::~DataExchange() {
 void DataExchange::describe(int indentLevel, ostream &stream) {
 	ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
-	stream << indent.str() << "Sender No: " << sender->getId() << "\n";
-	stream << indent.str() << "Sender Segments: ";
+	
+	stream << indent.str() << "Sender Segments: [";
 	vector<int> sendTags = sender->getSegmentTags();
 	for (unsigned int i = 0; i < sendTags.size(); i++) {
 		stream << sendTags[i] << ' ';
 	}
-	stream << indent.str() << "\nReceiver No: " << receiver->getId() << "\n";
+	stream << "]\n";
+	stream << indent.str() << "Sender Data Content:\n";
+	drawDataDescription(sender->getDataDescription(), stream, indentLevel + 1);
+
 	stream << indent.str() << "Receiver Segments: ";
 	vector<int> receiveTags = receiver->getSegmentTags();
 	for (unsigned int i = 0; i < receiveTags.size(); i++) {
 		stream << receiveTags[i] << ' ';
 	}
-	stream << '\n' << indent.str() << "Sender Data Content:\n";
-	drawDataDescription(sender->getDataDescription());
-	stream << '\n' << indent.str() << "Receiver Data Content:\n";
-	drawDataDescription(receiver->getDataDescription());
-	stream << "\n" << indent.str() << "Total data items: " << getTotalElementsCount() << "\n";
-	stream << '\n' << indent.str() << "To be Exchanged Data: \n";
-	drawDataDescription(exchangeDesc);
+	stream << "]\n";
+	stream << indent.str() << "Receiver Data Content:\n";
+	drawDataDescription(receiver->getDataDescription(), stream, indentLevel + 1);
+	
+	stream << "\n" << indent.str() << "Total data items: ";
+	stream << getTotalElementsCount() << "\n";
+	stream << indent.str() << "To be Exchanged Data: \n";
+	drawDataDescription(exchangeDesc, stream, indentLevel + 1);
 }
 
 int DataExchange::getTotalElementsCount() {
@@ -365,11 +369,15 @@ bool DataExchange::involvesLocalSegment(int localSegmentTag) {
 	return sender->hasSegmentTag(localSegmentTag) || receiver->hasSegmentTag(localSegmentTag);
 }
 
-void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList) {
+void DataExchange::drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList, 
+		ostream &stream, int indentation) {
+	std:ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
 	for (int i = 0; i < seqList->NumElements(); i++) {
-		cout << "Sequence #" << i << ":\n";
+		stream << indent.str() << "Sequence #" << i + 1 << ":\n";
 		MultidimensionalIntervalSeq *seq = seqList->Nth(i);
-		seq->draw();
+		seq->draw(indentation + 1, stream);
+		stream << "\n";
 	}
 }
 

@@ -49,6 +49,14 @@ int CommBuffer::compareTo(CommBuffer *other, bool forReceive) {
 	return dataExchange->compareTo(other->dataExchange, forReceive); 
 }
 
+void CommBuffer::describe(std::ostream &stream, int indentation) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+	stream << indent.str() << "Tag: " << bufferTag << "\n";
+	stream << indent.str() << "Element Count: " << elementCount << "\n";
+	dataExchange->describe(indentation, stream);	
+}
+
 char *CommBuffer::getData() {
 	std::cout << "buffer content reference is not valid for all communication buffer types";
 	std::exit(EXIT_FAILURE);

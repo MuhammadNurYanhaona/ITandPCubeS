@@ -83,6 +83,7 @@ class CommBuffer {
 	int getBufferSize() { return elementCount * elementSize; }
 	int compareTo(CommBuffer *other, bool forReceive);
 	int getBufferTag() { return bufferTag; }
+	void describe(std::ostream &stream, int indentation);
 	
 	// should be overriden by buffer types that has a physical storage for holding data; the default is to through a 
 	// fault

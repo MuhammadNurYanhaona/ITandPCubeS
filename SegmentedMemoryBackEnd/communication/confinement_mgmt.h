@@ -210,7 +210,8 @@ class DataExchange {
 	// synchronizations for a specific data dependency
 	static int getTotalParticipantsCount(List<DataExchange*> *exchangeList, bool sendingSide);
   private:
-	void drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList);
+	void drawDataDescription(List<MultidimensionalIntervalSeq*> *seqList, 
+			std::ostream &stream, int indentation);
 };
 
 /* For a particular data synchronization scenario there might be a need to move data between different segments,

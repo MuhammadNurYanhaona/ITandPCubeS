@@ -53,6 +53,36 @@ void DrawingLine::draw() {
 	cout << "\n";
 }
 
+void DrawingLine::draw(int indentation, std::ostream &stream) {
+	
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+	
+	stream << indent.str();
+	for (int i = 0; i < dim.length; i++) {
+		stream << line->Nth(i);
+	}
+	stream << "\n\n";
+
+	stream << indent.str();
+	int labelPosition = dim.range.min;
+	int outputCount = 0;
+	while (labelPosition < dim.range.max) {
+		stream << labelPosition;
+		ostringstream lbStream;
+		lbStream << labelPosition;
+		int labelLength = lbStream.str().length();
+		outputCount += labelLength;
+		int fillerChar = labelGap - labelLength;
+		for (int i = 0; i < fillerChar && outputCount < dim.length; i++) {
+			cout << '.';
+			outputCount++;
+		}
+		labelPosition += labelGap;
+	}
+	stream << "\n";
+}
+
 //--------------------------------------------------------- 1D Interval Sequence --------------------------------------------------------/
 
 IntervalSeq::IntervalSeq(int b, int l, int p, int c) {
@@ -482,8 +512,13 @@ int MultidimensionalIntervalSeq::compareTo(MultidimensionalIntervalSeq *other) {
 	return 0;
 }
 
-void MultidimensionalIntervalSeq::draw() {
+void MultidimensionalIntervalSeq::draw(int indentation, std::ostream &stream) {
+	
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+
 	for (int i = 0; i < dimensionality; i++) {
+		
 		IntervalSeq *interval = intervals[i];
 		int begin = 0;
 		int end = interval->begin + interval->period * interval->count;
@@ -493,8 +528,9 @@ void MultidimensionalIntervalSeq::draw() {
 		dim.length = end - begin + 1;
 		DrawingLine drawLine = DrawingLine(dim, 10);
 		interval->draw(&drawLine);
-		cout << "Dimension No: " << i + 1;
-		drawLine.draw();
+
+		stream << indent.str() << "Dimension No: " << i + 1 << "\n";
+		drawLine.draw(indentation, stream);
 	}
 }
 

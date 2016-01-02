@@ -78,6 +78,7 @@ class Communicator : public CommBufferManager {
 	void setParticipants(std::vector<int> *participants) { this->participantSegments = participants; }
 	void setCommStat(CommStatistics *commStat) { this->commStat = commStat; }
 	CommStatistics *getCommStat() { return commStat; }
+	virtual void describe(int indentation);
 
 	// sets up the tags in each communication buffer that will be used during MPI communications in some communicator types; it
 	// also assign the communicator an ID which can also be used as a tag in some contexts

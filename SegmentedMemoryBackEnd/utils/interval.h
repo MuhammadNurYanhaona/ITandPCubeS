@@ -34,13 +34,15 @@ class DrawingLine {
 	Dimension dim;
 	// the position in the line will be written in periodic interval equal to the label gap
 	int labelGap;
-	// the characters representing the current status of the line; it spans from dim.min to dim.max and a 1
-	// is represented by the inclusion-character and a 0 by the exclusion character
+	// the characters representing the current status of the line; it spans from dim.min to dim.max and a 1 is 
+	// represented by the inclusion-character and a 0 by the exclusion character
 	List<char> *line;
   public:
 	DrawingLine(Dimension dim, int labelGap);
 	void setIndexToOne(int index);
 	void draw();
+	void draw(int indentation, std::ostream &stream);
+
 	// this function should be used to reset the line into its original state, which is all 0
 	void reset();
 };
@@ -116,6 +118,7 @@ class MultidimensionalIntervalSeq {
 	IntervalSeq *getIntervalForDim(int dimensionNo);
 	bool isEqual(MultidimensionalIntervalSeq *other);
 	void draw();
+	void draw(int indentation, std::ostream &stream);
 
 	// This function is used to determine the order of multidimensional sequences in a sorted list; the sequence with
 	// component intervals beginning at an earlier point should come before the other. Note that both sequences are
