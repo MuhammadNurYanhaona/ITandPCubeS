@@ -75,7 +75,7 @@ void DrawingLine::draw(int indentation, std::ostream &stream) {
 		outputCount += labelLength;
 		int fillerChar = labelGap - labelLength;
 		for (int i = 0; i < fillerChar && outputCount < dim.length; i++) {
-			cout << '.';
+			stream << '.';
 			outputCount++;
 		}
 		labelPosition += labelGap;

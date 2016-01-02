@@ -277,7 +277,7 @@ void DataExchange::describe(int indentLevel, ostream &stream) {
 	stream << indent.str() << "Sender Data Content:\n";
 	drawDataDescription(sender->getDataDescription(), stream, indentLevel + 1);
 
-	stream << indent.str() << "Receiver Segments: ";
+	stream << indent.str() << "Receiver Segments: [";
 	vector<int> receiveTags = receiver->getSegmentTags();
 	for (unsigned int i = 0; i < receiveTags.size(); i++) {
 		stream << receiveTags[i] << ' ';
