@@ -94,6 +94,10 @@ class PartHandler {
 	// reading/writing process, e.g., opening and closing I/O streams.
 	virtual void begin() = 0;
 	virtual void terminate() = 0;
+
+	// a post processing routine to be implemented by any handler to further manipulate the content of the data part
+	// recently being read/written
+	virtual void postProcessPart(DataPart *dataPart) {}
   private:
 	// a recursive helper routine to aid the processParts() function
 	void processPart(Dimension *partDimensions, int currentDimNo, List<int> *partialIndex);

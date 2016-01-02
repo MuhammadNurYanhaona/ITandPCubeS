@@ -64,6 +64,15 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << doubleIndent << "dataStore[storeIndex] = stream->readElement(dataIndex)" << stmtSeparator;
 	headerFile << indent <<  "}\n";
 
+	// if the data item is multi-versioned then we need to implement another function to ensure that all versions
+	// of each data part are at sync after a file read (note that the default version count is 0)
+	int versionCount = array->getLocalVersionCount();
+	if (versionCount > 0) {
+		headerFile << indent << "void postProcessPart(DataPart *dataPart) {\n";
+		headerFile << doubleIndent << "dataPart->synchronizeAllVersions()" << stmtSeparator;
+		headerFile << indent <<  "}\n";
+	}
+
 	headerFile << "}" << stmtSeparator;
 }
 

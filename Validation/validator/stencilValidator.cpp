@@ -29,6 +29,11 @@ int mainSV() {
 	int plateSize = plateDims[0].length * plateDims[1].length;
 	double *plate1 = new double[plateSize];
 
+	// synchronize the alternative version of the plate with the plate read from the file
+	for (int i = 0; i < plateSize; i++) {
+		plate1[i] = plate0[i];
+	}
+
 	// do the iterative stencil computation
 	double *oldPlate, *newPlate;
 	oldPlate = NULL;
@@ -78,4 +83,6 @@ int mainSV() {
 	} else {
 		cout << "outputs mismatch in " << mismatchCount << " data points\n";
 	}
+
+	return 0;
 }

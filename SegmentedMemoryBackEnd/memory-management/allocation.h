@@ -80,6 +80,8 @@ class DataPart {
 	int epochHead;
 	// a circular array of allocation units, one for each epoch version
 	std::vector<void*> *dataVersions;
+	// size of each element of the data part in terms of the number of characters
+	int elementSize;
   public:
 	DataPart(PartMetadata *metadata, int epochCount);
 
@@ -87,13 +89,14 @@ class DataPart {
 	template <class type> static void allocate(DataPart *dataPart) {
 		int size = dataPart->metadata->getSize();
 		Assert(size > 0);
-		int versionCount = dataPart->epochCount; 
+		int versionCount = dataPart->epochCount;
+		dataPart->elementSize = sizeof(type) / sizeof(char); 
 		std::vector<void*> *dataVersions = dataPart->dataVersions;
 		for (int i = 0; i < versionCount; i++) {
 			void *data = new type[size];
 			Assert(data != NULL);
 			char *charData = reinterpret_cast<char*>(data);
-			int charSize = size * sizeof(type) / sizeof(char);
+			int charSize = size * dataPart->elementSize;
 			for (int i = 0; i < charSize; i++) {
 				charData[i] = 0;
 			}
@@ -108,7 +111,13 @@ class DataPart {
 	// returns the memory reference of the allocation unit for a specific epoch version
 	void *getData(int epoch);
 	// moves the head of the circular array one step ahead
-        inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }	
+        inline void advanceEpoch() { epochHead = (epochHead + 1) % epochCount; }
+
+	// This function is used by multi-versioned data parts to copy values from one allocation to all other
+	// allocations. This operation is typically needed when the data part is read from some external file.
+	// The contract for multi-versioned data parts is that initially, i.e. before the task starts execution, 
+	// all versions have the content. 
+	void synchronizeAllVersions();	
 };
 
 /* This class provides generic information about all the parts of an LPS data structure that a segment holds */

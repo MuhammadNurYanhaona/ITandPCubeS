@@ -4,6 +4,7 @@
 #include "../utils/list.h"
 #include "../codegen/structure.h"
 #include <vector>
+#include <cstring>
 
 //---------------------------------------------------------------- Part Metadata ---------------------------------------------------------------/
 
@@ -57,6 +58,7 @@ DataPart::DataPart(PartMetadata *metadata, int epochCount) {
 	this->dataVersions = new std::vector<void*>;
 	dataVersions->reserve(epochCount);
 	this->epochHead = 0;
+	this->elementSize = 0;
 }
 
 void *DataPart::getData() {
@@ -66,6 +68,20 @@ void *DataPart::getData() {
 void *DataPart::getData(int epoch) {
 	int versionIndex = (epochHead + epoch) % epochCount;
 	return dataVersions->at(versionIndex);
+}
+
+void DataPart::synchronizeAllVersions() {
+	
+	void *updatedData = dataVersions->at(epochHead);
+	int partSize = metadata->getSize() * elementSize;
+	
+	int epoch = 1;
+	while (epoch < epochCount) {
+		int versionIndex = (epochHead + epoch) % epochCount;
+		void *staleData = dataVersions->at(versionIndex);
+		memcpy(staleData, updatedData, partSize);
+		epoch++;
+	}
 }
 
 //---------------------------------------------------------------- Data Parts List -------------------------------------------------------------/

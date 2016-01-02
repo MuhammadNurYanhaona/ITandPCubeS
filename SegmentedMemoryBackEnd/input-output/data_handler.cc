@@ -166,6 +166,7 @@ void PartHandler::processParts() {
 		List<int> *partIndexList = new List<int>;
 		processPart(partDimensions, 0, partIndexList);
 		delete partIndexList;
+		postProcessPart(dataPart);
 	}
 	delete currentPartInfo;
 	terminate();
