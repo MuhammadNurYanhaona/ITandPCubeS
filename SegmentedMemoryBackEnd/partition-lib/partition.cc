@@ -299,7 +299,7 @@ XformedIndexInfo *BlockSizeInstr::transformIndex(XformedIndexInfo *indexToXform)
 	int index = indexToXform->index;
 	int count = calculatePartsCount(dimension, false);
 
-	bool includePadding = hasPadding & !excludePaddingInIntervalCalculation;
+	bool includePadding = hasPadding && !excludePaddingInIntervalCalculation;
 	int partNo = index / size;
 	Dimension newDimension = getDimension(dimension, partNo, count, includePadding);
 
@@ -307,15 +307,23 @@ XformedIndexInfo *BlockSizeInstr::transformIndex(XformedIndexInfo *indexToXform)
 	indexToXform->index = index;
 	indexToXform->partNo = partNo;
 
+	// Note that the logic is that if the content in the index originially belongs to the current part but also 
+	// included as in an adjacent part in its overlapping padding region with the current, only then we should
+	// return the neigbor as a padding part. If you fail to understand this then the following calculation will 
+	// boggle your mind.
 	if (includePadding) {
 		Dimension paddinglessDim = getDimension(dimension, partNo, count, false);
 		int indexForwardDrift = index - paddinglessDim.range.min;
 		int indexBackwardDrift = paddinglessDim.range.max - index;
-		if (indexForwardDrift <= frontPadding && partNo > 0) {
+
+		// the first condition checks if the index originially belongs to the current part
+		// the second condition checks if the index is included in the padding region of a neigbor
+		// the last condition excludes the terminal case
+		if (indexForwardDrift >= 0 && indexForwardDrift <= frontPadding && partNo > 0) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo - 1, getDimension(dimension, partNo - 1, count, true));
 			return paddingPart;
-		} else if (indexBackwardDrift <= rearPadding && partNo < count - 1) {
+		} else if (indexBackwardDrift >= 0 && indexBackwardDrift <= rearPadding && partNo < count - 1) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo + 1, getDimension(dimension, partNo + 1, count, true));
 			return paddingPart;
@@ -493,22 +501,30 @@ XformedIndexInfo *BlockCountInstr::transformIndex(XformedIndexInfo *indexToXform
 
 	int partSize = dimension.length / count;
 	int partNo = index / partSize;
-	bool includePadding = hasPadding & !excludePaddingInIntervalCalculation;
+	bool includePadding = hasPadding && !excludePaddingInIntervalCalculation;
 	Dimension newDimension = getDimension(dimension, partNo, count, includePadding);
 
 	indexToXform->partDimension = newDimension;
 	indexToXform->index = index;
 	indexToXform->partNo = partNo;
 
+	// Note that the logic is that if the content in the index originially belongs to the current part but also 
+	// included as in an adjacent part in its overlapping padding region with the current, only then we should
+	// return the neigbor as a padding part. If you fail to understand this then the following calculation will 
+	// boggle your mind.
 	if (includePadding) {
 		Dimension paddinglessDim = getDimension(dimension, partNo, count, false);
 		int indexForwardDrift = index - paddinglessDim.range.min;
 		int indexBackwardDrift = paddinglessDim.range.max - index;
-		if (indexForwardDrift <= frontPadding && partNo > 0) {
+
+		// the first condition checks if the index originially belongs to the current part
+		// the second condition checks if the index is included in the padding region of a neigbor
+		// the last condition excludes the terminal case
+		if (indexForwardDrift >= 0 && indexForwardDrift <= frontPadding && partNo > 0) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo - 1, getDimension(dimension, partNo - 1, count, true));
 			return paddingPart;
-		} else if (indexBackwardDrift <= rearPadding && partNo < count - 1) {
+		} else if (indexBackwardDrift >= 0 && indexBackwardDrift <= rearPadding && partNo < count - 1) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo + 1, getDimension(dimension, partNo + 1, count, true));
 			return paddingPart;
