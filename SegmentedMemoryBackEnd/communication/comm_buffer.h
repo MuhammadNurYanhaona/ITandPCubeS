@@ -19,6 +19,8 @@
 #include "../utils/list.h"
 #include "../runtime/comm_barrier.h"
 #include <vector>
+#include <iostream>
+#include <fstream>
 
 /* To configure the communication buffers properly, we need the data-parts-list representing the operating memory for
  * a data structure for involved LPSes and data item size along with the other information provided by a confinement
@@ -95,8 +97,8 @@ class CommBuffer {
 	// get the communication buffer list for the synchronization and invoke read-data or write-data in each of them
 	// depending on what is appropriate in that situation. After that the segment controller will resume the threads
 	// doing computation.
-	virtual void readData() = 0;
-	virtual void writeData() = 0;
+	virtual void readData(bool loggingEnabled, std::ostream &logFile) = 0;
+	virtual void writeData(bool loggingEnabled, std::ostream &logFile) = 0;
 	
 	// these two functions tell if the current segment is sending data, receiving data, or both
 	bool isSendActivated();
@@ -126,8 +128,9 @@ class PreprocessedCommBuffer : public CommBuffer {
   public:
 	PreprocessedCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	~PreprocessedCommBuffer();
-	virtual void readData() = 0;
-	virtual void writeData() = 0;
+
+	virtual void readData(bool loggingEnabled, std::ostream &logFile) = 0;
+	virtual void writeData(bool loggingEnabled, std::ostream &logFile) = 0;
   private:
 	// a helper function to traverse a part container tree and get all memory locations for data items that are part
 	// of the data-exchange a communication-buffer has been created for
@@ -146,14 +149,15 @@ class PhysicalCommBuffer : public CommBuffer {
   public:
 	PhysicalCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	~PhysicalCommBuffer() { delete[] data; }
-	void readData();
-	void writeData();
+	void readData(bool loggingEnabled, std::ostream &logFile);
+	void writeData(bool loggingEnabled, std::ostream &logFile);
 	void setData(char *data) { this->data = data; }
 	char *getData() { return data; }
   protected:
 	void transferData(TransferSpec *transferSpec,
 			DataPartSpec *dataPartSpec,
-			PartIdContainer *partTree);
+			PartIdContainer *partTree,
+			bool loggingEnabled, std::ostream &logFile);
 };
 
 /* The extension of physical communication buffer to be used with pre-processing enabled
@@ -164,8 +168,8 @@ class PreprocessedPhysicalCommBuffer : public PreprocessedCommBuffer {
   public:
 	PreprocessedPhysicalCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	~PreprocessedPhysicalCommBuffer() { delete[] data; }
-	void readData();
-	void writeData();
+	void readData(bool loggingEnabled, std::ostream &logFile);
+	void writeData(bool loggingEnabled, std::ostream &logFile);
 	void setData(char *data) { this->data = data; }
 	char *getData() { return data; }
 };
@@ -177,11 +181,12 @@ class PreprocessedPhysicalCommBuffer : public PreprocessedCommBuffer {
 class VirtualCommBuffer : public CommBuffer {
   public:
 	VirtualCommBuffer(DataExchange *exchange, SyncConfig *syncConfig) : CommBuffer(exchange, syncConfig) {}
-	void readData();
+	void readData(bool loggingEnabled, std::ostream &logFile);
+	
 	// Read-write is short-circuited in a virtual buffer. So we need to implement one of the two transfer functions. 
 	// To clarify, the segment will call eventually writeData() sometimes after readData() but the act of reading 
 	// involves reading into the destination operating memory. So the call for writing is unnecessary.
-	void writeData() {}
+	void writeData(bool loggingEnabled, std::ostream &logFile) {}
 };
 
 /* This is the virtual communication buffer extension with pre-processing enabled
@@ -190,8 +195,8 @@ class PreprocessedVirtualCommBuffer : public PreprocessedCommBuffer {
   public:
 	PreprocessedVirtualCommBuffer(DataExchange *exchange,
 			SyncConfig *syncConfig) : PreprocessedCommBuffer(exchange, syncConfig) {}
-	void readData();
-	void writeData() {}
+	void readData(bool loggingEnabled, std::ostream &logFile);
+	void writeData(bool loggingEnabled, std::ostream &logFile) {}
 };
 
 /* This class contains all communication buffers related to a particular data synchronization and does the buffer read
@@ -213,8 +218,8 @@ class CommBufferManager {
 
 	// two functions to pre and post process communication buffers before a send and after a receive respectively
 	// these basically read and write the communication buffers
-	virtual void prepareBuffersForSend();
-	virtual void processBuffersAfterReceive();	
+	virtual void prepareBuffersForSend() = 0;
+	virtual void processBuffersAfterReceive() = 0;	
 
 	// functions to be implemented by the sync-type specific subclasses for send and receive; the signal type 
 	// indicates if the invoking PPU is interested in communication or not and the iteration represents the invo-

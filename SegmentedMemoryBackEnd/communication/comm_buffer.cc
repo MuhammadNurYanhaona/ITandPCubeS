@@ -134,29 +134,46 @@ PhysicalCommBuffer::PhysicalCommBuffer(DataExchange *e, SyncConfig *s) : CommBuf
 	data = new char[elementCount * elementSize];
 }
 
-void PhysicalCommBuffer::readData() {
+void PhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 	if (isSendActivated()) {
+		if (loggingEnabled) {
+			logFile << "start reading data for communication buffer: " << bufferTag << "\n";
+		}
+		
 		DataPartSpec *partSpec = new DataPartSpec(senderPartList, senderDataConfig);
 		TransferSpec *readSpec = new TransferSpec(DATA_PART_TO_COMM_BUFFER, elementSize);
-		transferData(readSpec, partSpec, senderTree);
+		transferData(readSpec, partSpec, senderTree, loggingEnabled, logFile);
 		delete partSpec;
 		delete readSpec;
+		
+		if (loggingEnabled) {
+			logFile << "reading done for communication buffer: " << bufferTag << "\n";
+		}
 	}
 }
 
-void PhysicalCommBuffer::writeData() {
+void PhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream &logFile) {
 	if (isReceiveActivated()) {
+		if (loggingEnabled) {
+			logFile << "start writing data from communication buffer: " << bufferTag << "\n";
+		}
+		
 		DataPartSpec *partSpec = new DataPartSpec(receiverPartList, receiverDataConfig);
 		TransferSpec *writeSpec = new TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize);
-		transferData(writeSpec, partSpec, receiverTree);
+		transferData(writeSpec, partSpec, receiverTree, loggingEnabled, logFile);
 		delete partSpec;
 		delete writeSpec;
+
+		if (loggingEnabled) {
+			logFile << "writing done for communication buffer: " << bufferTag << "\n";
+		}
 	}
 }
 
 void PhysicalCommBuffer::transferData(TransferSpec *transferSpec,
 		DataPartSpec *dataPartSpec,
-		PartIdContainer *partTree) {
+		PartIdContainer *partTree, 
+		bool loggingEnabled, std::ostream &logFile) {
 
 	vector<XformedIndexInfo*> *transformVector = new vector<XformedIndexInfo*>;
 	transformVector->reserve(dataDimensions);
@@ -165,15 +182,36 @@ void PhysicalCommBuffer::transferData(TransferSpec *transferSpec,
 	}
 	ExchangeIterator *iterator = getIterator();
 	int elementIndex = 0;
+	int transferRequests = 0;
+	int transferCount = 0;
 	while (iterator->hasMoreElements()) {
 		vector<int> *dataItemIndex = iterator->getNextElement();
+		if (loggingEnabled) {
+			logFile << "\t\tTransfer Request for: (";
+			for (int i = 0; i < dataItemIndex->size(); i++) {
+				if (i > 0) logFile << ',';
+				logFile << dataItemIndex->at(i);
+			}
+			logFile << ")\n";
+		}
 		dataPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
 		char *dataLocation = data + elementIndex * elementSize;
 		transferSpec->setBufferEntry(dataLocation, dataItemIndex);
-		partTree->transferData(transformVector, transferSpec, dataPartSpec);
+		int elementTransfers = partTree->transferData(transformVector, transferSpec, dataPartSpec);
+		if (loggingEnabled) {
+			logFile << "\t\tData Transfers for Request: ";
+			logFile << elementTransfers << "\n";
+		}
 		elementIndex++;
+		transferRequests++;
+		transferCount += elementTransfers;
 	}
 	delete transformVector;
+	
+	if (loggingEnabled) {
+		logFile << "\tTotal transfer requests: " << transferRequests << "\n";
+		logFile << "\tTotal data transfers for those requests: " << transferCount << "\n";
+	}
 }
 
 //------------------------------------------ Pre-processed Physical Communication Buffer -----------------------------------------/
@@ -183,7 +221,7 @@ PreprocessedPhysicalCommBuffer::PreprocessedPhysicalCommBuffer(DataExchange *exc
 	data = new char[elementCount * elementSize];
 }
 
-void PreprocessedPhysicalCommBuffer::readData() {
+void PreprocessedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 	for (int i = 0; i < elementCount; i++) {
 		char *readLocation = senderTransferMapping[i];
 		char *writeLocation = data + i * elementSize;
@@ -191,7 +229,7 @@ void PreprocessedPhysicalCommBuffer::readData() {
 	}
 }
 
-void PreprocessedPhysicalCommBuffer::writeData() {
+void PreprocessedPhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream &logFile) {
 	for (int i = 0; i < elementCount; i++) {
 		char *readLocation = data + i * elementSize;
 		char *writeLocation = receiverTransferMapping[i];
@@ -201,9 +239,13 @@ void PreprocessedPhysicalCommBuffer::writeData() {
 
 //------------------------------------------------- Virtual Communication Buffer -------------------------------------------------/
 
-void VirtualCommBuffer::readData() {
+void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 	if (isReceiveActivated()) {
-
+		if (loggingEnabled) {
+			logFile << "start transferring data for communication buffer ";
+			logFile << bufferTag << "\n";
+		}
+	
 		DataPartSpec *readPartSpec = new DataPartSpec(senderPartList, senderDataConfig);
 		TransferSpec *readTransferSpec = new TransferSpec(DATA_PART_TO_COMM_BUFFER, elementSize);
 
@@ -218,28 +260,59 @@ void VirtualCommBuffer::readData() {
 			transformVector->push_back(new XformedIndexInfo());
 		}
 
+		int transferRequests = 0;
+		int readCount = 0;
+		int writeCount = 0;
+
 		ExchangeIterator *iterator = getIterator();
 		while (iterator->hasMoreElements()) {
 
 			// get the next data item index from the iterator
 			vector<int> *dataItemIndex = iterator->getNextElement();
+			if (loggingEnabled) {
+				logFile << "\t\tTransfer Request for: (";
+				for (int i = 0; i < dataItemIndex->size(); i++) {
+					if (i > 0) logFile << ',';
+					logFile << dataItemIndex->at(i);
+				}
+				logFile << ")\n";
+			}
 
 			// traverse the sender tree and copy data from appropriate location in the the data-entry
 			readTransferSpec->setBufferEntry(dataEntry, dataItemIndex);
 			readPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
-			senderTree->transferData(transformVector, readTransferSpec, readPartSpec);
+			int elementsRead = senderTree->transferData(transformVector, 
+					readTransferSpec, readPartSpec);
+			if (loggingEnabled) {
+				logFile << "\t\tElements Read: " << elementsRead << "\n";
+			}
+			readCount += elementsRead;
 
 			// then write the data-entry in the appropriate location on the other side the same way
 			writeTransferSpec->setBufferEntry(dataEntry, dataItemIndex);
 			writePartSpec->initPartTraversalReference(dataItemIndex, transformVector);
-			receiverTree->transferData(transformVector, writeTransferSpec, writePartSpec);
+			int elementsWritten = receiverTree->transferData(transformVector, 
+					writeTransferSpec, writePartSpec);
+			if (loggingEnabled) {
+				logFile << "\t\tElements written: " << elementsWritten << "\n";
+			}
+			writeCount += elementsWritten;
+
+			transferRequests++;
+		}
+		
+		if (loggingEnabled) {
+			logFile << "\tTotal data transfer requests: " << transferRequests << "\n";
+			logFile << "\tData reads: " << readCount << "\n";
+			logFile << "\tData writes: " << writeCount << "\n";
+			logFile << "data transferring done for communication buffer " << bufferTag << "\n";
 		}
 	}
 }
 
 //------------------------------------------- Pre-processed Virtual Communication Buffer -----------------------------------------/
 
-void PreprocessedVirtualCommBuffer::readData() {
+void PreprocessedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 	for (int i = 0; i < elementCount; i++) {
 		char *readLocation = senderTransferMapping[i];
 		char *writeLocation = receiverTransferMapping[i];
@@ -261,22 +334,6 @@ CommBufferManager::~CommBufferManager() {
 		delete buffer;
 	}
 	delete commBufferList;
-}
-
-void CommBufferManager::prepareBuffersForSend() {
-	List<CommBuffer*> *sendBufferList = getSortedList(false);
-	for (int i = 0; i < sendBufferList->NumElements(); i++) {
-		sendBufferList->Nth(i)->readData();
-	}
-	delete sendBufferList;
-}
-
-void CommBufferManager::processBuffersAfterReceive() {
-	List<CommBuffer*> *receiveBufferList = getSortedList(true);
-	for (int i = 0; i < receiveBufferList->NumElements(); i++) {
-		receiveBufferList->Nth(i)->writeData();
-	}
-	delete receiveBufferList;
 }
 
 List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive, List<CommBuffer*> *bufferList) {

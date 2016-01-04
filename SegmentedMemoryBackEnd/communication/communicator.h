@@ -80,7 +80,12 @@ class Communicator : public CommBufferManager {
 	CommStatistics *getCommStat() { return commStat; }
 	virtual void describe(int indentation);
 
-	// sets up the tags in each communication buffer that will be used during MPI communications in some communicator types; it
+	// two functions to pre and post process communication buffers before a send and after a receive respectively these basically 
+	// read and write the communication buffers
+        virtual void prepareBuffersForSend();
+        virtual void processBuffersAfterReceive();
+
+	// sets up the tags in each communication buffer that will be used during MPI communications in some communicator types; it 
 	// also assign the communicator an ID which can also be used as a tag in some contexts
 	void setupBufferTags(int communicatorId, int totalSegmentsInMachine);
 

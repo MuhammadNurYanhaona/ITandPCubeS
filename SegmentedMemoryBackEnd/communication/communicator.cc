@@ -101,6 +101,22 @@ void Communicator::describe(int indentation) {
 	}
 }
 
+void Communicator::prepareBuffersForSend() {
+        List<CommBuffer*> *sendBufferList = getSortedList(false);
+        for (int i = 0; i < sendBufferList->NumElements(); i++) {
+                sendBufferList->Nth(i)->readData(false, *logFile);
+        }
+        delete sendBufferList;
+}
+
+void Communicator::processBuffersAfterReceive() {
+        List<CommBuffer*> *receiveBufferList = getSortedList(true);
+        for (int i = 0; i < receiveBufferList->NumElements(); i++) {
+                receiveBufferList->Nth(i)->writeData(false, *logFile);
+        }
+        delete receiveBufferList;
+}
+
 void Communicator::setupBufferTags(int communicatorId, int totalSegmentsInMachine) {
 	this->communicatorId = communicatorId;
 	std::ostringstream digitStr;

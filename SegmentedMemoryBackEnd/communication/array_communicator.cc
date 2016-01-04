@@ -146,11 +146,12 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	List<CommBuffer*> *localBufferList = new List<CommBuffer*>;
 	List<CommBuffer*> *remoteBufferList = new List<CommBuffer*>;
 	seperateLocalAndRemoteBuffers(localSegmentTag, localBufferList, remoteBufferList);
+
 	for (int i = 0; i < localBufferList->NumElements(); i++) {
 		CommBuffer *localBuffer = localBufferList->Nth(i);
 		// for local buffers just update the operating memory with buffer's content; note that reading data into
 		// the buffer is not needed as that has been already done for all buffers 
-		localBuffer->writeData();
+		localBuffer->writeData(false, *logFile);
 	}
 	delete localBufferList;
 
@@ -218,7 +219,7 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	}
 	for (int i = 0; i < remoteRecvs; i++) {
 		CommBuffer *buffer = remoteReceiveBuffers->Nth(i);
-		buffer->writeData();
+		buffer->writeData(false, *logFile);
 	}
 
 	// wait for all sends to finish
@@ -337,7 +338,7 @@ void UpSyncCommunicator::sendData() {
 	// for the local data transfer case, just write data from buffer to operating memory as reading has been already 
 	// taken care of
 	if (exchange->getReceiver()->hasSegmentTag(localSegmentTag)) {
-		sendBuffer->writeData();
+		sendBuffer->writeData(false, *logFile);
 	} else {
 		char *data = sendBuffer->getData();
 		int bufferSize = sendBuffer->getBufferSize();
@@ -544,7 +545,7 @@ void DownSyncCommunicator::sendData() {
 			exit(EXIT_FAILURE);
 		}
 		// need to update own operating memory data as the sender will bypass the receive call on the communicator
-		buffer->writeData();
+		buffer->writeData(false, *logFile);
 	} else {		
 		// need to update its own receiving buffer in the scatter mode separately; interchange for others are included
 		// in the scatter buffer configuration 
@@ -705,7 +706,7 @@ void DownSyncCommunicator::updateLocalBufferPart() {
 		CommBuffer *buffer = commBufferList->Nth(i);
 		Participant *receiver = buffer->getExchange()->getReceiver();
 		if (receiver->hasSegmentTag(localSegmentTag)) {
-			buffer->writeData();
+			buffer->writeData(false, *logFile);
 			break;
 		}
 	}
@@ -743,7 +744,7 @@ void CrossSyncCommunicator::sendData() {
 	
 	// write the local buffers into operating memory; as in other cases, reading has been done already in some earlier function call
 	for (int i = 0; i < localBuffers->NumElements(); i++) {
-		localBuffers->Nth(i)->writeData();
+		localBuffers->Nth(i)->writeData(false, *logFile);
 	}
 	delete localBuffers;
 
@@ -793,7 +794,7 @@ void CrossSyncCommunicator::sendData() {
 			// if data to be sent to a remote segment is also replicated locally then write the buffer in the local
 			// operating memory
 			if (segmentTag == localSegmentTag) {
-				buffer->writeData();
+				buffer->writeData(false, *logFile);
 				continue;
 			}
 
@@ -819,7 +820,7 @@ void CrossSyncCommunicator::sendData() {
 		}
 		for (int i = 0; i < remoteReceives->NumElements(); i++) {
 			CommBuffer *buffer = remoteReceives->Nth(i);
-			buffer->writeData();
+			buffer->writeData(false, *logFile);
 		}
 	}
 
