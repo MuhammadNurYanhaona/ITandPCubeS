@@ -230,7 +230,8 @@ void PartContainer::foldContainer(List<PartFolding*> *fold) {
 
 int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		TransferSpec *transferSpec,
-		DataPartSpec *dataPartSpec) {
+		DataPartSpec *dataPartSpec,
+		bool loggingEnabled, std::ostream &logFile, int indentLevel) {
 
 	DataItemConfig *dataConfig = dataPartSpec->getConfig();
 	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
@@ -239,6 +240,11 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 	int transferCount = 0;
 
 	int partNo = dimIndex->partNo;
+	if (loggingEnabled) {
+		for (int i = 0; i < indentLevel; i++) logFile << '\t';
+		logFile << "Part No: " << partNo << "\n";
+	}
+
 	vector<int> partIndex;
 	int dataDimensions = dataConfig->getDimensionality();
 	partIndex.reserve(dataDimensions);
@@ -253,10 +259,17 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
 		transferSpec->performTransfer(dataLocation);
 		transferCount++;
+	} else if (loggingEnabled) {
+		for (int i = 0; i < indentLevel; i++) logFile << '\t';
+		logFile << "Part Not Found\n"; 
 	}
 
 	if (paddedIndex != NULL) {
 		int partNo = paddedIndex->partNo;
+		if (loggingEnabled) {
+			for (int i = 0; i < indentLevel; i++) logFile << '\t';
+			logFile << "Padded Part No: " << partNo << "\n"; 
+		}
 		partIndex[dimNo] = paddedIndex->index;
 		SuperPart *part = getPart(partNo);
 		if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
@@ -264,6 +277,9 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 			char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
 			transferSpec->performTransfer(dataLocation);
 			transferCount++;
+		} else if (loggingEnabled) {
+			for (int i = 0; i < indentLevel; i++) logFile << '\t';
+			logFile << "Padded Part Not Found\n"; 
 		}
 		delete paddedIndex;
 	}
@@ -360,8 +376,9 @@ void PartListContainer::foldContainer(List<PartFolding*> *fold) {
 }
 
 int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
-				TransferSpec *transferSpec,
-				DataPartSpec *dataPartSpec) {
+		TransferSpec *transferSpec,
+		DataPartSpec *dataPartSpec,
+		bool loggingEnabled, std::ostream &logFile, int indentLevel) {
 
 	DataItemConfig *dataConfig = dataPartSpec->getConfig();
 	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
@@ -370,17 +387,34 @@ int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 	int transferCount = 0;
 
 	int partNo = dimIndex->partNo;
+	if (loggingEnabled) {
+		for (int i = 0; i < indentLevel; i++) logFile << '\t';
+		logFile << "Part No: " << partNo << "\n";
+	}
+
 	PartIdContainer *nextContainer = getContainer(partNo);
 	if (nextContainer != NULL) {
-		transferCount += nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
+		transferCount += nextContainer->transferData(xformVector, 
+				transferSpec, dataPartSpec, loggingEnabled, logFile, indentLevel + 1);
+	} else if (loggingEnabled) {
+		for (int i = 0; i < indentLevel; i++) logFile << '\t';
+		logFile << "Part Not Found\n";
 	}
 
 	if (paddedIndex != NULL) {
 		dimIndex->copyInfo(paddedIndex);
 		int partNo = dimIndex->partNo;
+		if (loggingEnabled) {
+			for (int i = 0; i < indentLevel; i++) logFile << '\t';
+			logFile << "Padded Part No: " << partNo << "\n";
+		}
 		PartIdContainer *nextContainer = getContainer(partNo);
 		if (nextContainer != NULL) {
-			transferCount += nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
+			transferCount += nextContainer->transferData(xformVector, 
+					transferSpec, dataPartSpec, loggingEnabled, logFile, indentLevel + 1);
+		} else if (loggingEnabled) {
+			for (int i = 0; i < indentLevel; i++) logFile << '\t';
+			logFile << "Padded Part Not Found\n";
 		}
 		delete paddedIndex;
 	}

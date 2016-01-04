@@ -119,7 +119,8 @@ void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
 		vector<int> *dataItemIndex = iterator->getNextElement();
 		dataPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
 		transferSpec->setBufferLocation(&buffer[elementIndex]);
-		partContainerTree->transferData(transformVector, transferSpec, dataPartSpec);
+		partContainerTree->transferData(transformVector, 
+				transferSpec, dataPartSpec, false, std::cout);
 		elementIndex++;
 	}
 
@@ -197,7 +198,9 @@ void PhysicalCommBuffer::transferData(TransferSpec *transferSpec,
 		dataPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
 		char *dataLocation = data + elementIndex * elementSize;
 		transferSpec->setBufferEntry(dataLocation, dataItemIndex);
-		int elementTransfers = partTree->transferData(transformVector, transferSpec, dataPartSpec);
+		int elementTransfers = partTree->transferData(transformVector, 
+				transferSpec, 
+				dataPartSpec, loggingEnabled, logFile, 3);
 		if (loggingEnabled) {
 			logFile << "\t\tData Transfers for Request: ";
 			logFile << elementTransfers << "\n";
@@ -282,7 +285,8 @@ void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 			readTransferSpec->setBufferEntry(dataEntry, dataItemIndex);
 			readPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
 			int elementsRead = senderTree->transferData(transformVector, 
-					readTransferSpec, readPartSpec);
+					readTransferSpec, 
+					readPartSpec, loggingEnabled, logFile, 3);
 			if (loggingEnabled) {
 				logFile << "\t\tElements Read: " << elementsRead << "\n";
 			}
@@ -292,7 +296,8 @@ void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 			writeTransferSpec->setBufferEntry(dataEntry, dataItemIndex);
 			writePartSpec->initPartTraversalReference(dataItemIndex, transformVector);
 			int elementsWritten = receiverTree->transferData(transformVector, 
-					writeTransferSpec, writePartSpec);
+					writeTransferSpec, 
+					writePartSpec, loggingEnabled, logFile, 3);
 			if (loggingEnabled) {
 				logFile << "\t\tElements written: " << elementsWritten << "\n";
 			}

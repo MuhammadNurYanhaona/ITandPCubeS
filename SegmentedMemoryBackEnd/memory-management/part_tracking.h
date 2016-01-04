@@ -114,7 +114,8 @@ class PartIdContainer {
 	// useful for debugging purpose.
 	virtual int transferData(std::vector<XformedIndexInfo*> *xformVector,
 			TransferSpec *transferSpec,
-			DataPartSpec *dataPartSpec) = 0;
+			DataPartSpec *dataPartSpec,
+			bool loggingEnabled, std::ostream &logFile, int indentLevel = 0) = 0;
 };
 
 // this is the leaf level container that holds the actual parts of a data structure
@@ -133,7 +134,8 @@ class PartContainer : public PartIdContainer {
 	void foldContainer(List<PartFolding*> *fold);
 	int transferData(std::vector<XformedIndexInfo*> *xformVector,
 			TransferSpec *transferSpec,
-			DataPartSpec *dataPartSpec);
+			DataPartSpec *dataPartSpec,
+			bool loggingEnabled, std::ostream &logFile, int indentLevel = 0);
 
 	// function to be used to set up an actual part as the replacement for the place-holder SuperPart after a
 	// valid data part has been created and initialized based on the nature of the data structure under concern 
@@ -159,8 +161,9 @@ class PartListContainer : public PartIdContainer {
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
 	void foldContainer(List<PartFolding*> *fold);
 	int transferData(std::vector<XformedIndexInfo*> *xformVector,
-				TransferSpec *transferSpec,
-				DataPartSpec *dataPartSpec);
+			TransferSpec *transferSpec,
+			DataPartSpec *dataPartSpec,
+			bool loggingEnabled, std::ostream &logFile, int indentLevel = 0);
 	List<List<int*>*> *getAllPartIdsAtLevel(int levelNo,
 			int dataDimensions,
 			List<int*> *partIdUnderConstruct = new List<int*>,
