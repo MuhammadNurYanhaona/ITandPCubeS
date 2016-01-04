@@ -242,7 +242,7 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 	int partNo = dimIndex->partNo;
 	if (loggingEnabled) {
 		for (int i = 0; i < indentLevel; i++) logFile << '\t';
-		logFile << "Part No: " << partNo << "\n";
+		logFile << "Dimension: " << dimNo << " Part No: " << partNo << "\n";
 	}
 
 	vector<int> partIndex;
@@ -268,7 +268,7 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		int partNo = paddedIndex->partNo;
 		if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Padded Part No: " << partNo << "\n"; 
+			logFile << "Dimension: " << dimNo << "Padded Part No: " << partNo << "\n"; 
 		}
 		partIndex[dimNo] = paddedIndex->index;
 		SuperPart *part = getPart(partNo);
@@ -389,7 +389,7 @@ int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 	int partNo = dimIndex->partNo;
 	if (loggingEnabled) {
 		for (int i = 0; i < indentLevel; i++) logFile << '\t';
-		logFile << "Part No: " << partNo << "\n";
+		logFile << "Dimension: " << dimNo << " Part No: " << partNo << "\n";
 	}
 
 	PartIdContainer *nextContainer = getContainer(partNo);
@@ -406,7 +406,7 @@ int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 		int partNo = dimIndex->partNo;
 		if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Padded Part No: " << partNo << "\n";
+			logFile << "Dimension: " << partNo << " Padded Part No: " << partNo << "\n";
 		}
 		PartIdContainer *nextContainer = getContainer(partNo);
 		if (nextContainer != NULL) {
