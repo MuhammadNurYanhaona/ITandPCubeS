@@ -228,7 +228,7 @@ void PartContainer::foldContainer(List<PartFolding*> *fold) {
 	delete rangeList;
 }
 
-void PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
+int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		TransferSpec *transferSpec,
 		DataPartSpec *dataPartSpec) {
 
@@ -236,6 +236,7 @@ void PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
 	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
 	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
+	int transferCount = 0;
 
 	int partNo = dimIndex->partNo;
 	vector<int> partIndex;
@@ -251,6 +252,7 @@ void PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
 		char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
 		transferSpec->performTransfer(dataLocation);
+		transferCount++;
 	}
 
 	if (paddedIndex != NULL) {
@@ -261,9 +263,12 @@ void PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 			PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
 			char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
 			transferSpec->performTransfer(dataLocation);
+			transferCount++;
 		}
 		delete paddedIndex;
 	}
+
+	return transferCount;
 }
 
 SuperPart *PartContainer::getPart(int partNo) {
@@ -354,7 +359,7 @@ void PartListContainer::foldContainer(List<PartFolding*> *fold) {
 	}
 }
 
-void PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
+int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 				TransferSpec *transferSpec,
 				DataPartSpec *dataPartSpec) {
 
@@ -362,11 +367,12 @@ void PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector
 	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
 	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
 	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
+	int transferCount = 0;
 
 	int partNo = dimIndex->partNo;
 	PartIdContainer *nextContainer = getContainer(partNo);
 	if (nextContainer != NULL) {
-		nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
+		transferCount += nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
 	}
 
 	if (paddedIndex != NULL) {
@@ -374,10 +380,11 @@ void PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector
 		int partNo = dimIndex->partNo;
 		PartIdContainer *nextContainer = getContainer(partNo);
 		if (nextContainer != NULL) {
-			nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
+			transferCount += nextContainer->transferData(xformVector, transferSpec, dataPartSpec);
 		}
 		delete paddedIndex;
 	}
+	return transferCount;
 }
 
 List<List<int*>*> *PartListContainer::getAllPartIdsAtLevel(int levelNo, int dataDimensions,

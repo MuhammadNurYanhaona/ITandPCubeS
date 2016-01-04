@@ -107,10 +107,12 @@ class PartIdContainer {
 			int previousLevel = -1);
 
 	// function to be used for transferring data elements between a communication buffer and one or more data parts
-	// this is a recursive process of identifying the data part that holds the memory location to participate in the
+	// This is a recursive process of identifying the data part that holds the memory location to participate in the
 	// exchange with the communication buffer, transforming index along the way so that the address within the part
 	// for the actual data-structure-index is known, then do the read/write based on the transfer specification.
-	virtual void transferData(std::vector<XformedIndexInfo*> *xformVector,
+	// The function returns the number of transfers taken place through the recursive process. This information is 
+	// useful for debugging purpose.
+	virtual int transferData(std::vector<XformedIndexInfo*> *xformVector,
 			TransferSpec *transferSpec,
 			DataPartSpec *dataPartSpec) = 0;
 };
@@ -129,7 +131,7 @@ class PartContainer : public PartIdContainer {
 	SuperPart *getPartAtIndex(int index) { return dataPartList[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
 	void foldContainer(List<PartFolding*> *fold);
-	void transferData(std::vector<XformedIndexInfo*> *xformVector,
+	int transferData(std::vector<XformedIndexInfo*> *xformVector,
 			TransferSpec *transferSpec,
 			DataPartSpec *dataPartSpec);
 
@@ -156,7 +158,7 @@ class PartListContainer : public PartIdContainer {
 	PartIdContainer *getNestedContainerAtIndex(int index) { return nextLevelContainers[index]; }
 	SuperPart *getPart(List<int*> *partId, PartIterator *iterator);
 	void foldContainer(List<PartFolding*> *fold);
-	void transferData(std::vector<XformedIndexInfo*> *xformVector,
+	int transferData(std::vector<XformedIndexInfo*> *xformVector,
 				TransferSpec *transferSpec,
 				DataPartSpec *dataPartSpec);
 	List<List<int*>*> *getAllPartIdsAtLevel(int levelNo,
