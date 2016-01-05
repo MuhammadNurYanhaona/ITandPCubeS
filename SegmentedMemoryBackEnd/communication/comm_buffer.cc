@@ -255,6 +255,8 @@ void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 		DataPartSpec *writePartSpec = new DataPartSpec(receiverPartList, receiverDataConfig);
 		TransferSpec *writeTransferSpec = new TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize);
 
+		Assert(senderDataConfig != receiverDataConfig);
+
 		char *dataEntry = new char[elementSize];
 
 		vector<XformedIndexInfo*> *transformVector = new vector<XformedIndexInfo*>;

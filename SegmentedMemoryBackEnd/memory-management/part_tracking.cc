@@ -268,7 +268,7 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		int partNo = paddedIndex->partNo;
 		if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Dimension: " << dimNo << "Padded Part No: " << partNo << "\n"; 
+			logFile << "Dimension: " << dimNo << " Padded Part No: " << partNo << "\n"; 
 		}
 		partIndex[dimNo] = paddedIndex->index;
 		SuperPart *part = getPart(partNo);
