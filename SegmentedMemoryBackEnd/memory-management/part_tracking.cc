@@ -236,6 +236,8 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 	DataItemConfig *dataConfig = dataPartSpec->getConfig();
 	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
 	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
+	XformedIndexInfo backupIndex = *dimIndex;
+	
 	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
 	int transferCount = 0;
 
@@ -283,6 +285,16 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		}
 		delete paddedIndex;
 	}
+
+	// Multiple data transfers may result from a single transfer requests due to the presence of paddings in partition
+	// configuration of data parts. As apparent from the logic of this function, multiple transfers take place in a 
+	// depth first manner. Throughout the whole recursive process, the algorithm maintains a single transform vector 
+	// for identification of the location of transfers. Each step of the recursion update one entry from the transform
+	// vector. Further, the part identification in lower level steps uses the current value of the transform vector.
+	// This can cause the transform vector to be corrupted when the control of execution returns from a lower level and
+	// about to proceed a padded data part next. Thus before returning from the function, we need to restore proper
+	// entry of the transform vector to its previous value.
+	dimIndex->copyInfo(&backupIndex);
 
 	return transferCount;
 }
@@ -383,6 +395,8 @@ int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 	DataItemConfig *dataConfig = dataPartSpec->getConfig();
 	PartitionInstr *partitionInstr = dataConfig->getInstruction(level, dimNo);
 	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
+	XformedIndexInfo backupIndex = *dimIndex;
+	
 	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
 	int transferCount = 0;
 
@@ -411,13 +425,25 @@ int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 		PartIdContainer *nextContainer = getContainer(partNo);
 		if (nextContainer != NULL) {
 			transferCount += nextContainer->transferData(xformVector, 
-					transferSpec, dataPartSpec, loggingEnabled, logFile, indentLevel + 1);
+					transferSpec, dataPartSpec, 
+					loggingEnabled, logFile, indentLevel + 1);
 		} else if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';
 			logFile << "Padded Part Not Found\n";
 		}
 		delete paddedIndex;
 	}
+
+	// Multiple data transfers may result from a single transfer requests due to the presence of paddings in partition
+	// configuration of data parts. As apparent from the logic of this function, multiple transfers take place in a 
+	// depth first manner. Throughout the whole recursive process, the algorithm maintains a single transform vector 
+	// for identification of the location of transfers. Each step of the recursion update one entry from the transform
+	// vector. Further, the part identification in lower level steps uses the current value of the transform vector.
+	// This can cause the transform vector to be corrupted when the control of execution returns from a lower level and
+	// about to proceed a padded data part next. Thus before returning from the function, we need to restore proper
+	// entry of the transform vector to its previous value.
+	dimIndex->copyInfo(&backupIndex);
+
 	return transferCount;
 }
 
@@ -430,7 +456,8 @@ List<List<int*>*> *PartListContainer::getAllPartIdsAtLevel(int levelNo, int data
 		PartIdContainer *sampleChild = nextLevelContainers.at(0);
 		if (sampleChild->getLevel() != levelNo) {
 			delete partIdList;
-			return PartIdContainer::getAllPartIdsAtLevel(levelNo, dataDimensions, partIdUnderConstruct, previousLevel);
+			return PartIdContainer::getAllPartIdsAtLevel(levelNo, 
+					dataDimensions, partIdUnderConstruct, previousLevel);
 		}
 	}
 
