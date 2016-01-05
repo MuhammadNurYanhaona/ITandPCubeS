@@ -77,6 +77,7 @@ public:
 	void setPartId(int partId) { this->partId = partId; }
 	bool doesReorderIndex() { return reorderIndex; }
 	void setExcludePaddingFlag(bool stat) { excludePaddingInIntervalCalculation = stat; }
+	bool isPaddingExcluded() { return excludePaddingInIntervalCalculation; }
 	PartitionInstr *getPreviousInstr() { return prevInstr; }
 	int getPartsCount() { return partsCount; }
 	void setPriorityOrder(int priorityOrder) { this->priorityOrder = priorityOrder; }

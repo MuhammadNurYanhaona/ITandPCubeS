@@ -406,7 +406,7 @@ int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 		int partNo = dimIndex->partNo;
 		if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Dimension: " << partNo << " Padded Part No: " << partNo << "\n";
+			logFile << "Dimension: " << dimNo << " Padded Part No: " << partNo << "\n";
 		}
 		PartIdContainer *nextContainer = getContainer(partNo);
 		if (nextContainer != NULL) {

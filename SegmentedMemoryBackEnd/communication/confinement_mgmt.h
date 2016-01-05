@@ -106,6 +106,14 @@ class ConfinementConstructionConfig {
 	// confinement based on demand of the situation.
 	void configurePaddingInPartitionConfigs();
 
+	// Similar to the above, partition configurations need to be configured for data transfers between 
+	// communication buffers and the operating memory. The padding setting, however, should be a bit different
+	// from that done for confinement processing. The reader side should be the same to the sender config from
+	// the last time, but padding should be enabled on all levels on the writing side. This is because we need
+	// to propagate an up-to-date value of data point to all data parts regardless of the former being in the
+	// owned, actual region or the padding region of the latter. 
+	void configurePaddingInPartitionConfigsForReadWrite();
+
 	// two auxiliary functions to be used to construct sender and receiver LPS dimension order paths
 	std::vector<LpsDimConfig> *forwardTruncateDimVector(int truncateLevel,
 			std::vector<LpsDimConfig> *originalVector);

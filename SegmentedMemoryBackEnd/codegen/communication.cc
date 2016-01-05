@@ -591,6 +591,7 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	fnBody << '\n' << tripleIndent << "partConfigMap" << paramSeparator;
 	fnBody << '\n' << tripleIndent << "localSegmentTag" << paramSeparator;
 	fnBody << '\n' << tripleIndent << "distributionMap)" << stmtSeparator;
+	fnBody << indent << "ccConfig->configurePaddingInPartitionConfigsForReadWrite()" << stmtSeparator;
 	
 	// then retrieve all data exchanges applicable for the current segments for this dependency
 	fnBody << indent << "struct timeval start" << stmtSeparator;

@@ -148,6 +148,20 @@ void ConfinementConstructionConfig::configurePaddingInPartitionConfigs() {
 	setPaddingThresholdInDataConfig(receiverConfig, receiverLps);
 }
 
+void ConfinementConstructionConfig::configurePaddingInPartitionConfigsForReadWrite() {
+
+	setPaddingThresholdInDataConfig(senderConfig, confinementLps);
+	
+	int levels = receiverConfig->getLevels();
+	int dataDimensions = getDataDimensions();
+	for (int level = 0; level < levels; level++) {
+		for (int dimNo = 0; dimNo < dataDimensions; dimNo++) {
+			PartitionInstr *instr = receiverConfig->getInstruction(level, dimNo);
+			instr->setExcludePaddingFlag(false);
+		}
+	}
+}
+
 void ConfinementConstructionConfig::setPaddingThresholdInDataConfig(DataItemConfig *dataConfig,
 		int thresholdLps) {
 
