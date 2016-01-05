@@ -6,6 +6,7 @@
 #include "part_config.h"
 #include "../codegen/structure.h"
 #include "../memory-management/allocation.h"
+#include "../utils/utility.h"
 
 using namespace std;
 
@@ -57,7 +58,8 @@ char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, vector<int> *par
 	int partNo = partLocator->getPartListIndex();
 	List<DataPart*> *partList = dataParts->getPartList();
 	DataPart *dataPart = partList->Nth(partNo);
-	Dimension *partDimensions = dataPart->getMetadata()->getBoundary();
+	PartMetadata *metadata = dataPart->getMetadata();
+	Dimension *partDimensions = metadata->getBoundary();
 
 	int dataPointNo = 0;
 	int multiplier = 1;
@@ -70,6 +72,8 @@ char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, vector<int> *par
 
 	void *data = dataPart->getData();
 	char *charData = reinterpret_cast<char*>(data);
+
+	Assert(dataPointNo < metadata->getSize());
 
 	char *updateLocation = charData + dataItemSize * dataPointNo;
 	return updateLocation;
