@@ -319,11 +319,11 @@ XformedIndexInfo *BlockSizeInstr::transformIndex(XformedIndexInfo *indexToXform)
 		// the first condition checks if the index originially belongs to the current part
 		// the second condition checks if the index is included in the padding region of a neigbor
 		// the last condition excludes the terminal case
-		if (indexForwardDrift >= 0 && indexForwardDrift <= frontPadding && partNo > 0) {
+		if (indexForwardDrift >= 0 && indexForwardDrift < frontPadding && partNo > 0) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo - 1, getDimension(dimension, partNo - 1, count, true));
 			return paddingPart;
-		} else if (indexBackwardDrift >= 0 && indexBackwardDrift <= rearPadding && partNo < count - 1) {
+		} else if (indexBackwardDrift >= 0 && indexBackwardDrift < rearPadding && partNo < count - 1) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo + 1, getDimension(dimension, partNo + 1, count, true));
 			return paddingPart;
@@ -520,11 +520,11 @@ XformedIndexInfo *BlockCountInstr::transformIndex(XformedIndexInfo *indexToXform
 		// the first condition checks if the index originially belongs to the current part
 		// the second condition checks if the index is included in the padding region of a neigbor
 		// the last condition excludes the terminal case
-		if (indexForwardDrift >= 0 && indexForwardDrift <= frontPadding && partNo > 0) {
+		if (indexForwardDrift >= 0 && indexForwardDrift < frontPadding && partNo > 0) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo - 1, getDimension(dimension, partNo - 1, count, true));
 			return paddingPart;
-		} else if (indexBackwardDrift >= 0 && indexBackwardDrift <= rearPadding && partNo < count - 1) {
+		} else if (indexBackwardDrift >= 0 && indexBackwardDrift < rearPadding && partNo < count - 1) {
 			XformedIndexInfo *paddingPart = new XformedIndexInfo(index,
 					partNo + 1, getDimension(dimension, partNo + 1, count, true));
 			return paddingPart;
