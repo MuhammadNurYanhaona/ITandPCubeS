@@ -21,6 +21,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 /* To configure the communication buffers properly, we need the data-parts-list representing the operating memory for
  * a data structure for involved LPSes and data item size along with the other information provided by a confinement
@@ -83,6 +84,7 @@ class CommBuffer {
 	virtual ~CommBuffer() {}
 	DataExchange *getExchange() { return dataExchange; }
 	int getBufferSize() { return elementCount * elementSize; }
+	int getElementCount() { return elementCount; }
 	int compareTo(CommBuffer *other, bool forReceive);
 	int getBufferTag() { return bufferTag; }
 	void describe(std::ostream &stream, int indentation);
@@ -153,6 +155,26 @@ class PhysicalCommBuffer : public CommBuffer {
 	void writeData(bool loggingEnabled, std::ostream &logFile);
 	void setData(char *data) { this->data = data; }
 	char *getData() { return data; }
+
+	// a templated function's implementation must be in the header file
+	template <class Type> static void printContent(CommBuffer *buffer, 
+			std::ostream &stream, 
+			int indentLevel, int itemPerLine) {
+
+		Type *typedData = reinterpret_cast<Type*>(buffer->getData());
+		int items = buffer->getElementCount();
+		std::ostringstream indentStr;
+		for (int i = 0; i < indentLevel; i++) indentStr << '\t';
+		std::string indent = indentStr.str();
+
+		for (int i = 0; i < items; i++) {
+			if (i % itemPerLine == 0) { 
+				stream << '\n' << indent; 
+			} else stream << ' ';
+			stream << typedData[i];
+		}
+		stream << '\n';
+	}
   protected:
 	void transferData(TransferSpec *transferSpec,
 			DataPartSpec *dataPartSpec,

@@ -132,7 +132,11 @@ void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
 //------------------------------------------------ Physical Communication Buffer -------------------------------------------------/
 
 PhysicalCommBuffer::PhysicalCommBuffer(DataExchange *e, SyncConfig *s) : CommBuffer(e, s) {
-	data = new char[elementCount * elementSize];
+	int bufferSize = elementCount * elementSize;
+	data = new char[bufferSize];
+	for (int i = 0; i < bufferSize; i++) {
+		data[i] = 0;
+	}
 }
 
 void PhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
@@ -221,7 +225,12 @@ void PhysicalCommBuffer::transferData(TransferSpec *transferSpec,
 
 PreprocessedPhysicalCommBuffer::PreprocessedPhysicalCommBuffer(DataExchange *exchange,
 		SyncConfig *syncConfig) : PreprocessedCommBuffer(exchange, syncConfig) {
-	data = new char[elementCount * elementSize];
+	
+	int bufferSize = elementCount * elementSize;
+	data = new char[bufferSize];
+	for (int i = 0; i < bufferSize; i++) {
+		data[i] = 0;
+	}
 }
 
 void PreprocessedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
