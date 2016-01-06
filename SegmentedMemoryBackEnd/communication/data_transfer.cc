@@ -64,15 +64,20 @@ char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, vector<int> *par
 	int dataPointNo = 0;
 	int multiplier = 1;
 	for (int i = partIndex->size() - 1; i >= 0; i--) {
+		
 		int firstIndex = partDimensions[i].range.min;
+		int lastIndex = partDimensions[i].range.max;
 		int dimensionIndex = partIndex->at(i);
+		
+		Assert(firstIndex <= dimensionIndex && dimensionIndex <= lastIndex);
+		
 		dataPointNo += (dimensionIndex - firstIndex) * multiplier;
 		multiplier *= partDimensions[i].length;
 	}
 
 	void *data = dataPart->getData();
 	char *charData = reinterpret_cast<char*>(data);
-
+	
 	Assert(dataPointNo < metadata->getSize());
 
 	char *updateLocation = charData + dataItemSize * dataPointNo;
