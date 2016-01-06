@@ -301,7 +301,7 @@ XformedIndexInfo *BlockSizeInstr::transformIndex(XformedIndexInfo *indexToXform)
 
 	bool includePadding = hasPadding && !excludePaddingInIntervalCalculation;
 	int partNo = (index - dimension.range.min) / size;
-	Dimension newDimension = getDimension(dimension, partNo, count, includePadding);
+	Dimension newDimension = getDimension(dimension, partNo, count, hasPadding);
 
 	indexToXform->partDimension = newDimension;
 	indexToXform->index = index;
@@ -504,7 +504,7 @@ XformedIndexInfo *BlockCountInstr::transformIndex(XformedIndexInfo *indexToXform
 	if (partNo >= count) partNo = count - 1;
 
 	bool includePadding = hasPadding && !excludePaddingInIntervalCalculation;
-	Dimension newDimension = getDimension(dimension, partNo, count, includePadding);
+	Dimension newDimension = getDimension(dimension, partNo, count, hasPadding);
 
 	indexToXform->partDimension = newDimension;
 	indexToXform->index = index;
