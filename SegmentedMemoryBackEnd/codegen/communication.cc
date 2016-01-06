@@ -560,8 +560,13 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	const char *varName = commCharacter->getVarName();
 	const char *senderAllocatorLpsName = commCharacter->getSenderDataAllocatorSpace()->getName();
 	const char *receiverAllocatorLpsName = commCharacter->getReceiverDataAllocatorSpace()->getName();
-	const char *senderSyncLpsName = commCharacter->getSenderSyncSpace()->getName();
-	const char *receiverSyncLpsName = commCharacter->getReceiverSyncSpace()->getName();
+	
+	const char *signalerLpsName = commCharacter->getSenderSyncSpace()->getName();
+	const char *waitingLpsName = commCharacter->getReceiverSyncSpace()->getName();
+	if (commCharacter->doesWaitSignalDifferFromSyncLpses()) {
+		waitingLpsName = commCharacter->getWaitingSpace()->getName();
+		signalerLpsName = commCharacter->getSignalerSpace()->getName();
+	}
 	
 	DataStructure *structure = rootLps->getStructure(varName);
 	ArrayType *varType = (ArrayType*) structure->getType();
@@ -634,9 +639,9 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 
 	// find out the number of sender and receiver PPUs within current segment
 	fnBody << indent << "int localSenderPpus = localSegment->getPpuCountForLps(Space_";
-	fnBody << senderSyncLpsName << ")" << stmtSeparator;
+	fnBody << signalerLpsName << ")" << stmtSeparator;
 	fnBody << indent << "int localReceiverPpus = localSegment->getPpuCountForLps(Space_";
-	fnBody << receiverSyncLpsName << ")" << stmtSeparator << '\n';
+	fnBody << waitingLpsName << ")" << stmtSeparator << '\n';
 
 	// determine if the data structure has multiple versions; this will tell if we can preprocessed buffers that keep track
 	// of operating memory addresses to populate (and vice versa) elements of the communication buffer for a data exchange

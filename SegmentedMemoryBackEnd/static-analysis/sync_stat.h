@@ -43,6 +43,12 @@ class CommunicationCharacteristics {
 	Space *receiverDataAllocatorSpace;
 	// a back pointer to the sync requirement is needed for code generation
 	SyncRequirement *syncRequirement;
+	// When the synchronization dependency is to or from a compiler injected stage the waiting and/or 
+	// signaling LPSes for the dependency may be different from the sender/receiver SyncSpace. Therefore
+	// the following flag and two other LPS properties are added to the communication characteristics.
+	bool waitSignalMayDifferFromSyncLpses;
+	Space *signalerSpace;
+	Space *waitingSpace;
   public:
 	CommunicationCharacteristics(const char *varName);
 	const char *getVarName() { return varName; }
@@ -64,6 +70,13 @@ class CommunicationCharacteristics {
 	Space *getReceiverDataAllocatorSpace() { return receiverDataAllocatorSpace; }
 	void setSyncRequirement(SyncRequirement *syncRequirement);
 	SyncRequirement *getSyncRequirement();
+
+	void setDifferentWaitSignalerFromSync() { this->waitSignalMayDifferFromSyncLpses = true; }
+	bool doesWaitSignalDifferFromSyncLpses() { return waitSignalMayDifferFromSyncLpses; }
+	void setSignalerSpace(Space *signaler) { this->signalerSpace = signaler; }
+	Space *getSignalerSpace() { return signalerSpace; }
+	void setWaitingSpace(Space *waitingSpace) { this->waitingSpace = waitingSpace; } 
+	Space *getWaitingSpace() { return waitingSpace; }
 	
 	// A code generation helper routine------------------------------------------------------------------
 	// indicates if the underlying communication mechanism implementing the characteristics specified here

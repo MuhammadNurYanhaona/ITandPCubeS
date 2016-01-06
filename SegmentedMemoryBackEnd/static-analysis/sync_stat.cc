@@ -23,6 +23,9 @@ CommunicationCharacteristics::CommunicationCharacteristics(const char *varName) 
 	receiverDataAllocatorSpace = NULL;
 	receiverSyncSpace = NULL;
 	syncRequirement = NULL;
+	waitSignalMayDifferFromSyncLpses = false;
+	signalerSpace = NULL;
+	waitingSpace = NULL;
 }
 
 void CommunicationCharacteristics::setSyncRequirement(SyncRequirement *syncRequirement) {
@@ -225,6 +228,10 @@ CommunicationCharacteristics *GhostRegionSync::getCommunicationInfo(int segmenta
 	commCharacter->setReceiverDataAllocatorSpace(allocatorSpace);
 	commCharacter->setSyncRequirement(this);
 	
+	commCharacter->setDifferentWaitSignalerFromSync();
+	commCharacter->setSignalerSpace(syncSpace);
+	commCharacter->setWaitingSpace(arc->getDestination()->getSpace());
+
 	return commCharacter;	
 }
 
