@@ -14,7 +14,7 @@
 #include <iostream>
 #include <sstream>
 
-//--------------------------------------------- Statement -------------------------------------------/
+//-------------------------------------------------------------- Statement -------------------------------------------------------------/
 
 void Stmt::mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
 			Hashtable<VariableAccess*> *second) {
@@ -29,7 +29,7 @@ void Stmt::mergeAccessedVariables(Hashtable<VariableAccess*> *first,
         }
 }
 
-//------------------------------------------ Loop Statement -----------------------------------------/
+//------------------------------------------------------------ Loop Statement ----------------------------------------------------------/
 
 LoopStmt *LoopStmt::currentLoop = NULL;
 
@@ -264,7 +264,7 @@ void LoopStmt::finalizeReductionLoop(std::ostringstream &stream, int indentLevel
 	stream << indent.str() << "} //scope ends for reduction\n";
 }
 
-//------------------------------------------ Statement Block ----------------------------------------/
+//------------------------------------------------------------ Statement Block ---------------------------------------------------------/
 
 StmtBlock::StmtBlock(List<Stmt*> *s) : Stmt() {
 	Assert(s != NULL);
@@ -315,7 +315,7 @@ void StmtBlock::analyseEpochDependencies(Space *space) {
 	}	
 }
 	
-//-------------------------------------- Conditional Statement ---------------------------------------/
+//-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
 ConditionalStmt::ConditionalStmt(Expr *c, Stmt *s, yyltype loc) : Stmt(loc) {
 	Assert(s != NULL);
@@ -435,7 +435,7 @@ void IfStmt::analyseEpochDependencies(Space *space) {
 	}
 }
 
-//----------------------------------------- Parallel Loop -------------------------------------------/
+//------------------------------------------------------------ Parallel Loop -----------------------------------------------------------/
 
 IndexRangeCondition::IndexRangeCondition(List<Identifier*> *i, Identifier *c, 
 		int dim, Expr *rs, yyltype loc) : Node(loc) {
@@ -690,27 +690,39 @@ List<LogicalExpr*> *PLoopStmt::getIndexRestrictions() {
 	return restrictionList;
 }
 
-//--------------------------------------- Sequential For Loop -------------------------------------------/
+//--------------------------------------------------------- Sequential For Loop --------------------------------------------------------/
 
-SLoopStmt::SLoopStmt(Identifier *i, Expr *re, Expr *se, Stmt *b, yyltype loc) : LoopStmt(loc) {
-	Assert(i != NULL && re != NULL && b != NULL);
-	id = i;
-	id->SetParent(this);
-	rangeExpr = re;
-	rangeExpr->SetParent(this);
-	stepExpr = se;
-	if (stepExpr != NULL) {
-		stepExpr->SetParent(this);
-	}
-	body = b;
-	body->SetParent(this);
-	isArrayIndexTraversal = false;
+SLoopAttribute::SLoopAttribute(Expr *range, Expr *step, Expr *restriction) {
+        Assert(range != NULL);
+        this->range = range;
+        this->step = step;
+        this->restriction = restriction;
+}
+
+SLoopStmt::SLoopStmt(Identifier *i, SLoopAttribute *attr, Stmt *b, yyltype loc) : LoopStmt(loc) {
+        Assert(i != NULL && attr != NULL && b != NULL);
+        id = i;
+        id->SetParent(this);
+        rangeExpr = attr->getRange();
+        rangeExpr->SetParent(this);
+        stepExpr = attr->getStep();
+        if (stepExpr != NULL) {
+                stepExpr->SetParent(this);
+        }
+        restriction = attr->getRestriction();
+        if (restriction != NULL) {
+                restriction->SetParent(this);
+        }
+        body = b;
+        body->SetParent(this);
+        isArrayIndexTraversal = false;
 }
     	
 void SLoopStmt::PrintChildren(int indentLevel) {
 	id->Print(indentLevel + 1, "(Index) ");
 	rangeExpr->Print(indentLevel + 1, "(Range) ");
 	if (stepExpr != NULL) stepExpr->Print(indentLevel + 1, "(Step) ");
+	if (restriction != NULL) restriction->Print(indentLevel + 1, "(Index Restriction) ");
 	body->Print(indentLevel + 1);
 }
 
@@ -722,6 +734,7 @@ void SLoopStmt::performTypeInference(Scope *executionScope) {
 	Scope *loopScope = executionScope->enter_scope(this->scope);
 	rangeExpr->inferType(loopScope, Type::rangeType);
 	if (stepExpr != NULL) stepExpr->inferType(loopScope, Type::intType);
+	if (restriction != NULL) restriction->inferType(loopScope, Type::boolType);
 	body->performTypeInference(loopScope);
 	
 	LoopStmt::currentLoop = this->previousLoop;
@@ -800,6 +813,7 @@ void SLoopStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
 
 	rangeExpr->resolveType(loopScope, ignoreTypeFailures);
 	if (stepExpr != NULL) stepExpr->resolveType(loopScope, ignoreTypeFailures);
+	if (restriction != NULL) restriction->resolveType(loopScope, ignoreTypeFailures);
 
 	body->checkSemantics(loopScope, ignoreTypeFailures);
 	
@@ -820,6 +834,8 @@ Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
 	mergeAccessedVariables(table, rangeExpr->getAccessedGlobalVariables(globalReferences));
 	if (stepExpr != NULL) mergeAccessedVariables(table, 
 			stepExpr->getAccessedGlobalVariables(globalReferences));
+	if (restriction != NULL) mergeAccessedVariables(table, 
+			restriction->getAccessedGlobalVariables(globalReferences));
 	
 	Iterator<VariableAccess*> iter = table->GetIterator();
 	VariableAccess *accessLog;
@@ -842,12 +858,18 @@ void SLoopStmt::analyseEpochDependencies(Space *space) {
 	LoopStmt::analyseEpochDependencies(space);
 	rangeExpr->setEpochVersions(space, 0);
 	if (stepExpr != NULL) stepExpr->setEpochVersions(space, 0);
+	if (restriction != NULL) restriction->setEpochVersions(space, 0);
 }
 
 void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 
 	if(isArrayIndexTraversal) {
-		LoopStmt::generateIndexLoops(stream, indentLevel, space, body);
+		List<LogicalExpr*> *indexRestrictions = NULL;
+                if (restriction != NULL) {
+                        indexRestrictions = new List<LogicalExpr*>;
+                        indexRestrictions->Append((LogicalExpr*) restriction);
+                }
+                LoopStmt::generateIndexLoops(stream, indentLevel, space, body, indexRestrictions);
 	} else {
 		IndexScope::currentScope->enterScope(indexScope);
 
@@ -866,7 +888,16 @@ void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
         	std::ostringstream rangeLoop;
         	range->generateLoopForRangeExpr(rangeLoop, indentLevel, space);
         	stream << rangeLoop.str();
-		
+	
+		// if there is an additional restriction that says what values within the range should be skipped
+                // then apply the restriction here as a continue block inside the loop
+                if (restriction != NULL) {
+                        stream << indent.str() << '\t';
+                        stream << "if (!(";
+                        restriction->translate(stream, indentLevel + 1, 0, space);
+                        stream << ")) continue;\n";
+                }
+	
 		// translate the body of the for loop if it is not a reduction loop; otherwise do reduce iteration
 		if (!reductionLoop) {
 			body->generateCode(stream, indentLevel + 1, space);
@@ -886,7 +917,7 @@ void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
 	}
 }
 
-//---------------------------------------------- While Loop ----------------------------------------------------/
+//-------------------------------------------------------------- While Loop ------------------------------------------------------------/
 
 WhileStmt::WhileStmt(Expr *c, Stmt *b, yyltype loc) : Stmt(loc) {
 	Assert(c != NULL && b != NULL);

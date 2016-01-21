@@ -20,25 +20,24 @@ class Stmt : public Node {
 	Stmt() : Node() {}
      	Stmt(yyltype loc) : Node(loc) {}
 
-	// Semantic checking is done by recursively going through each statement within
-	// a code block and then by examining each expression within that statement. All
-	// sub-classes of statement therefore should provide an implementation for this
-	// method. The symantic analysis process should have three steps. First, we do 
-	// the analysis without concern for missing types. This step should reveal the
-	// types of some undeclared variables and some expression. Second, we do the type 
-	// inference (using the subsequent method) to recover the missing types. Finally,
-	// we do the analysis again with strict type confirmance. If some type information
-	// is still missing in the final step, we throw type errors. 	 
+	// Semantic checking is done by recursively going through each statement within a code block 
+	// and then by examining each expression within that statement. All sub-classes of statement 
+	// therefore should provide an implementation for this method. The symantic analysis process 
+	// should have three steps. First, we do the analysis without concern for missing types. This 
+	// step should reveal the types of some undeclared variables and some expression. Second, we 
+	// do the type inference (using the subsequent method) to recover the missing types. Finally,
+	// we do the analysis again with strict type confirmance. If some type information  is still 
+	// missing in the final step, we throw type errors. 	 
 	virtual void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures) {}
 	
-	// Since we require the types of only task-global variables to be declared, a type
-	// inference step is needed before we can proceed to semantic analysis.
+	// Since we require the types of only task-global variables to be declared, a type inference 
+	// step is needed before we can proceed to semantic analysis.
 	virtual void performTypeInference(Scope *executionScope) {}
 
-	// The first stage of static analysis is to determine which task global variable
-	// been modified where. In that regard, statement class just facilitate a recursive
-	// analysis by invoking the access checking method in all nested expressions. The
-	// Expr class does the actual heavy lifting.
+	// The first stage of static analysis is to determine which task global variable has been 
+	// modified where. In that regard, statement class just facilitate a recursive analysis by 
+	// invoking the access checking method in all nested expressions. The Expr class does the 
+	// actual heavy lifting.
 	virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 				TaskGlobalReferences *globalReferences) {
 		return new Hashtable<VariableAccess*>;
@@ -46,7 +45,7 @@ class Stmt : public Node {
 	static void mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
 				Hashtable<VariableAccess*> *second);
 
-	// back end code generation routine; subclasses should provide appropriate implementations
+	// a back end code generation routine; subclasses should provide appropriate implementations
 	virtual void generateCode(std::ostringstream &stream, 
 			int indentLevel, Space *space = NULL) {};
 };
@@ -152,21 +151,22 @@ class LoopStmt: public Stmt {
 	Scope *scope;
 	IndexScope *indexScope;
 	Stmt *body;
-	// when a loop embodies a reduction operation it needs to be translated in a way different
+
+	// when a loop embodies a reduction operation, it needs to be translated in a way different
 	// than normal loop translation. Furthermore, currently the compiler cannot handle other
-	// statements within the same loop containing a reduction. To serve both of these needs we
+	// statements within the same loop containing a reduction. To serve both of these needs, we
 	// need a flag separating reduction loops from other loops.
 	bool reductionLoop;
-	// need to maintain a reference to the reduction expression when this embodies reduction
+	// need to maintain a reference to the reduction expression when this embodies a reduction
 	ReductionExpr *reduction;
   public:
 	LoopStmt();
      	LoopStmt(yyltype loc);
 	
 	// These two pointers are used to determine what is the closest enclosing loop for a 
-	// reduction operation (possibly within the loop). During semantic analysis of the code
-	// as a loop is encountered and exited these two references are updated accordingly to 
-	// be accessed by any embedded reduction operation.   
+	// reduction operation (possibly within the loop). During semantic analysis of the code, as 
+	// a loop is encountered and exited, these two references are updated accordingly to be 
+	// accessed by any embedded reduction operation.   
 	static LoopStmt *currentLoop;
 	LoopStmt *previousLoop;
     
@@ -189,7 +189,7 @@ class LoopStmt: public Stmt {
 	void generateIndexLoops(std::ostringstream &stream, int indentLevel, 
 			Space *space, Stmt *body, List<LogicalExpr*> *indexRestrictions = NULL);
 	// a helper routine that decides what index restrictions can be applied to the current 
-	// index loop iteration among the list of such restrictions and creates a and filter in 
+	// index loop iteration among the list of such restrictions and creates and filters in 
 	// the remaining expressions in an argument list
 	// @param indexesInvisible is a hashmap of indexes that will be available in some lower
 	//        level nested loop; there not visible to the current loop
@@ -201,8 +201,8 @@ class LoopStmt: public Stmt {
 	List<LogicalExpr*> *getApplicableExprs(Hashtable<const char*> *indexesInvisible, 
 			List<LogicalExpr*> *currentExprList, 
 			List<LogicalExpr*> *remainingExprList);
-	// a routine to declare any supplementary variable and do initialization of result variable 
-	// when the loop is a reduction operation  
+	// a routine to declare any supplementary variable and do initialization of the result 
+	// variable when the loop is a reduction operation  
 	void initializeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
 	// counterpart routine to terminate/finalize the result of reduction after iteration ends
 	void finalizeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
@@ -230,11 +230,23 @@ class PLoopStmt: public LoopStmt {
 	
 	//--------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
-	// a function for retrieving a list of boolean expressions that may be part of the range conditions
-	// associated with this loop. A mechanism was needed to break such additional index traversal
-	// restrictions into simpler boolean expressions and then place those expressions in appropriate for
-	// loop to avoid unnecessary iterations in nested loops.
+	// a function for retrieving a list of boolean expressions that may be part of the range 
+	// conditions associated with this loop. A mechanism was needed to break such additional 
+	// index traversal restrictions into simpler boolean expressions and then place those 
+	// expressions in appropriate for loops to avoid unnecessary iterations in nested loops.
 	List<LogicalExpr*> *getIndexRestrictions();
+};
+
+class SLoopAttribute {
+  protected:
+	Expr *range;
+	Expr *step;
+	Expr *restriction;
+  public:
+	SLoopAttribute(Expr *range, Expr *step, Expr *restriction);
+	Expr *getRange() { return range; }
+	Expr *getStep() { return step; }
+	Expr *getRestriction() { return restriction; }
 };
 
 class SLoopStmt: public LoopStmt {
@@ -242,12 +254,14 @@ class SLoopStmt: public LoopStmt {
 	Identifier *id;
 	Expr *rangeExpr;
 	Expr *stepExpr;
+	Expr *restriction;
+
 	// a flag used for code generation efficiency; if the sequential loop is traversing some
 	// array dimension then its code can be generated by invoking the utility method in loop
 	// statement class 
 	bool isArrayIndexTraversal;
   public:
-	SLoopStmt(Identifier *id, Expr *rangeExpr, Expr *stepExpr, Stmt *body, yyltype loc);	
+	SLoopStmt(Identifier *id, SLoopAttribute *attr, Stmt *body, yyltype loc);	
     
 	//-------------------------------------------------------------------------Syntex Analysis Routines	
     	const char *GetPrintNameForNode() { return "SequentialForLoop"; }

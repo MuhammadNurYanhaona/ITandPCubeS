@@ -51,6 +51,7 @@ void yyerror(const char *msg); // standard error-handling routine
 	ConditionalStmt			*condStmt;
 	List<ConditionalStmt*>		*condStmtList;
 	IndexRangeCondition		*rangeCond;
+	SLoopAttribute                  *sloopAttr;
 	List<IndexRangeCondition*>	*rangeCondList;
 	Identifier			*id;
 	List<Identifier*>		*idList;
@@ -157,6 +158,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <condStmt>	else else_if
 %type <rangeCond>	index_range
 %type <rangeCondList>	index_ranges
+%type <sloopAttr>       sloop_attr
 %type <fnHeader>	in_out
 %type <initInstr>	initialize
 %type <linkageType>	mode
@@ -338,8 +340,10 @@ stmt		: parallel_loop
 		| sequencial_loop
 		| if_else_block					
 		| expr						{ $$ = $1; };
-sequencial_loop	: Do In Sequence '{' stmt_block '}'
-		For id In expr step_expr			{ $$ = new SLoopStmt($8, $10, $11, new StmtBlock($5), @1); };
+sequencial_loop : Do In Sequence '{' stmt_block '}'
+                For id In sloop_attr                            { $$ = new SLoopStmt($8, $10, new StmtBlock($5), @1); };
+sloop_attr      : field step_expr                               { $$ = new SLoopAttribute($1, $2, NULL); }
+                | field O_AND expr                              { $$ = new SLoopAttribute($1, NULL, $3); };
 parallel_loop	: Do '{' stmt_block '}' For index_ranges	{ $$ = new PLoopStmt($6, new StmtBlock($3), @1); }
 		| Do '{' stmt_block '}' While expr		{ $$ = new WhileStmt($6, new StmtBlock($3), @1); };
 index_ranges	: index_range					{ ($$ = new List<IndexRangeCondition*>)->Append($1); }	

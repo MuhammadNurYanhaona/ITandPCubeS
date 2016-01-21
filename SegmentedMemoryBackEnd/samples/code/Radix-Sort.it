@@ -1,3 +1,15 @@
+Program (args) {         
+        rdSortEnv = new TaskEnvironment(name: "Radix Sort")
+       
+        bind_input(rdSortEnv, "keys", args.input_file)
+        bind_output(rdSortEnv, "keys", args.output_file)
+
+        digits = args.digits
+        key_size = args.key_size
+        p = args.p
+        execute("Radix Sort"; rdSortEnv; Initialize: digits, key_size; Partition: p)
+}
+
 Task "Radix Sort":
 	Define:
 		keys, scatter_offsets, l: 1D Array of Integer
@@ -48,11 +60,9 @@ Task "Radix Sort":
 				}
 				// do a prefix scan of entries for a particular value rd in the current digit place to 
 				// determine the offsets of keys relative to the first key
-				stride = 1
-				do {	do {	g[i][rd] at (t) = (g[i][rd] + g[i - stride][rd]) at (t - 1)
-					} for i in g and i > stride
-					stride = stride * 2
-				} while (2 ** stride < partition.p)
+				do in sequence {	
+					g[i][rd] = g[i][rd] + g[i - 1][rd]
+				} for i in g.dimension1.range and i > 0
 			} for rd in g.dimension2.range
 		}
 		// calculate the exact offsets of all local keys within a partition using the information of the starting
@@ -66,16 +76,13 @@ Task "Radix Sort":
 			// determine the distribution offsets of keys respective to the first key with r at the digit place
 			"Local Scan" (Space B) {
 				do {	
-					if (f[i]) { l[i] = 1 } else { l[i] = 0}
+					if (f[i]) { l[i] = 1 } else { l[i] = 0 }
 				} for i in f
 				first_index = l.local.dimension1.range.min
 				l[first_index] = l[first_index] + g[g.local.dimension1.range.min][r]
-				local_entries = l.local.dimension1.range.max - first_index + 1
-				stride = 1
-				do {	do {	l[i] at (t) = (l[i] + l[i - stride]) at (t - 1)
-					} for i in l and i > stride
-					stride = stride * 2
-				} while (2 ** stride < local_entries)
+				do in sequence {	
+					l[i] = l[i] + l[i - 1]
+				} for i in l.dimension1.range and i > first_index
 			}
 			// store the positions where the local keys should go in next
 			"Assign Scatter Offsets" (Space B) {

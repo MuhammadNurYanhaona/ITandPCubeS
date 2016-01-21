@@ -291,10 +291,13 @@ void ArithmaticExpr::translate(std::ostringstream &stream, int indentLevel, int 
 		right->translate(stream, indentLevel, currentLineLength, space);
 		stream << ")";
 	} else {
+		stream << "(";
+		stream << "(" << type->getCType() << ")";
 		stream << "pow(";
 		left->translate(stream, indentLevel, currentLineLength, space);
 		stream << ", ";
 		right->translate(stream, indentLevel, currentLineLength, space);
+		stream << ")";
 		stream << ")";
 	}
 }
