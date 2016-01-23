@@ -21,7 +21,7 @@ Task "Radix Sort":
 	Environment:
 		keys: link
 	Initialize (digits, key_size):
-		radix = digits ** 2
+		radix = 2 ** digits
 		scatter_offsets.dimension = f.dimension = l.dimension = keys.dimension
 		g.dimension1.range.min = 0
 		g.dimension1.range.max = partition.p - 1
