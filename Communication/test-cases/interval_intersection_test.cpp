@@ -12,17 +12,17 @@ using namespace std;
 int mainIIT() {
 
 	Dimension dim;
-	dim.length = 1000;
+	dim.length = 8;
 	dim.range.min = 0;
-	dim.range.max = 990;
+	dim.range.max = 7;
 
 	// scenario #1
 	//IntervalSeq *interval1 = new IntervalSeq(10, 5, 20, 4);
 	//IntervalSeq *interval2 = new IntervalSeq(0, 2, 10, 5);
 
 	// scenario #2
-	IntervalSeq *interval1 = new IntervalSeq(15, 30, 30, 1);
-	IntervalSeq *interval2 = new IntervalSeq(2, 4, 10, 5);
+	IntervalSeq *interval1 = new IntervalSeq(0, 8, 8, 1);
+	IntervalSeq *interval2 = new IntervalSeq(6, 2, 8, 1);
 
 	// scenario #3
 	// IntervalSeq *interval1 = new IntervalSeq(28, 6, 6, 1);

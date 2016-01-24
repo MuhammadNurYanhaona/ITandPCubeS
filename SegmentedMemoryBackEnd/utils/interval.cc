@@ -292,7 +292,9 @@ List<IntervalSeq*> *IntervalSeq::computeIntersection(IntervalSeq *other) {
 		// of the second, if exists
 		int endIntervalNo = (e1 - b2) / p2;
 		int endIntervalBegin = endIntervalNo * p2 + b2;
-		if (endIntervalNo < c2 && endIntervalBegin <= e1 && endIntervalBegin + l2 - 1 > e1) {
+		if (endIntervalNo < c2
+                		&& endIntervalBegin >= b1 && endIntervalBegin <= e1
+                		&& endIntervalBegin + l2 - 1 > e1) {
 			int overlapLength = e1 - max(b1, endIntervalBegin) + 1;
 			IntervalSeq *endingOverlap = new IntervalSeq(endIntervalBegin,
 					overlapLength, overlapLength, 1);
