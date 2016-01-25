@@ -18,13 +18,15 @@ Task "Radix Sort":
 		sorting_rounds.min = 0
 		sorting_rounds.max = key_size / digits - 1
 	Compute:
-		// calculate the number of keys having different values for the current digit place in each partition
+		// calculate the number of keys that have different values for the current digit place in each partition
 		"Upsweep Reduction" (Space B) {
 			// determine which keys in the array have r in the current digit place 
 			"Digit Decoding" (Space B) {
-				value = r << (digits ** round)
+				max = radix - 1
+				ones = max << (round * digits)
+				r_value = r << (round * digits)
 				do { 
-					if ((keys[i] & value) == value) { l[i] = 1 
+					if ((keys[i] & ones) == r_value) { l[i] = 1 
 					} else { l[i] = 0 }
 				} for i in keys
 			}
@@ -40,19 +42,13 @@ Task "Radix Sort":
 		// determine the starting offsets for the entries belonging to different partitions for various values for 
 		// the current digit place
 		"Top Level Scan" (Space A) {
+			current_sum = 0
 			do in sequence {
-				// add the last distribution offset for the immediate lower value to set the offset of the 
-				// first key with rd at the current digit place  					
-				if (rd > 0) { 
-					g[0][rd] = g[0][rd] + g[g.dimension1.range.max][rd - 1] 
-				}
-				// do a prefix scan of entries for a particular value rd in the current digit place to 
-				// determine the offsets of keys relative to the first key
-				stride = 1
-				do {	do {	g[i][rd] at (t) = (g[i][rd] + g[i - stride][rd]) at (t - 1)
-					} for i in g and i > stride
-					stride = stride * 2
-				} while (2 ** stride < partition.p)
+				do in sequence {
+					current_value = g[i][rd]	
+					g[i][rd] = current_sum
+					current_sum = current_sum + current_value
+				} for i in g.dimension1.range
 			} for rd in g.dimension2.range
 		}
 		// calculate the exact offsets of all local keys within a partition using the information of the starting
@@ -60,33 +56,27 @@ Task "Radix Sort":
 		"Downsweep Scatter" (Space B) {
 			// again, determine which keys in the array have r in the current digit place 
 			"Flag Vector Generation" (Space B) {
-				value = r << (digits ** round)
-				do { f[i] = ((keys[i] & value) == value) } for i in keys
+				max = radix - 1
+				ones = max << (round * digits)
+				r_value = r << (round * digits)
+				do { f[i] = ((keys[i] & ones) == r_value) } for i in keys
 			}
 			// determine the distribution offsets of keys respective to the first key with r at the digit place
-			"Local Scan" (Space B) {
-				do {	
-					if (f[i]) { l[i] = 1 } else { l[i] = 0}
-				} for i in f
-				first_index = l.local.dimension1.range.min
-				l[first_index] = l[first_index] + g[g.local.dimension1.range.min][r]
-				local_entries = l.local.dimension1.range.max - first_index + 1
-				stride = 1
-				do {	do {	l[i] at (t) = (l[i] + l[i - stride]) at (t - 1)
-					} for i in l and i > stride
-					stride = stride * 2
-				} while (2 ** stride < local_entries)
-			}
-			// store the positions where the local keys should go in next
 			"Assign Scatter Offsets" (Space B) {
-				do { if (f[i]) { scatter_offsets[i] = l[i] } } for i in f
+				current_sum = g[g.local.dimension1.range.min][r]
+				do in sequence {	
+					if (f[i]) { 
+						scatter_offsets[i] = current_sum
+						current_sum = current_sum + 1 
+					}
+				} for i in f.dimension1.range
 			}
 			// do the offset calculation for all possible values in the current digit place
 			Repeat: from "Flag Vector Generation" for r in g.dimension2.range
 		}
 		// finally shuffle the keys based on the calculated scatter offsets to finish one round of distribution sort
 		"Rearrange Input Sequence" (Space A) {
-			do { keys[i] at (t) = keys[scatter_offsets[i]] at (t - 1) } for i in keys
+			do { keys[scatter_offsets[i]] at (t) = keys[i] at (t - 1) } for i in keys
 		}
 		// repeat from the beginning to have as many rounds of distribution sort as required by the size of the keys
 		Repeat: from "Upsweep Reduction" for round in sorting_rounds
