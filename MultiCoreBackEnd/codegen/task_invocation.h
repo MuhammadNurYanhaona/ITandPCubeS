@@ -20,11 +20,17 @@ void initiateProgramHeaders(const char *headerFile,
 		ProgramDef *programDef);
 
 // this function, as its name suggests, generates a method that will prompt the user to enter values 
-// for all program arguments, construcrs an instant of the argument data structure, and returns it 
+// for all program arguments, constructs an instant of the argument data structure, and returns it 
 // to the caller
 void generateRoutineToInitProgramArgs(TupleDef *programArg, 
 		const char *headerFile, 
 		const char *programFile);
+
+// this is an alternative to the previous function that reads all program arguments as key, value 
+// pairs from the command line
+void generateRoutineToReadProgramArgs(TupleDef *programArg,
+                const char *headerFile,
+                const char *programFile);
 
 // as we already have a method to initiate the array-metadata from environment links for automatic
 // generation of a main-function for isolated task, instead of writing another one for initiating

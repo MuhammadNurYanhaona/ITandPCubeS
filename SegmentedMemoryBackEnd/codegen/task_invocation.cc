@@ -146,6 +146,95 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 	programFile.close();
 }
 
+void generateRoutineToReadProgramArgs(TupleDef *programArg,  const char *headerFileName,  const char *programFileName) {
+	
+	std::cout << "Generating routine to read program arguments\n";
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open output header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+
+	std::ostringstream fnHeader;
+        const char *comments = "function for reading program arguments";
+	decorator::writeSectionHeader(headerFile, comments);
+	headerFile << std::endl;
+	decorator::writeSectionHeader(programFile, comments);
+	programFile << std::endl;
+
+	// write function signature in header and program files
+	const char *tupleName = programArg->getId()->getName();
+	fnHeader << tupleName << " readProgramArgs(int argc" << paramSeparator << "char *argv[])";
+	headerFile << fnHeader.str() << stmtSeparator;
+	programFile << fnHeader.str();
+
+	// start function definition
+	programFile << " {\n\n";
+
+	// create a new instance of the program argument object
+	programFile << indent << tupleName << " programArgs = " << tupleName << "()" << stmtSeparator;
+	programFile << "\n";
+
+	// go through the command line arguments one by one and separate each argument into a key and a value part
+	programFile << indent << "for (int i = 1; i < argc; i++) {\n";
+	programFile << doubleIndent << "std::string keyValue = std::string(argv[i])" << stmtSeparator;
+	programFile << doubleIndent << "size_t separator = keyValue.find('=')" << stmtSeparator;
+	programFile << doubleIndent << "if (separator == std::string::npos) {\n";
+	programFile << tripleIndent << "std::cout << \"a command line parameter must be in the form of key=value\\n\"";
+	programFile << stmtSeparator;
+	programFile << tripleIndent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
+	programFile << doubleIndent << "}\n";
+	programFile << doubleIndent << "std::string key = keyValue.substr(0, separator)" << stmtSeparator;
+	programFile << doubleIndent << "std::string value = keyValue.substr(separator + 1)" << stmtSeparator;
+	programFile << "\n";
+
+	// identify the argument type by comparing the key with property names of the program argument tuple and
+	// assign the value to the matching property
+	List<VariableDef*> *propertyList = programArg->getComponents();
+	for (int i = 0; i < propertyList->NumElements(); i++) {
+		VariableDef *property = propertyList->Nth(i);
+		const char *propertyName = property->getId()->getName();
+		if (i > 0) {
+			programFile << " else ";
+		} else {
+			programFile << doubleIndent;
+		}
+		programFile << "if (strcmp(";
+		programFile << "\"" << propertyName << "\"" << paramSeparator;
+		programFile << "key.c_str()) == 0) {\n";
+		
+		// cast the value into appropriate type and assign it to the matching property of the program argument
+		Type *propertyType = property->getType();
+		if (propertyType == Type::stringType) {
+			programFile << tripleIndent << "programArgs." << propertyName << " = strdup(";
+			programFile << "value.c_str())" << stmtSeparator;	
+		} else {
+			programFile << tripleIndent << "std::istringstream stream(" << "value)" << stmtSeparator;
+			programFile << tripleIndent << "stream >> programArgs." << propertyName << stmtSeparator;
+		}
+
+		programFile << doubleIndent << "}";
+	}
+	programFile << " else {\n";
+        programFile << tripleIndent << "std::cout << \"unrecognized command line parameter: \" << key";
+        programFile << " << '\\n'" << stmtSeparator;
+        programFile << tripleIndent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
+        programFile << doubleIndent << "}\n";
+
+	programFile << indent << "}\n";
+	
+	// return the initialized argument object
+	programFile << indent << "return programArgs" << stmtSeparator;
+
+	// close function definition;
+	programFile << "}\n";
+
+	headerFile.close();
+	programFile.close();
+}
+
 void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
                 const char *initials,
                 List<const char*> *externalEnvLinks,
@@ -479,17 +568,12 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << indent << "std::ofstream logFile" << stmtSeparator;
         stream << indent << "logFile.open(logFileName.str().c_str())" << stmtSeparator << std::endl;
 
-	// get all command line arguments as input from an input file
+	// read all command line arguments as key, value pairs
 	const char *argName = coordDef->getArgumentName();
-	stream << indent << "// getting command line inputs\n";
+	stream << indent << "// reading command line inputs\n";
 	stream << indent << "ProgramArgs " << argName << stmtSeparator;
-	stream << indent << "if (argc > 1) {\n";
-	stream << doubleIndent << "char *argFileName = argv[1]" << stmtSeparator;
-	stream << doubleIndent << argName << " = getProgramArgs(argFileName"; 
-	stream << paramSeparator << "logFile)" << stmtSeparator;
-	stream << doubleIndent << "logFile << \"read program arguments\\n\"" << stmtSeparator;
-	stream << doubleIndent << "logFile.flush()" << stmtSeparator;
-	stream << indent << "}\n";
+	stream << indent << argName << " = readProgramArgs(argc" << paramSeparator;
+	stream << "argv)" << stmtSeparator; 
 
 	// declare all local variables found in scope
 	stream << std::endl << indent << "// declaring local variables\n";
@@ -539,8 +623,8 @@ void processCoordinatorProgram(ProgramDef *programDef, const char *headerFile, c
 
 	// initializing the header and program files with appropriate include directives
 	initiateProgramHeaders(headerFile, programFile, programDef);
-	// generating routine for initializing program arguments
-	generateRoutineToInitProgramArgs(coordDef->getArgumentTuple(), headerFile, programFile);
+	// generating routine for reading program arguments
+	generateRoutineToReadProgramArgs(coordDef->getArgumentTuple(), headerFile, programFile);
 	// generating the task executing main function
 	generateMain(programDef, programFile);
         

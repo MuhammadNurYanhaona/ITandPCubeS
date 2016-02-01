@@ -10,6 +10,8 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/common_utils.h"
+#include "../utils/decorator_utils.h"
+#include "../utils/code_constant.h"
 #include "name_transformer.h"
 
 #include <sstream>
@@ -41,18 +43,17 @@ void initiateProgramHeaders(const char *headerFileName, const char *programFileN
         int programHeaderIndex = string_utils::getLastIndexOf(headerFileName, '/') + 1;
         char *programHeader = string_utils::substr(headerFileName, 
 			programHeaderIndex, strlen(headerFileName));
-        programFile << "/*-----------------------------------------------------------------------------------\n";
-        programFile << "header file for the coordinator program" << std::endl;
-        programFile << "------------------------------------------------------------------------------------*/\n\n";
+	const char *message1 = "header file for the coordinator program";
+        decorator::writeSectionHeader(programFile, message1);
         programFile << "#include \"" << programHeader  << '"' << std::endl << std::endl;
 
 	// prepare an stream to write all header that should be included in both files
 	std::ostringstream commonHeaders;
 
 	// retrieve the list of default libraries from an external file
-        commonHeaders << "/*-----------------------------------------------------------------------------------\n";
-        commonHeaders << "header files included for different purposes" << std::endl;
-       	commonHeaders << "------------------------------------------------------------------------------------*/\n\n";
+	const char *message2 = "header files included for different purposes";
+        decorator::writeSectionHeader(commonHeaders, message2);
+        commonHeaders << std::endl;
 	if (commIncludeFile.is_open()) {
                 while (std::getline(commIncludeFile, line)) {
                         commonHeaders << line << std::endl;
@@ -64,9 +65,9 @@ void initiateProgramHeaders(const char *headerFileName, const char *programFileN
 	headerFile << commonHeaders.str();
 
 	// include headers for all tasks in the library list;
-        commonHeaders << "/*-----------------------------------------------------------------------------------\n";
-        commonHeaders << "header files for tasks" << std::endl;
-       	commonHeaders << "------------------------------------------------------------------------------------*/\n\n";
+	const char *message3 = "header files for tasks";
+        decorator::writeSectionHeader(commonHeaders, message3);
+        commonHeaders << std::endl;
 	List<TaskDef*> *taskList = programDef->getTasks();
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		commonHeaders << "#include \"";
@@ -143,6 +144,95 @@ void generateRoutineToInitProgramArgs(TupleDef *programArg, const char *headerFi
 	headerFile.close();
 	programFile.close();
 }
+
+void generateRoutineToReadProgramArgs(TupleDef *programArg,  const char *headerFileName,  const char *programFileName) {
+
+        std::cout << "Generating routine to read program arguments\n";
+        std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open output header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+
+        std::ostringstream fnHeader;
+        const char *comments = "function for reading program arguments";
+        decorator::writeSectionHeader(headerFile, comments);
+        headerFile << std::endl;
+        decorator::writeSectionHeader(programFile, comments);
+        programFile << std::endl;
+
+        // write function signature in header and program files
+        const char *tupleName = programArg->getId()->getName();
+        fnHeader << tupleName << " readProgramArgs(int argc" << paramSeparator << "char *argv[])";
+        headerFile << fnHeader.str() << stmtSeparator;
+        programFile << fnHeader.str();
+
+        // start function definition
+        programFile << " {\n\n";
+
+        // create a new instance of the program argument object
+        programFile << indent << tupleName << " programArgs = " << tupleName << "()" << stmtSeparator;
+        programFile << "\n";
+        // go through the command line arguments one by one and separate each argument into a key and a value part
+        programFile << indent << "for (int i = 1; i < argc; i++) {\n";
+        programFile << doubleIndent << "std::string keyValue = std::string(argv[i])" << stmtSeparator;
+        programFile << doubleIndent << "size_t separator = keyValue.find('=')" << stmtSeparator;
+        programFile << doubleIndent << "if (separator == std::string::npos) {\n";
+        programFile << tripleIndent << "std::cout << \"a command line parameter must be in the form of key=value\\n\"";
+        programFile << stmtSeparator;
+        programFile << tripleIndent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
+        programFile << doubleIndent << "}\n";
+        programFile << doubleIndent << "std::string key = keyValue.substr(0, separator)" << stmtSeparator;
+        programFile << doubleIndent << "std::string value = keyValue.substr(separator + 1)" << stmtSeparator;
+        programFile << "\n";
+
+        // identify the argument type by comparing the key with property names of the program argument tuple and
+        // assign the value to the matching property
+        List<VariableDef*> *propertyList = programArg->getComponents();
+        for (int i = 0; i < propertyList->NumElements(); i++) {
+                VariableDef *property = propertyList->Nth(i);
+                const char *propertyName = property->getId()->getName();
+                if (i > 0) {
+                        programFile << " else ";
+                } else {
+                        programFile << doubleIndent;
+                }
+                programFile << "if (strcmp(";
+                programFile << "\"" << propertyName << "\"" << paramSeparator;
+                programFile << "key.c_str()) == 0) {\n";
+
+                // cast the value into appropriate type and assign it to the matching property of the program argument
+                Type *propertyType = property->getType();
+                if (propertyType == Type::stringType) {
+                        programFile << tripleIndent << "programArgs." << propertyName << " = strdup(";
+                        programFile << "value.c_str())" << stmtSeparator;
+                } else {
+                        programFile << tripleIndent << "std::istringstream stream(" << "value)" << stmtSeparator;
+                        programFile << tripleIndent << "stream >> programArgs." << propertyName << stmtSeparator;
+                }
+
+                programFile << doubleIndent << "}";
+        }
+        programFile << " else {\n";
+        programFile << tripleIndent << "std::cout << \"unrecognized command line parameter: \" << key";
+        programFile << " << '\\n'" << stmtSeparator;
+        programFile << tripleIndent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
+	programFile << doubleIndent << "}\n";
+
+        programFile << indent << "}\n";
+
+        // return the initialized argument object
+        programFile << indent << "return programArgs" << stmtSeparator;
+
+        // close function definition;
+        programFile << "}\n\n";
+
+        headerFile.close();
+        programFile.close();
+}
+
 
 void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
                 const char *initials,
@@ -533,18 +623,12 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
                 std::cout << "Unable to open output program file";
                 std::exit(EXIT_FAILURE);
         }
-
-        stream << "/*-----------------------------------------------------------------------------------\n";
-        stream << "main function\n";
-        stream << "------------------------------------------------------------------------------------*/\n";
+	decorator::writeSectionHeader(stream, "main function");
 
 	CoordinatorDef *coordDef = programDef->getProgramController();
-        std::string indent = "\t";
-        std::string stmtSeparator = ";\n";
-        std::string paramSeparator = ", ";
 
         // write the function signature
-        stream << "\nint main() {\n\n";
+        stream << "\nint main(int argc" << paramSeparator << "char *argv[]) {\n\n";
 
 	// start execution time monitoring timer
         stream << indent << "// starting execution timer clock\n";
@@ -557,13 +641,15 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << indent << "std::ofstream logFile" << stmtSeparator;
         stream << indent << "logFile.open(\"it-program.log\")" << stmtSeparator << std::endl;
 
-	// get all command line arguments as input from the user
-	stream << indent << "// getting command line inputs\n";
-	stream << indent << "ProgramArgs " << coordDef->getArgumentName();
-	stream << " = getProgramArgs()" << stmtSeparator << std::endl;
+	// read all command line arguments as key, value pairs
+        const char *argName = coordDef->getArgumentName();
+        stream << indent << "// reading command line inputs\n";
+        stream << indent << "ProgramArgs " << argName << stmtSeparator;
+        stream << indent << argName << " = readProgramArgs(argc" << paramSeparator;
+        stream << "argv)" << stmtSeparator;
 
 	// declare all local variables found in scope
-	stream << indent << "// declaring local variables\n";
+	stream << std::endl << indent << "// declaring local variables\n";
 	std::ostringstream declStream;
 	coordDef->declareVariablesInScope(declStream, 1);
 	stream << declStream.str() << std::endl;
@@ -608,7 +694,7 @@ void processCoordinatorProgram(ProgramDef *programDef, const char *headerFile, c
 	// initializing the header and program files with appropriate include directives
 	initiateProgramHeaders(headerFile, programFile, programDef);
 	// generating routine for initializing program arguments
-	generateRoutineToInitProgramArgs(coordDef->getArgumentTuple(), headerFile, programFile);
+	generateRoutineToReadProgramArgs(coordDef->getArgumentTuple(), headerFile, programFile);
 	// generating the task executing main function
 	generateMain(programDef, programFile);
         
