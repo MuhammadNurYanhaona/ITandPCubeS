@@ -20,7 +20,7 @@ void initializeOutputFiles(const char *headerFile,
 void generateThreadCountConstants(const char *outputFile, 
 		MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig);
 
-/* function definition for generating the runtime library routine that will create ThreadIds */
+/* function definition for generating the runtime library routine that will create thread Ids */
 void generateFnForThreadIdsAllocation(const char *headerFile, 
 		const char *programFile, 
 		const char *initials, 

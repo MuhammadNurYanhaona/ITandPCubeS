@@ -157,18 +157,32 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	int mappingCount = mappingList->NumElements();
 	int totalPPSes = pcubesConfig->NumElements();
 	while (i < mappingCount) {
+
 		// determine the LPS and PPS for the mapping
+
 		std::string mapping = mappingList->Nth(i);
 		tokenList = string_utils::tokenizeString(mapping, mappingDelimiter);
+		int ppsId = atoi(tokenList->Nth(1).c_str());
+		PPS_Definition *pps = pcubesConfig->Nth(totalPPSes - ppsId);
+
+		// the mapping root is already defined and maintained separately; therefore, the remaining logic
+		// can be skipped for the root
 		std::string lpsStr = tokenList->Nth(0);
+		std::string rootName(Space::RootSpaceName);
+		std::size_t rootFound = lpsStr.rfind(rootName);
+		if (rootFound != std::string::npos) {
+			rootEntry->PPS = pps;
+			rootSpace->setPpsId(ppsId);
+			i++;
+			continue;
+		}
+
 		char lpsId = lpsStr.at(lpsStr.length() - 1);
 		Space *lps = lpsHierarchy->getSpace(lpsId);
 		if (lps == NULL) {
-			std::cout << "Logical space is not found in the code" << std::endl;
+			std::cout << "Logical space \"" << lpsStr << "\" is not found in the code" << std::endl;
 			std::exit(EXIT_FAILURE);
 		}
-		int ppsId = atoi(tokenList->Nth(1).c_str());
-		PPS_Definition *pps = pcubesConfig->Nth(totalPPSes - ppsId);
 		
 		// create a mapping configuration object
 		MapEntry *entry = new MapEntry();

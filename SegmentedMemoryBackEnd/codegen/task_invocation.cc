@@ -375,6 +375,15 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	// open function definition
 	programFile << " {\n\n";
 
+	// if the current segment has nothing to do about the task then control should return back to the main 
+	// function from here without spending time in vein in any resource management computation
+	programFile << indent << "if (segmentId >= Total_Segments) {\n";
+	programFile << doubleIndent << "logFile << \"Current segment does not participate in: ";
+	programFile << taskGenerator->getTaskName() << "\\n\"" << stmtSeparator;
+	programFile << doubleIndent << "return" << stmtSeparator;
+	programFile << indent << "}\n\n";
+	
+
 	// create an instance of the environment-links object from the environment reference
 	programFile << indent << "// initializing environment-links object\n";
 	programFile << indent << "EnvironmentLinks envLinks = initiateEnvLinks(environment)" << stmtSeparator;
