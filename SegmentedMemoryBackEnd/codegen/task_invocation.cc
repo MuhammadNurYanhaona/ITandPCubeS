@@ -380,6 +380,10 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << indent << "if (segmentId >= Total_Segments) {\n";
 	programFile << doubleIndent << "logFile << \"Current segment does not participate in: ";
 	programFile << taskGenerator->getTaskName() << "\\n\"" << stmtSeparator;
+	if (taskGenerator->hasCommunicators()) {
+		programFile << doubleIndent << "excludeFromAllCommunication(";
+		programFile << "segmentId" << paramSeparator << "logFile)" << stmtSeparator;
+	}	
 	programFile << doubleIndent << "return" << stmtSeparator;
 	programFile << indent << "}\n\n";
 	

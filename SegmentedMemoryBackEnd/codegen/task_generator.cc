@@ -165,8 +165,12 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	int communicatorCount = commCharacterList->NumElements();
 	generateAllDataExchangeFns(headerFile, programFile, taskDef, commCharacterList);
 	if (communicatorCount > 0) {
-		generateAllCommunicators(headerFile, programFile, taskDef, commCharacterList);
-		generateCommunicatorMapFn(headerFile, programFile, taskDef, commCharacterList);
+		generateAllCommunicators(headerFile, 
+				programFile, taskDef, commCharacterList);
+		generateCommunicatorMapFn(headerFile, 
+				programFile, taskDef, commCharacterList);
+		generateCommunicationExcludeFn(headerFile, 
+				programFile, taskDef, commCharacterList);
 	}
 
 	// generate task executor and associated functions
@@ -547,6 +551,11 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	stream << indent << "delete[] ppuCounts" << stmtSeparator;
 	stream << indent << "logFile << \"\\tmemory allocation is complete\\n\"" << stmtSeparator;
 	stream << indent << "logFile.flush()" << stmtSeparator;
+}
+
+bool TaskGenerator::hasCommunicators() {
+	List<const char*> *syncVars = taskDef->getComputation()->getVariablesNeedingCommunication(segmentedPPS);
+	return syncVars != NULL && syncVars->NumElements() > 0;
 }
 
 bool TaskGenerator::generateCommunicators(std::ofstream &stream) {	

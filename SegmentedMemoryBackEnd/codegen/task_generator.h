@@ -45,6 +45,7 @@ class TaskGenerator {
 	static const char *getHeaderFileName(TaskDef *taskDef);
 	static const char *getNamespace(TaskDef *taskDef);
 	SyncManager *getSyncManager() { return syncManager; }
+	bool hasCommunicators();
 
 	// function to generate all data structures and methods that are relevant to this task 
 	// including a thread run function to run the task as a parallel program in multiple threads

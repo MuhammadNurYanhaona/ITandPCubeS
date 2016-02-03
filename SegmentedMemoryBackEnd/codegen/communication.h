@@ -84,6 +84,14 @@ void generateAllCommunicators(const char *headerFile,
 void generateCommunicatorMapFn(const char *headerFile,
                 const char *programFile,
                 TaskDef *taskDef,
+                List<CommunicationCharacteristics*> *commCharacterList);
+
+// If some segment is not going to participate in any computation related to a task then it should exclude itself 
+// from all communicator setup operations too. This function generate a routine that the non-participating segment
+// can call before exiting to inform other that it is quitting.
+void generateCommunicationExcludeFn(const char *headerFile,
+                const char *programFile,
+                TaskDef *taskDef,
                 List<CommunicationCharacteristics*> *commCharacterList);	
 
 #endif

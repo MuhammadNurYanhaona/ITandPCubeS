@@ -900,3 +900,55 @@ void generateCommunicatorMapFn(const char *headerFileName,
 	headerFile.close();
 }
 
+void generateCommunicationExcludeFn(const char *headerFileName,
+                const char *programFileName,
+                TaskDef *taskDef,
+                List<CommunicationCharacteristics*> *commCharacterList) {
+	
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open output file for generating a communication exclude routine";
+                std::exit(EXIT_FAILURE);
+        }
+
+	const char *initials = string_utils::getInitials(taskDef->getName());
+        initials = string_utils::toLower(initials);
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+
+	const char *message = "communication exclude routine";
+	decorator::writeSubsectionHeader(headerFile, message);
+	decorator::writeSubsectionHeader(programFile, message);
+
+	std::ostringstream fnHeader;
+	std::ostringstream fnBody;
+
+	fnHeader << "excludeFromAllCommunication(";
+	fnHeader << "int segmentId" << paramSeparator;
+	fnHeader << "std::ofstream &logFile";
+	fnHeader << ")";
+
+	fnBody << "{\n\n";
+	
+	for (int i = 0; i < commCharacterList->NumElements(); i++) {
+		CommunicationCharacteristics *commCharacter = commCharacterList->Nth(i);
+		SyncRequirement *syncReq = commCharacter->getSyncRequirement();
+		const char *dependencyName = syncReq->getDependencyArc()->getArcName();
+		if (commCharacter->shouldAllocateGroupResources()) {		
+			fnBody << indent << "Communicator::excludeOwnselfFromCommunication(";
+			fnBody << '"' << dependencyName << '"' << paramSeparator;
+			fnBody << "segmentId" << paramSeparator;
+			fnBody << "logFile)" << stmtSeparator;
+		}
+	}
+
+	fnBody << "}\n";
+	
+	headerFile << "void " << fnHeader.str() << stmtSeparator;
+	programFile << "\nvoid " << initials << "::";
+	programFile << fnHeader.str() << " " << fnBody.str();
+
+	programFile.close();
+	headerFile.close();
+}
