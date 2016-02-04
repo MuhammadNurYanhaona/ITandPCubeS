@@ -8,4 +8,4 @@
 //--------------------------------------------------------------------------------------
 Space 	3:  		CPU 		(1) 		// 26 GB Main Memory	
 Space 	2: 		Quad-Core 	(2) 		// 6 MB L-2 Cache Per Quad Core		
-Space 	1*: 		Core 		(4)
+Space 	1<core>: 	Core 		(4)		

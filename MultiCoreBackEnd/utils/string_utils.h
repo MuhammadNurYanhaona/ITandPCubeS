@@ -50,6 +50,11 @@ namespace string_utils {
 
 	// determine if a list of string contains a particular string
         bool contains(List<const char*> *list, const char *str);
+
+	// generate a list of attributes from a text containing each attribute 
+        // in <attribute> format
+        List<const char*> *readAttributes(std::string &str);
+
 }
 
 #endif

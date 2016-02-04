@@ -11,10 +11,11 @@ class PPS_Definition {
 	int id;
 	const char *name;
 	int units;
+
 	/* We need a variable that designate the PPS representing CPU cores. This is required 
 	   to manage thread affinity. For the sake of identification, the current requirement 
            is that in the PCubeS description file, the space correspond to CPU cores should be 
-	   marked as '*' besides its name.
+	   marked as '<core>' besides its name.
 	*/
 	bool coreSpace;
 };

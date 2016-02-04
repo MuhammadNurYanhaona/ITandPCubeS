@@ -15,21 +15,24 @@ class PPS_Definition {
 	/* We need a variable that designate the PPS representing CPU cores. This is required to 
 	   manage thread affinity. For the sake of identification, the current requirement is 
 	   that in the PCubeS description file, the space correspond to CPU cores should be marked 
-	   as '*' besides its name.
+	   as <core> besides its name.
 	*/
 	bool coreSpace;
+
 	/* We need another variable to identify where memory segmentation occurs in the hardware.
 	   That is, either we have distributed memory in the PPS or there is non-uniformity in 
 	   the access latency for memory modules. Note that if the memory of a PPS is segmented
 	   among its PPUs then any memory available in an ancestor PPS in not directly available
 	   in those PPUs either as an addressible memory.
-	   The marker '^' after a PPS name indicates that it has segmented memory.	 	
+	   The marker '<segment>' after a PPS name indicates that it has segmented memory.	 	
 	*/
 	bool segmented;
 
 	/* We need a variable to identify where in the PCubeS hierarchy the separation of physical
 	   hardware happens. This information is needed to determine when to restart the processor
 	   numbering while assigning threads to processors.
+	   The marker '<unit>' after a PPS name indicates that in this space physical separation
+	   happens between hardware units.
 	*/
 	bool physicalUnit;
 
