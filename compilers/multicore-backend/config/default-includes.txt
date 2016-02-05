@@ -1,0 +1,43 @@
+// for error reporting and diagnostics
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cstdlib>
+#include <stdio.h>
+#include <time.h>
+#include <sys/time.h>
+
+// for math functions
+#include <math.h>
+#include <algorithm>
+#include <climits>
+
+// for tuple definitions found in the source code
+#include "tuple.h"
+#include <vector>
+
+// for LPU and PPU management data structures
+#include "../../src/runtime/structure.h"
+#include "../../src/runtime/lpu_management.h"
+
+// for utility routines
+#include "../../src/utils/list.h"
+#include "../../src/utils/hashtable.h"
+#include "../../src/utils/string_utils.h"
+#include "../../src/utils/common_utils.h"
+
+// for routines related to partition functions
+#include "../../src/partition-lib/index_xform.h"
+#include "../../src/partition-lib/partition_mgmt.h"
+
+// to input-output and initialization
+#include "../../src/runtime/input_prompt.h"
+#include "../../src/runtime/output_prompt.h"
+#include "../../src/runtime/allocator.h"
+
+// for threading
+#include <pthread.h>
+
+// for synchronization
+#include "../../src/runtime/sync.h"
+
