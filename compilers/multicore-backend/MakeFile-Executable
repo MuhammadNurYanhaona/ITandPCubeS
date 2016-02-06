@@ -1,5 +1,9 @@
 .PHONY: clean 
 
+# These properties should be passed to the make file to tailer the output based on current
+# need
+C_COMPILER = g++
+C_OPT_FLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
 BUILD_SUBDIR = tmp
 EXECUTABLE = ./bin/it-program.o
 
@@ -21,13 +25,11 @@ OBJS =	$(patsubst %.cc, %.o, $(filter %.cc, $(BUILD_SRCS))) 	\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(PARTITION_LIBS)))
 
 # Define the backend C++ compiler and linker to be used
-CC= g++
-LD = g++
+CC = $(C_COMPILER)
+LD = $(C_COMPILER)
 
-# settings for development and debugging
-CFLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
-# settings for optimized code generation
-#CFLAGS = -O3 -mtune=native -march=native -mfpmath=sse
+# backend code optimization settings
+CFLAGS = $(C_OPT_FLAGS)
 
 # We need flag to enable the POSIX thread library during compiling generated code
 RFLAG = -pthread

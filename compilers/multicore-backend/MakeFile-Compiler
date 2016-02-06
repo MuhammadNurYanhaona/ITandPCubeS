@@ -5,6 +5,9 @@ COMPILER = micc
 PRODUCTS = $(COMPILER) 
 default: $(PRODUCTS)
 
+# The backend C++ compiler should be different for environment; the default is g++
+C_COMPILER=g++
+
 # Set up the list of source and object files
 SRCS = $(shell find src ! -name "hashtable.cc" -name "*.cc" -not -path "./build/*")
 
@@ -15,8 +18,8 @@ SRC_JUNK = src/*.o src/*/*.o
 TOOL_JUNK= *.o lex.yy.c dpp.yy.c y.tab.c y.tab.h *.core core y.output
 
 # Define the tools we are going to use
-CC= g++
-LD = g++
+CC= $(C_COMPILER)
+LD = $(C_COMPILER)
 LEX = flex
 YACC = bison
 
