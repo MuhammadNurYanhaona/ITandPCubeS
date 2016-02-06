@@ -6,10 +6,10 @@
  * file inclusions or C++ variable declarations/prototypes that are needed
  * by your code here.
  */
-#include "scanner.h" // for yylex
-#include "parser.h"
-#include "utils/utility.h"
-#include "syntax/errors.h"
+#include "lib/scanner.h" // for yylex
+#include "lib/parser.h"
+#include "src/utils/utility.h"
+#include "src/syntax/errors.h"
 
 void yyerror(const char *msg); // standard error-handling routine
 %}

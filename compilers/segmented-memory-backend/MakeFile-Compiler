@@ -1,0 +1,82 @@
+.PHONY: clean
+
+# Set the default target. When you make with no arguments, this will be the target built.
+COMPILER = sicc
+PRODUCTS = $(COMPILER) 
+default: $(PRODUCTS)
+
+# The backend C++ compiler should be different for environment; the default is mpicc
+C_COMPILER=mpic++
+
+# Set up the list of source and object files
+SRCS = $(shell find src ! -name "hashtable.cc" -name "*.cc" -not -path "./build/*")
+
+# OBJS can deal with either .cc or .c files listed in SRCS
+OBJS = y.tab.o lex.yy.o $(patsubst %.cc, %.o, $(filter %.cc,$(SRCS))) $(patsubst %.c, %.o, $(filter %.c, $(SRCS)))
+
+SRC_JUNK = src/*.o src/*/*.o
+TOOL_JUNK= *.o lex.yy.c dpp.yy.c y.tab.c y.tab.h *.core core y.output
+
+# Define the tools we are going to use
+CC= $(C_COMPILER)
+LD = $(C_COMPILER)
+LEX = flex
+YACC = bison
+
+#--------------------------------------------------------------------------------------------------
+# Set up the necessary flags for the tools
+#--------------------------------------------------------------------------------------------------
+# settings for optimized code generation
+CFLAGS = -O3
+
+# We need flag to enable the POSIX thread library during compiling generated code
+RFLAG = -pthread
+
+# The -d flag tells lex to set up for debugging. Can turn on/off by
+# setting value of global yy_flex_debug inside the scanner itself
+LEXFLAGS = -d
+
+# The -d flag tells yacc to generate header with token types
+# The -v flag writes out a verbose description of the states and conflicts
+# The -t flag turns on debugging capability
+# The -y flag means imitate yacc's output file naming conventions
+YACCFLAGS = -dvty
+#--------------------------------------------------------------------------------------------------
+
+# Link with standard c library, math library, and lex library
+LIBS = -lc -lm -pthread
+
+# Link with POSIX thread library
+BUILD_LIBS = -pthread
+
+#--------------------------------------------------------------------------------------------------
+# Rules for various parts of the target
+#--------------------------------------------------------------------------------------------------
+.yy.o: $*.yy.c
+	$(CC) $(CFLAGS) -c -o $@ $*.cc
+
+lex.yy.c: IT.l IT.y y.tab.h 
+	$(LEX) $(LEXFLAGS) IT.l
+
+y.tab.o: y.tab.c
+	$(CC) $(CFLAGS) -c -o y.tab.o y.tab.c
+
+y.tab.h y.tab.c: IT.y
+	$(YACC) $(YACCFLAGS) IT.y
+
+.cc.o: $*.cc
+	$(CC) $(CFLAGS) $(RFLAG) -c -o $@ $*.cc
+#--------------------------------------------------------------------------------------------------
+
+# rule to build the compiler
+$(COMPILER) : $(OBJS)
+	$(LD) -o $@ $(OBJS) $(LIBS)
+	rm -f $(TOOL_JUNK) 
+
+clean:
+	rm -f $(SRC_JUNK) 
+	rm -f $(TOOL_JUNK)
+	rm -f $(PRODUCTS)
+
+	
+

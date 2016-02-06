@@ -42,16 +42,16 @@ int main(int argc, const char *argv[]) {
 		std::cout << "Mapping Configuration: " << mappingFile << std::endl;	
 	}
 	// an additional optional parameter is supported to generate the C++ files for the
-	// program in some directory other than the default directory 
-	const char *buildSubDir;
-	if (argc > 5) {
-		buildSubDir = argv[5];
-	} else buildSubDir = "tmp";
-	// create a build subdirectory for the program
-	const char *buildDir = "build/";
-	std::ostringstream outputDirStr;
-	outputDirStr << buildDir << buildSubDir << "/";
-	mkdir(outputDirStr.str().c_str(), 0700);
+        // program in some directory other than the default directory 
+        const char *buildSubDir;
+        if (argc > 5) {
+                buildSubDir = argv[5];
+        } else buildSubDir = "tmp";
+        // create a build subdirectory for the program
+        const char *buildDir = "build/";
+        std::ostringstream outputDirStr;
+        outputDirStr << buildDir << buildSubDir << "/";
+        mkdir(outputDirStr.str().c_str(), 0700);
 	// redirect standard input to the source file for the front end compiler to work
 	int fileDescriptor = open(sourceFile, O_RDONLY);
 	if (fileDescriptor < 0) {
@@ -61,17 +61,17 @@ int main(int argc, const char *argv[]) {
 	dup2(fileDescriptor, STDIN_FILENO);
 	close(fileDescriptor);
 	// set the output directory and common header file parameters
-	const char *outputDir = strdup(outputDirStr.str().c_str());
-	std::ostringstream tupleHeaderStr;
-	tupleHeaderStr << buildDir << buildSubDir << "/tuple.h"; 
-	const char *tupleHeader = strdup(tupleHeaderStr.str().c_str());
-	// set the output header and program files for the coordinator program
-	std::ostringstream coordHeaderStr;
-	coordHeaderStr << buildDir << buildSubDir << "/coordinator.h";
-	const char *coordHeader = strdup(coordHeaderStr.str().c_str());
-	std::ostringstream coordProgramStr;
-	coordProgramStr << buildDir << buildSubDir << "/coordinator.cc";
-	const char *coordProgram = strdup(coordProgramStr.str().c_str());
+        const char *outputDir = strdup(outputDirStr.str().c_str());
+        std::ostringstream tupleHeaderStr;
+        tupleHeaderStr << buildDir << buildSubDir << "/tuple.h";
+        const char *tupleHeader = strdup(tupleHeaderStr.str().c_str());
+        // set the output header and program files for the coordinator program
+        std::ostringstream coordHeaderStr;
+        coordHeaderStr << buildDir << buildSubDir << "/coordinator.h";
+        const char *coordHeader = strdup(coordHeaderStr.str().c_str());
+        std::ostringstream coordProgramStr;
+        coordProgramStr << buildDir << buildSubDir << "/coordinator.cc";
+        const char *coordProgram = strdup(coordProgramStr.str().c_str());
 	//***********************************************************************************
 
 
@@ -100,7 +100,6 @@ int main(int argc, const char *argv[]) {
 	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription(pcubesFile);
 	// iterate over list of tasks and generate code for each of them in separate files
 	List<TaskDef*> *taskList = ProgramDef::program->getTasks();
-	TaskGenerator *firstTaskGenerator= NULL;
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		TaskDef *taskDef = taskList->Nth(i);
 		// do static analysis of the task to determine what data structure has been 
@@ -109,19 +108,13 @@ int main(int argc, const char *argv[]) {
 		TaskGenerator *generator = new TaskGenerator(taskDef, 
 				outputDir, mappingFile, processorFile);
 		generator->generate(pcubesConfig);
-		if (i == 0) firstTaskGenerator = generator;
 	}
 	// generate classes for the list of tuples present in the source in a header file
 	generateClassesForTuples(tupleHeader, ProgramDef::program->getTuples());
-	// if the program file consist of an isolated task then generate a main function based
-	// on the task definition	
-	if (ProgramDef::program->isIsolatedTaskProgram()) {
-		firstTaskGenerator->generateTaskMain();
-	// otherwise invoke the library handling task-invocations to generate all routines
-	// needed for multi-task management and a the main function corresponds to the 
-	// coordinator program definition
-	} else {
-		processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
-	}
+	// invoke the library handling task-invocations to generate all routines needed for 
+	// multi-task management and a the main function corresponds to the coordinator 
+	// program definition
+	processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
+	//***********************************************************************************
 }
 

@@ -1,0 +1,58 @@
+.PHONY: clean 
+
+# These properties should be passed to the make file to tailer the output based on current
+# need
+C_COMPILER = mpic++
+C_OPT_FLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
+BUILD_SUBDIR = tmp
+EXECUTABLE = ./bin/it-program.o
+
+# Set the default target. When you make with no arguments, this will be the target built.
+default: build
+
+# Set up the list of sources to be included as static libraries from the compiler
+RUNTIME_LIBS = $(shell find src -name "*.cc" -path "src/runtime/*")
+UTILITY_LIBS = $(shell find src -not -name "hashtable.cc" -name "*.cc" -path "src/utils/*")
+PARTITION_LIBS = $(shell find src -name "*.cc" -path "src/partition-lib/*")
+MM_MANAGEMENT_LIBS = $(shell find src -name "*.cc" -path "src/memory-management/*")
+COMMUNICATION_LIBS = $(shell find src -name "*.cc" -path "src/communication/*")
+IO_LIBS = $(shell find src -name "*.cc" -path "src/input-output/*")
+
+# Set up the list of sources generated for the IT program
+BUILD_SRCS = $(shell find build/$(BUILD_SUBDIR) -name "*.cc")
+
+# objects for compiling any generated code for IT program
+OBJS =	$(patsubst %.cc, %.o, $(filter %.cc, $(BUILD_SRCS))) 		\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(RUNTIME_LIBS)))		\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(UTILITY_LIBS)))		\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(PARTITION_LIBS))) 	\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(MM_MANAGEMENT_LIBS)))	\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(COMMUNICATION_LIBS)))	\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(IO_LIBS)))
+
+# Define the backend C++ compiler and linker to be used
+CC = $(C_COMPILER)
+LD = $(C_COMPILER)
+
+# backend code optimization settings
+CFLAGS = $(C_OPT_FLAGS)
+
+# We need flag to enable the POSIX thread library during compiling generated code
+RFLAG = -pthread
+
+# Link with standard c library, math library, and lex library
+LIBS = -lc -lm -pthread
+
+# Rules for various parts of the target
+
+.cc.o: $*.cc
+	$(CC) $(CFLAGS) $(RFLAG) -c -o $@ $*.cc
+
+build: $(OBJS)
+	$(LD) -o $(EXECUTABLE) $(OBJS) $(LIBS)
+
+clean:
+	rm -rfv  build/$(BUILD_SUBDIR)
+
+	
+

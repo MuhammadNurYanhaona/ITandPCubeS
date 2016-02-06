@@ -1,4 +1,5 @@
 #!/bin/bash
-rm -f *.cc
-rm -f *.o
-rm -f *.h
+rm -rvf *.cc
+rm -rvf *.o
+rm -rvf *.h
+rm -rvf ./*/

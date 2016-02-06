@@ -1,10 +1,10 @@
 /*--------------------------------------------Prolog------------------------------------------------*/
 %{
-#include "string.h"
-#include "stdio.h"
-#include "scanner.h"
-#include "parser.h" // for token codes, yylval
-#include "utils/list.h"
+#include <string.h>
+#include <stdio.h>
+#include "lib/scanner.h"
+#include "lib/parser.h" // for token codes, yylval
+#include "src/utils/list.h"
 
 #define TAB_SIZE 8
 #define DIM_LENGTH 3
