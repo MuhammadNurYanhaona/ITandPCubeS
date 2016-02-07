@@ -25,4 +25,4 @@ rm -f sicc
 
 # come back to the installer directory and delete the compiler script
 cd $installer_dir
-rm -f sicc
+rm -f smicc
