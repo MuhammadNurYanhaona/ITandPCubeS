@@ -1,0 +1,130 @@
+Program (args) {
+	// creating environment objects for component tasks
+	vaEnv = new TaskEnvironment(name: "Vector Addition")
+	dpEnv = new TaskEnvironment(name: "Vector Dot Product")	
+	mvmEnv = new TaskEnvironment(name: "CSR Matrix Vector Multiply")
+	
+	// load the argument sparse matrix stored in compressed row format from file
+	load_array(mvmEnv.columns, args.arg_matrix_cols)
+	load_array(mvmEnv.rows, args.arg_matrix_rows)
+	load_array(mvmEnv.values, args.arg_matrix_values)
+
+	// create and initialize some auxiliary arrays for computation
+	b = new 1D Array of Real double-precision
+	load_array(b, args.known_vector)
+	r_i = new 1D Array of Real double-precision
+	x_i = new 1D Array of Real double-precision
+	load_array(x_i, args.prediction_vector)
+	
+	// run the conjugate gradient logic
+	// note that here iteration should continue until the estimate for solution vector
+	// converges to its actual value. That should happen if the residual error is zero.
+	// But we are doing an max-iterations based termination as we do not know how to
+	// generate a sparse, symmetric, positive-definite argument matrix with a spectral
+	// radius less than 1
+	iteration = 0
+	maxIterations = args.maxIterations
+	do {	
+		// calculate A * x_i
+		mvmEnv.v = x_i
+		execute("CSR Matrix Vector Multiply"; mvmEnv; Partition: args.r)
+		
+		// determine the current residual error as r_i = b - A * x_i
+		vaEnv.u = b
+		vaEnv.alpha = 1
+		vaEnv.v = mvmEnv.w
+		vaEnv.beta = -1
+		execute("Vector Addition"; vaEnv; Partition: args.b)
+		r_i = vaEnv.w
+
+		// determine the dot product of r_i to itself as the residual norm
+		dpEnv.u = dpEnv.v = r_i
+		execute("Vector Dot Product"; dpEnv)
+		norm = dpEnv.product
+		
+		// determine A * r_i
+		mvmEnv.v = r_i
+		execute("CSR Matrix Vector Multiply"; mvmEnv; Partition: args.r)
+
+		// determine dot product of r_i to A * r_i
+		dpEnv.v = mvmEnv.w
+		execute("Vector Dot Product"; dpEnv)
+
+		// determine the next step size alpha_i as (r_i.r_i) / (r_i.(A * r_i))
+		alpha_i = norm / dpEnv.product
+
+		// calculate the next estimate x_i = x_i + alpha_i * r_i
+		vaEnv.u = x_i
+		vaEnv.alpha = 1
+		vaEnv.v = r_i
+		vaEnv.beta = alpha_i		
+		execute("Vector Addition"; vaEnv; Partition: args.b)
+
+		// prepare for the next iteration
+		x_i = vaEnv.w	
+		iteration = iteration + 1
+
+	} while iteration < maxIterations and norm > args.precision
+
+	// store the solution vector in an output file
+	store_array(x_i, args.solution_vector)
+}
+
+Task "Vector Addition":
+	Define:
+		u, v, w: 1D Array of Real double-precision
+		alpha, beta: Real double-precision
+	Environment:
+		u, v, alpha, beta: link
+		w: create
+	Initialize:
+		w.dimension = u.dimension
+	Compute:
+		"" (Space A) { do { w[i] = alpha * u[i] + beta * v[i] } for i in u }
+	Partition(b):
+		Space A <1D> {
+			u, v, w: block_size(b)
+		}
+
+Task "Vector Dot Product":
+	Define:
+		u, v: 1D Array of Real double-precision
+		product: Real double-precision	
+	Environment:
+		u, v: link
+		product: create
+	Compute:
+		"" (Space A) { do { product = reduce("sum", u[i]*v[i]) } for i in u }
+	Partition: 
+		Space A <un-partitioned> {u, v}
+
+Task "CSR Matrix Vector Multiply":
+	Define:
+		columns, rows: 1D Array of Integer	
+		values, v, w: 1D Array of Real double-precision
+	Environment:
+		values, columns, rows, v: link
+		w: create
+	Initialize:
+		w.dimension = rows.dimension
+	Compute:
+		"" (Space A) {
+			start = rows.local.dimension1.range.min
+			if (start == 0) { start = -1 }
+			do {	if (i > 0) {
+					beginIndex = rows[i - 1] + 1
+				} else {
+					beginIndex = 0
+				}
+				endIndex = rows[i]
+				do {
+					w[i] = w[i] + values[j] * v[columns[j]] 
+				} for j in columns and j >= beginIndex and j <= endIndex
+			} for i in rows and i > start
+		}	
+	Partition(r):
+		Space A <1D> {
+			values, columns, v: replicated
+			w: block_size(r)
+			rows: block_size(r) padding(1, 0)
+		}

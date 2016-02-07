@@ -1,0 +1,13 @@
+#!/bin/bash
+
+command=$1
+
+if [ "$command" == "install" ] 
+then
+	./scripts/install-compilers.sh
+elif [ "$command" == "uninstall" ]
+then
+	./scripts/uninstall-compilers.sh
+else
+	echo "specify what you want to do:[install/uninstall]" 
+fi
