@@ -1,0 +1,27 @@
+PCubeS-Description------------------------------------------------------------------------
+To generate PCubeS descriptions for your target execution platforms, take the help of any 
+hardware description manual or operating system files. In linux, you can get additional 
+aid from the following two locations to get enough information about writing a good PCubeS 
+description
+   a) /proc/cpuinfo file for processor information
+   b) /sys/devices/system/cpu/ directory to get information about cache hierarchies
+
+Your PCubeS description file should have the extension .ml
+
+Core-Numbering----------------------------------------------------------------------------
+Different hardware vendors assign physical IDs to the hardware cores differently. So a 
+core numbering file is needed, in addition to the PCubeS description file, to generate 
+executables tuned for a target backend. To generate the core numbering file, one needs to 
+parse the content of the /proc/cpuinfo file using the following command
+
+  cat $CPU-Info-File | grep -e processor -e "physical id" -e "core id" | paste - - -
+
+Your core numbering file should have the extension .cn
+
+------------------------------------------------------------------------------------------
+Both the PCubeS description and core numbering files should be placed within a single 
+directory. Further, do not place more than one hardware's description in that directory.
+Have separate directories for your different target machines.
+
+Finally, several example descriptions are given in the ../machine-models directory	
+ 

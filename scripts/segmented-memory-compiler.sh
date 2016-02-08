@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# print the compiler name and version
+echo "IT segmented-memory backend compiler (version 1)"
+
 # keep track of the current directory
 current_dir=`pwd`
 
@@ -41,7 +44,6 @@ build_dir=tmp_$t
 
 # retrieve the hardware description files' location
 machine_model_dir=`cat ${config_dir}/executable.properties | grep 'segmented.memory.machine.model.dir' | cut -d '=' -f2`
-echo "machine model for generating the executable is taken from: $machine_model_dir"
 
 # retrieve the two files needed for code generation from hardware description directory
 pcubes_file=`ls ${machine_model_dir}/*.ml`
@@ -71,6 +73,12 @@ pcubes=`readlink -f $pcubes_file`
 cores=`readlink -f $core_numbering_file`
 mapping=`readlink -f $mapping_file`
 
+# print the paths of the files
+echo "IT source code: $src"
+echo "PCubes description file: $pcubes"
+echo "Core numbering file: $cores"
+echo "Mapping file: $mapping"
+
 # determine what backend C++ compiler has been used to install the IT segmented-memory compiler
 multicore_c=`cat ${config_dir}/compiler.properties | grep 'segmented.memory.backend.c.compiler' | cut -d '=' -f2`
 
@@ -78,19 +86,16 @@ multicore_c=`cat ${config_dir}/compiler.properties | grep 'segmented.memory.back
 c_opt_flags=`cat ${config_dir}/executable.properties | grep 'c.optimization.flags' | cut -d '=' -f2`
 
 # generate intermediate C++ source codes
-echo ""
-echo ""
 echo "generating intermediate code"
 cd $segmented_memory_compiler_dir
-${segmented_memory_compiler} $src $pcubes $cores $mapping $build_dir
+${segmented_memory_compiler} $src $pcubes $cores $mapping $build_dir > /dev/null
 
 # generate the binary from the intermediate source code and delete the intermediate source code
-echo ""
-echo ""
-echo "generating executable from the intermediate code"
-make -f MakeFile-Executable C_COMPILER=$multicore_c EXECUTABLE=$executable BUILD_SUBDIR=$build_dir C_OPT_FLAGS="$c_opt_flags"
-make -f MakeFile-Executable BUILD_SUBDIR=$build_dir clean 
+echo "generating an executable from the intermediate code"
+make -f MakeFile-Executable C_COMPILER=$multicore_c EXECUTABLE=$executable BUILD_SUBDIR=$build_dir C_OPT_FLAGS="$c_opt_flags" > /dev/null
+echo "cleaning up intermediate files/directories"
+make -f MakeFile-Executable BUILD_SUBDIR=$build_dir clean > /dev/null
 
 cd $current_dir
-echo "executable has been written in the file: $executable"
+echo "the executable has been written in the file: $executable"
 
