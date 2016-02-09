@@ -14,6 +14,7 @@
 #include "codegen/thread_state_mgmt.h"	
 #include "codegen/space_mapping.h"
 #include "utils/list.h"
+#include "utils/properties.h"
 #include "syntax/ast.h"
 #include "syntax/ast_def.h"
 #include "syntax/errors.h"
@@ -74,6 +75,12 @@ int main(int argc, const char *argv[]) {
         const char *coordProgram = strdup(coordProgramStr.str().c_str());
 	//***********************************************************************************
 
+
+	//*****************************************************Compiler Property Files Reader
+        const char *deploymentKey = "deployment";
+        const char *deploymentPropertiesFile = "config/deployment.properties";
+        PropertyReader::readPropertiesFile(deploymentPropertiesFile, deploymentKey);
+        //***********************************************************************************
 
 	
 	//**************************************************************** Front End Compiler

@@ -26,6 +26,7 @@
 #include "../utils/string_utils.h"
 #include "../utils/decorator_utils.h"
 #include "../utils/code_constant.h"
+#include "../utils/properties.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_def.h"
 #include "../syntax/errors.h"
@@ -631,10 +632,27 @@ void TaskGenerator::startThreads(std::ofstream &stream) {
 	stream << indent << indent << "int cpuId = (i * Core_Jump / Threads_Per_Core) % Processors_Per_Phy_Unit";
 	stream << stmtSeparator;
 	stream << indent << indent << "int physicalId = Processor_Order[cpuId]" << stmtSeparator;
-	// then set the affinity attribute based on the CPU Id
-	stream << indent << indent << "CPU_ZERO(&cpus)" << stmtSeparator;
-	stream << indent << indent << "CPU_SET(physicalId, &cpus)" << stmtSeparator;
-	stream << indent << indent << "pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus)" << stmtSeparator;
+
+	// check if thread affinity is disabled in the deployment; by default threads are pinned to specific cores
+        bool affinityEnabled = true;
+        Properties *deploymentProps = PropertyReader::propertiesGroups->Lookup("deployment");
+        if (deploymentProps != NULL) {
+                const char *affinityKey = "thread.affinity.enabled";
+                const char *affinitySetting = deploymentProps->getProperty(affinityKey);
+                if (affinitySetting != NULL && strcmp(affinitySetting, "true") != 0) {
+                        affinityEnabled = false;
+                        std::cout << "\tGenerating multithreaded code without thread affinity\n";
+                }
+        }
+
+        // then set the affinity attribute based on the CPU Id
+        if (affinityEnabled) {
+                stream << indent << indent << "CPU_ZERO(&cpus)" << stmtSeparator;
+                stream << indent << indent << "CPU_SET(physicalId, &cpus)" << stmtSeparator;
+                stream << indent << indent << "pthread_attr_setaffinity_np(&attr, sizeof(cpu_set_t), &cpus)";
+                stream << stmtSeparator;
+        }
+
 	// then create the thread
 	stream << indent << indent << "state = pthread_create(&threads[i], &attr, runPThreads, (void *) threadArgs[i])";
 	stream << stmtSeparator;

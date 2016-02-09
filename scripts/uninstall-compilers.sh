@@ -12,6 +12,7 @@ echo "cleaning up the IT multicore backend compiler"
 cd $multicore_compiler_dir
 make -f MakeFile-Compiler clean
 rm -f micc
+rm -f config/deployment.properties
 
 # come back to the installer directory and delete the compiler script
 cd $installer_dir
@@ -22,6 +23,7 @@ echo "cleaning up the IT segmented memory backend compiler"
 cd $segmented_memory_compiler_dir
 make -f MakeFile-Compiler clean
 rm -f sicc
+rm -f config/deployment.properties
 
 # come back to the installer directory and delete the compiler script
 cd $installer_dir
