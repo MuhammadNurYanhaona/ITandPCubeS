@@ -328,11 +328,16 @@ void generateRoutineForDataStorage(const char *headerFileName, const char *progr
 	programFile << "void " << string_utils::toLower(initials) << "::" << fnHeader.str();
 	programFile << " {\n\n";
 
-	// for now assume the number of segment is equal to the number of MPI processes in the system and get the MPI rank
-	// and count to ready current process for serialized output
+	// determine the actual number of segments participated in the computation of this task and the ID of the current
+	// segment to order segments for sequential file output
 	programFile << indent << "int segmentId" << stmtSeparator;
 	programFile << indent << "MPI_Comm_rank(MPI_COMM_WORLD, &segmentId)" << stmtSeparator;
-	programFile << indent << "int segmentCount = Total_Segments" << stmtSeparator;
+        programFile << indent << "int mpiProcessCount" << stmtSeparator;
+        programFile << indent << "MPI_Comm_size(MPI_COMM_WORLD" << paramSeparator;
+        programFile << "&mpiProcessCount)" << stmtSeparator;
+        programFile << indent << "int segmentCount = min(mpiProcessCount" << paramSeparator;
+        programFile << "Max_Segments_Count)" << stmtSeparator;
+
 	programFile << indent << "env->getReadyForOutput(";
 	programFile << "segmentId" << paramSeparator << "segmentCount" << paramSeparator;
 	programFile << "MPI_COMM_WORLD" << paramSeparator << "logFile)" << stmtSeparator << '\n';

@@ -377,7 +377,7 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 
 	// if the current segment has nothing to do about the task then control should return back to the main 
 	// function from here without spending time in vein in any resource management computation
-	programFile << indent << "if (segmentId >= Total_Segments) {\n";
+	programFile << indent << "if (segmentId >= Max_Segments_Count) {\n";
 	programFile << doubleIndent << "logFile << \"Current segment does not participate in: ";
 	programFile << taskGenerator->getTaskName() << "\\n\"" << stmtSeparator;
 	if (taskGenerator->hasCommunicators()) {
@@ -386,7 +386,17 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	}	
 	programFile << doubleIndent << "return" << stmtSeparator;
 	programFile << indent << "}\n\n";
-	
+
+	// determine the active segment count and update the static variable keeping track of the total number 
+	// of threads to be used for the task's execution
+	programFile << indent << "// setting the total-number-of-threads static variable\n";
+	programFile << indent << "int mpiProcessCount" << stmtSeparator;
+	programFile << indent << "MPI_Comm_size(MPI_COMM_WORLD" << paramSeparator;
+	programFile << "&mpiProcessCount)" << stmtSeparator;
+	programFile << indent << "int activeSegments = min(mpiProcessCount" << paramSeparator;
+	programFile << "Max_Segments_Count)" << stmtSeparator;
+	programFile << indent << "Total_Threads = activeSegments * Threads_Per_Segment" << stmtSeparator;
+	programFile << "\n";
 
 	// create an instance of the environment-links object from the environment reference
 	programFile << indent << "// initializing environment-links object\n";

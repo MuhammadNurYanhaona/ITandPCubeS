@@ -7,7 +7,4 @@ Space   5<unit>:		Socket		(4)		// multiple physical units at this level
 Space 	4<segment>:  		CPU 		(4)		// 64 GB RAM Per CPU (location of memory segmentation)						
 Space 	3: 			NUMA-Node 	(2) 		// 6 MB L-3 Cache		
 Space 	2: 			Core-Pair 	(4)		// 2 MB L-2 Cache (1 floating point unit per core-pair)
-Space 	1<core>:		Core		(2)		// 16 KB L-1 Cache ( OS numbers processors starting
-								// from this space, indicated by the '*' marker. Don't
-								// map anything in this space. It was not supposed to 
-								// be there in the original PCubeS description.)
+Space 	1<core>:		Core		(2)		// 16 KB L-1 Cache (core numbering starts here)

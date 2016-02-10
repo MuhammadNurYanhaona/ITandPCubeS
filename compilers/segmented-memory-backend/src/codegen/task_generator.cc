@@ -147,6 +147,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// generate thread management functions and classes
         generateFnForThreadIdsAllocation(headerFile, 
 			programFile, initials, mappingConfig, pcubesConfig);
+        generateFnForThreadIdsAdjustment(headerFile, programFile, initials, mappingConfig);
         generateThreadStateImpl(headerFile, programFile, mappingConfig, partParamConfigMap);
 
 	// generate synchronization primitives and their initialization functions
@@ -469,7 +470,7 @@ void TaskGenerator::initiateThreadStates(std::ofstream &stream) {
 	stream << indent << "ThreadIds *threadIdsList[Total_Threads]" << stmtSeparator;
 	stream << indent << "for (int i = 0; i < Total_Threads; i++) {\n";
 	stream << indent << indent << "threadIdsList[i] = getPpuIdsForThread(i)" << stmtSeparator;
-	//stream << indent << indent << "threadIdsList[i]->print(logFile)" << stmtSeparator;
+	stream << indent << indent << "adjustPpuCountsAndGroupSizes(threadIdsList[i])" << stmtSeparator;
 	stream << indent << "}\n";
 
 	// create a data partition configuration object

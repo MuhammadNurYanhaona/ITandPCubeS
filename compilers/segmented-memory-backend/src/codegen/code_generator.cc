@@ -103,7 +103,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 			}
 		}
 	}
-	
+
 	const char *sysConstMsg = "System Constants";
 	decorator::writeSubsectionHeader(programFile, sysConstMsg);
 	
@@ -129,7 +129,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 				if (pps == nextPps) break;
 			}
 		}
-		programFile << "const int Space_" << lps->getName() << "_Threads = ";
+		programFile << "const int Max_Space_" << lps->getName() << "_Threads = ";
 		programFile << threadCount << stmtSeparator;
 		lpsNames->Append(lps->getName());
 		lpsThreadCounts->Append(threadCount);
@@ -145,7 +145,12 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 			if (pps->id == lowestPpsId) break;
 		}
 	}
-	programFile << "const int Total_Threads = " << totalThreads << stmtSeparator;
+	programFile << "const int Max_Total_Threads = " << totalThreads << stmtSeparator;
+	
+	// The actual total threads count is a static variable as opposed to a constant like others. 
+	// This is because its value is updated by the task executor function at runtime depending
+	// on the number of actual segments that do the task's computation. 
+	programFile << "static int Total_Threads = " << totalThreads << stmtSeparator;
 
 	const char *sgConstMsg = "Segment Constants";
 	decorator::writeSubsectionHeader(programFile, sgConstMsg);
@@ -174,7 +179,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 	}
 	programFile << "const int Threads_Per_Segment = " << threadsPerSegment << stmtSeparator;
 	int totalSegments = totalThreads / threadsPerSegment;
-	programFile << "const int Total_Segments = " << totalSegments << stmtSeparator;
+	programFile << "const int Max_Segments_Count = " << totalSegments << stmtSeparator;
 	
 	// determine the total number of threads per segment for different LPSes
 	for (int i = 0; i < lpsNames->NumElements(); i++) {
@@ -267,7 +272,7 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 		std::exit(EXIT_FAILURE);
 	}
                 
-	const char *message = "function to generate PPU IDs and PPU group IDs for a thread";
+	const char *message = "functions to generate PPU IDs and PPU group IDs for a thread";
 	decorator::writeSectionHeader(headerFile, message);
 	headerFile << std::endl;
 	decorator::writeSectionHeader(programFile, message);
@@ -364,7 +369,7 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 		// determine the total number of threads contributing in the parent PPS and current thread's 
 		// index in that PPS 
 		if (parent == mappingRoot) {
-			functionBody << indent << "threadCount = Total_Threads";
+			functionBody << indent << "threadCount = Max_Total_Threads";
 			functionBody << stmtSeparator;
 			groupThreadIdStr << "idsArray[Space_Root]";
 		} else {
@@ -417,6 +422,95 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 
 	headerFile << "ThreadIds *" << functionHeader.str() << ";\n\n";	
 	programFile << std::endl << "ThreadIds *" << initials << "::"; 
+	programFile <<functionHeader.str() << " " << functionBody.str();
+	programFile << std::endl;
+
+	headerFile.close();
+	programFile.close();
+}
+
+void generateFnForThreadIdsAdjustment(const char *headerFileName, 
+                const char *programFileName, const char *initials, MappingNode *mappingRoot) {
+
+	std::ofstream programFile, headerFile;
+	programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+	headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+		std::cout << "Unable to open header/program file";
+		std::exit(EXIT_FAILURE);
+	}
+                
+	std::ostringstream functionHeader;
+        functionHeader << "adjustPpuCountsAndGroupSizes(ThreadIds *threadId)";
+        std::ostringstream functionBody;
+        
+	functionBody << " {\n\n";
+
+	// declare two local variables to keep track of the thread index ranges of current thread's group as the flow of
+	// control moves downward from upper to lower LPSes
+	functionBody << indent << "int groupBegin = 0" << stmtSeparator;
+	functionBody << indent << "int groupEnd = Total_Threads - 1" << stmtSeparator;
+	functionBody << '\n';
+
+	// declare some other local variables to temporarily hold group Ids and counts
+	functionBody << indent << "int groupId = 0" << stmtSeparator;
+	functionBody << indent << "int groupSize = Total_Threads" << stmtSeparator;
+	functionBody << indent << "int ppuCount = 1" << stmtSeparator;
+	functionBody << '\n';
+
+	// iterate over the mapping nodes in FCFS order	
+	std::deque<MappingNode*> nodeQueue;
+        for (int i = 0; i < mappingRoot->children->NumElements(); i++) {
+        	nodeQueue.push_back(mappingRoot->children->Nth(i));
+        }
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		Space *lps = node->mappingConfig->LPS;
+		const char *lpsName = lps->getName();
+		
+		// create a prefix and variable name to make future references easy
+		std::string namePrefix = "threadId->ppuIds[Space_";
+		std::ostringstream varNameStr;
+		varNameStr << namePrefix << lps->getName() << "]";
+		std::string varName = varNameStr.str();
+
+		// if the LPS is a subpartition space then the PPU count is default 1 and we can assign the group size
+		// of its parent to its group size
+		if (lps->isSubpartitionSpace()) {
+			functionBody << indent << varName << ".groupSize = groupEnd - groupBegin + 1";
+			functionBody << stmtSeparator << '\n';
+			continue;
+		}
+
+		// otherwise we need to do some actual count and assumed count comparison; first retrieves the values 
+		// of some interesting variable
+		functionBody << indent << "groupId = " << varName << ".groupId" << stmtSeparator;
+		functionBody << indent << "groupSize = " << varName << ".groupSize" << stmtSeparator;
+
+		// determine the PPU count at the current level
+		functionBody << indent << "ppuCount = ((groupEnd - groupBegin + 1) + (groupSize - 1)) / groupSize";
+		functionBody << stmtSeparator;
+		functionBody << indent << varName << ".ppuCount = ppuCount" << stmtSeparator;
+
+		// determine the thread Id range to be partitioned by next level
+		functionBody << indent << "groupBegin = groupId * groupSize" << stmtSeparator;
+		functionBody << indent << "groupEnd = min(groupBegin + groupSize - 1" << paramSeparator;
+		functionBody << "groupEnd)" << stmtSeparator;
+
+		// determine the group size as the number of IDs within the updated range
+		functionBody << indent << varName << ".groupSize = groupEnd - groupBegin + 1" << stmtSeparator;
+
+		functionBody << '\n';
+	}
+	 
+	functionBody << "}\n";
+	
+	headerFile << "void " << functionHeader.str() << ";\n\n";	
+	programFile << std::endl << "void " << initials << "::"; 
 	programFile <<functionHeader.str() << " " << functionBody.str();
 	programFile << std::endl;
 
