@@ -95,6 +95,11 @@ class IntervalSeq {
 
 	// returns true if the interval sequence contains the point; otherwise returns false
 	bool contains(int point);
+
+	// two functions for conversion between an interval sequence and its character string representation; the string
+	// representation is needed to transfer the interval description over the network
+	const char *toString();
+	static IntervalSeq *fromString(const char *str);
 };
 
 /* A multidimensional sequence of intervals to represent multidimensional data structure parts
@@ -133,6 +138,15 @@ class MultidimensionalIntervalSeq {
 	// dimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalSeqs(int dimensionality,
 			List<List<IntervalSeq*>*> *intervalSeqLists);
+
+	// functions for conversion between a multidimensional interval sequence and its character string representation;
+	// the string representation is needed to transfer the interval description over the network
+	const char *toString();
+	static MultidimensionalIntervalSeq *fromString(const char *str);
+
+	// these two functions are used when a set of multidimensional interval descriptions are communicated on the wire
+	static const char *convertSetToString(List<MultidimensionalIntervalSeq*> *intervals);
+	static List<MultidimensionalIntervalSeq*> *constructSetFromString(const char *str);
   private:
 	// a recursive helper routine to generate multidimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(int dimensionality,

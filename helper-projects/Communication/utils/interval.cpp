@@ -2,8 +2,10 @@
 #include <sstream>
 #include <cstdlib>
 #include <algorithm>
+#include <string.h>
 #include <math.h>
 #include "list.h"
+#include "string_utils.h"
 #include "../structure.h"
 #include "interval.h"
 #include "common.h"
@@ -375,6 +377,27 @@ bool IntervalSeq::contains(int point) {
 	return (intervalBegin <= point) && (point <= intervalEnd);
 }
 
+const char *IntervalSeq::toString() {
+	ostringstream stream;
+	stream << begin << '|';
+	stream << length << '|';
+	stream << period << '|';
+	stream << count;
+	return strdup(stream.str().c_str());
+}
+
+IntervalSeq *IntervalSeq::fromString(const char *str) {
+	string desc(str);
+	string delim("|");
+	List<string> *elems = string_utils::tokenizeString(desc, delim);
+	int b = atoi(elems->Nth(0).c_str());
+	int l = atoi(elems->Nth(1).c_str());
+	int p = atoi(elems->Nth(2).c_str());
+	int c = atoi(elems->Nth(3).c_str());
+	delete elems;
+	return new IntervalSeq(b, l, p, c);
+}
+
 //-------------------------------------------------- Multidimensional Interval Sequence  ------------------------------------------------/
 
 MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
@@ -382,7 +405,7 @@ MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
 	intervals = vector<IntervalSeq*>();
 	intervals.reserve(dimensionality);
 	for (int i = 0; i < dimensionality; i++) {
-		intervals[i] = NULL;
+		intervals.push_back(NULL);
 	}
 }
 
@@ -507,6 +530,56 @@ void MultidimensionalIntervalSeq::draw() {
 		cout << "Dimension No: " << i + 1;
 		drawLine.draw();
 	}
+}
+
+const char *MultidimensionalIntervalSeq::toString() {
+	ostringstream stream;
+	stream << dimensionality;
+	for (int i = 0; i < dimensionality; i++) {
+		stream << '_';
+		stream << intervals.at(i)->toString();
+	}
+	return strdup(stream.str().c_str());
+}
+
+MultidimensionalIntervalSeq *MultidimensionalIntervalSeq::fromString(const char *str) {
+
+	string desc(str);
+	string delim("_");
+	List<string> *components = string_utils::tokenizeString(desc, delim);
+	int d = atoi(components->Nth(0).c_str());
+
+	MultidimensionalIntervalSeq *seq = new MultidimensionalIntervalSeq(d);
+	for (int i = 1; i < components->NumElements(); i++) {
+		string interval = components->Nth(i);
+		int dimension = i - 1;
+		seq->setIntervalForDim(dimension, IntervalSeq::fromString(interval.c_str()));
+	}
+	delete components;
+	return seq;
+}
+
+const char *MultidimensionalIntervalSeq::convertSetToString(List<MultidimensionalIntervalSeq*> *intervals) {
+	ostringstream stream;
+	for (int i = 0; i < intervals->NumElements(); i++) {
+		MultidimensionalIntervalSeq *interval = intervals->Nth(i);
+		if (i > 0) stream << '#';
+		stream << interval->toString();
+	}
+	return strdup(stream.str().c_str());
+}
+
+List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::constructSetFromString(const char *str) {
+	string desc(str);
+	string delim("#");
+	List<string> *intervalDescs = string_utils::tokenizeString(desc, delim);
+	List<MultidimensionalIntervalSeq*> *intervalSeqs = new List<MultidimensionalIntervalSeq*>;
+	for (int i = 0; i < intervalDescs->NumElements(); i++) {
+		string intervalDesc = intervalDescs->Nth(i);
+		intervalSeqs->Append(MultidimensionalIntervalSeq::fromString(intervalDesc.c_str()));
+	}
+	delete intervalDescs;
+	return intervalSeqs;
 }
 
 //---------------------------------------------------------- Sequence Iterator ----------------------------------------------------------/
