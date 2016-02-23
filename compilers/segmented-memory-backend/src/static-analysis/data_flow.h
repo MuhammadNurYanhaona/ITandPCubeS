@@ -156,6 +156,12 @@ class FlowStage {
 	// the flow stage to simplify code generation.
 	List<const char*> *filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap = NULL);
 
+	// We need to determine what environmental variables are read-only and what are read-write within a task
+	// to determine what impact a task's execution should have in the overall program environment. This method
+	// recursively fills a list of empty environmental variable access objects with actual access information
+	// to aid in the program environment management process.
+	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+
 	// This is a static analysis routine that mainly serves the purpose of annotating a task with information 
 	// about different data structure usage in different LPSes. This knowledge is important regarding data 
 	// structure generation and memory allocation for variables in any backend; 
@@ -290,6 +296,7 @@ class CompositeStage : public FlowStage {
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	virtual void performEpochUsageAnalysis();
 	void reorganizeDynamicStages();
+	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
 	
@@ -402,6 +409,7 @@ class RepeatCycle : public CompositeStage {
 	void setRepeatConditionAccessMap(Hashtable<VariableAccess*> *map) { repeatConditionAccessMap = map; }
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void performEpochUsageAnalysis();
+	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
 	void calculateLPSUsageStatistics();
 	List<DependencyArc*> *getAllTaskDependencies();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);

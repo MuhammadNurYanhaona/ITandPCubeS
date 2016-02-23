@@ -158,6 +158,17 @@ List<const char*> *FlowStage::filterInArraysFromAccessMap(Hashtable<VariableAcce
 	return arrayList;
 }
 
+void FlowStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
+	for (int i = 0; i < envAccessList->NumElements(); i++) {
+		VariableAccess *envAccessLog = envAccessList->Nth(i);
+		const char *varName = envAccessLog->getName();
+		VariableAccess *stageAccessLog = accessMap->Lookup(varName);
+		if (stageAccessLog != NULL) {
+			envAccessLog->mergeAccessInfo(stageAccessLog);
+		}
+	}
+}
+
 void FlowStage::calculateLPSUsageStatistics() {
 	if (space->isDynamic() && executeCond != NULL) {
 		List<const char*> *localStructures = space->getLocalDataStructureNames();

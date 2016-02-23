@@ -306,6 +306,13 @@ void CompositeStage::reorganizeDynamicStages() {
 	}
 }
 
+void CompositeStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
+	for (int i = 1; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->fillInTaskEnvAccessList(envAccessList);
+	}
+}
+
 List<List<FlowStage*>*> *CompositeStage::getConsecutiveNonLPSCrossingStages() {
 	
 	List<List<FlowStage*>*> *stageGroups = new List<List<FlowStage*>*>;
@@ -1277,6 +1284,20 @@ void RepeatCycle::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 	CompositeStage::performDependencyAnalysis(hierarchy);	
 	FlowStage::performDependencyAnalysis(repeatConditionAccessMap, hierarchy);
 	CompositeStage::performDependencyAnalysis(hierarchy);	
+}
+
+void RepeatCycle::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
+	if (repeatConditionAccessMap != NULL) {
+		for (int i = 0; i < envAccessList->NumElements(); i++) {
+			VariableAccess *envAccessLog = envAccessList->Nth(i);
+			const char *varName = envAccessLog->getName();
+			VariableAccess *stageAccessLog = repeatConditionAccessMap->Lookup(varName);
+			if (stageAccessLog != NULL) {
+				envAccessLog->mergeAccessInfo(stageAccessLog);
+			}
+		}		
+	}
+	CompositeStage::fillInTaskEnvAccessList(envAccessList);
 }
 
 void RepeatCycle::performEpochUsageAnalysis() {

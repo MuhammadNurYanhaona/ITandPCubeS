@@ -219,6 +219,18 @@ void TaskDef::analyseCode() {
 	compute->getComputation()->setReactivatorFlagsForSyncReqs();
 }
 
+List<VariableAccess*> *TaskDef::getAccessLogOfEnvVariables() {
+	List<VariableAccess*> *accessList = new List<VariableAccess*>;
+	List<EnvironmentLink*> *links = environment->getLinks();
+	for (int i = 0; i < links->NumElements(); i++) {
+		EnvironmentLink *link = links->Nth(i);
+		const char *varName = link->getVariable()->getName();
+		accessList->Append(new VariableAccess(varName));
+	}
+	compute->getComputation()->fillInTaskEnvAccessList(accessList);
+	return accessList;
+}
+
 void TaskDef::print() {
 	printf("------------------------------------------------------------------\n");
 	printf("Task: %s", id->getName());
