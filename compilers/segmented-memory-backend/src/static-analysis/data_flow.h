@@ -8,6 +8,7 @@
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../utils/hashtable.h"
+#include "task_env_stat.h"
 
 #include <iostream>
 #include <fstream>
@@ -162,6 +163,12 @@ class FlowStage {
 	// to aid in the program environment management process.
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
 
+	// The functionality of this method overlaps with the previous fillInTaskEnvAccessList() method. It tracks
+	// the usage of environmental variables within the task and the states different memory allocations for a
+	// single data structure are left at the end of the execution of the computation flow in a task environment
+	// statistic variable. For the first part, it uses the result of the previous function.  
+	virtual void prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);
+
 	// This is a static analysis routine that mainly serves the purpose of annotating a task with information 
 	// about different data structure usage in different LPSes. This knowledge is important regarding data 
 	// structure generation and memory allocation for variables in any backend; 
@@ -297,6 +304,7 @@ class CompositeStage : public FlowStage {
 	virtual void performEpochUsageAnalysis();
 	void reorganizeDynamicStages();
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+	virtual void prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
 	
@@ -410,6 +418,7 @@ class RepeatCycle : public CompositeStage {
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void performEpochUsageAnalysis();
 	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+	void prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);
 	void calculateLPSUsageStatistics();
 	List<DependencyArc*> *getAllTaskDependencies();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);

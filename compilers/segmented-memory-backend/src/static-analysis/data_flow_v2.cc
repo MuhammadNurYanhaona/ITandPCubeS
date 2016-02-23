@@ -1,6 +1,7 @@
 #include "data_flow.h"
 #include "data_access.h"
 #include "sync_stat.h"
+#include "task_env_stat.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
@@ -165,6 +166,33 @@ void FlowStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
 		VariableAccess *stageAccessLog = accessMap->Lookup(varName);
 		if (stageAccessLog != NULL) {
 			envAccessLog->mergeAccessInfo(stageAccessLog);
+		}
+	}
+}
+
+void FlowStage::prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
+	if (accessMap == NULL) {
+		accessMap = this->accessMap;
+	}
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+	VariableAccess *accessLog;
+	while ((accessLog = iterator.GetNextValue()) != NULL) {
+		
+		// if only the metadata of the object has been accessed then there is no need to track it
+		if (!(accessLog->isRead() || accessLog->isModified())) continue;
+		
+		const char *varName = accessLog->getName();
+		EnvVarStat *varStat = taskStat->getVariableStat(varName);
+		
+		// if there is no stat object for the variable access in the environment then it is not an environment variable
+		if (varStat == NULL) continue;
+
+		DataStructure *structure = space->getStructure(varName);
+		Space *allocatorLps = structure->getAllocator();
+		if (accessLog->isModified()) {
+			varStat->flagWriteOnLps(allocatorLps);
+		} else {
+			varStat->flagReadOnLps(allocatorLps);
 		}
 	}
 }

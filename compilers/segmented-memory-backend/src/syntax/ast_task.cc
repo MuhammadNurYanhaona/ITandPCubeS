@@ -14,6 +14,7 @@
 #include "../semantics/task_space.h"
 #include "../static-analysis/data_flow.h"
 #include "../static-analysis/data_access.h"
+#include "../static-analysis/task_env_stat.h"
 
 #include <sstream>
 
@@ -229,6 +230,14 @@ List<VariableAccess*> *TaskDef::getAccessLogOfEnvVariables() {
 	}
 	compute->getComputation()->fillInTaskEnvAccessList(accessList);
 	return accessList;
+}
+
+TaskEnvStat *TaskDef::getAfterExecutionEnvStat() {
+	List<VariableAccess*> *envAccessList = getAccessLogOfEnvVariables();
+	Space *rootLps = getPartitionHierarchy()->getRootSpace();
+	TaskEnvStat *taskStat = new TaskEnvStat(envAccessList, rootLps);
+	compute->getComputation()->prepateTaskEnvStat(taskStat);
+	return taskStat;
 }
 
 void TaskDef::print() {

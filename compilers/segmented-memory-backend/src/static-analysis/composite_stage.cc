@@ -1,6 +1,7 @@
 #include "data_flow.h"
 #include "data_access.h"
 #include "sync_stat.h"
+#include "task_env_stat.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
@@ -310,6 +311,13 @@ void CompositeStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessLis
 	for (int i = 1; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->fillInTaskEnvAccessList(envAccessList);
+	}
+}
+
+void CompositeStage::prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
+	for (int i = 1; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->prepateTaskEnvStat(taskStat);
 	}
 }
 
@@ -1298,6 +1306,13 @@ void RepeatCycle::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) 
 		}		
 	}
 	CompositeStage::fillInTaskEnvAccessList(envAccessList);
+}
+
+void RepeatCycle::prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
+	if (repeatConditionAccessMap != NULL) {
+		FlowStage::prepateTaskEnvStat(taskStat, repeatConditionAccessMap);
+	}
+	CompositeStage::prepateTaskEnvStat(taskStat);
 }
 
 void RepeatCycle::performEpochUsageAnalysis() {
