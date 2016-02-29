@@ -15,6 +15,17 @@ PartMetadata::PartMetadata(int dimensionality, List<int*> *idList, Dimension *bo
 	this->boundary = boundary;
 	this->padding = padding;
 }
+
+PartMetadata::~PartMetadata() {
+	delete[] boundary;
+	delete[] padding;
+	while (idList->NumElements() > 0) {
+		int *idPart = idList->Nth(0);
+		idList->RemoveAt(0);
+		delete[] idPart;
+	}
+	delete idList;
+}
         
 int PartMetadata::getSize() {
 	int size = 1;
@@ -59,6 +70,15 @@ DataPart::DataPart(PartMetadata *metadata, int epochCount) {
 	dataVersions->reserve(epochCount);
 	this->epochHead = 0;
 	this->elementSize = 0;
+}
+
+DataPart::~DataPart() {
+	delete metadata;
+	while (dataVersions->size() > 0) {
+		void *version = dataVersions->front();
+		delete[] version;
+	}
+	delete dataVersions;
 }
 
 void *DataPart::getData() {

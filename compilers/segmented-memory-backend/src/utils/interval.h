@@ -110,6 +110,7 @@ class MultidimensionalIntervalSeq {
 	std::vector<IntervalSeq*> intervals;
   public:
 	MultidimensionalIntervalSeq(int dimensionality);
+	~MultidimensionalIntervalSeq();
 
 	// returns the total number of 1's included in this multidimensional interval sequence
 	int getNumOfElements();

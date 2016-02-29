@@ -37,6 +37,7 @@ class PartMetadata {
 	int *padding;
   public:
 	PartMetadata(int dimensionality, List<int*> *idList, Dimension *boundary, int *padding);
+	~PartMetadata();
 	int getSize();
 	inline int getDimensions() { return dimensionality; }
 	inline List<int*> *getIdList() { return idList; }
@@ -84,6 +85,7 @@ class DataPart {
 	int elementSize;
   public:
 	DataPart(PartMetadata *metadata, int epochCount);
+	~DataPart();
 
 	// because this is a templated function, its implementation needs to be in the header file
 	template <class type> static void allocate(DataPart *dataPart) {

@@ -439,6 +439,13 @@ MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
 	}
 }
 
+MultidimensionalIntervalSeq::~MultidimensionalIntervalSeq() {
+	while (intervals.size() > 0) {
+		IntervalSeq *seq = intervals.front();
+		delete seq;
+	}
+}
+
 int MultidimensionalIntervalSeq::getNumOfElements() {
 	int count = intervals[0]->getNumOfElements();
 	for (int i = 1; i < dimensionality; i++) {
