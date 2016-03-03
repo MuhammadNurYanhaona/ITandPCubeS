@@ -11,6 +11,50 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <sstream>
+#include <string.h>
+#include <cstdlib>
+
+//--------------------------------------------------------- Part Interval Pattern ---------------------------------------------------------/
+
+PartIntervalPattern::PartIntervalPattern() {
+	beginExpr = NULL;
+	count = 0;
+	period = 0;
+	length = 0;
+	overflow = 0;
+	instances = 0;
+}
+
+PartIntervalPattern::PartIntervalPattern(int c, int p, int l, int o, int i) {
+	beginExpr = NULL;
+	count = c;
+	period = p;
+	length = l;
+	overflow = o;
+	instances = i;
+}
+
+bool PartIntervalPattern::isEqual(PartIntervalPattern *other) {
+	return (strcmp(beginExpr, other->beginExpr) == 0)
+			&& (count == other->count)
+			&& (period == other->period)
+			&& (length == other->length)
+			&& (overflow == other->overflow)
+			&& (instances == other->instances);
+}
+
+bool PartIntervalPattern::isEqualIgnoringInstanceCount(PartIntervalPattern *other) {
+	return (strcmp(beginExpr, other->beginExpr) == 0)
+			&& (count == other->count)
+			&& (period == other->period)
+			&& (length == other->length)
+			&& (overflow == other->overflow);
+}
+
+int PartIntervalPattern::getPartLength() {
+	return count * length + overflow;
+}
 
 //---------------------------------------------------------- Dim Partition Config ---------------------------------------------------------/
 
@@ -99,6 +143,20 @@ int DimPartitionConfig::getOriginalIndex(int partIndex, int position,
 	} else return partIndex;
 }
 
+List<PartIntervalPattern*> *DimPartitionConfig::getPartIntervalPatterns(Dimension origDimension) {
+	List<PartIntervalPattern*> *list = new List<PartIntervalPattern*>;
+	PartIntervalPattern *pattern = new PartIntervalPattern;
+	pattern->count = 1;
+	pattern->period = origDimension.getLength();
+	pattern->length = pattern->period;
+	pattern->instances = 1;
+	std::ostringstream stream;
+	stream << origDimension.range.min;
+	pattern->beginExpr = strdup(stream.str().c_str());
+	list->Append(pattern);
+	return list;
+}
+
 //------------------------------------------------------------ Block Size Config ----------------------------------------------------------/
 
 int BlockSizeConfig::getPartsCount(Dimension parentDimension) {
@@ -160,6 +218,65 @@ PartitionInstr *BlockSizeConfig::getPartitionInstr() {
 	return instr;
 }
 
+bool BlockSizeConfig::isEqual(DimPartitionConfig *otherConfig) {
+	BlockSizeConfig *other = dynamic_cast<BlockSizeConfig*>(otherConfig);
+	if (other == NULL) return false;
+	return (partitionArgs[0] == other->partitionArgs[0])
+			&& (paddings[0] == other->paddings[0])
+			&& (paddings[1] == other->paddings[1]);
+}
+
+List<PartIntervalPattern*> *BlockSizeConfig::getPartIntervalPatterns(Dimension origDimension) {
+	
+	int partsCount = getPartsCount(origDimension);
+	if (partsCount == 1) return DimPartitionConfig::getPartIntervalPatterns(origDimension);
+	
+	int size = partitionArgs[0];
+	List<PartIntervalPattern*> *patternList = new List<PartIntervalPattern*>;
+	
+	// separately create a pattern description for the first part as it might differ from the rest if there is a
+	// non-zero front padding
+	Dimension firstPartDim = getPartDimension(0, origDimension);
+	PartIntervalPattern *pattern = new PartIntervalPattern(1, firstPartDim.length, firstPartDim.length, 0, 1);
+	std::ostringstream stream;
+	stream << "partId * " << size;
+	pattern->beginExpr = strdup(stream.str().c_str());
+	patternList->Append(pattern);
+
+	// create a pattern for the rest of the parts	
+	Dimension secondPartDim = getPartDimension(1, origDimension);
+	int instances = partsCount - 1;
+	pattern = new PartIntervalPattern(1, secondPartDim.length, secondPartDim.length, 0, instances);
+	if (paddings[0] > 0) {
+		stream << " - " << paddings[0];
+	}
+	pattern->beginExpr = strdup(stream.str().c_str());
+	// only add the second pattern in the list if it differs from the first pattern
+	if (pattern->isEqualIgnoringInstanceCount(patternList->Nth(0))) {
+		patternList->Nth(0)->instances = partsCount;
+		delete pattern;
+	} else {
+		patternList->Append(pattern);
+	}
+
+	// if the original dimension is not evenly divided by the partition instruction or there is a non-zero back 
+	// padding then the last part's pattern should differ from that of the others
+	if (partsCount > 2 && (origDimension.length % size != 0 || paddings[1] != 0)) {
+		
+		// first decrease the instance count from the recently added pattern
+		int patternCount = patternList->NumElements();
+		pattern = patternList->Nth(patternCount - 1);
+		pattern->instances = pattern->instances - 1;
+
+		// then add the exception pattern in the list
+		Dimension lastPartDim = getPartDimension(partsCount - 1, origDimension);
+		pattern = new PartIntervalPattern(1, lastPartDim.length, lastPartDim.length, 0, 1);
+		pattern->beginExpr = strdup(stream.str().c_str());
+		patternList->Append(pattern);	
+	}
+	return patternList;	
+}
+
 //----------------------------------------------------------- Block Count Config ----------------------------------------------------------/
 
 int BlockCountConfig::getPartsCount(Dimension parentDimension) {
@@ -219,6 +336,70 @@ PartitionInstr *BlockCountConfig::getPartitionInstr() {
 	return instr;
 }
 
+bool BlockCountConfig::isEqual(DimPartitionConfig *otherConfig) {
+	BlockCountConfig *other = dynamic_cast<BlockCountConfig*>(otherConfig);
+	if (other == NULL) return false;
+	return (partitionArgs[0] == other->partitionArgs[0])
+			&& (paddings[0] == other->paddings[0])
+			&& (paddings[1] == other->paddings[1]);
+}
+
+// the implementation of this function for the block-count-configuration matches almost exactly with the implementation 
+// for the block-size-configuration
+List<PartIntervalPattern*> *BlockCountConfig::getPartIntervalPatterns(Dimension origDimension) {
+	
+	int partsCount = getPartsCount(origDimension);
+	if (partsCount == 1) return DimPartitionConfig::getPartIntervalPatterns(origDimension);
+
+	// calculation of the parts' size is the place where the logics for block-count and block-size configuration
+	// differs 
+	int size = origDimension.length / partsCount;
+
+	List<PartIntervalPattern*> *patternList = new List<PartIntervalPattern*>;
+	
+	// separately create a pattern description for the first part as it might differ from the rest if there is a
+	// non-zero front padding
+	Dimension firstPartDim = getPartDimension(0, origDimension);
+	PartIntervalPattern *pattern = new PartIntervalPattern(1, firstPartDim.length, firstPartDim.length, 0, 1);
+	std::ostringstream stream;
+	stream << "partId * " << size;
+	pattern->beginExpr = strdup(stream.str().c_str());
+	patternList->Append(pattern);
+
+	// create a pattern for the rest of the parts	
+	Dimension secondPartDim = getPartDimension(1, origDimension);
+	int instances = partsCount - 1;
+	pattern = new PartIntervalPattern(1, secondPartDim.length, secondPartDim.length, 0, instances);
+	if (paddings[0] > 0) {
+		stream << " - " << paddings[0];
+	}
+	pattern->beginExpr = strdup(stream.str().c_str());
+	// only add the second pattern in the list if it differs from the first pattern
+	if (pattern->isEqualIgnoringInstanceCount(patternList->Nth(0))) {
+		patternList->Nth(0)->instances = partsCount;
+		delete pattern;
+	} else {
+		patternList->Append(pattern);
+	}
+
+	// if the original dimension is not evenly divided by the partition instruction or there is a non-zero back 
+	// padding then the last part's pattern should differ from that of the others
+	if (partsCount > 2 && (origDimension.length % size != 0 || paddings[1] != 0)) {
+		
+		// first decrease the instance count from the recently added pattern
+		int patternCount = patternList->NumElements();
+		pattern = patternList->Nth(patternCount - 1);
+		pattern->instances = pattern->instances - 1;
+
+		// then add the exception pattern in the list
+		Dimension lastPartDim = getPartDimension(partsCount - 1, origDimension);
+		pattern = new PartIntervalPattern(1, lastPartDim.length, lastPartDim.length, 0, 1);
+		pattern->beginExpr = strdup(stream.str().c_str());
+		patternList->Append(pattern);	
+	}
+	return patternList;	
+}
+
 //-------------------------------------------------------------- Stride Config ------------------------------------------------------------/
 
 int StrideConfig::getPartsCount(Dimension parentDimension) {
@@ -262,6 +443,43 @@ int StrideConfig::getOriginalIndex(int partIndex, int position, List<int> *partI
 	
 	return DimPartitionConfig::getOriginalIndex(originalIndex, position, partIdList, 
 			partCountList, partDimensionList);
+}
+
+bool StrideConfig::isEqual(DimPartitionConfig *otherConfig) {
+	StrideConfig *other = dynamic_cast<StrideConfig*>(otherConfig);
+	if (other == NULL) return false;
+	return ppuCount == other->ppuCount;
+}
+
+List<PartIntervalPattern*> *StrideConfig::getPartIntervalPatterns(Dimension origDimension) {
+		
+	int partsCount = getPartsCount(origDimension);
+	if (partsCount == 1) return DimPartitionConfig::getPartIntervalPatterns(origDimension);
+
+	// determine if the number of stride steps and if the strides divide the original dimension evenly
+	int steps = origDimension.length / partsCount;
+	int remainder = origDimension.length % partsCount;
+
+	List<PartIntervalPattern*> *patternList = new List<PartIntervalPattern*>;
+	
+	// first create a pattern assuming that there is no overflow, that is, the remainder is zero
+	PartIntervalPattern *pattern = new PartIntervalPattern(steps, partsCount, 1, 0, partsCount);
+	std::ostringstream stream;
+	stream << "partId * 1";
+	pattern->beginExpr = strdup(stream.str().c_str());
+
+	// if there is a reminder than earlier parts should have an extra steps and we need to reduce the number of
+	// instances we registered for the already included parts
+	if (remainder > 0) {
+		// reduce the instance count
+		pattern->instances = partsCount - remainder;
+		// create a new pattern and add that at the beginning
+		pattern = new PartIntervalPattern(steps + 1, partsCount, 1, 0, remainder);
+		pattern->beginExpr = strdup(stream.str().c_str());
+		patternList->InsertAt(pattern, 0);
+	}	
+
+	return patternList;
 }
 
 //----------------------------------------------------------- Block Stride Config ---------------------------------------------------------/
@@ -332,6 +550,60 @@ PartitionInstr *BlockStrideConfig::getPartitionInstr() {
 	PartitionInstr *instr = new BlockStrideInstr(ppuCount, blockSize);
 	Assert(instr != NULL);
 	return instr; 
+}
+
+bool BlockStrideConfig::isEqual(DimPartitionConfig *otherConfig) {
+	BlockStrideConfig *other = dynamic_cast<BlockStrideConfig*>(otherConfig);
+	if (other == NULL) return false;
+	return (ppuCount == other->ppuCount) && (partitionArgs[0] == other->partitionArgs[0]);
+}
+
+List<PartIntervalPattern*> *BlockStrideConfig::getPartIntervalPatterns(Dimension origDimension) {
+	
+	int partsCount = getPartsCount(origDimension);
+	if (partsCount == 1) return DimPartitionConfig::getPartIntervalPatterns(origDimension);
+	
+	int blockSize = partitionArgs[0];
+	List<PartIntervalPattern*> *patternList = new List<PartIntervalPattern*>;
+	
+	// There are three possible patterns for a block stride configuration. In the general case, most parts will
+	// have the same number of stride steps. In case the dimension is not partitioned evenly, however, some parts
+	// may have an extra steps; and at most one part may have an overflow, i.e., a partial steps.
+	int strideLength = blockSize * partsCount;
+	int steps = origDimension.length / strideLength;
+	int remainder = origDimension.length % strideLength;
+	int partialBlocks = remainder / blockSize;
+	int overflow = remainder % blockSize;
+
+	// create a begin expression common to all parts
+	std::ostringstream stream;
+	stream << stream << "partid * " << blockSize;
+	const char *beginExpr = strdup(stream.str().c_str());
+	
+	// create a pattern for the general case parts
+	int count1 = partsCount - partialBlocks - ((overflow > 0) ? 1 : 0);
+	if (count1 > 0) {
+		PartIntervalPattern *pattern = new PartIntervalPattern(steps, strideLength, blockSize, 0, count1);
+		pattern->beginExpr = beginExpr;
+		patternList->Append(pattern);
+	}
+
+	// we are adding patterns in the reverse order here; so if there is an overflow block we add it next
+	if (overflow > 0) {
+		PartIntervalPattern *pattern = new PartIntervalPattern(steps, strideLength, blockSize, overflow, 1);
+		pattern->beginExpr = beginExpr;
+		patternList->InsertAt(pattern, 0);
+	}
+
+	// finally add the parts pattern that have one more extra step in the stride
+	if (partialBlocks > 0) {
+		PartIntervalPattern *pattern = new PartIntervalPattern(steps + 1, 
+				strideLength, blockSize, 0, partialBlocks);
+		pattern->beginExpr = beginExpr;
+		patternList->InsertAt(pattern, 0);
+	} 
+
+	return patternList;
 }
 
 //---------------------------------------------------------- Data Partition Config --------------------------------------------------------/
@@ -655,4 +927,152 @@ DataItemConfig *DataPartitionConfig::generateStateFulVersion() {
 	
 	dataItemConfig->updateParentLinksOnPartitionConfigs();
 	return dataItemConfig;
+}
+
+bool DataPartitionConfig::isEquivalent(DataPartitionConfig *other) {
+	
+	// first compare the root data-dimenions the two configurations are trying to divide into parts; if they are
+	// different then the parts lists cannot be the same
+	for (int i = 0; i < dimensionCount; i++) {
+		Dimension myDim = dimensionConfigs->Nth(i)->getDataDimension();
+		Dimension otherDim = other->dimensionConfigs->Nth(i)->getDataDimension();
+		if (!myDim.isEqual(otherDim)) return false;
+	}
+
+	// then construct partition hierarchies for the two configurations
+	List<std::vector<DimPartitionConfig*>*> *myHierarchy = new List<std::vector<DimPartitionConfig*>*>; 
+	this->preparePartitionHierarchy(myHierarchy);
+	List<std::vector<DimPartitionConfig*>*> *otherHierarchy = new List<std::vector<DimPartitionConfig*>*>;
+	other->preparePartitionHierarchy(otherHierarchy);
+
+	// if the two hierarchies have different lengths then, given the degenerarive instructions are removed, the
+	// parts being generated by the two configurations are most likely different
+	if (myHierarchy->NumElements() != otherHierarchy->NumElements()) return false;
+
+ 
+	// determine if the number of times index reordering happens in the two hierarchies are different; if the are
+	// then the resulting parts are certainly different
+	// While we are calculating the number of reorderings along the tow hierarchy; we can also determine if one has
+	// more partition instructions at any level, or different dimensions are partitionned at a level by the two
+	// hierarchies. If that happens then too the parts are different
+	for (int i = 0; i < myHierarchy->NumElements(); i++) {
+		std::vector<DimPartitionConfig*> *configVector1 = myHierarchy->Nth(i);
+		std::vector<DimPartitionConfig*> *configVector2 = otherHierarchy->Nth(i);
+		for (int j = 0; j < dimensionCount; j++) {
+			DimPartitionConfig *dimConfig1 = configVector1->at(j);
+			DimPartitionConfig *dimConfig2 = configVector2->at(j);
+			if ((dimConfig1 == NULL && dimConfig2 != NULL) 
+					|| (dimConfig1 != NULL && dimConfig2 == NULL)
+					|| (dimConfig1->doesReorderIndices() != dimConfig2->doesReorderIndices())) {
+				return false;
+			}
+		}
+	}
+
+	// if the two hierarchies have the exact same partition instructions at all levels for all dimensions then the
+	// parts are equivalent
+	bool sameConfiguration = true;
+	for (int i = 0; i < myHierarchy->NumElements(); i++) {
+		std::vector<DimPartitionConfig*> *configVector1 = myHierarchy->Nth(i);
+		std::vector<DimPartitionConfig*> *configVector2 = otherHierarchy->Nth(i);
+		for (int j = 0; j < dimensionCount; j++) {
+			DimPartitionConfig *dimConfig1 = configVector1->at(j);
+			DimPartitionConfig *dimConfig2 = configVector2->at(j);
+			if (dimConfig1 != NULL && !dimConfig1->isEqual(dimConfig2)) {
+				sameConfiguration = false;
+				break;
+			}
+		}
+		if (!sameConfiguration) break;
+	}
+	if (sameConfiguration) return true;
+	
+	// There might be a chance that although the instructions in the two hierarchies do not exactly match, parts
+	// generated by them will be the same nonetheless. Instead of generating all the parts and compare their metadata
+	// to test for that case -- which is time and memory intensive -- we can recursively generate interval pattern 
+	// expressions for the parts' dimensions then test for pattern equivalence along each dimension
+	for (int i = 0; i < dimensionCount; i++) {
+		Dimension dataDimension = dimensionConfigs->Nth(i)->getDataDimension();
+		if(!generateSimilarParts(myHierarchy, otherHierarchy, i, 0, dataDimension)) return false;
+	}    
+	return true;	
+}
+
+void DataPartitionConfig::preparePartitionHierarchy(List<std::vector<DimPartitionConfig*>*> *hierarchy) {	
+	
+	std::vector<DimPartitionConfig*> *myVector = new std::vector<DimPartitionConfig*>;
+	myVector->reserve(dimensionCount);
+	
+	bool activeLevel = false;
+	for (int i = 0; i < dimensionCount; i++) {
+		DimPartitionConfig *dimConfig = dimensionConfigs->Nth(i);
+		if (dimConfig->isDegenerativeCase()) {
+			myVector->push_back(NULL);
+		} else {
+			myVector->push_back(dimConfig);
+			activeLevel = true;
+		}
+	}
+	if (activeLevel) {
+		hierarchy->InsertAt(myVector, 0);
+	} else {
+		delete myVector;
+	}
+	if (parent != NULL) parent->preparePartitionHierarchy(hierarchy);
+}
+
+bool DataPartitionConfig::generateSimilarParts(List<std::vector<DimPartitionConfig*>*> *first,
+		List<std::vector<DimPartitionConfig*>*> *second,
+		int currentDimNo,
+		int currentLevel,
+		Dimension dimToDivide) {
+
+	// Note that this function is called after deducing that the two configuration hierarchies have the same height.
+	// So if the recursion reaches the end level of one hierarchy then there is nothing more to test and we can say
+	// the parts will be similar  
+	if (currentLevel == first->NumElements()) return true;
+
+	// Previous validation ensures that if one hierarchy does not have any partition instruction at a particular 
+	// level then the other hierarchy does not have any instruction at that level either. Thus, the call should be
+	// forwarded to the next level
+	DimPartitionConfig *firstConfig = first->Nth(currentLevel)->at(currentDimNo);
+	if (firstConfig == NULL) {
+		return generateSimilarParts(first, second, currentDimNo, currentLevel + 1, dimToDivide);
+	}
+
+	DimPartitionConfig *secondConfig = second->Nth(currentLevel)->at(currentDimNo);
+	
+	// Determine if the number of parts generated by the two configuration at the current level and dimension of
+	// interest are different. If they are different then the parts are dissimilar.
+	int partsCount1 = firstConfig->getPartsCount(dimToDivide);
+	int partsCount2 = secondConfig->getPartsCount(dimToDivide);
+	if (partsCount1 != partsCount2) return false;
+
+	// retrieve the interval patterns of the parts generated by the two configurations
+	List<PartIntervalPattern*> *firstPatternSet = firstConfig->getPartIntervalPatterns(dimToDivide);
+	List<PartIntervalPattern*> *secondPatternSet = secondConfig->getPartIntervalPatterns(dimToDivide);
+
+	// if the number of patterns in the two sets are different then the final parts are dissimilar
+	if (firstPatternSet->NumElements() != secondPatternSet->NumElements()) return false;
+
+	// compare the individual patterns for similarity
+	for (int i = 0; i < firstPatternSet->NumElements(); i++) {
+		PartIntervalPattern *firstPattern = firstPatternSet->Nth(i);
+		PartIntervalPattern *secondPattern = secondPatternSet->Nth(i);
+		if (!firstPattern->isEqual(secondPattern)) return false;
+		
+		// Even if the patterns are similar at the current level, when they are divided at the subsequent levels
+		// by upcoming partition instructions, they can become different. Therefore, we need to roll the recursion
+		// for each parts of the pattern generated here
+		int partLength = firstPattern->getPartLength();
+		// The begining of a part's dimension does not influence how it should be divided by partition instructions.
+		// Thus, we can create a single dimension object of appropriate length for all parts
+		Dimension nextDimension;
+		nextDimension.setLength(partLength);
+		bool match = generateSimilarParts(first, second, currentDimNo, currentLevel + 1, nextDimension);
+		if (!match) return false; 
+	}
+
+	// if no differences are found in all descendent levels then the parts are similar
+	return true;	
 }

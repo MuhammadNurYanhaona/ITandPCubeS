@@ -39,6 +39,40 @@ class DimensionMetadata {
 	int paddings[2];
 };
 
+/* This is a helper class used in determining if two data partition configurations generate the same data parts. 
+   It stands for an interval description pattern different parts genenated by the partition instruction for a 
+   single dimension adhere to. The goal is to estimate if the parts are the same by comparing just the pattern
+   instead of comparing individual data parts. Note that a partition instruction may cause a dimension to be 
+   partitionned into parts with different patterns. In that case, all those patterns need to be considered during
+   partition configurations comparison. Further note that the pattern comparison process must be hierarchical 
+   due to the presence     
+*/
+class PartIntervalPattern {
+  public:
+	// since each part starts at a different index, the beginning should be specified as an expression; the
+	// suggested pattern is 'partId * multiplier + offset' A partition instruction is supposed to evaluate its 
+	// runtime arguments for the partition and padding parameters and setup the numerical values for the
+	// multiplier and the offset so that patterns comparison can be done effectively   
+	const char *beginExpr;
+	int count;
+	int period;
+	int length;
+	// Dometimes a partition instruction may not divide the dimension evenly among the generated parts. Then
+	// it may create some parts having some overflow indices from the trailing end of the dimension. The 
+	// following field retains the overflow amount. Note that a new pattern should be generated for each
+	// distinct overflow amount  
+	int overflow;
+	// the number of times the pattern occurs in the generated parts
+	int instances;
+  public:
+	PartIntervalPattern();
+	// a second constructor for convenience that sets every field execpt the begin expression
+	PartIntervalPattern(int c, int p, int l, int o, int i);
+	bool isEqual(PartIntervalPattern *other);
+	bool isEqualIgnoringInstanceCount(PartIntervalPattern *other);
+	int getPartLength();	
+};
+
 /* Superclass to represent the partition configuration applied for a particular dimension of an array for an LPS. 
    Note that this class has a parent reference. This is needed as partitioning in IT is hierarchical and the 
    properties of a lower LPS data part often cannot be found without investigating its higher LPS ancestor parts. 
@@ -61,8 +95,8 @@ class DimPartitionConfig {
 	// represent the ancestor config if the current instance is dividing an already divided dimension
 	DimPartitionConfig *parentConfig;
 
-	// a recursive helper routine to get the part of the dimension that been subject to partitioning
-	// by the current dimension configuration instance 
+	// a recursive helper routine to get the part of the dimension that been subject to partitioning by the 
+	// current dimension configuration instance 
 	Dimension getDimensionFromParent(List<int> *partIdList, int position);
 	
 	// these two functions determine the actual amount of padding been applied to a particular part; the 
@@ -89,15 +123,15 @@ class DimPartitionConfig {
 	// an accumulator function that returns results of different dimension configuration utilies above 
 	DimensionMetadata *generateDimMetadata(List<int> *partIdList);
 
-	// function to be used by data partition config to generate dimension metadata about a structure from
-	// just its hierarchical part Id
+	// function to be used by data partition config to generate dimension metadata about a structure from just 
+	// its hierarchical part Id
 	Dimension getPartDimension(List<int> *partIdList);
 
 	// This is a recursive process for determining how original data dimension has been repeatedly divided
 	// into smaller dimensions along the partition hierarchy of a task to reach a particular data part 
 	// identified by the last argument. Along the way this process also calculate the number of partitions
-	// in each point of divisioning. This function has been added to support file IO operation that needs
-	// a data part index to file location transformation.
+	// in each point of divisioning. This function has been added to support file IO operation that needs a 
+	// data part index to file location transformation.
 	void getHierarchicalDimensionAndPartCountInfo(List<Dimension*> *dimensionList, 
 			List<int> *partCountsList, 
 			int position, List<int> *partIdList);
@@ -125,6 +159,24 @@ class DimPartitionConfig {
 	// of these classes and for the hierarchical agregate DataPartitionConfig class. This function is 
 	// provided to aid in the stateful DataItemConfig, the counterpart of DataPartitionConfig, creation. 
 	virtual PartitionInstr *getPartitionInstr() = 0;
+
+	// This function tells if a partition configuration does not divide the dimension it is specified to
+	// operate on. For example, replication-config is by default like that. Sometimes, some other partition
+	// functions may be configured in a similar way. In particular, if there are multiple tasks in the 
+	// program and the user wants to match partition configurations for different tasks for a shared data
+	// structure to reduce data movements due to task transitions
+	virtual bool isDegenerativeCase() = 0;
+
+	// this tells if a partition configuration reorder the indices of the dimension it operate over
+	virtual bool doesReorderIndices() = 0;
+	
+	// this tells if two instances of dimension partition configurations are the same in all respects
+	virtual bool isEqual(DimPartitionConfig *otherConfig) = 0;
+
+	// given a dimension to partition, the subclasses should return all the different interval patterns
+	// for the dimension parts they generate from it; the default base-class implementation should be used
+	// when the number of parts is just 1 to ensure that there is no discrepancy in the terminal case pattern 
+	virtual List<PartIntervalPattern*> *getPartIntervalPatterns(Dimension origDimension);
 };
 
 /* configuration subclass to be instantiated when a data dimension has not been divided within the LPS */
@@ -139,10 +191,15 @@ class ReplicationConfig : public DimPartitionConfig {
 	int pickPartCount(int *lpuCount) { return 1; }
 	int getPartsCount(Dimension parentDimension) { return 1; }
 	Dimension getPartDimension(int partId, Dimension parentDimension) { return parentDimension; }		
-	PartitionInstr *getPartitionInstr() { 
-		PartitionInstr *instr = new VoidInstr();
-		Assert(instr != NULL);
-		return instr; 
+	PartitionInstr *getPartitionInstr() {
+        	PartitionInstr *instr = new VoidInstr();
+        	Assert(instr != NULL);
+        	return instr;
+	}
+	bool isDegenerativeCase() { return true; }
+	bool doesReorderIndices() { return false; }
+	bool isEqual(DimPartitionConfig *otherConfig) {
+		return dynamic_cast<ReplicationConfig*>(otherConfig) != NULL;
 	}
 };
 
@@ -157,8 +214,12 @@ class BlockSizeConfig : public DimPartitionConfig {
 			partitionArgs, paddings, ppuCount, lpsAlignment) {}
 	
 	int getPartsCount(Dimension parentDimension);
-	Dimension getPartDimension(int partId,   Dimension parentDimension);
+	Dimension getPartDimension(int partId, Dimension parentDimension);
 	PartitionInstr *getPartitionInstr();
+	bool isDegenerativeCase() { return false; }
+	bool doesReorderIndices() { return false; }
+	bool isEqual(DimPartitionConfig *otherConfig);
+	List<PartIntervalPattern*> *getPartIntervalPatterns(Dimension origDimension);
 };
 
 /* configuration subclass corresponding to 'block_count' partition function; it takes a 'count' parameter */
@@ -172,8 +233,12 @@ class BlockCountConfig : public DimPartitionConfig {
 			partitionArgs, paddings, ppuCount, lpsAlignment) {}
 	
 	int getPartsCount(Dimension parentDimension);
-	Dimension getPartDimension(int partId,   Dimension parentDimension);
+	Dimension getPartDimension(int partId, Dimension parentDimension);
 	PartitionInstr *getPartitionInstr();
+	bool isDegenerativeCase() { return partitionArgs[0] == 1; }
+	bool doesReorderIndices() { return false; }
+	bool isEqual(DimPartitionConfig *otherConfig);
+	List<PartIntervalPattern*> *getPartIntervalPatterns(Dimension origDimension);
 };
 
 /* configuration subclass for parameter-less 'stride' partition function */
@@ -192,6 +257,10 @@ class StrideConfig : public DimPartitionConfig {
 		Assert(instr != NULL);
 		return instr; 
 	}
+	bool isDegenerativeCase() { return ppuCount == 1; }
+	bool doesReorderIndices() { return true; }
+	bool isEqual(DimPartitionConfig *otherConfig);
+	List<PartIntervalPattern*> *getPartIntervalPatterns(Dimension origDimension);
 };
 
 /* configuration subclass for 'block_stride' partition function that takes a 'block_size' parameter */
@@ -207,6 +276,10 @@ class BlockStrideConfig : public DimPartitionConfig {
 			List<int> *partCountList, 
 			List<Dimension*> *partDimensionList);
 	PartitionInstr *getPartitionInstr();
+	bool isDegenerativeCase() { return ppuCount == 1; }
+	bool doesReorderIndices() { return true; }
+	bool isEqual(DimPartitionConfig *otherConfig);
+	List<PartIntervalPattern*> *getPartIntervalPatterns(Dimension origDimension);
 };
 
 /* This is the class that holds the partition configuration for different dimensions of a single data structure 
@@ -261,8 +334,8 @@ class DataPartitionConfig {
 	// within an LPU
 	void updatePartDimensionInfo(List<int*> *partIdList, int *lpuCounts, PartDimension *partDimension);
 	// an alternative version for calculating part dimension information of a data part by drawing out
-	// information from a parent part; this should be more efficient than the function above as it will
-	// avoid some recursions
+	// information from a parent part; this should be more efficient than the function above as it will avoid 
+	// some recursions
 	void updatePartDimensionInfo(int *lpuId, int *lpuCounts, 
 			PartDimension *partDims, PartDimension *parentPartDims);
 
@@ -270,36 +343,62 @@ class DataPartitionConfig {
 	// the second argument is NULL, data-dimension should be used to determine the parts count
 	int getPartsCountAlongDimension(int dimensionNo, Dimension *parentDimension = NULL);
 
-	// According to the chosen strategy the data part for an LPU for an LPS may refer to a portion of
-	// a larger part from an ancestor LPS. Therefore, at runtime the identity of that ancestor part 
-	// needs to be calculated as opposed to the smaller subpart the LPU refers to. This method provides
-	// that functionality. Here the second parameter indicates how many lpuIds should be skipped from 
-	// the rear to reach the desired ancestor. The third parameter is used when an already allocated
-	// list for the part ID should be updated. If it is null then the function creates a new part ID
-	// list and returns it. 
+	// According to the chosen strategy the data part for an LPU for an LPS may refer to a portion of a larger 
+	// part from an ancestor LPS. Therefore, at runtime the identity of that ancestor part needs to be 
+	// calculated as opposed to the smaller subpart the LPU refers to. This method provides that functionality. 
+	// Here the second parameter indicates how many lpuIds should be skipped from the rear to reach the desired 
+	// ancestor. The third parameter is used when an already allocated list for the part ID should be updated. 
+	// If it is null then the function creates a new part ID list and returns it. 
 	List<int*> *generateSuperPartId(List<int*> *lpuIds, int backsteps, List<int*> *idTemplate = NULL);  
 
-	// function to generate the list of data parts (see allocation.h) from the partition configuration;
-	// note that the data parts list returned by this function is unusable until memory allocations has
-	// been done 
+	// function to generate the list of data parts (see allocation.h) from the partition configuration; note 
+	// that the data parts list returned by this function is unusable until memory allocations has been done 
 	DataPartsList *generatePartList(int epochCount);
 
-	// this function is used to determine the data-parts content of PPUs other than the current one so 
-	// that decision about the nature and content of communication for shared data can be made.
+	// this function is used to determine the data-parts content of PPUs other than the current one so that 
+	// decision about the nature and content of communication for shared data can be made.
 	ListMetadata *generatePartListMetadata(List<List<int*>*> *partIds);
 
 	// Stateful versions of data-partition-configuration are needed by the communication libraries; To
 	// give an example why is that, consider a synchronization of ghost boundary regions of data parts.
-	// Then the sender parts will have their paddings disabled but not the receiver parts, despite the
-	// whole synchronization being taken place within the sphere/confinement of a single LPS. In that
-	// case, we will have two DataItemConfig instances, one for the sender and the other for the receiver,
-	// and activate paddings on the second before we use them to calculate data movement requirements.
+	// Then the sender parts will have their paddings disabled but not the receiver parts, despite the whole 
+	// synchronization being taken place within the sphere/confinement of a single LPS. In that case, we 
+	// will have two DataItemConfig instances, one for the sender and the other for the receiver, and 
+	// activate paddings on the second before we use them to calculate data movement requirements.
 	DataItemConfig *generateStateFulVersion();
+
+	// When running a multi-tasked program in a segmented-memory architecture, at the point of transition
+	// from one task to a subsequent task, we need to determine what kind of data parts rearrangements
+	// and data communications may be needed to prepare the program environment for the upcoming task.
+	// The ideal situation is the data parts arrangement left by completed tasks is readily usable in the
+	// future task, but that might not be the case at a particular situation. Furthermore, even if the
+	// already available data parts can be used to serve the needs of future tasks, determining if they
+	// are adequate needs an elaborate machanism for comparting the actual parts description. The process
+	// may be time consuming and our investigation suggests that it may also have signification memory 
+	// footprint. We choose to implement a much faster decision making process instead that may miss some 
+	// cases and result in not-strictly-necessary communications and/or data-rearrangements. The chosen
+	// process compares the partition hierarchies of interacting tasks sharing the same data structure.
+	// The process goes far beyond comparing just the sameness of the partition configurations when	it tries
+	// deduce if the parts generated by the two configurations may be equivalent. 
+	bool isEquivalent(DataPartitionConfig *other);
   private:
 	// a recursive helper routine for the generatePartId(List<int*> lpuIds) function
 	void generatePartId(List<int*> *lpuIds, int position, 
 		List<int*> *partIdUnderConstr, 
 		bool updateExistingPartId = false, int updatePoint = 0);
+
+	// this is a helper function for comparing equivalence of data partition configurations; it provides 
+	// a compact hierarchy of vectors (elements of the vectors are the dimension partition instructions)
+	// for a configuration by eliminating degenarative instructions
+	void preparePartitionHierarchy(List<std::vector<DimPartitionConfig*>*> *hierarchy);
+
+	// this is again a helper function for comparing if two data-partition-configuration are equivalent; it
+	// recursively deduces if the way a particular dimension of is divided by two configurations is the same
+	bool generateSimilarParts(List<std::vector<DimPartitionConfig*>*> *first, 
+			List<std::vector<DimPartitionConfig*>*> *second, 
+			int currentDimNo, 
+			int currentLevel, 
+			Dimension dimToDivide);
 };
 
 #endif

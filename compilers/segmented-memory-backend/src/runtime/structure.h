@@ -50,6 +50,7 @@ class Dimension {
 	Range getPositiveRange();
 	Range adjustPositiveSubRange(Range positiveSubRange);
 	Dimension getNormalizedDimension();
+	bool isEqual(Dimension other);
 	void print(std::ostream &stream);
 };
 

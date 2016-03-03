@@ -14,6 +14,7 @@ int Dimension::getLength() {
 void Dimension::setLength(int length) {
 	range.min = 0;
 	range.max = length - 1;	
+	this->length = length;
 }
 
 void Dimension::setLength() {
@@ -49,6 +50,10 @@ Dimension Dimension::getNormalizedDimension() {
 	normalDimension.range = normalRange;
 	normalDimension.length = length;
 	return normalDimension;	
+}
+
+bool Dimension::isEqual(Dimension other) {
+	return (this->range.min == other.range.min) && (this->range.max == other.range.max);
 }
 
 void Dimension::print(std::ostream &stream) {
