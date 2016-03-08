@@ -1,4 +1,5 @@
 #include "environment.h"
+#include "env_instruction.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/interval.h"
@@ -296,6 +297,10 @@ ObjectIdentifier *EnvironmentLinkKey::generateObjectIdentifier(int taskId) {
 	return new ObjectIdentifier(taskId, linkId);
 }
 
+bool EnvironmentLinkKey::isEqual(EnvironmentLinkKey *other) {
+	return (strcmp(this->varName, other->varName) == 0 && this->linkId == other->linkId);
+}
+
 //------------------------------------------------------------- LPS Allocation ---------------------------------------------------------/
 
 LpsAllocation::LpsAllocation(const char *lpsId, DataPartitionConfig *partitionConfig) {
@@ -321,8 +326,9 @@ PartsListReference *LpsAllocation::generatePartsListReference(int envId,
 
 //--------------------------------------------------------------- Task Item ------------------------------------------------------------/
 
-TaskItem::TaskItem(EnvironmentLinkKey *key, int dimensionality) {
+TaskItem::TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality) {	
 	this->key = key;
+	this->type = type;
 	this->rootDimensions = new List<Dimension>;
 	for (int i = 0; i < dimensionality; i++) {
 		rootDimensions->Append(Dimension());
@@ -341,3 +347,116 @@ void TaskItem::preConfigureLpsAllocation(const char *lpsId, DataPartitionConfig 
 	LpsAllocation *lpsAllocation = new LpsAllocation(lpsId, partitionConfig);
 	allocations->Enter(lpsId, lpsAllocation);
 }
+
+bool TaskItem::isEmpty() {
+	Iterator<LpsAllocation*>  iterator =  allocations->GetIterator();
+	LpsAllocation *allocation = NULL;
+	bool noPartsListFound = true;
+	while ((allocation = iterator.GetNextValue()) != NULL) {
+		if (allocation->getPartsList() != NULL) {
+			noPartsListFound = false;
+			break;
+		}
+	}
+	return noPartsListFound;
+}
+
+//-------------------------------------------------------- Task Environment -----------------------------------------------------------/
+
+TaskEnvironment::TaskEnvironment(int envId) {
+	this->envId = envId;
+	this->envItems = new Hashtable<TaskItem*>;
+	prepareItemsMap();
+}
+
+void TaskEnvironment::setDefaultEnvInitInstrs() {
+	Iterator<TaskItem*> iterator = envItems->GetIterator();
+	TaskItem *taskItem = NULL;
+	while ((taskItem = iterator.GetNextValue()) != NULL) {
+		EnvItemType type = taskItem->getType();
+		TaskInitEnvInstruction *instr = NULL;
+		if (type == IN_OUT) {
+			instr = new StaleRefreshInstruction(taskItem);
+		} else if (type == OUT) {
+			instr = new CreateFreshInstruction(taskItem);
+		} else {
+			if (taskItem->isEmpty()) {
+				instr = new CreateFreshInstruction(taskItem);
+			} else {
+				instr = new StaleRefreshInstruction(taskItem);
+			}
+		}
+		initInstrs.push_back(instr);
+	}
+}
+
+void TaskEnvironment::addInitEnvInstruction(TaskInitEnvInstruction *instr) { 
+	
+	TaskItem *itemToUpdate = instr->getItemToUpdate();
+	EnvironmentLinkKey *itemKey = itemToUpdate->getEnvLinkKey();
+	
+	// there must be exactly one initialization instruction per environment item; thus we first check if an instruction is
+	// already in the queue for the item
+	int oldInstrIndex = - 1;
+	for (int i = 0; i < initInstrs.size(); i++) {
+		TaskInitEnvInstruction *currInstr = initInstrs[i];
+		if (currInstr->getItemToUpdate()->getEnvLinkKey()->isEqual(itemKey)) {
+			oldInstrIndex = i;
+			break;
+		}
+	} 
+	
+	// if there is already an instruction for the item then replace it; otherwise add a new instruction
+	if (oldInstrIndex != -1) {
+		TaskInitEnvInstruction *oldInstr = initInstrs[oldInstrIndex];
+		initInstrs[oldInstrIndex] = instr;
+		delete oldInstr;
+	} else initInstrs.push_back(instr); 
+}
+        
+void TaskEnvironment::addEndEnvInstruction(TaskEndEnvInstruction *instr) { 
+	// unlike the case of initialization instructions, there might be multiple task completion instructions for a single item
+	endingInstrs.push_back(instr); 
+}
+
+void TaskEnvironment::setupItemsDimensions() {
+	for (int i = 0; i < initInstrs.size(); i++) {
+		initInstrs.at(i)->setupDimensions();
+	}
+}
+
+void TaskEnvironment::preprocessProgramEnvForItems() {
+	for (int i = 0; i < initInstrs.size(); i++) {
+		initInstrs.at(i)->preprocessProgramEnv();
+	}
+}
+
+void TaskEnvironment::setupItemsPartsLists() {
+	for (int i = 0; i < initInstrs.size(); i++) {
+		initInstrs.at(i)->setupPartsList();
+	}
+}
+
+void TaskEnvironment::postprocessProgramEnvForItems() {
+	while (!initInstrs.empty()) {
+		TaskInitEnvInstruction *instr = initInstrs.back();
+		initInstrs.pop_back();
+		instr->postprocessProgramEnv();
+		delete instr;
+	}
+}
+
+void TaskEnvironment::executeTaskCompletionInstructions() {
+	while (!endingInstrs.empty()) {
+		TaskEndEnvInstruction *instr = endingInstrs.back();
+		endingInstrs.pop_back();
+		instr->execute();
+		delete instr;
+	}
+}
+
+void TaskEnvironment::resetEnvInstructions() {
+	setDefaultEnvInitInstrs();
+	setDefaultTaskCompletionInstrs();
+}
+

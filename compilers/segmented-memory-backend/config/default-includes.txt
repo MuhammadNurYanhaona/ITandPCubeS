@@ -61,6 +61,10 @@
 #include "../../src/communication/scalar_communicator.h"
 #include "../../src/communication/array_communicator.h"
 
+// for task and program environment management and interaction
+#include "../../src/environment/environment.h"
+#include "../../src/environment/env_instruction.h"
+
 // for threading
 #include <pthread.h>
 

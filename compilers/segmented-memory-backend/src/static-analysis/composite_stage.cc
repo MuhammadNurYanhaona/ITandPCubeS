@@ -308,14 +308,14 @@ void CompositeStage::reorganizeDynamicStages() {
 }
 
 void CompositeStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
-	for (int i = 1; i < stageList->NumElements(); i++) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->fillInTaskEnvAccessList(envAccessList);
 	}
 }
 
 void CompositeStage::prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
-	for (int i = 1; i < stageList->NumElements(); i++) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
 		stage->prepateTaskEnvStat(taskStat);
 	}

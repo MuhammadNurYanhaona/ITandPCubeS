@@ -9,10 +9,15 @@
 #include "../memory-management/part_tracking.h"
 #include "../runtime/structure.h"
 
+#include <vector>
+
 /* This library holds all the data structure definitionss related to enviornment managements of a multi-tasked IT program. 
  * The first set of classes are for program environment related data structures and the seconds are for task environment
  * related data structures. These two sets go hand-in-hand as program environment gets updated by execution of each task. 
  */
+
+class TaskInitEnvInstruction;
+class TaskEndEnvInstruction;
 
 /*------------------------------------------------------------------------------------------------------------------------
 						Program Environment
@@ -212,6 +217,7 @@ class EnvironmentLinkKey {
 	void flagAsDataSource(int taskId);
 	const char *generateKey(int taskId);
 	ObjectIdentifier *generateObjectIdentifier(int taskId);	
+	bool isEqual(EnvironmentLinkKey *other);
 };
 
 /* A single task can have multiple parts list for independent LPSes sharing the same data item. This class holds all 
@@ -226,29 +232,41 @@ class LpsAllocation {
 	PartsList *partsList;
   public:
 	LpsAllocation(const char *lpsId, DataPartitionConfig *partitionConfig);
+	void setPartitionConfig(DataPartitionConfig *config) { partitionConfig = config; }
 	void setPartContainerTree(PartIdContainer *containerTree) {
 		this->partContainerTree = containerTree;
 	}
 	void setPartsList(PartsList *partsList) { this->partsList = partsList; }
+	PartsList *getPartsList() { return partsList; }	
 	ListReferenceKey *generatePartsListReferenceKey(int envId, const char *varName);	
 	PartsListReference *generatePartsListReference(int envId, 
 		const char *varName, List<Dimension> *rootDimensions);	
 };
 
+/* The linkage type of an task-item needs to be retained to determine what should we do about the item if no explicit 
+ * instruction has been provided for its initialization
+ */
+enum EnvItemType { IN_OUT, OPTIONAL_IN_OUT, OUT };
+
 /* This class traks all parts lists references and their metadata for a single data item used by a task */
 class TaskItem {
   protected:
 	EnvironmentLinkKey *key;
+	EnvItemType type;
 	List<Dimension> *rootDimensions;
 	Hashtable<LpsAllocation*> *allocations;
   public:
-	TaskItem(EnvironmentLinkKey *key, int dimensionality);
+	TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality);
 	void setRootDimensions(Dimension *dimensions);
 	void setRootDimensions(List<Dimension> *dimensionList) { this->rootDimensions = dimensionList; }
 	List<Dimension> *getRootDimensions() { return rootDimensions; }
 	EnvironmentLinkKey *getEnvLinkKey() { return key; }
 	void preConfigureLpsAllocation(const char *lpsId, DataPartitionConfig *partitionConfig);
 	LpsAllocation *getLpsAllocation(const char *lpsId) { return allocations->Lookup(lpsId); }
+	Dimension getDimension(int dimNo) { return rootDimensions->Nth(dimNo); }
+	void setDimension(int dimNo, Dimension dimension) { rootDimensions->Nth(dimNo) = dimension; }
+	EnvItemType getType() { return type; }
+	bool isEmpty();
 };
 
 /* This is the super-class for all task environments. Compiler will generate task specific environment objects to provide
@@ -260,13 +278,35 @@ class TaskEnvironment {
 	int envId;
 	// environmental data item references for the underlying task
 	Hashtable<TaskItem*> *envItems;
+	// queues of instructions to be executed at the beginning and ending of a task execution for environment management
+	std::vector<TaskInitEnvInstruction*> initInstrs;
+	std::vector<TaskEndEnvInstruction*> endingInstrs;
   public:
-	TaskEnvironment(int envId) {
-		this->envId = envId;
-		this->envItems = new Hashtable<TaskItem*>;
-	}
+	TaskEnvironment(int envId);
 	TaskItem *getItem(const char *itemName) { return envItems->Lookup(itemName); }
-	virtual void prepareItemsMap() = 0;
+	void setDefaultEnvInitInstrs();
+
+	// task specific environment subclasses should provide implementation of the following two library functions
+	virtual void prepareItemsMap() {}
+	virtual void setDefaultTaskCompletionInstrs() {}
+
+	// functions to register an environment object manipulation instruction
+	void addInitEnvInstruction(TaskInitEnvInstruction *instr);
+	void addEndEnvInstruction(TaskEndEnvInstruction *instr);
+
+	// functions to be invoked at different phases of task invocation/execution/ending to do the work for various
+	// environment manipulation instructions
+	//------------------------------------------------ task initialization functions
+	void setupItemsDimensions();
+	void preprocessProgramEnvForItems();
+	void setupItemsPartsLists();
+	void postprocessProgramEnvForItems();
+	//----------------------------------------------------- task completion function
+	void executeTaskCompletionInstructions();
+
+	// function to be invoked to re-populate the default initialization and completion time instructions to prepare for
+	// future usages of the same task environment
+	void resetEnvInstructions(); 
 };
 
 #endif

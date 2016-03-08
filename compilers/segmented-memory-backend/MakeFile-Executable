@@ -17,6 +17,7 @@ PARTITION_LIBS = $(shell find src -name "*.cc" -path "src/partition-lib/*")
 MM_MANAGEMENT_LIBS = $(shell find src -name "*.cc" -path "src/memory-management/*")
 COMMUNICATION_LIBS = $(shell find src -name "*.cc" -path "src/communication/*")
 IO_LIBS = $(shell find src -name "*.cc" -path "src/input-output/*")
+ENV_MANAGEMENT_LIBS = $(shell find src -name "*.cc" -path "src/environment/*")
 
 # Set up the list of sources generated for the IT program
 BUILD_SRCS = $(shell find build/$(BUILD_SUBDIR) -name "*.cc")
@@ -28,6 +29,7 @@ OBJS =	$(patsubst %.cc, %.o, $(filter %.cc, $(BUILD_SRCS))) 		\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(PARTITION_LIBS))) 	\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(MM_MANAGEMENT_LIBS)))	\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(COMMUNICATION_LIBS)))	\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(ENV_MANAGEMENT_LIBS)))	\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(IO_LIBS)))
 
 # Define the backend C++ compiler and linker to be used

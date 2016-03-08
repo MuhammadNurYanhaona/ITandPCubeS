@@ -72,6 +72,7 @@ class EnvironmentLink : public Node {
         const char *GetPrintNameForNode();
         void PrintChildren(int indentLevel);
 	Identifier *getVariable() { return var; }
+	LinkageType getMode() { return mode; }
 
 	//---------------------------------------------------------------------------Helper routines for back-end compiler
 	bool isExternal() { return (mode == TypeLink || mode == TypeCreateIfNotLinked); }

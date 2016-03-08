@@ -240,6 +240,7 @@ class SyncStage : public FlowStage {
 	
 	// For now usage statistics is not been gathered for sync stages 
 	void calculateLPSUsageStatistics() {}
+	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {}
 
 	// returns the execution stage that did actual write of a structure listed as modified my this sync stage
 	FlowStage *getUltimateModifier(const char *varName);

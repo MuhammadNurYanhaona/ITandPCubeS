@@ -20,6 +20,7 @@
 #include "memory_mgmt.h"
 #include "file_io.h"
 #include "communication.h"
+#include "environment_mgmt.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -174,6 +175,11 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 		generateCommunicationExcludeFn(headerFile, 
 				programFile, taskDef, commCharacterList);
 	}
+
+	// generate environment management data structures and functions
+	generateTaskEnvironmentClass(taskDef, initials, headerFile, programFile);
+	generateFnToInitEnvLinksFromEnvironment(taskDef, initials, headerFile, programFile);
+	generateFnToPreconfigureLpsAllocations(taskDef, initials, headerFile, programFile);
 
 	// generate task executor and associated functions
 	generateFnToInitEnvLinksFromEnvironment(taskDef, 
