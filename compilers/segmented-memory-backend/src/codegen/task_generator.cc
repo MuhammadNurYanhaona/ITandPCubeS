@@ -133,12 +133,12 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// generate functions related to memory management
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
 	genRoutinesForTaskPartitionConfigs(headerFile, programFile, upperInitials, lpsHierarchy);
-	genTaskMemoryConfigRoutine(headerFile, programFile, upperInitials, lpsHierarchy);
+	genTaskMemoryConfigRoutine(taskDef, headerFile, programFile, upperInitials);
 	
 	// generate functions and classes for I/O
-	generateReaderWriters(headerFile, initials, rootLps);
-	generateRoutineForDataInitialization(headerFile, programFile, taskDef);
-	generateRoutineForDataStorage(headerFile, programFile, taskDef);
+	generateReaderWriters(headerFile, initials, taskDef);
+	generateReadersMap(headerFile, programFile, initials, taskDef);
+	generateWritersMap(headerFile, programFile, initials, taskDef);
 
 	// generate routines to contruct LPUs
 	Hashtable<List<PartitionParameterConfig*>*> *partParamConfigMap 
@@ -182,8 +182,6 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generateFnToPreconfigureLpsAllocations(taskDef, initials, headerFile, programFile);
 
 	// generate task executor and associated functions
-	generateFnToInitEnvLinksFromEnvironment(taskDef, 
-				initials, envLinkList, headerFile, programFile);
 	generateTaskExecutor(this);
 
 	// initialize the variable transformation map that would be used to translate the code 
@@ -541,7 +539,8 @@ void TaskGenerator::initializeSegmentMemory(std::ofstream &stream) {
 	// generate the task data object instance
 	stream << indent << "TaskData *taskData = initializeTaskData(mySegment->getParticipantList()" << paramSeparator;
 	stream << "\n" << indent << doubleIndent << "metadata" << paramSeparator;
-	stream  << "partition" << paramSeparator << "ppuCounts)" << stmtSeparator;
+	stream << "environment" << paramSeparator << "mySegment" << paramSeparator;
+	stream << "partition" << paramSeparator << "ppuCounts)" << stmtSeparator;
 
 	// set the task data property in each thread of the segment
 	stream << indent << "for (int i = participantStart; i <= participantEnd; i++) {\n";

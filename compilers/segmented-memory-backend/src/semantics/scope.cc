@@ -114,6 +114,8 @@ void Scope::declareVariables(std::ostringstream &stream, int indent) {
                         int dimensions = array->getDimensions();
                         stream << stmtIndent.str() << "PartDimension " << name << "Dims";
                         stream << "[" << dimensions << "]" << stmtSeparator;
+			stream << stmtIndent.str() << "ArrayTransferConfig " << name;
+			stream << "TransferConfig = ArrayTransferConfig()" << stmtSeparator;
                 }
         }
 }

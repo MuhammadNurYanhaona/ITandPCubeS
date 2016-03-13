@@ -615,6 +615,16 @@ DataPartitionConfig::DataPartitionConfig(int dimensionCount, List<DimPartitionCo
 	this->dimensionOrder = NULL;
 }
 
+DataPartitionConfig::~DataPartitionConfig() {
+	while (dimensionConfigs->NumElements() > 0) {
+		DimPartitionConfig *config = dimensionConfigs->Nth(0);
+		dimensionConfigs->RemoveAt(0);
+		delete config;
+	}
+	delete dimensionConfigs;
+	delete dimensionOrder;
+}
+
 void DataPartitionConfig::setParent(DataPartitionConfig *parent, int parentJump) { 
 	this->parent = parent; 
 	for (int i = 0; i < dimensionCount; i++) {

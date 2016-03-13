@@ -1,13 +1,12 @@
-/* File: ast_type.cc
- * -----------------
- * Implementation of type node classes.
- */
-#include "ast_type.h"
 #include <sstream>
 #include <iostream>
 #include <string>
+#include <cstdlib>
+
+#include "ast_type.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
+#include "../utils/string_utils.h"
 #include "ast_def.h"
 
 /* Class constants
@@ -140,6 +139,7 @@ NamedType::NamedType(Identifier *i) : Type(*i->GetLocation()) {
     	Assert(i != NULL);
     	(id=i)->SetParent(this);
 	environmentType = false;
+	taskName = NULL;
 } 
 
 void NamedType::PrintChildren(int indentLevel) {
@@ -152,9 +152,18 @@ bool NamedType::isEqual(Type *other) {
 	return strcmp(this->getName(), otherType->getName()) == 0;
 }
 
+const char *NamedType::getCType() {
+	if (!environmentType) return id->getName();
+	std::ostringstream stream;
+	const char *initials = string_utils::getInitials(taskName);
+	initials = string_utils::toLower(initials);
+	stream << initials << "::TaskEnvironmentImpl";
+	return strdup(stream.str().c_str()); 
+}
+
 const char *NamedType::getCppDeclaration(const char *varName, bool pointer) {
 	std::ostringstream decl;
-	decl << id->getName() << " ";
+	decl << getCType() << " ";
 	if (environmentType) decl << "*"; 
 	decl << varName;
 	return strdup(decl.str().c_str());

@@ -25,20 +25,20 @@ class DataItems {
 	const char *name;
 	// dimensionality of the data structure
 	int dimensionality;
-	// partition configuration for each dimension
-	List<DimPartitionConfig*> *dimConfigList;
 	// generated data partition config from individual dimension configuration
 	DataPartitionConfig *partitionConfig;
 	// structure holding the list of data parts that belong to current PPU 
 	DataPartsList *partsList;
 	// a flag indicating that the data items have been initialized and ready to be used in computation
 	bool ready;
+	// a flag to indicate if the components of this data-items can be deleted and their memory spaces 
+	// can be reclaimed at the end of the task execution
+	bool cleanable;
   public:
-	DataItems(const char *name, int dimensionality);
+	DataItems(const char *name, int dimensionality, bool cleanable);
+	~DataItems();
 	const char *getName() { return name; }
 	int getDimensions() { return dimensionality; }
-	void addDimPartitionConfig(int dimensionId, DimPartitionConfig *dimConfig);
-	void generatePartitionConfig();
 	void setPartitionConfig(DataPartitionConfig *partitionConfig);
 	DataPartitionConfig *getPartitionConfig();
 	void setPartsList(DataPartsList *partsList) { this->partsList = partsList; }
@@ -62,6 +62,8 @@ class LpsContent {
 	Hashtable<DataItems*> *dataItemsMap;
   public:
 	LpsContent(int id);
+	~LpsContent();
+
 	inline void addDataItems(const char *varName, DataItems *dataItems) {
 		dataItemsMap->Enter(varName, dataItems);
 	}
@@ -76,6 +78,8 @@ class TaskData {
 	Hashtable<LpsContent*> *lpsContentMap;
   public:
 	TaskData();
+	~TaskData();
+
 	void addLpsContent(const char *lpsId, LpsContent *content);
 	DataItems *getDataItemsOfLps(const char *lpsId, const char *varName);		
 

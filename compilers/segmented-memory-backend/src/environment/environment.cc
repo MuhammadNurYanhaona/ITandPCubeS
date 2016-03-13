@@ -326,7 +326,7 @@ PartsListReference *LpsAllocation::generatePartsListReference(int envId,
 
 //--------------------------------------------------------------- Task Item ------------------------------------------------------------/
 
-TaskItem::TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality) {	
+TaskItem::TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality, int elementSize) {	
 	this->key = key;
 	this->type = type;
 	this->rootDimensions = new List<Dimension>;
@@ -334,6 +334,7 @@ TaskItem::TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality
 		rootDimensions->Append(Dimension());
 	}
 	allocations = new Hashtable<LpsAllocation*>;
+	this->elementSize = elementSize;
 }
 
 void TaskItem::setRootDimensions(Dimension *dimensions) {
@@ -363,10 +364,20 @@ bool TaskItem::isEmpty() {
 
 //-------------------------------------------------------- Task Environment -----------------------------------------------------------/
 
-TaskEnvironment::TaskEnvironment(int envId) {
-	this->envId = envId;
+int TaskEnvironment::CURRENT_ENV_ID = 0;
+
+TaskEnvironment::TaskEnvironment() {
+	
+	this->envId = TaskEnvironment::CURRENT_ENV_ID;
+	TaskEnvironment::CURRENT_ENV_ID++;
+
 	this->envItems = new Hashtable<TaskItem*>;
+	this->name = NULL;
+	this->readersMap = NULL;
+	this->writersMap = NULL;
+
 	prepareItemsMap();
+	resetEnvInstructions();
 }
 
 void TaskEnvironment::setDefaultEnvInitInstrs() {
@@ -417,6 +428,17 @@ void TaskEnvironment::addInitEnvInstruction(TaskInitEnvInstruction *instr) {
 void TaskEnvironment::addEndEnvInstruction(TaskEndEnvInstruction *instr) { 
 	// unlike the case of initialization instructions, there might be multiple task completion instructions for a single item
 	endingInstrs.push_back(instr); 
+}
+
+TaskInitEnvInstruction *TaskEnvironment::getInstr(const char *itemName, int instrType) {
+	for (int i = 0; i < initInstrs.size(); i++) {
+		TaskInitEnvInstruction *currInstr = initInstrs[i];
+		EnvironmentLinkKey *itemKey = currInstr->getItemToUpdate()->getEnvLinkKey(); 
+		if (strcmp(itemKey->getVarName(), itemName) == 0) {
+			if (currInstr->getType() == instrType) return currInstr;	
+		}
+	}	
+	return NULL;
 }
 
 void TaskEnvironment::setupItemsDimensions() {

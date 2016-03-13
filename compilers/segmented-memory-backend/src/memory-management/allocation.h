@@ -84,7 +84,7 @@ class DataPart {
 	// size of each element of the data part in terms of the number of characters
 	int elementSize;
   public:
-	DataPart(PartMetadata *metadata, int epochCount);
+	DataPart(PartMetadata *metadata, int epochCount, int elementSize);
 	~DataPart();
 
 	// because this is a templated function, its implementation needs to be in the header file
@@ -92,7 +92,6 @@ class DataPart {
 		int size = dataPart->metadata->getSize();
 		Assert(size > 0);
 		int versionCount = dataPart->epochCount;
-		dataPart->elementSize = sizeof(type) / sizeof(char); 
 		std::vector<void*> *dataVersions = dataPart->dataVersions;
 		for (int i = 0; i < versionCount; i++) {
 			void *data = new type[size];
@@ -119,7 +118,19 @@ class DataPart {
 	// allocations. This operation is typically needed when the data part is read from some external file.
 	// The contract for multi-versioned data parts is that initially, i.e. before the task starts execution, 
 	// all versions have the content. 
-	void synchronizeAllVersions();	
+	void synchronizeAllVersions();
+
+	// These two functions are added to support data part allocation and content-copying from the environment
+	// management module. 
+	// Note that cloning of content from a data part in the program environment to a part in a task's 
+	// execution environment will be taken place only when both data-parts are expected to contain the same 
+	// regions of the underlying data structure.
+	void clone(DataPart *other);
+	// The location in the environment management module where data part allocation may take place does not
+	// have content's data type information. Therefore an allocation mechanism is needed that is independent 
+	// of the element type. The default -1 value of the parameter means that all versions of should be 
+	// allocated. Otherwise, only those versions that are on or above the threshold should be allocated
+	void allocate(int versionThreshold = 0);	
 };
 
 /* This class provides generic information about all the parts of an LPS data structure that a segment holds */
@@ -141,13 +152,12 @@ class ListMetadata {
 	inline bool isPadded() { return hasPadding; }
 };
 
-/* This is the class holding all parts of a particular data structures that a PPU holds for some LPS. Although it
-   is called a list, an instance can hold multiple lists for epoch dependent data structure where there will be 
-   one version of the list for each epoch. Note that, a new data parts list should be created within a PPU for a
-   data if there is none already, there is a reordering of data since the last LPS configuration been used for 
-   allocation, or a new LPS using the data is found along a path in the partition hierarchy that is not related to 
-   any other LPSes the data has been allocated for. Any LPS that does not use the data in any computation should 
-   maintain a reference to the list of its nearest decendent or ancestor LPS.  
+/* This is the class holding all parts of a particular data structures that a PPU holds for some LPS. Note that, a 
+   new data parts list should be created within a PPU for a data if there is none already, there is a reordering 
+   of data since the last LPS configuration been used for allocation, or a new LPS using the data is found along a 
+   path in the partition hierarchy that is not related to any other LPSes the data has been allocated for. Any LPS 
+   that does not use the data in any computation should maintain a reference to the list of its nearest decendent 
+   or ancestor LPS.  
 */
 class DataPartsList {
   protected:
@@ -163,40 +173,21 @@ class DataPartsList {
 	bool invalid;
   public:
 	DataPartsList(ListMetadata *metadata, int epochCount);
+	~DataPartsList();
 	
+	void initializePartsList(DataPartitionConfig *partConfig, 
+			PartIdContainer *partContainer, 
+			int partElementSize);
+
 	// because this is a templated function, its implementation needs to be in the header file
-	template <class type> static void allocate(DataPartsList *dataPartsList, 
-			DataPartitionConfig *partConfig, 
-			PartIdContainer *partContainer) {
-		
-		dataPartsList->partContainer = partContainer;
-		int partCount = partContainer->getPartCount();
-		if (partCount > 0) {
-			dataPartsList->partList = new List<DataPart*>(partCount);
-			dataPartsList->invalid = false;
-
-			PartIterator *iterator = partContainer->getIterator();
-			int dimensions = dataPartsList->metadata->getDimensions();
-			int epochCount = dataPartsList->epochCount;
-			SuperPart *part = NULL;
-			int listIndex = 0;
-
-			while ((part = iterator->getCurrentPart()) != NULL) {
-				List<int*> *partId = part->getPartId();
-				PartLocator *partLocator = new PartLocator(partId, dimensions, listIndex);
-				Assert(partLocator != NULL);
-				iterator->replaceCurrentPart(partLocator);
-				DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId), epochCount);
-				Assert(dataPart != NULL);
-				DataPart::allocate<type>(dataPart);
-				dataPartsList->partList->Append(dataPart);
-				listIndex++;
-				iterator->advance();
-			}
-		} else {
-			dataPartsList->invalid = true;
+	template <class type> static void allocateParts(DataPartsList *dataPartsList) {
+		if (dataPartsList->invalid) return;
+		List<DataPart*> *parts = dataPartsList->partList;
+		for (int i = 0; i < parts->NumElements(); i++) {
+			DataPart *dataPart = parts->Nth(i);
+			DataPart::allocate<type>(dataPart);
 		}
-	}
+	} 
 	
 	inline ListMetadata *getMetadata() { return metadata; }
 	inline PartIdContainer *getPartContainer() { return partContainer; }
@@ -205,8 +196,8 @@ class DataPartsList {
 	inline bool isInvalid() { return invalid; }
 	DataPart *getPart(List<int*> *partId, PartIterator *iterator);
 
-	// each PPU-controller within a segment should get an iterator for each data part list that to be used later for 
-	// part searching
+	// each PPU-controller within a segment should get an iterator for each data part list that to be used later 
+	// for part searching
 	PartIterator *createIterator() { return partContainer->getIterator(); }
 };
 

@@ -5,6 +5,7 @@
 #include "../semantics/scope.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
+#include "../utils/code_constant.h"
 #include "../codegen/name_transformer.h"
 
 #include <iostream>
@@ -78,9 +79,10 @@ AssignmentMode determineAssignmentMode(AssignmentExpr *expr) {
 	if (leftField == NULL) return COPY; 
 
 	// We choose to do a reference assignment from left to right side for an assignment expression 
-	// only if the arrays on both sides have the same dimensionality and they are accessed in full
-	// as part of the assignment expression.  
-	if (leftType->isEqual(rightType) && leftType->isEqual(exprType)) return REFERENCE;
+	// if the arrays on both sides have the same dimensionality and they are accessed in full as 
+	// part of the assignment expression or the left side is part of a task environment.  
+	if ((leftType->isEqual(rightType) && leftType->isEqual(exprType)) 
+			|| leftArray->isPartOfEnv()) return REFERENCE;
 	// Otherwise, we copy data from right to the left side array.
 	return COPY;
 }
@@ -92,7 +94,7 @@ List<DimensionAccess*> *generateDimensionAccessInfo(ArrayName *array, Expr *expr
 
 	// First we add default entries in the access list assuming that each dimension of the array 
 	// has been explicitly accessed in the expression. This is needed as just an standalone reference
-	// such as in 'a = b[...][i]' should be treated as accessing the first dimension of a wholly. 
+	// such as in 'a = b[...][i]' should be treated as accessing the whole first dimension of a. 
 	for (int i = 0; i < arrayDimensions; i++) {
 		accessList->Append(new DimensionAccess(i));
 	}
@@ -135,22 +137,22 @@ void ArrayName::describe(int indent) {
 }
 
 const char *ArrayName::getTranslatedName() {
-	std::ostringstream nameStr;
 	if (partOfEnv) {
-		nameStr << envObjName << "->" << name;
-		return strdup(nameStr.str().c_str());
+		// name translation is not applicable for environmental variables
+		return NULL;
 	} else {
+		std::ostringstream nameStr;
 		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
 		return transformer->getTransformedName(name, false, true, type);
 	}
 }
 
 const char *ArrayName::getTranslatedMetadataPrefix() {
-	std::ostringstream prefixStr;
 	if (partOfEnv) {
-		prefixStr << envObjName << "->" << name << "Dims";
-		return strdup(prefixStr.str().c_str());
+		// name translation is not applicable for environmental variables
+		return NULL;
 	} else {
+		std::ostringstream prefixStr;
 		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
 		return transformer->getTransformedName(name, true, true, type);
 	}
@@ -286,40 +288,136 @@ void AssignmentDirective::generateCodeForCopy(std::ostringstream &stream, int in
 
 void AssignmentDirective::generateCodeForReference(std::ostringstream &stream, int indentLevel, Space *space) {
 	
-	std::string stmtSeparator = ";\n";
-	std::string paramSeparator = ", ";
 	std::ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
-	
+	std::string indents = indent.str();
+
+	bool leftLocal = !assigneeArray->isPartOfEnv();	
 	const char *leftName = assigneeArray->getTranslatedName();
 	const char *leftMetaPrefix = assigneeArray->getTranslatedMetadataPrefix();
+	bool rightLocal = !assignerArray->isPartOfEnv();
 	const char *rightName = assignerArray->getTranslatedName();
 	const char *rightMetaPrefix = assignerArray->getTranslatedMetadataPrefix();
 
-	// assign the array reference from the right to that of the left
-	stream << indent.str() << leftName << " = " << rightName << stmtSeparator;
+	// create a scope for the array transfer operation
+	stream << '\n' << indents << "{ // scope starts for transferring contents between arrays\n";
 
-	// copy metadata from right to left for each dimension of the array
-	// Note that given that it is known that this can be translated into a reference transfer, we can
-	// assume many things about the dimension access annotations that does not hold for copy transfer. So
-	// the simplicity of metadata assignment in this case should not fool us.
-	for (int i = 0; i < annotations->NumElements(); i++) {
-		DimensionAnnotation *annotation = annotations->Nth(i);
-		DimensionAccess *leftAccess = annotation->getAssigneeInfo()->Nth(0);
-		DimensionAccess *rightAccess = annotation->getAssignerInfo()->Nth(0);
-		stream << indent.str();
-		stream << leftMetaPrefix << "[" << leftAccess->getDimensionNo() << "]";
-		stream << " = " << rightMetaPrefix << "[" << rightAccess->getDimensionNo() << "]";
-		if (rightAccess->getAccessType() == SUBRANGE) {
-			stream << ".getSubrange(";
-			SubRangeExpr *accessExpr = (SubRangeExpr*) rightAccess->getAccessExpr();
-			accessExpr->getBegin()->translate(stream, indentLevel);
-			stream << paramSeparator;
-			accessExpr->getEnd()->translate(stream, indentLevel);
-			stream << ")";
-		}
+	// if the left-side array is not a local variable then this is an environment object transfar and we need
+	// retrieve the environmental item that will get updated and initialize a transfer instruction for it
+	if (!leftLocal) {
+		stream << indents << "TaskItem *destItem = " << assigneeArray->getEnvObjName();
+		stream << "->getItem(\"" << assigneeArray->getName() << "\")" << stmtSeparator;
+		stream << indents << "DataTransferInstruction *instr =";
+		stream << " new DataTransferInstruction(destItem)" << stmtSeparator;
+		stream << indents << "ArrayTransferConfig *destConfig = new ArrayTransferConfig()";
+		stream << stmtSeparator;
+		stream << indents << "instr->setTransferConfig(destConfig)" << stmtSeparator;
+	} else {
+		stream << indents << "ArrayTransferConfig *destConfig = &" << leftName << "TransferConfig";
 		stream << stmtSeparator;
 	}
+
+	// If the right-side array is not a local variable then we retreive the task-item to be able to access
+	// dimension information from it. Otherwise just retrieve the local source transfer configuration object
+	// as a reference. At the same time set the data source reference from the source to the destination 
+	if (!rightLocal) {
+		const char *sourceEnvObjName = assignerArray->getEnvObjName();
+		const char *sourceProperty = assignerArray->getName();
+		stream << indents << "TaskItem *sourceItem = " << sourceEnvObjName;
+		stream << "->getItem(\"" << sourceProperty << "\")" << stmtSeparator;
+		// if there is a transfer configuration associated with the right-side array then retrieve that
+		stream << indents << "TaskInitEnvInstruction *sourceInstr = " << assignerArray->getEnvObjName();
+		stream << "->getInstr(\"" << sourceProperty << "\"" << paramSeparator;
+		// array transfer is of type three 
+		stream << '3' << ")" << stmtSeparator;
+		stream << indents << "ArrayTransferConfig *sourceConfig " << '\n'  << indents << doubleIndent;
+		stream << "= (sourceInstr != NULL) " << '\n' << indents << doubleIndent;
+		stream << "? ((DataTransferInstruction*) sourceInstr)->getTransferConfig()";
+		stream << '\n' << indents << doubleIndent << ": NULL" << stmtSeparator;
+		stream << indents << "destConfig->setSource(" << sourceEnvObjName << paramSeparator;
+		stream << '"' << sourceProperty << "\")" << stmtSeparator;
+	} else {
+		stream << indents << "ArrayTransferConfig *sourceConfig = &" << rightName;
+		stream << "TransferConfig" << stmtSeparator;
+		stream << indents << "destConfig->setSource(" << rightName << paramSeparator;
+		stream << "NULL)" << stmtSeparator;
+	}
+
+	// if neither side is an environmental array, we can assign the reference from the right to the left
+	if (leftLocal && rightLocal) {
+		stream << indents << leftName << " = " << rightName << stmtSeparator;
+	}
+	
+	// copy metadata from right to left for each dimension of the array
+	for (int i = 0; i < annotations->NumElements(); i++) {
+		DimensionAnnotation *annotation = annotations->Nth(i);
+
+		// Note that the current logic for determining the array assignment mode (copy/reference) says
+		// that the left side is a field access. Thus, there cannot be multiple dimension accesses per
+		// annotation at the left side. TODO we should remove this restriction in the future and support
+		// more data transfers to happen as reference passing
+		DimensionAccess *leftAccess = annotation->getAssigneeInfo()->Nth(0);
+
+		// get the list of dimension information from the right side and populate dimension transfers
+		// on the array transfer configuration of the left
+		List<DimensionAccess*> *rightAccessList = annotation->getAssignerInfo();
+		for (int j = 0; j < rightAccessList->NumElements(); j++) {
+			DimensionAccess *rightAccess = rightAccessList->Nth(j);
+			int dimNo = rightAccess->getDimensionNo();
+			
+			stream << indents << "Dimension storeDim" << dimNo << " = ";
+			if (rightLocal) {
+				stream << rightMetaPrefix << "[" << dimNo << "].storage" << stmtSeparator;
+			} else {
+				stream << "sourceItem->getDimension(" << dimNo << ")" << stmtSeparator;
+			}
+			
+			stream << indents << "destConfig->recordTransferDimConfig(";
+			if (rightAccess->getAccessType() == SUBRANGE) {
+				stream << dimNo << paramSeparator << "Range(";
+				SubRangeExpr *accessExpr = (SubRangeExpr*) rightAccess->getAccessExpr();
+				accessExpr->getBegin()->translate(stream, indentLevel);
+				stream << paramSeparator;
+				accessExpr->getEnd()->translate(stream, indentLevel);
+				stream << ")";
+			} else if (rightAccess->getAccessType() == INDEX) {
+				stream << dimNo << paramSeparator;
+				rightAccess->getAccessExpr()->translate(stream, indentLevel);
+			} else {
+				stream << dimNo << paramSeparator << "storeDim" << dimNo << ".range";
+			}
+			stream << ")" << stmtSeparator;
+			
+			// if the left side is a local array then we should update its storage dimension as
+			// that information is available here; note that we can be confident that the left and 
+			// right dimension numbers are the same as this is a reference assignment
+			if (leftLocal) {
+				stream << indents << leftMetaPrefix;
+				stream << "[" << dimNo << "].storage = storeDim" << dimNo << stmtSeparator;
+			}  
+		}
+		
+		// assign the transfer configuration of the right side as the parrent to the configuration for
+		// the left side
+		stream << indents << "destConfig->setParent(sourceConfig)" << stmtSeparator; 
+	
+		// finally, if the left-side array is a local variable then update the partition dimensions
+		// using the destination transfer configuration object
+		if (leftLocal) {
+			ArrayType *leftType = assigneeArray->getType();
+			int dimensionality = leftType->getDimensions();
+			stream << indents << "destConfig->copyDimensions(" << leftMetaPrefix;
+			stream << paramSeparator << dimensionality << ")" << stmtSeparator;
+			
+		// otherwise, record the transfer instruction in the environment object holding the left array
+		} else {
+			stream << indents << assigneeArray->getEnvObjName();
+			stream << "->addInitEnvInstruction(instr)" << stmtSeparator;
+		}
+	}
+
+	// close scope
+	stream  << indents << "} // scope ends for transferring contents between arrays\n\n";
 }
 
 //---------------------------------------------------- Assignment Directive List ------------------------------------------------/

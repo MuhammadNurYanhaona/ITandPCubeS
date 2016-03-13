@@ -17,17 +17,24 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructure *structure);
 
 /* function to generate all reader and writer subclasses for all arrays that an LPS allocates memory for */
-void generateReaderWriterForLpsStructures(std::ofstream &headerFile, const char *initials, Space *lps);
+void generateReaderWriterForLpsStructures(std::ofstream &headerFile, 
+		const char *initials, Space *lps, 
+		List<const char*> *envVariables);
 
 /* this function calls the function above to generate classes for all LPSes */
-void generateReaderWriters(const char *headerFile, const char *initials, Space *rootLps);
+void generateReaderWriters(const char *headerFile, const char *initials, TaskDef *taskDef);
 
-/* function that generates a routine to initialize all parts of data structures in different LPSes of a task's 
-   environment for which some input file has been specified during task invocation. */
-void generateRoutineForDataInitialization(const char *headerFile, const char *programFile, TaskDef *taskDef);
+/* Since data writers are statefull objects (they depend on existance of valid computations the current segment
+   supposed to execute in an LPS, segment's position in the segment ordering, etc.) and at the same time needed
+   to be executed from the outside-task environment management library, we create a map of preconfigured data 
+   writers at task invocation. This function generates the method for creating the map.	*/
+void generateWritersMap(const char *headerFile, 
+		const char *programFile, 
+		const char *initials, TaskDef *taskDef);
 
-/* function to generate a routine for writing the content of environment on files for data structures that have 
-   been instructed to be saved in files at task invocation */
-void generateRoutineForDataStorage(const char *headerFile, const char *programFile, TaskDef *taskDef);
+/* similar to the above, this generates a routine to create a map of Part-Readers for environment variables*/
+void generateReadersMap(const char *headerFile, 
+		const char *programFile, 
+		const char *initials, TaskDef *taskDef);
 
 #endif

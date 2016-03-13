@@ -64,7 +64,8 @@ class PartHandler {
 	// to indicate when padding exclusion should be bothered with.
 	bool needToExcludePadding;
   public:
-	PartHandler(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig);
+	PartHandler(DataPartsList *partsList, DataPartitionConfig *partConfig);
+	void setFileName(const char *fileName) { this->fileName = fileName; }
 	void setNeedToExcludePadding(bool stat) { needToExcludePadding = stat; }
 	bool doesNeedToExcludePadding() { return needToExcludePadding; }
 	
@@ -106,8 +107,7 @@ class PartHandler {
 /* base class to be extended for the reading process */
 class PartReader : public PartHandler {
   public:
-	PartReader(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig) 
-			: PartHandler(partsList, fileName, partConfig) {}
+	PartReader(DataPartsList *partsList, DataPartitionConfig *partConfig) : PartHandler(partsList, partConfig) {}
 
 	// the process element method just call the virtual read element function; this conversion is done to make it
 	// explicit the reading process. Task specific subclasses should implement the readElement() function
@@ -120,16 +120,19 @@ class PartReader : public PartHandler {
 /* base class to be extended for the writing process */
 class PartWriter : public PartHandler {
   protected:
-	// A writer has an id so that if some ordering is needed among writers of different segments or some specific
+	// A writer has an ID so that if some ordering is needed among writers of different segments or some specific
 	// operation need to be done by the writer of a specific segment such as initializing a output file with 
 	// dimension header that can be done. In conventional case, therefore, the writer Id will be the segment Id of
-	// the process using it 
+	// the process using it.
 	int writerId;
+	// for the same reason there is a count variable that keep tracks of the number of participating writers
+	int writersCount;
   public:
-	PartWriter(int writerId, DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig) 
-			: PartHandler(partsList, fileName, partConfig) {
+	PartWriter(int writerId, DataPartsList *partsList, DataPartitionConfig *partConfig) 
+			: PartHandler(partsList, partConfig) {
 		this->writerId = writerId;
 	}
+	void setWritersCount(int writersCount) { this->writersCount = writersCount; }
 
 	// like the PartReader, this class also override the processElement() method to make writing process explicit
 	// for task specific subclasses  

@@ -30,13 +30,10 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 
 	// write the constructor for the class
 	headerFile << "  public:\n";
-	headerFile << indent << varName << "InSpace" << lpsName << "Reader (";
-	headerFile << "DataPartitionConfig *partConfig" << paramSeparator;
-	headerFile << std::endl << indent << doubleIndent;
-	headerFile << "DataPartsList *partsList" << paramSeparator;
-	headerFile << "const char *fileName)\n" ;
+	headerFile << indent << varName << "InSpace" << lpsName << "Reader(";
+	headerFile << "DataPartitionConfig *partConfig" << paramSeparator << "DataPartsList *partsList)\n" ;
 	headerFile << indent << doubleIndent << ": PartReader(";
-	headerFile << "partsList" << paramSeparator << "fileName" << paramSeparator << "partConfig) {\n";
+	headerFile << "partsList" << paramSeparator << "partConfig) {\n";
 	headerFile << doubleIndent << "this->partConfig = partConfig" << stmtSeparator;
 	headerFile << doubleIndent << "this->stream = NULL" << stmtSeparator;
 	headerFile << indent << "}\n"; 
@@ -93,14 +90,11 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 
 	// write the constructor for the class
 	headerFile << "  public:\n";
-	headerFile << indent << varName << "InSpace" << lpsName << "Writer (";
-	headerFile << "DataPartitionConfig *partConfig" << paramSeparator;
-	headerFile << std::endl << indent << doubleIndent;
-	headerFile << "int writerId" << paramSeparator;
-	headerFile << "DataPartsList *partsList" << paramSeparator;
-	headerFile << "const char *fileName)\n" ;
+	headerFile << indent << varName << "InSpace" << lpsName << "Writer(";
+	headerFile << "DataPartitionConfig *partConfig" << paramSeparator << "int writerId" << paramSeparator;
+	headerFile << "DataPartsList *partsList)\n" ;
 	headerFile << indent << doubleIndent << ": PartWriter(writerId" << paramSeparator;
-	headerFile << "partsList" << paramSeparator << "fileName" << paramSeparator << "partConfig) {\n";
+	headerFile << "partsList" << paramSeparator << "partConfig) {\n";
 	headerFile << doubleIndent << "this->partConfig = partConfig" << stmtSeparator;
 	headerFile << doubleIndent << "this->stream = NULL" << stmtSeparator;
 	if (array->doesGenerateOverlappingParts()) {
@@ -136,7 +130,8 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	headerFile << "}" << stmtSeparator;
 }
 
-void generateReaderWriterForLpsStructures(std::ofstream &headerFile, const char *initials, Space *lps) {
+void generateReaderWriterForLpsStructures(std::ofstream &headerFile, 
+		const char *initials, Space *lps, List<const char*> *envVariables) {
 	
 	std::ostringstream header;
 	const char *lpsName = lps->getName();
@@ -145,13 +140,16 @@ void generateReaderWriterForLpsStructures(std::ofstream &headerFile, const char 
 
 	List<const char*> *localStructures = lps->getLocalDataStructureNames();
 	for (int i = 0; i < localStructures->NumElements(); i++) {
+
+		// reader-writer classes are needed only for environmental variables
 		const char *varName = localStructures->Nth(i);
+		if (!string_utils::contains(envVariables, varName)) continue;
 		
 		// reader and writers are generated for a data structure only if it has been allocated in the current LPS
 		DataStructure *structure = lps->getLocalStructure(varName);
 		if (!structure->getUsageStat()->isAllocated()) continue;
 
-		// currently we only read/write arrays from file
+		// currently we only read/write arrays from/to files
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		if (array == NULL) continue;
 
@@ -160,8 +158,19 @@ void generateReaderWriterForLpsStructures(std::ofstream &headerFile, const char 
 	}
 }
 
-void generateReaderWriters(const char *headerFileName, const char *initials, Space *rootLps) {
-        
+void generateReaderWriters(const char *headerFileName, const char *initials, TaskDef *taskDef) {
+       
+	std::cout << "Generating structures and functions for file IO\n";
+	 
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+	List<const char*> *envVariables = new List<const char*>;
+	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
+        for (int i = 0; i < envLinkList->NumElements(); i++) {
+                EnvironmentLink *link = envLinkList->Nth(i);
+                const char *varName = link->getVariable()->getName();
+		envVariables->Append(varName);
+	}
+
 	std::ofstream headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         if (!headerFile.is_open()) {
@@ -186,14 +195,15 @@ void generateReaderWriters(const char *headerFileName, const char *initials, Spa
 		}
 		if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
 		if (lps->allocateStructures()) {
-			generateReaderWriterForLpsStructures(headerFile, initials, lps);
+			generateReaderWriterForLpsStructures(headerFile, initials, lps, envVariables);
 		}
 	}
 
 	headerFile.close();
 }
 
-void generateRoutineForDataInitialization(const char *headerFileName, const char *programFileName, TaskDef *taskDef) {
+void generateWritersMap(const char *headerFileName,  const char *programFileName, 
+                const char *initials, TaskDef *taskDef) {
 	
 	std::ofstream programFile;
 	std::ofstream headerFile;
@@ -204,220 +214,229 @@ void generateRoutineForDataInitialization(const char *headerFileName, const char
                 std::exit(EXIT_FAILURE);
         }
 
-        const char *message = "environment initializer function";
-        decorator::writeSectionHeader(headerFile, message);
-	headerFile << std::endl;
-        decorator::writeSectionHeader(programFile, message);
-	programFile << std::endl;
+	const char *message = "Parts-writer map generator";
+        decorator::writeSubsectionHeader(headerFile, message);
+        decorator::writeSubsectionHeader(programFile, message);
 
-	const char *initials = string_utils::getInitials(taskDef->getName());
-	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
-	List<EnvironmentLink*> *envLinks = taskDef->getEnvironmentLinks();
-
-	// The initializer function needs the environment parameter to determine what data structures are instructed to 
-	// be input from file. It populates the LPS contents of the taskData section based on those intructions and the 
-	// part-configuration map is needed for file index to data part index transformation during reading.
+	// generate function header
 	std::ostringstream fnHeader;
-	fnHeader << "initializeEnvironment(" << initials << "Environment *env" << paramSeparator;
-	fnHeader << std::endl << indent << doubleIndent << "TaskData *taskData" << paramSeparator;
-	fnHeader << std::endl << indent << doubleIndent << "Hashtable<DataPartitionConfig*> *partConfigMap)";
-
-	headerFile << "void " << fnHeader.str() << stmtSeparator;
-	programFile << "void " << string_utils::toLower(initials) << "::" << fnHeader.str();
-	programFile << " {\n\n";
-
-	// iterate over the environment links and consider only those that are or may be external	
-	for (int i = 0; i < envLinks->NumElements(); i++) {
-		EnvironmentLink *link = envLinks->Nth(i);
-		if (!link->isExternal()) continue;
-
-		// add a condition block checking if there is an file input instruction for the link under concern
-		const char *varName = link->getVariable()->getName();
-		programFile << indent << "if (env->hasInputBinding(\"" << varName << "\")) {\n";
-		programFile << doubleIndent << "const char *fileName = env->getInputFileForStructure";
-		programFile << "(\"" << varName << "\")" << stmtSeparator;
-
-		// iterate over the list of LPSes and consider only those that allocates the current data structure
-		std::deque<Space*> lpsQueue;
-		List<Space*> *childrenLpses = rootLps->getChildrenSpaces();
-		for (int i = 0; i < childrenLpses->NumElements(); i++) {
-			lpsQueue.push_back(childrenLpses->Nth(i));
-		}
-		 while (!lpsQueue.empty()) {
-			Space *lps = lpsQueue.front();
-			lpsQueue.pop_front();
-			childrenLpses = lps->getChildrenSpaces();
-			for (int i = 0; i < childrenLpses->NumElements(); i++) {
-				lpsQueue.push_back(childrenLpses->Nth(i));
-			}
-			if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
-			if (!lps->allocateStructure(varName)) continue;
-
-			// add a checking to see if the current segment has data parts for the structure for the LPS
-			const char *lpsName = lps->getName();
-			std::ostringstream dataItemName;
-			dataItemName << varName << "InSpace" << lpsName;
-			programFile << doubleIndent << "DataItems *" << dataItemName.str(); 
-			programFile << " = taskData->getDataItemsOfLps(\"" << lpsName << "\"" << paramSeparator;
-			programFile << "\"" << varName << "\")" << stmtSeparator;
-			programFile << doubleIndent << "if (" << dataItemName.str() << " != NULL "; 
-			programFile << "&& !" << dataItemName.str() << "->isEmpty()) {\n";
-
-			// retrieve the partition configuration object for the structure in the LPS
-			std::ostringstream configName;
-			configName << varName << "Space" << lpsName << "Config";
-			programFile << tripleIndent << "DataPartitionConfig *config" << " = partConfigMap->Lookup";
-			programFile << "(\"" << configName.str() << "\")" << stmtSeparator;
-
-			// instantiate a part reader subclass of appropriate type
-			std::ostringstream readerClassName;
-			readerClassName << varName << "InSpace" << lpsName << "Reader";
-			programFile << tripleIndent << readerClassName.str() << " *reader = new ";
-			programFile << readerClassName.str();
-			programFile << "(" << "config" << paramSeparator << std::endl << doubleIndent << tripleIndent; 
-			programFile << dataItemName.str() << "->getPartsList()" << paramSeparator;
-			programFile << "fileName" << ")" << stmtSeparator;
-			programFile << tripleIndent << "Assert(reader != NULL)" << stmtSeparator;
-
-			// do the reading
-			programFile << tripleIndent << "reader->processParts()" << stmtSeparator;
-
-			programFile << doubleIndent << "}\n";		
-		}
-		programFile << indent << "}\n";
-	}
-	programFile << indent << "env->resetInputBindings()" << stmtSeparator;
-	programFile << "}\n";
-
-	headerFile.close();
-	programFile.close();		
-}
-
-// this function is very similar to the generateRoutineForDataInitialization() function presented above; so did not write
-// too many comments in it
-void generateRoutineForDataStorage(const char *headerFileName, const char *programFileName, TaskDef *taskDef) {
-	
-	std::ofstream programFile;
-	std::ofstream headerFile;
-        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
-        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
-        if (!programFile.is_open() || !headerFile.is_open()) {
-                std::cout << "Unable to open header/program file";
-                std::exit(EXIT_FAILURE);
-        }
-
-        const char *message = "function for storing environmental structures in files";
-        decorator::writeSectionHeader(headerFile, message);
-	headerFile << std::endl;
-        decorator::writeSectionHeader(programFile, message);
-	programFile << std::endl;
-
-	const char *initials = string_utils::getInitials(taskDef->getName());
-	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
-	List<EnvironmentLink*> *envLinks = taskDef->getEnvironmentLinks();
-	
-	std::ostringstream fnHeader;
-	fnHeader << "storeEnvironment(" << initials << "Environment *env" << paramSeparator;
-	fnHeader << std::endl << indent << doubleIndent << "TaskData *taskData" << paramSeparator;
-	fnHeader << std::endl << indent << doubleIndent << "SegmentState *segment" << paramSeparator;
+	fnHeader << "generateWritersMap(TaskData *taskData" << paramSeparator;
 	fnHeader << std::endl << indent << doubleIndent;
-	fnHeader  << "Hashtable<DataPartitionConfig*> *partConfigMap" << paramSeparator;
-	fnHeader << std::endl << indent << doubleIndent << "std::ofstream &logFile)";
+	fnHeader << "SegmentState *segment" << paramSeparator;
+	fnHeader << std::endl << indent << doubleIndent;
+	fnHeader  << "Hashtable<DataPartitionConfig*> *partConfigMap)";
+	headerFile << "Hashtable<PartWriter*> *" << fnHeader.str() << stmtSeparator;
+	programFile << "Hashtable<PartWriter*> *" << initials << "::" << fnHeader.str();
 
-	headerFile << "void " << fnHeader.str() << stmtSeparator;
-	programFile << "void " << string_utils::toLower(initials) << "::" << fnHeader.str();
+	// retrieve the names of all environmental variables to generate file writers for them
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+	List<const char*> *envVariables = new List<const char*>;
+	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
+        for (int i = 0; i < envLinkList->NumElements(); i++) {
+                EnvironmentLink *link = envLinkList->Nth(i);
+                const char *varName = link->getVariable()->getName();
+		envVariables->Append(varName);
+	}
+
+	// start function body
 	programFile << " {\n\n";
 
-	// determine the actual number of segments participated in the computation of this task and the ID of the current
-	// segment to order segments for sequential file output
-	programFile << indent << "int segmentId" << stmtSeparator;
-	programFile << indent << "MPI_Comm_rank(MPI_COMM_WORLD, &segmentId)" << stmtSeparator;
+	// instantiate the writer map
+	programFile << indent << "Hashtable<PartWriter*> *writersMap = new Hashtable<PartWriter*>" << stmtSeparator;
+	programFile << '\n';
+
+	// determine current segment's writer ID and the total number of active writers 
+	programFile << indent << "int writerId" << stmtSeparator;
+	programFile << indent << "MPI_Comm_rank(MPI_COMM_WORLD, &writerId)" << stmtSeparator;
         programFile << indent << "int mpiProcessCount" << stmtSeparator;
         programFile << indent << "MPI_Comm_size(MPI_COMM_WORLD" << paramSeparator;
         programFile << "&mpiProcessCount)" << stmtSeparator;
-        programFile << indent << "int segmentCount = min(mpiProcessCount" << paramSeparator;
+        programFile << indent << "int writersCount = min(mpiProcessCount" << paramSeparator;
         programFile << "Max_Segments_Count)" << stmtSeparator;
-
-	programFile << indent << "env->getReadyForOutput(";
-	programFile << "segmentId" << paramSeparator << "segmentCount" << paramSeparator;
-	programFile << "MPI_COMM_WORLD" << paramSeparator << "logFile)" << stmtSeparator << '\n';
 	
-	// unlike in the case of the initializer we consider all linked and created environment objects (though the present
-	// implementation is limited to arrays only) while writing
-	for (int i = 0; i < envLinks->NumElements(); i++) {
-		EnvironmentLink *link = envLinks->Nth(i);
-		const char *varName = link->getVariable()->getName();
-		programFile << indent << "if (env->hasOutputBinding(\"" << varName << "\")) {\n";
-		programFile << doubleIndent << "const char *fileName = env->getOutputFileForStructure";
-		programFile << "(\"" << varName << "\")" << stmtSeparator;
-
-		// unlike in the case of reader, we need to write the output from only a single LPS that allocate the data
-		// structure;
-		Space *allocatingLps = NULL;
-		std::deque<Space*> lpsQueue;
-		List<Space*> *childrenLpses = rootLps->getChildrenSpaces();
-		for (int i = 0; i < childrenLpses->NumElements(); i++) {
-			lpsQueue.push_back(childrenLpses->Nth(i));
+        std::deque<Space*> lpsQueue;
+	lpsQueue.push_back(rootLps);
+	while (!lpsQueue.empty()) {
+                Space *lps = lpsQueue.front();
+                lpsQueue.pop_front();
+		List<Space*> *childrenLpses = lps->getChildrenSpaces();
+        	for (int i = 0; i < childrenLpses->NumElements(); i++) {
+                	lpsQueue.push_back(childrenLpses->Nth(i));
 		}
-		 while (!lpsQueue.empty()) {
-			Space *lps = lpsQueue.front();
-			lpsQueue.pop_front();
-			if (lps->allocateStructure(varName)) {
-				allocatingLps = lps;
-				break;
+		if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
+		
+		const char *lpsName = lps->getName();
+		bool writersFound = false;
+		List<const char*> *localStructures = lps->getLocalDataStructureNames();
+		for (int i = 0; i < localStructures->NumElements(); i++) {
+
+			// writer classes are needed only for environmental variables
+			const char *varName = localStructures->Nth(i);
+			if (!string_utils::contains(envVariables, varName)) continue;
+			
+			// writers are generated for a data structure only if it has been allocated in the current LPS
+			DataStructure *structure = lps->getLocalStructure(varName);
+			if (!structure->getUsageStat()->isAllocated()) continue;
+
+			// currently we only write arrays to files
+			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+			if (array == NULL) continue;
+
+			if (!writersFound) {
+				programFile << "\n" << indent << "// writers for Space " << lpsName << "\n";
+				writersFound = true;
 			}
-			childrenLpses = lps->getChildrenSpaces();
-			for (int i = 0; i < childrenLpses->NumElements(); i++) {
-				lpsQueue.push_back(childrenLpses->Nth(i));
-			}
-			if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
-		}	
-		if (allocatingLps != NULL) {
-			const char *lpsName = allocatingLps->getName();
+
+			// retrieve the data item and add a checking that says if a writer should be created
 			std::ostringstream dataItemName;
 			dataItemName << varName << "InSpace" << lpsName;
-			programFile << doubleIndent << "DataItems *" << dataItemName.str(); 
+			programFile << indent << "DataItems *" << dataItemName.str(); 
 			programFile << " = taskData->getDataItemsOfLps(\"" << lpsName << "\"" << paramSeparator;
 			programFile << "\"" << varName << "\")" << stmtSeparator;
-			programFile << doubleIndent << "if (" << dataItemName.str() << " != NULL";
+			programFile << indent << "if (" << dataItemName.str() << " != NULL";
 			programFile << " && !" << dataItemName.str() << "->isEmpty()";
 			programFile << " && segment->computeStagesInLps(Space_" << lpsName << ")";
 			programFile << ") {\n";
 
 			std::ostringstream configName;
 			configName << varName << "Space" << lpsName << "Config";
-			programFile << tripleIndent << "DataPartitionConfig *config" << " = partConfigMap->Lookup";
+			programFile << doubleIndent << "DataPartitionConfig *config" << " = partConfigMap->Lookup";
 			programFile << "(\"" << configName.str() << "\")" << stmtSeparator;
 			
+			// create  the writer and insert it in the writers map
 			std::ostringstream writerClassName;
 			writerClassName << varName << "InSpace" << lpsName << "Writer";
-			programFile << tripleIndent << writerClassName.str() << " *writer = new ";
+			programFile << doubleIndent << writerClassName.str() << " *writer = new ";
 			programFile << writerClassName.str();
 			programFile << "(" << "config" << paramSeparator; 
-			programFile << std::endl << doubleIndent << tripleIndent;
-			programFile << "segment->getSegmentId()" << paramSeparator; 
-			programFile << std::endl << doubleIndent << tripleIndent;
-			programFile << dataItemName.str() << "->getPartsList()" << paramSeparator;
-			programFile << "fileName" << ")" << stmtSeparator;
-			programFile << tripleIndent << "Assert(writer != NULL)" << stmtSeparator;
+			programFile << std::endl << doubleIndent << doubleIndent;
+			programFile << "writerId" << paramSeparator;
+			programFile << dataItemName.str() << "->getPartsList())" << stmtSeparator;
+			programFile << doubleIndent << "Assert(writer != NULL)" << stmtSeparator;
+			programFile << doubleIndent << "writer->setWritersCount(writersCount)" << stmtSeparator;
+			programFile << doubleIndent << "writersMap->Enter(\"" << writerClassName.str() << "\"";
+			programFile << paramSeparator << "writer)" << stmtSeparator;
 
-			programFile << tripleIndent << "writer->processParts()" << stmtSeparator;
-				
-			programFile << doubleIndent << "}\n";		
+			// in case a writer should not be created, enter a NULL entry in the map
+			programFile << indent << "} else {\n";
+			programFile << doubleIndent << "writersMap->Enter(\"" << writerClassName.str() << "\"";
+			programFile << paramSeparator << "NULL)" << stmtSeparator;
+			programFile << indent << "}\n";
 		}
-		programFile << indent << "}\n";
 	}
 
-	// once writing has been done for all data structures, signal the next segment to start its output
-	programFile << '\n' << indent << "env->signalOutputCompletion(";
-	programFile << "segmentId" << paramSeparator << "segmentCount" << paramSeparator;
-	programFile << "MPI_COMM_WORLD" << paramSeparator << "logFile)" << stmtSeparator;
-
-	// finaly reset all output binding instructions so that if the environment is been used again there is no IO overwrite
-	programFile << indent << "env->resetOutputBindings()" << stmtSeparator;
+	// end function body
+	programFile << '\n' << indent << "return writersMap" << stmtSeparator;
 	programFile << "}\n";
 
 	headerFile.close();
-	programFile.close();		
+	programFile.close();
 }
 
+// the implementation of this function is similar to the previous function; therefore, comments are not provided here
+void generateReadersMap(const char *headerFileName, 
+                const char *programFileName, 
+                const char *initials, TaskDef *taskDef) {
+	
+	std::ofstream programFile;
+	std::ofstream headerFile;
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+
+        const char *message1 = "file I/O for environmental data structures";
+        decorator::writeSectionHeader(headerFile, message1);
+        decorator::writeSectionHeader(programFile, message1);
+	
+	const char *message2 = "Parts-reader map generator";
+        decorator::writeSubsectionHeader(headerFile, message2);
+        decorator::writeSubsectionHeader(programFile, message2);
+
+	std::ostringstream fnHeader;
+	fnHeader << "generateReadersMap(TaskData *taskData" << paramSeparator;
+	fnHeader << std::endl << indent << doubleIndent;
+	fnHeader << "SegmentState *segment" << paramSeparator;
+	fnHeader << std::endl << indent << doubleIndent;
+	fnHeader  << "Hashtable<DataPartitionConfig*> *partConfigMap)";
+	headerFile << "Hashtable<PartReader*> *" << fnHeader.str() << stmtSeparator;
+	programFile << "Hashtable<PartReader*> *" << initials << "::" << fnHeader.str();
+	
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+	List<const char*> *envVariables = new List<const char*>;
+	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
+        for (int i = 0; i < envLinkList->NumElements(); i++) {
+                EnvironmentLink *link = envLinkList->Nth(i);
+                const char *varName = link->getVariable()->getName();
+		envVariables->Append(varName);
+	}
+
+	programFile << " {\n\n";
+	programFile << indent << "Hashtable<PartReader*> *readersMap = new Hashtable<PartReader*>" << stmtSeparator;
+        
+	std::deque<Space*> lpsQueue;
+	lpsQueue.push_back(rootLps);
+	while (!lpsQueue.empty()) {
+                Space *lps = lpsQueue.front();
+                lpsQueue.pop_front();
+		List<Space*> *childrenLpses = lps->getChildrenSpaces();
+        	for (int i = 0; i < childrenLpses->NumElements(); i++) {
+                	lpsQueue.push_back(childrenLpses->Nth(i));
+		}
+		if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
+		
+		const char *lpsName = lps->getName();
+		bool readersFound = false;
+		List<const char*> *localStructures = lps->getLocalDataStructureNames();
+		for (int i = 0; i < localStructures->NumElements(); i++) {
+
+			const char *varName = localStructures->Nth(i);
+			if (!string_utils::contains(envVariables, varName)) continue;
+			DataStructure *structure = lps->getLocalStructure(varName);
+			if (!structure->getUsageStat()->isAllocated()) continue;
+			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+			if (array == NULL) continue;
+
+			if (!readersFound) {
+				programFile << "\n" << indent << "// readers for Space " << lpsName << "\n";
+				readersFound = true;
+			}
+			
+			std::ostringstream dataItemName;
+			dataItemName << varName << "InSpace" << lpsName;
+			programFile << indent << "DataItems *" << dataItemName.str(); 
+			programFile << " = taskData->getDataItemsOfLps(\"" << lpsName << "\"" << paramSeparator;
+			programFile << "\"" << varName << "\")" << stmtSeparator;
+			programFile << indent << "if (" << dataItemName.str() << " != NULL";
+			programFile << " && !" << dataItemName.str() << "->isEmpty()) {\n";
+
+			std::ostringstream configName;
+			configName << varName << "Space" << lpsName << "Config";
+			programFile << doubleIndent << "DataPartitionConfig *config" << " = partConfigMap->Lookup";
+			programFile << "(\"" << configName.str() << "\")" << stmtSeparator;
+
+                        std::ostringstream readerClassName;
+                        readerClassName << varName << "InSpace" << lpsName << "Reader";
+                        programFile << doubleIndent << readerClassName.str() << " *reader = new ";
+                        programFile << readerClassName.str();
+                        programFile << "(" << "config" << paramSeparator; 
+                        programFile << dataItemName.str() << "->getPartsList())" << stmtSeparator;
+                        programFile << doubleIndent << "Assert(reader != NULL)" << stmtSeparator;
+			programFile << doubleIndent << "readersMap->Enter(\"" << readerClassName.str() << "\"";
+			programFile << paramSeparator << "reader)" << stmtSeparator;
+
+			programFile << indent << "} else {\n";
+			programFile << doubleIndent << "readersMap->Enter(\"" << readerClassName.str() << "\"";
+			programFile << paramSeparator << "NULL)" << stmtSeparator;
+			programFile << indent << "}\n";
+
+		}
+	}
+	
+	programFile << '\n' << indent << "return readersMap" << stmtSeparator;
+	programFile << "}\n";
+	headerFile.close();
+	programFile.close();
+}

@@ -67,7 +67,7 @@ class NamedType : public Type {
 	const char *getTaskName() { return taskName; }
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
 	bool isEqual(Type *other);
-	const char *getCType() { return id->getName(); }	
+	const char *getCType();
 	virtual const char *getCppDeclaration(const char *varName, bool pointer);
 };
 

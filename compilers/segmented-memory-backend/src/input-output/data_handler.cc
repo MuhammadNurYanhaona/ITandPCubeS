@@ -111,8 +111,8 @@ bool PartInfo::isDataIndexInCorePart(List<int> *dataIndex) {
 
 //------------------------------------------------------------- Part Handler -------------------------------------------------------------/
 
-PartHandler::PartHandler(DataPartsList *partsList, const char *fileName, DataPartitionConfig *partConfig) {
-	this->fileName = fileName;
+PartHandler::PartHandler(DataPartsList *partsList, DataPartitionConfig *partConfig) {
+	this->fileName = NULL;
 	this->dataParts = partsList->getPartList();
 	this->partConfig = partConfig;
 	this->currentPart = NULL;

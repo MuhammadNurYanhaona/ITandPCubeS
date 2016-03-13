@@ -270,13 +270,16 @@ void genRoutinesForTaskPartitionConfigs(const char *headerFileName,
 	programFile.close();
 }
 	
-void genRoutineForLpsContent(std::ofstream &headerFile, 
-		std::ofstream &programFile, const char *initials, Space *lps, Space *rootLps) {
+void genRoutineForLpsContent(std::ofstream &headerFile, std::ofstream &programFile, const char *initials,
+		List<const char*> *envArrayList,  
+		Space *lps, Space *rootLps) {
 	
 	std::ostringstream functionHeader;
 	functionHeader << "genSpace" << lps->getName() << "Content(";
 	functionHeader << "List<ThreadState*> *threads" << paramSeparator;
 	functionHeader << "ArrayMetadata *metadata" << paramSeparator;
+	functionHeader << '\n' << doubleIndent;
+	functionHeader << "TaskEnvironment *environment" << paramSeparator;
 	functionHeader << '\n' << doubleIndent;
 	functionHeader << initials << "Partition partition" << paramSeparator;
 	functionHeader << '\n' << doubleIndent;
@@ -312,10 +315,14 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		if (array == NULL) continue;
 
+		// create a new data-items object to hold the parts of the data structure
 		int dimensionCount = array->getDimensionality();
 		programFile << indent << "DataItems *" << varName << " = new DataItems(";
 		programFile << '"' << varName << '"' << paramSeparator;
-		programFile << dimensionCount << ")" << stmtSeparator;
+		programFile << dimensionCount << paramSeparator;
+		if (string_utils::contains(envArrayList, varName)) {
+			programFile << "false)" << stmtSeparator;
+		} else programFile << "true)" << stmtSeparator;
 
 		// retrieve the partition config object
 		programFile << indent << "DataPartitionConfig *" << varName << "Config = ";
@@ -397,32 +404,67 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 	programFile << doubleIndent << "}\n";	
 	programFile << indent << "}\n";
 
-	// allocate memory for all data parts in their corresponding data parts list
+	// initialize data parts in their corresponding data parts list
 	for (int i = 0; i < structureList->NumElements(); i++) {
 		DataStructure *structure = lps->getLocalStructure(structureList->Nth(i));
 		if (!structure->getUsageStat()->isAllocated()) continue;
 		const char *varName = structure->getName();
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		if (array == NULL) continue;
-		programFile << indent << "DataPartsList::allocate ";
+
 		Type *type = structure->getType();
 		ArrayType *arrayType = reinterpret_cast<ArrayType*>(type);
-		programFile << "<" << arrayType->getTerminalElementType()->getCType() << ">(";
-		programFile << varName << "Parts" << paramSeparator;
+		const char *cType =  arrayType->getTerminalElementType()->getCType();
+		programFile << '\n' << indent << varName << "Parts->initializePartsList(";
 		programFile << varName << "Config" << paramSeparator;
-		programFile << varName << "Container)" << stmtSeparator;
+		programFile << varName << "Container" << paramSeparator;
+		programFile << "sizeof(" << cType << "))" << stmtSeparator;
+
+		// if the data structure is not part of the task environment then allocate memory for its data parts
+		if (!string_utils::contains(envArrayList, varName)) {
+			programFile << indent << "DataPartsList::allocateParts ";
+			programFile << "<" << cType << "> (" << varName << "Parts)" << stmtSeparator;
+		// otherwise send the initialized parts list and other associated information to the task environment
+		} else {
+			programFile << indent << "TaskItem *" << varName << "Item = environment->";
+			programFile << "getItem(\"" << varName << "\")" << stmtSeparator;
+			programFile << indent << "LpsAllocation *" << varName << "Alloc = " << varName;
+			programFile << "Item->getLpsAllocation(\"" << lpsName << "\")" << stmtSeparator;
+			programFile << indent << varName << "Alloc->setPartContainerTree(";
+			programFile << varName << "Container)" << stmtSeparator;
+			programFile << indent << varName << "Alloc->setPartsList(new PartsList(";
+			programFile << varName << "Parts->getPartList()))" << stmtSeparator;
+		}
 	}	
 	
 	programFile << std::endl << indent << "return space" << lpsName << "Content" << stmtSeparator;		
 	programFile << "}\n";	
 }
 
-void genTaskMemoryConfigRoutine(const char *headerFileName,
-                const char *programFileName,
-                const char *initials,
-                PartitionHierarchy *hierarchy) {
+void genTaskMemoryConfigRoutine(TaskDef *taskDef,
+		const char *headerFileName,
+                const char *programFileName, const char *initials) {
 	
 	std::cout << "Generating routines to construct and manage task's memory allocations\n";
+	
+	// First, get the names of all environmental arrays the task accesses. These arrays will be initialized
+	// by the environment management module -- not directly by the task itself -- then they will be made
+	// accessible to the task. Note that other non-array environmental data structures should have a similar 
+	// initialization process, but at this stage, we are handling arrays only.
+        PartitionHierarchy *hierarchy = taskDef->getPartitionHierarchy();
+	Space *root = hierarchy->getRootSpace();
+	List<const char*> *envArrays = new List<const char*>;
+	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
+        for (int i = 0; i < envLinkList->NumElements(); i++) {
+                EnvironmentLink *link = envLinkList->Nth(i);
+                const char *varName = link->getVariable()->getName();
+                DataStructure *structure = root->getStructure(varName);
+                ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+                StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(structure->getType());
+                if (array != NULL && staticArray == NULL) {
+			envArrays->Append(varName);
+		}
+	}
 
         std::ofstream programFile, headerFile;
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
@@ -443,6 +485,10 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 	functionHeader << "List<ThreadState*> *threads" << paramSeparator;
 	functionHeader << "ArrayMetadata *metadata" << paramSeparator;
 	functionHeader << "\n" << doubleIndent;
+	functionHeader << "TaskEnvironment *environment" << paramSeparator;
+	functionHeader << "\n" << doubleIndent;
+	functionHeader << "SegmentState *segment" << paramSeparator;
+	functionHeader << "\n" << doubleIndent;
 	functionHeader << initials << "Partition partition" << paramSeparator;
 	functionHeader << "int *ppuCounts)";
 
@@ -452,13 +498,18 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 	functionBody << '\n' << indent << doubleIndent;
 	functionBody << "getDataPartitionConfigMap(metadata" << paramSeparator << "partition";
 	functionBody << paramSeparator << "ppuCounts)" << stmtSeparator;
-
+	
 	// create a task data object
 	functionBody << indent << "TaskData *taskData = new TaskData()" << stmtSeparator;
 	functionBody << indent << "Assert(taskData != NULL)" << stmtSeparator;
+
+	// pre-configure LPS allocations in the environment reference that is used to initialize environment 
+	// data items
+	functionBody << indent << "preconfigureLpsAllocationsInEnv(environment" << paramSeparator;
+	functionBody << "metadata" << paramSeparator << "configMap)" << stmtSeparator; 
 	
 	// iterate all LPSes and create LPS Content instance in each that has any data structure to allocate 
-	Space *root = hierarchy->getRootSpace();
+	functionBody << '\n' << indent << "// prepare LPS contents map\n";
 	std::deque<Space*> lpsQueue;
 	lpsQueue.push_back(root);
         while (!lpsQueue.empty()) {
@@ -477,16 +528,38 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 		if (lps == root) continue;
 		
 		programFile << std::endl;
-		genRoutineForLpsContent(headerFile, programFile, initials, lps, root);
+		genRoutineForLpsContent(headerFile, programFile, initials, envArrays, lps, root);
 
 		const char *lpsName = lps->getName();
 		functionBody << indent << "LpsContent *space" << lpsName << "Content = ";
 		functionBody << "genSpace" << lpsName << "Content(threads" << paramSeparator;
-		functionBody << "metadata" << paramSeparator << "partition" << paramSeparator;
+		functionBody << "metadata" << paramSeparator;
+		functionBody << '\n' << tripleIndent;
+		functionBody << "environment" << paramSeparator << "partition" << paramSeparator;
 		functionBody << "configMap)" << stmtSeparator;
 		functionBody << indent << "taskData->addLpsContent(\"" << lpsName << '"';
 		functionBody << paramSeparator << "space" << lpsName << "Content)" << stmtSeparator;
 	}
+
+	// now partition configuration information is available and all data items are created; set up the
+	// data parts readers-writers in the environment to respond to any file binding instructions later
+	functionBody << '\n' << indent << "// prepare file I/O handlers in the environment\n";
+	functionBody << indent << "Hashtable<PartReader*> *readersMap = generateReadersMap(";
+	functionBody << "taskData" << paramSeparator << "segment" << paramSeparator;
+	functionBody << "configMap)" << stmtSeparator;
+	functionBody << indent << "environment->setReadersMap(readersMap)" << stmtSeparator;
+	functionBody << indent << "Hashtable<PartWriter*> *writersMap = generateWritersMap(";
+	functionBody << "taskData" << paramSeparator << "segment" << paramSeparator;
+	functionBody << "configMap)" << stmtSeparator;
+	functionBody << indent << "environment->setWritersMap(writersMap)" << stmtSeparator;
+	 
+
+	// invoke task environment functions in proper sequence to initialize data parts for environmental 
+	// data structures
+	functionBody << '\n' << indent << "// initialize parts lists of environmental variables\n";
+	functionBody << indent << "environment->preprocessProgramEnvForItems()" << stmtSeparator; 
+	functionBody << indent << "environment->setupItemsPartsLists()" << stmtSeparator; 
+	functionBody << indent << "environment->postprocessProgramEnvForItems()" << stmtSeparator; 
 	
 	// write the task data initializer function in both files
 	const char *message = "Task Data Initializer";
@@ -496,7 +569,7 @@ void genTaskMemoryConfigRoutine(const char *headerFileName,
 	programFile << "\n" << "TaskData *";
 	programFile << string_utils::toLower(initials) << "::" << functionHeader.str();
 	functionBody << indent << "return taskData" << stmtSeparator;
-	programFile << " {\n" << functionBody.str() << "}\n";
+	programFile << " {\n\n" << functionBody.str() << "}\n";
 	
 	headerFile.close();
 	programFile.close();

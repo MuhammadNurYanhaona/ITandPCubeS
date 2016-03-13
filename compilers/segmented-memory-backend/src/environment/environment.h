@@ -7,6 +7,7 @@
 #include "../memory-management/allocation.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_tracking.h"
+#include "../input-output/data_handler.h"
 #include "../runtime/structure.h"
 
 #include <vector>
@@ -212,6 +213,7 @@ class EnvironmentLinkKey {
 	const char *sourceKey;
   public:
 	EnvironmentLinkKey(const char *varName, int linkId);
+	const char *getVarName() { return varName; }
 	void setSourceKey(const char *sourceKey) { this->sourceKey = sourceKey; }
 	const char *getSourceKey() { return sourceKey; }
 	void flagAsDataSource(int taskId);
@@ -255,8 +257,9 @@ class TaskItem {
 	EnvItemType type;
 	List<Dimension> *rootDimensions;
 	Hashtable<LpsAllocation*> *allocations;
+	int elementSize;
   public:
-	TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality);
+	TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality, int elementSize);
 	void setRootDimensions(Dimension *dimensions);
 	void setRootDimensions(List<Dimension> *dimensionList) { this->rootDimensions = dimensionList; }
 	List<Dimension> *getRootDimensions() { return rootDimensions; }
@@ -281,9 +284,23 @@ class TaskEnvironment {
 	// queues of instructions to be executed at the beginning and ending of a task execution for environment management
 	std::vector<TaskInitEnvInstruction*> initInstrs;
 	std::vector<TaskEndEnvInstruction*> endingInstrs;
+	// maps of file readers-writers to load/store environmental data from/to files
+	Hashtable<PartReader*> *readersMap;
+	Hashtable<PartWriter*> *writersMap;
+	// a stream for logging events during task environment processing
+        std::ofstream *logFile;
   public:
-	TaskEnvironment(int envId);
+	// this variable does not have any practical purpose; it is there just to keep track of the name of the task the
+	// environment object has been created for 
+	const char *name;
+	// this variable is used to assign an unique ID to a new task-environment object during its creation
+	static int CURRENT_ENV_ID;	
+  public:
+	TaskEnvironment();
 	TaskItem *getItem(const char *itemName) { return envItems->Lookup(itemName); }
+	void setReadersMap(Hashtable<PartReader*> *readersMap) { this->readersMap = readersMap; }
+	void setWritersMap(Hashtable<PartWriter*> *writersMap) { this->writersMap = writersMap; }
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	void setDefaultEnvInitInstrs();
 
 	// task specific environment subclasses should provide implementation of the following two library functions
@@ -293,6 +310,10 @@ class TaskEnvironment {
 	// functions to register an environment object manipulation instruction
 	void addInitEnvInstruction(TaskInitEnvInstruction *instr);
 	void addEndEnvInstruction(TaskEndEnvInstruction *instr);
+
+	// return the current initialization instruction of a specific type for a particular item, if exists; otherwise
+	// returns NULL; check env_instruction.h header file to find what are the types of different initialization instrs
+	TaskInitEnvInstruction *getInstr(const char *itemName, int instrType);
 
 	// functions to be invoked at different phases of task invocation/execution/ending to do the work for various
 	// environment manipulation instructions

@@ -36,7 +36,7 @@ void generateTaskEnvironmentClass(TaskDef *taskDef, const char *initials,
 	// declare the extension class for task environment in the header file
 	headerFile << '\n' << "class TaskEnvironmentImpl : public TaskEnvironment {\n";
 	headerFile << "  public:\n";
-	headerFile << indent << "TaskEnvironmentImpl(int envId) : TaskEnvironment(envId) {}\n";
+	headerFile << indent << "TaskEnvironmentImpl() : TaskEnvironment() {}\n";
 	headerFile << indent << "void prepareItemMaps()" << stmtSeparator;
 	headerFile << indent << "void setDefaultTaskCompletionInstrs()" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
@@ -92,7 +92,9 @@ void generateFnForItemsMapPreparation(TaskDef *taskDef, const char *initials, st
 			programFile << "OUT";
 		}
 		programFile << paramSeparator;
-		programFile << dimensionality << ")" << stmtSeparator;
+		programFile << dimensionality << paramSeparator;
+		Type *elementType = type->getTerminalElementType();
+		programFile << "sizeof(" << elementType->getCType() << "))" << stmtSeparator;
 		
 		programFile << indent << "envItems->Enter(\"" << varName << "\"" << paramSeparator;
 		programFile << "item" << linkId << ")" << stmtSeparator;
@@ -161,7 +163,7 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef, const char *initi
 	std::ostringstream fnHeader;
 	programFile << "EnvironmentLinks " << initials << "::";
         headerFile << "EnvironmentLinks ";
-        fnHeader << "initiateEnvLinks(" << initials << "::TaskEnvironmentImpl *environment)";
+        fnHeader << "initiateEnvLinks(TaskEnvironment *environment)";
 	programFile << fnHeader.str();
         headerFile << fnHeader.str() << stmtSeparator;
 
@@ -231,7 +233,7 @@ void generateFnToPreconfigureLpsAllocations(TaskDef *taskDef, const char *initia
 	std::ostringstream fnHeader;
 	programFile << "void " << initials << "::";
         headerFile << "void ";
-        fnHeader << "preconfigureLpsAllocationsInEnv(TaskEnvironmentImpl *environment";
+        fnHeader << "preconfigureLpsAllocationsInEnv(TaskEnvironment *environment";
 	fnHeader << paramSeparator << '\n' << doubleIndent << "ArrayMetadata *metadata";
 	fnHeader << paramSeparator << '\n' << doubleIndent;
 	fnHeader << "Hashtable<DataPartitionConfig*> *partConfigMap)";

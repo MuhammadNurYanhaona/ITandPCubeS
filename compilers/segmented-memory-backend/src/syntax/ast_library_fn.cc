@@ -299,7 +299,6 @@ void BindOperation::validateArguments(Scope *scope, bool ignoreFailure) {
 			envType = objectType;
 		}
 	}
-
 	
 	Expr *arg2 = arguments->Nth(1);
 	StringConstant *varName = dynamic_cast<StringConstant*>(arg2);
@@ -341,28 +340,27 @@ void BindInput::generateCode(std::ostringstream &stream, int indentLevel, Space 
 	
 	std::ostringstream indentStr;
 	for (int i = 0; i < indentLevel; i++) indentStr << indent;
+	std::string indents = indentStr.str();
 	
 	Expr *arg1 = arguments->Nth(0);
 	Expr *arg2 = arguments->Nth(1);
 	Expr *arg3 = arguments->Nth(2);
-	const char *array = ((StringConstant *) arg2)->getValue();
 
-	stream << indentStr.str();
+	stream << '\n' << indents << "{ // scope starts for binding input\n";
+	stream << indents << "TaskItem *item = ";
 	arg1->translate(stream, indentLevel);
-	stream << "->bindInput(";
+	stream << "->getItem(";
 	arg2->translate(stream, indentLevel);
-	stream << paramSeparator;
+	stream << ")" << stmtSeparator;
+	stream << indents << "ReadFromFileInstruction *instr = new ReadFromFileInstruction(item)";
+	stream << stmtSeparator;
+	stream << indents << "instr->setFileName(";
 	arg3->translate(stream, indentLevel);
 	stream << ")" << stmtSeparator;
-	
-	stream << indentStr.str();  
+	stream << indents; 
 	arg1->translate(stream, indentLevel);
-	stream << "->readDimensionInfo(";
-	arg2->translate(stream, indentLevel);
-	stream << paramSeparator;
-	arg1->translate(stream, indentLevel);
-	stream << "->" << array << "Dims";
-	stream << ")" << stmtSeparator;
+	stream << "->addInitEnvInstruction(instr)" << stmtSeparator;
+	stream << indents << "} // scope ends for binding input\n\n";
 }
 
 //------------------------------------------------------- Bind Output -----------------------------------------------------/
@@ -371,16 +369,25 @@ void BindOutput::generateCode(std::ostringstream &stream, int indentLevel, Space
 	
 	std::ostringstream indentStr;
 	for (int i = 0; i < indentLevel; i++) indentStr << indent;
+	std::string indents = indentStr.str();
 	
 	Expr *arg1 = arguments->Nth(0);
 	Expr *arg2 = arguments->Nth(1);
 	Expr *arg3 = arguments->Nth(2);
 
-	stream << indentStr.str();
+	stream << '\n' << indents << "{ // scope starts for binding output\n";
+	stream << indents << "TaskItem *item = ";
 	arg1->translate(stream, indentLevel);
-	stream << "->bindOutput(";
+	stream << "->getItem(";
 	arg2->translate(stream, indentLevel);
-	stream << paramSeparator;
+	stream << ")" << stmtSeparator;
+	stream << indents << "WriteToFileInstruction *instr = new WriteToFileInstruction(item)";
+	stream << stmtSeparator;
+	stream << indents << "instr->setFileName(";
 	arg3->translate(stream, indentLevel);
 	stream << ")" << stmtSeparator;
+	stream << indents; 
+	arg1->translate(stream, indentLevel);
+	stream << "->addEndEnvInstruction(instr)" << stmtSeparator;
+	stream << indents << "} // scope ends for binding output\n\n";
 }

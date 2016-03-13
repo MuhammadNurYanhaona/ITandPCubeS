@@ -63,13 +63,13 @@ ListMetadata::ListMetadata(int dimensionality, Dimension *boundary) {
 
 //------------------------------------------------------------------- Data Part ----------------------------------------------------------------/
 
-DataPart::DataPart(PartMetadata *metadata, int epochCount) {
+DataPart::DataPart(PartMetadata *metadata, int epochCount, int elementSize) {
 	this->metadata = metadata;
 	this->epochCount = epochCount;
 	this->dataVersions = new std::vector<void*>;
 	dataVersions->reserve(epochCount);
 	this->epochHead = 0;
-	this->elementSize = 0;
+	this->elementSize = elementSize;
 }
 
 DataPart::~DataPart() {
@@ -104,6 +104,39 @@ void DataPart::synchronizeAllVersions() {
 	}
 }
 
+void DataPart::clone(DataPart *other) {
+	
+	while (dataVersions->size() > 0) {
+		dataVersions->pop_back();
+	}	
+	
+	int currentEpoch = 0;
+	while (currentEpoch < other->epochCount) {
+		dataVersions->push_back(other->getData(currentEpoch));	
+		if (currentEpoch == this->epochCount - 1) break;
+		currentEpoch++;
+	}
+
+	if (currentEpoch < epochCount - 1) {
+		allocate(currentEpoch + 1);
+		synchronizeAllVersions();
+	}
+}
+
+void DataPart::allocate(int versionThreshold) {
+	
+	int size = metadata->getSize();
+	int allocationSize = elementSize * size;
+
+	for (int i = versionThreshold; i < epochCount; i++) {
+		char *data = new char[allocationSize];
+		for (int j = 0; j < allocationSize; j++) {
+			data[j] = 0;
+		}
+		dataVersions->push_back((void *) data);
+	}
+}
+
 //---------------------------------------------------------------- Data Parts List -------------------------------------------------------------/
 
 DataPartsList::DataPartsList(ListMetadata *metadata, int epochCount) {
@@ -113,6 +146,50 @@ DataPartsList::DataPartsList(ListMetadata *metadata, int epochCount) {
 	this->epochCount = epochCount;
 	this->partList = NULL;
 	this->invalid = false;
+}
+
+DataPartsList::~DataPartsList() {
+	if (!invalid) {
+		while (partList->NumElements() > 0) {
+			DataPart *part = partList->Nth(0);
+			partList->RemoveAt(0);
+			delete part;
+		}
+		delete partList;
+	}
+}
+
+void DataPartsList::initializePartsList(DataPartitionConfig *partConfig, 
+		PartIdContainer *partContainer, 
+		int partElementSize) {
+
+	partContainer = partContainer;
+        int partCount = partContainer->getPartCount();
+	if (partCount > 0) {
+		partList = new List<DataPart*>(partCount);
+		invalid = false;
+
+		PartIterator *iterator = partContainer->getIterator();
+		int dimensions = metadata->getDimensions();
+		SuperPart *part = NULL;
+		int listIndex = 0;
+
+		while ((part = iterator->getCurrentPart()) != NULL) {
+			List<int*> *partId = part->getPartId();
+			PartLocator *partLocator = new PartLocator(partId, dimensions, listIndex);
+			Assert(partLocator != NULL);
+			iterator->replaceCurrentPart(partLocator);
+			DataPart *dataPart = new DataPart(partConfig->generatePartMetadata(partId),
+					epochCount, partElementSize);
+			Assert(dataPart != NULL);
+			partList->Append(dataPart);
+			listIndex++;
+			iterator->advance();
+		}
+	} else {
+		invalid = true;
+	}
+
 }
 
 DataPart *DataPartsList::getPart(List<int*> *partId, PartIterator *iterator) {

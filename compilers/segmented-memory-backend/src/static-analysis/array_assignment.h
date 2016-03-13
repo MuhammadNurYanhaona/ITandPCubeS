@@ -43,8 +43,11 @@ class ArrayName {
   public:
 	ArrayName();
 	void setPartOfEnv(bool partOfEnv) { this->partOfEnv = partOfEnv; }
+	bool isPartOfEnv() { return partOfEnv; }
 	void setEnvObjName(const char *envObjName) { this->envObjName = envObjName; }
+	const char *getEnvObjName() { return envObjName; }
 	void setName(const char *name) { this->name = name; }
+	const char *getName() { return name; }
 	void setType(ArrayType *type) { this->type = type; }
 	ArrayType *getType() { return type; }
 	void describe(int indent);
@@ -96,8 +99,8 @@ List<DimensionAccess*> *generateDimensionAccessInfo(ArrayName *array, Expr *expr
 class DimensionAnnotation {
   protected:
 	// We have a list of dimension access info for both sides instead of a single one as whole/partial 
-	// dimension accesses on both sides can be preceeded by arbitrary number of access to particular entry
-	// in other dimensions.
+	// dimension accesses on both sides can be preceeded by arbitrary number of accesses to the particular 
+	// entry in other dimensions.
 	List<DimensionAccess*> *assigneeInfo;
 	List<DimensionAccess*> *assignerInfo;
 

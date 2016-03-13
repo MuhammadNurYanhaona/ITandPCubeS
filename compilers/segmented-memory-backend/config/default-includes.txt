@@ -64,6 +64,7 @@
 // for task and program environment management and interaction
 #include "../../src/environment/environment.h"
 #include "../../src/environment/env_instruction.h"
+#include "../../src/runtime/array_transfer.h"
 
 // for threading
 #include <pthread.h>

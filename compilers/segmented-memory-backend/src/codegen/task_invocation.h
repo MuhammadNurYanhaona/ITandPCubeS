@@ -32,16 +32,6 @@ void generateRoutineToReadProgramArgs(TupleDef *programArg,
 		const char *headerFile, 
 		const char *programFile);
 
-// as we already have a method to initiate the array-metadata from environment links for automatic
-// generation of a main-function for isolated task, instead of writing another one for initiating
-// metadata from task-environment, we generate a routine to populate environment-links object from
-// environment to take benefit of already available function
-void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
-		const char *initials,
-		List<const char*> *externalEnvLinks,
-		const char *headerFile,
-		const char *programFile);
-
 // generate a function that serves as a task::main and handle initiation, execution, and after
 // processing of tasks.
 void generateTaskExecutor(TaskGenerator *taskGenerator);

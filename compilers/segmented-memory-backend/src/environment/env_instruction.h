@@ -2,6 +2,7 @@
 #define _H_env_instruction
 
 #include "environment.h"
+#include "../runtime/array_transfer.h"
 
 /*-------------------------------------------------------------------------------------------------------------------------------------
 				 Environment Instructions to be Processed At Task Initialization
@@ -33,7 +34,10 @@ class TaskInitEnvInstruction {
 
 	// this function should be invoked to ensure any new/updated parts list for the data structure has been included in 
 	// the program environment
-	virtual void postprocessProgramEnv() = 0;			
+	virtual void postprocessProgramEnv() = 0;		
+
+	// each subclass should return an unique type number to enable instructions retrieval by type
+	virtual int getType() = 0;	
 };
 
 /* This is the default instruction for linked task environmental variables. If there is no other instruction associated with
@@ -47,7 +51,8 @@ class StaleRefreshInstruction : public TaskInitEnvInstruction {
 	void setupDimensions() {};
 	void preprocessProgramEnv() {};
 	void setupPartsList() {};
-	void postprocessProgramEnv() {};			
+	void postprocessProgramEnv() {};
+	int getType() { return 0; }			
 };
 
 /* This is the instruction for environmental variables created by the task; creation of a new data item for such a variable 
@@ -60,6 +65,7 @@ class CreateFreshInstruction : public TaskInitEnvInstruction {
 	void preprocessProgramEnv() {};
 	void setupPartsList() {};
 	void postprocessProgramEnv() {};			
+	int getType() { return 1; }			
 };
 
 /* This, as the name suggests, causes the data parts content of a task item to be read from some external file.
@@ -68,12 +74,16 @@ class ReadFromFileInstruction : public TaskInitEnvInstruction {
   protected:
 	const char *fileName;
   public:	
-	ReadFromFileInstruction(TaskItem *itemToUpdate) : TaskInitEnvInstruction(itemToUpdate) {}
+	ReadFromFileInstruction(TaskItem *itemToUpdate) : TaskInitEnvInstruction(itemToUpdate) {
+		this->fileName = NULL;
+	}
 	void setFileName(const char *fileName) { this->fileName = fileName; }
+	
 	void setupDimensions() {};
 	void preprocessProgramEnv() {};
 	void setupPartsList() {};
 	void postprocessProgramEnv() {};			
+	int getType() { return 2; }			
 };
 
 /* This encodes an explicit object assignment from one task to another task environment in the form envA.a = envB.b; note
@@ -82,15 +92,19 @@ class ReadFromFileInstruction : public TaskInitEnvInstruction {
  */
 class DataTransferInstruction : public TaskInitEnvInstruction {
   protected:
-	TaskItem *dataSourceItem;
-	// need to encode subpartition range here
+	ArrayTransferConfig *transferConfig;
   public:	
-	DataTransferInstruction(TaskItem *itemToUpdate) : TaskInitEnvInstruction(itemToUpdate) {}
-	void setSourceItem(TaskItem *source) { dataSourceItem = source; }
+	DataTransferInstruction(TaskItem *itemToUpdate) : TaskInitEnvInstruction(itemToUpdate) {
+		this->transferConfig = NULL;
+	}
+	void setTransferConfig(ArrayTransferConfig *config) { transferConfig = config; }
+	ArrayTransferConfig *getTransferConfig() { return transferConfig; }
+	
 	void setupDimensions() {};
 	void preprocessProgramEnv() {};
 	void setupPartsList() {};
 	void postprocessProgramEnv() {};			
+	int getType() { return 3; }			
 };
 
 /*-------------------------------------------------------------------------------------------------------------------------------------

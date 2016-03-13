@@ -235,93 +235,6 @@ void generateRoutineToReadProgramArgs(TupleDef *programArg,  const char *headerF
 	programFile.close();
 }
 
-void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef,
-                const char *initials,
-                List<const char*> *externalEnvLinks,
-                const char *headerFileName,
-                const char *programFileName) {
-	
-	std::cout << "Generating routine to initiate environment-link from environment reference\n";
-	std::ofstream programFile, headerFile;
-        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
-        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
-        if (!programFile.is_open() || !headerFile.is_open()) {
-                std::cout << "Unable to open output header/program file";
-                std::exit(EXIT_FAILURE);
-        }
-
-	std::ostringstream fnHeader;
-        const char *comments = "function for initializing environment-links object";
-	decorator::writeSectionHeader(headerFile, comments);
-	headerFile << std::endl;
-	decorator::writeSectionHeader(programFile, comments);
-	programFile << std::endl;
-
-	// write function signature in header and program files
-	programFile << "EnvironmentLinks " << initials << "::";
-	headerFile << "EnvironmentLinks ";
-	fnHeader << "initiateEnvLinks";
-	TupleDef *envTuple = taskDef->getEnvTuple();
-	fnHeader << "(" << envTuple->getId()->getName() << " *environment)";
-	programFile << fnHeader.str();
-	headerFile << fnHeader.str() << stmtSeparator << std::endl;
-
-	// open function definition
-	programFile << " {\n";
-
-	// declare a local environment-link variable that will bre returned at the end
-	programFile << indent << "EnvironmentLinks envLinks" << stmtSeparator;
-
-	// iterate over all environmental properties
-	List<VariableDef*> *propertyList = envTuple->getComponents();
-	for (int i = 0; i < propertyList->NumElements(); i++) {
-		VariableDef *property = propertyList->Nth(i);
-		const char *propertyName = property->getId()->getName();
-		// determine if a property is a part of the environmental links
-		bool external = false;
-		for (int j = 0; j < externalEnvLinks->NumElements(); j++) {
-			if (strcmp(propertyName, externalEnvLinks->Nth(j)) == 0) {
-				external = true;
-				break;
-			}
-		}
-		// if it is a part of the environmental links then copy its value/reference from environment
-		if (external) {
-			programFile << indent;
-			programFile << "envLinks." << propertyName; 
-			programFile << " = environment->" << propertyName;
-			programFile << stmtSeparator;
-
-			// check if the property is of dynamic array type
-			Type *type = property->getType();
-			ArrayType *array = dynamic_cast<ArrayType*>(type);
-			StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(type);
-
-			// if the property is a dynamic array then copy dimension info from environemnt too
-			if (array != NULL && staticArray == NULL) {
-				int dimensions = array->getDimensions();
-				for (int d = 0; d < dimensions; d++) {
-					programFile << indent;
-					programFile << "envLinks." << propertyName;
-					programFile << "Dims[" << d << "]";
-					programFile << " = environment->" << propertyName;
-					programFile << "Dims[" << d << "].partition";
-					programFile << stmtSeparator;
-				}
-			}	
-		}
-	}
-
-	// return the populated environment link object
-	programFile << indent << "return envLinks" << stmtSeparator;
-	
-	// close function definition
-	programFile << "}\n";
-	
-	headerFile.close();
-	programFile.close();
-}
-
 void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	
 	std::cout << "Generating task execute routine \n";
@@ -343,10 +256,8 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << std::endl;
 
 	// generate the function header
-	TupleDef *envTuple = taskDef->getEnvTuple();
 	TupleDef *partitionTuple = taskDef->getPartitionTuple();
-	fnHeader << "execute(";
-	fnHeader << envTuple->getId()->getName() << " *environment";
+	fnHeader << "execute(TaskEnvironment *environment";
 	InitializeInstr *initSection = taskDef->getInitSection();
 	if (initSection != NULL) {
 		List<const char*> *arguments = initSection->getArguments();
@@ -374,6 +285,9 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 
 	// open function definition
 	programFile << " {\n\n";
+
+	// set up the log file handle to the task environment reference
+	programFile << indent << "environment->setLogFile(&logFile)" << stmtSeparator;
 
 	// if the current segment has nothing to do about the task then control should return back to the main 
 	// function from here without spending time in vein in any resource management computation
@@ -481,26 +395,6 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 		programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	}
 
-	// read data structures from files if instructed by the coordinator program
-	programFile << indent << "initializeEnvironment";
-	programFile << "(" << "environment" << paramSeparator;
-	programFile << "taskData" << paramSeparator;
-	programFile << "configMap" << ")" << stmtSeparator; 
-	programFile << indent << "logFile << \"\\tenvironment initialization is complete\\n\"" << stmtSeparator;
-	programFile << indent << "logFile.flush()" << stmtSeparator;
-
-	// log time spent on reading data from files
-	programFile << std::endl;
-	programFile << indent << "// calculating file reading time\n";
-	programFile << indent << "gettimeofday(&end, NULL)" << stmtSeparator;
-        programFile << indent << "double readingTime = ((end.tv_sec + end.tv_usec / 1000000.0)";
-        programFile << std::endl << indent << indent << indent;
-        programFile << "- (start.tv_sec + start.tv_usec / 1000000.0)) - timeConsumedSoFar" << stmtSeparator;
-        programFile << indent << "logFile << \"Data reading time: \" << readingTime";
-	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
-	programFile << indent << "timeConsumedSoFar += readingTime" << stmtSeparator;
-	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
-	
 	// start threads and wait for them to finish execution of the task 
         taskGenerator->startThreads(programFile);
 
@@ -516,9 +410,11 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile << indent << "timeConsumedSoFar += computationTime" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	
-	// memory allocation and communicator setup time should be included in the actual computation time as for a hand-written
-	// code those overheads should be insignifant -- the same is not true for file I/0, which should be proportionally costly
-	programFile << indent << "double compAndOverheadTime = timeConsumedSoFar - readingTime" << stmtSeparator;
+	// communicator setup time should be included in the actual computation time as for a hand-written code those 
+	// overheads should be insignifant -- the same is not true for file I/0, which should be proportionally costly;
+	// as I/O happens inside the memory allocation process, we subtract allocation-time from the calculation of
+	// execution time with overhead
+	programFile << indent << "double compAndOverheadTime = timeConsumedSoFar - allocationTime" << stmtSeparator;
 	programFile << indent << "logFile << \"Computation + overhead time: \" << compAndOverheadTime";
 	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
 	programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
@@ -532,21 +428,14 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
         	programFile << " << \" Seconds\" << std::endl" << stmtSeparator;
 		programFile << indent << "logFile << \"Computation without communication time: \"";
 		programFile << " << computationTime - commTime << \" Seconds\" << std::endl" << stmtSeparator;
+		programFile << indent << "logFile.flush()" << stmtSeparator;
 		programFile << std::endl;
 	}
 	
-	// write environmental data structures into output files if instructed by the coordinator program through output bindings
-	programFile << indent << "// storing outputs in files\n"; 
-	programFile << indent << "logFile << \"\\tgoing to write output to files\\n\"" << stmtSeparator;
-	programFile << indent << "logFile.flush()" << stmtSeparator;
-	programFile << indent << "storeEnvironment";
-	programFile << "(" << "environment" << paramSeparator;
-	programFile << "taskData" << paramSeparator;
-	programFile << "mySegment" << paramSeparator;
-	programFile << "configMap" << paramSeparator; 
-	programFile << "logFile" << ")" << stmtSeparator; 
-	programFile << indent << "logFile << \"\\tfile output is complete\\n\"" << stmtSeparator;
-	programFile << indent << "logFile.flush()" << stmtSeparator;
+	// execute all task end environment manipulation instructions and cleanup the non-environmental variables
+	programFile << indent << "// doing task end environmental processing and memory cleanup\n"; 
+	programFile << indent << "environment->executeTaskCompletionInstructions()" << stmtSeparator;
+	programFile << indent << "delete taskData" << stmtSeparator;
 	
 	// close function definition
 	programFile << "}\n\n";

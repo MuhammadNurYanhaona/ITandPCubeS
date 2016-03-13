@@ -12,28 +12,20 @@
 
 //--------------------------------------------------------------- Data Items ---------------------------------------------------------------/
 
-DataItems::DataItems(const char *name, int dimensionality) {
+DataItems::DataItems(const char *name, int dimensionality, bool cleanable) {
 	this->name = name;
 	this->dimensionality = dimensionality;
 	this->ready = false;
-	this->dimConfigList = new List<DimPartitionConfig*>;
-	Assert(this->dimConfigList != NULL);
 	this->partitionConfig = NULL;
 	this->partsList = NULL;
+	this->cleanable = cleanable;
 }
 
-void DataItems::addDimPartitionConfig(int dimensionId, DimPartitionConfig *dimConfig) {
-	Assert(dimensionId < dimensionality);
-	if (dimConfigList->NumElements() > dimensionId) {
-		dimConfigList->InsertAt(dimConfig, dimensionId);
-	} else dimConfigList->Append(dimConfig);
-}
-
-void DataItems::generatePartitionConfig() {
-	Assert(dimConfigList->NumElements() == dimensionality);
-	partitionConfig = new DataPartitionConfig(dimensionality, dimConfigList);
-	Assert(partitionConfig != NULL);
-	ready = true;
+DataItems::~DataItems() {
+	if (cleanable) {
+		delete partsList;
+		delete partitionConfig;
+	}
 }
 
 void DataItems::setPartitionConfig(DataPartitionConfig *partitionConfig) {
@@ -70,6 +62,15 @@ LpsContent::LpsContent(int id) {
 	Assert(this->dataItemsMap != NULL);
 }
 
+LpsContent::~LpsContent() {
+	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
+	DataItems *items = NULL;
+	while ((items = iterator.GetNextValue()) != NULL) {
+		delete items;
+	}
+	delete dataItemsMap;
+}
+
 void LpsContent::addPartIterators(Hashtable<PartIterator*> *partIteratorMap) {
 	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
 	DataItems *items = NULL;
@@ -100,6 +101,15 @@ bool LpsContent::hasValidDataItems() {
 TaskData::TaskData() { 
 	lpsContentMap = new Hashtable<LpsContent*>; 
 	Assert(lpsContentMap != NULL);
+}
+
+TaskData::~TaskData() {
+	Iterator<LpsContent*> iterator = lpsContentMap->GetIterator();
+	LpsContent *lpsContent = NULL;
+	while ((lpsContent = iterator.GetNextValue()) != NULL) {
+		delete lpsContent;
+	}
+	delete lpsContentMap;	
 }
 
 void TaskData::addLpsContent(const char *lpsId, LpsContent *content) { 

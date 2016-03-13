@@ -312,6 +312,7 @@ class DataPartitionConfig {
 	int lpsId;
   public:
 	DataPartitionConfig(int dimensionCount, List<DimPartitionConfig*> *dimensionConfigs);
+	~DataPartitionConfig();
 	void setParent(DataPartitionConfig *parent, int parentJump);
 	DimPartitionConfig *getDimensionConfig(int dimNo) { return dimensionConfigs->Nth(dimNo); }
 	void configureDimensionOrder();

@@ -546,7 +546,7 @@ void AssignmentExpr::translate(std::ostringstream &stream, int indentLevel, int 
 
 void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 
-	// First check if the assignment expression is an assignment of an array to another. If that is the case 
+	// First, check if the assignment expression is an assignment of an array to another. If that is the case 
 	// then we have to use an alternative, specific translation of this expression.
 	if (isArrayAssignment(this)) {
 		AssignmentDirectiveList *directives = new AssignmentDirectiveList(this);
@@ -562,8 +562,8 @@ void AssignmentExpr::generateCode(std::ostringstream &stream, int indentLevel, S
 		}
 
 		// Check if the assignment is a new declaration of a dynamic array. If it is so, we can ignore it as
-		// such a variable is only placeholder for some other environment variable and already declared at 
-		// the time of scope translation.
+		// such a variable is only a placeholder for some other environment variable and is already declared 
+		// at the time of scope translation.
 		if (!ObjectCreate::isDynamicArrayCreate(right)) {	
 
 			// If this is a dimension assignment statement with multiple dimensions of an array assigned 
@@ -846,8 +846,13 @@ void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, S
 	stream << indent.str() << "logFile << \"going to execute task: " << taskName->getName();
 	stream << "\\n\"" << stmtSeparator;
 	stream << indent.str() << "logFile.flush()" << stmtSeparator;
-        
-	// first create a partition object for the task
+
+	// first invoke the task environment's linked arrays' dimensions initialization function as the dimension
+	// lengths will be needed to construct task's partition hierarchy
+	stream << indent.str() << environment->getName();
+	stream << "->setupItemsDimensions()" << stmtSeparator;        
+
+	// create a partition object for the task
 	stream << indent.str() << partitionTuple->getId()->getName() << " partition" << stmtSeparator;
 
 	// collect parameters for the initialize section or populate properties of the partition 
@@ -884,6 +889,9 @@ void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, S
 	stream << paramSeparator << "partition";
 	stream << paramSeparator << "segmentId";
 	stream << paramSeparator << "logFile)" << stmtSeparator;	
+
+	// finally reset all environment update instructions
+	stream << indent.str() << environment->getName() << "->resetEnvInstructions()" << stmtSeparator;
 
 	stream << indent.str() << "} // scope ends for task invocation\n";
 }
