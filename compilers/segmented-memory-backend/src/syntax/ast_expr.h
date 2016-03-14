@@ -376,6 +376,13 @@ class FieldAccess : public Expr {
 	List<FieldAccess*> *getTerminalFieldAccesses();
 	void markAsIndex() { index = true; }
 	bool isIndex() { return index; }
+
+	// since environmental arrays are maintained differently from other variables in a segmented memory
+	// architecture, dimension access of an environmental array needs to be translated differently
+	bool isEnvArrayDim();
+	void translateEnvArrayDim(std::ostringstream &stream, 
+			int indentLevel, 
+			int currentLineLength, Space *space);
 	
 	// if the field access is an array index access where the index correspond to some loop iteration
 	// index then the actual memory location for the index is available in a generated back-end 

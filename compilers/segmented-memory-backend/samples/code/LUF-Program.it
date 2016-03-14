@@ -4,10 +4,8 @@ Program (args) {
 	bind_input(initEnv, "a", args.input_file)
 	execute("Initiate LU"; initEnv)
 	luEnv = new TaskEnvironment(name: "Transposed LU Factorization")
-	upper = initEnv.u
-	lower = initEnv.l
-	luEnv.u = upper
-	luEnv.l = lower
+	luEnv.u = initEnv.u
+	luEnv.l = initEnv.l
 	rows = initEnv.a.dimension1.range
 	max1 = rows.max
 	max2 = initEnv.a.dimension2.range.max

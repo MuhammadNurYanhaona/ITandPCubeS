@@ -241,6 +241,14 @@ bool FieldAccess::isLocalTerminalField() {
 void FieldAccess::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {
 
 	if (base != NULL) {
+		
+		// if the current field access is accessing the dimension parameter of some environmental array then
+		// we invoke a different translation process
+		if (isEnvArrayDim()) {
+			translateEnvArrayDim(stream, indentLevel, currentLineLength, space);
+			return;
+		}
+
 		// call the translate function recursively on base if it is not null
 		base->translate(stream, indentLevel, currentLineLength, space);
 		
@@ -321,6 +329,35 @@ List<FieldAccess*> *FieldAccess::getTerminalFieldAccesses() {
 		return list;
 	}
 	return base->getTerminalFieldAccesses();
+}
+
+bool FieldAccess::isEnvArrayDim() {
+	if (this->type != Type::dimensionType) return false;
+	if (base == NULL) return false;
+	FieldAccess *baseFieldAccess = dynamic_cast<FieldAccess*>(base);
+	if (baseFieldAccess == NULL) return false;
+	ArrayType *array = dynamic_cast<ArrayType*>(baseFieldAccess->getType());
+	StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(baseFieldAccess->getType());
+	if (array == NULL || staticArray != NULL) return false;
+	Expr *superBase = baseFieldAccess->getBase();
+	if (superBase == NULL) return false;
+	NamedType *superBaseType = dynamic_cast<NamedType*>(superBase->getType());
+	if (superBaseType == NULL || !superBaseType->isEnvironmentType()) return false;
+	return true;
+}
+
+void FieldAccess::translateEnvArrayDim(std::ostringstream &stream,
+		int indentLevel,
+		int currentLineLength, Space *space) {
+	
+	DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(field);
+	int dimIndex = dimension->getDimensionNo() - 1;
+	FieldAccess *baseFieldAccess = dynamic_cast<FieldAccess*>(base);
+	const char *arrayName = baseFieldAccess->getField()->getName();
+	FieldAccess *superBaseAccess = dynamic_cast<FieldAccess*>(baseFieldAccess->getBase());
+	const char *envName = superBaseAccess->getField()->getName();
+	
+	stream << envName << "->getItem(\"" << arrayName << "\")->getDimension(" << dimIndex << ")";
 }
 
 void FieldAccess::translateIndex(std::ostringstream &stream, const char *array, int dimension) {
