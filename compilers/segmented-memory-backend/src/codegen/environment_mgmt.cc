@@ -35,13 +35,35 @@ void generateTaskEnvironmentClass(TaskDef *taskDef, const char *initials,
 
 	// declare the extension class for task environment in the header file
 	headerFile << '\n' << "class TaskEnvironmentImpl : public TaskEnvironment {\n";
+
+	// declare all non-array environmental variables as properties of the task environment
+	bool scalarFound = false;
+	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+	for (int i = 0; i < envLinkList->NumElements(); i++) {
+		EnvironmentLink *link = envLinkList->Nth(i);
+		const char *varName = link->getVariable()->getName();
+		DataStructure *structure = rootLps->getStructure(varName);
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(structure->getType());
+		if (array != NULL && staticArray == NULL) continue;
+	
+		if (!scalarFound) {
+			headerFile << "  public:\n";
+			scalarFound = true;
+		}
+		Type *type = structure->getType();
+		headerFile << indent << type->getCppDeclaration(varName) << stmtSeparator;
+	}
+
+	// definitions for the two functions each task environment subclass needs to provide implementations for
 	headerFile << "  public:\n";
 	headerFile << indent << "TaskEnvironmentImpl() : TaskEnvironment() {}\n";
 	headerFile << indent << "void prepareItemMaps()" << stmtSeparator;
 	headerFile << indent << "void setDefaultTaskCompletionInstrs()" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
 
-	// three functions need to be implemented by the task specific environment subclass; call other functions to
+	// two functions need to be implemented by the task specific environment subclass; call other functions to
 	// generate their definitions in the program file
 	generateFnForItemsMapPreparation(taskDef, initials, programFile);
 	generateFnForTaskCompletionInstrs(taskDef, initials, programFile);
@@ -68,7 +90,7 @@ void generateFnForItemsMapPreparation(TaskDef *taskDef, const char *initials, st
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(structure->getType());
 		
-		// at this moment, we are doing environment management for arrays only
+		// item map preparation is applicable for environmental arrays only
 		if (array == NULL || staticArray != NULL) continue;
 
 		programFile << '\n';
@@ -120,7 +142,7 @@ void generateFnForTaskCompletionInstrs(TaskDef *taskDef, const char *initials, s
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(structure->getType());
 	
-		// at this moment, we are doing environment management for arrays only
+		// environment management instructions are applicable for dynamic arrays only
 		if (array == NULL || staticArray != NULL) continue;
 
 		// if the variable's content has not been accessed at all then there is no environmental update to do for it
@@ -173,6 +195,11 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef, const char *initi
 	// declare a local environment link instance that will be returned by the generated function at the end
 	programFile << indent << "EnvironmentLinks links" << stmtSeparator;
 	
+	// convert the generic task environment object into an instance of the task specific subclass so that its
+	// properties can be accessed
+	programFile << indent << initials << "::TaskEnvironmentImpl *taskEnv = ";
+	programFile << "(" << initials << "::TaskEnvironmentImpl *) environment" << stmtSeparator;
+	
 	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
 	for (int i = 0; i < envLinkList->NumElements(); i++) {
 		
@@ -186,8 +213,21 @@ void generateFnToInitEnvLinksFromEnvironment(TaskDef *taskDef, const char *initi
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(structure->getType());
 		
-		// at this moment, we are doing environment management for dynamic arrays only
-		if (array == NULL || staticArray != NULL) continue;
+		// for non-array variables or static arrays copy in properties from the environment to the links 
+		if (array == NULL || staticArray != NULL) {
+			if (staticArray == NULL) {
+				programFile << indent << "links." << varName << " = ";
+				programFile << "taskEnv->" << varName << stmtSeparator;
+			} else {
+				int dimensions = array->getDimensionality();
+				for (int d = 0; d < dimensions; d++) {
+					programFile << indent << "links." << varName << "[" << d << "] = ";
+					programFile << "taskEnv->" << varName;
+					programFile << "[" << d << "]" << stmtSeparator;
+				}
+			}
+			continue;
+		}
 	
 		// retrieve the item corresponding to the environmental variable from the task environment object
 		programFile << '\n';
@@ -252,7 +292,7 @@ void generateFnToPreconfigureLpsAllocations(TaskDef *taskDef, const char *initia
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(structure->getType());
 	
-		// at this moment, we are doing environment management for arrays only
+		// LPS allocations configuration is applicable for dynamic arrays only
 		if (array == NULL || staticArray != NULL) continue;
 
 		// retrieve the task item
@@ -302,6 +342,73 @@ void generateFnToPreconfigureLpsAllocations(TaskDef *taskDef, const char *initia
 		}	
 	}	
 
+	// close function definition	
+	programFile << "}\n";
+	
+	headerFile.close();
+	programFile.close();
+}
+
+void generateFnToCopyBackNonArrayVars(TaskDef *taskDef,
+                const char *initials,
+                const char *headerFileName,
+                const char *programFileName) {
+
+	std::ofstream programFile, headerFile;
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+	const char *message = "Non-array variables copier";
+	decorator::writeSubsectionHeader(headerFile, message);
+	decorator::writeSubsectionHeader(programFile, message);
+	headerFile << '\n';
+	programFile << '\n';
+
+	// generate function header
+	std::ostringstream fnHeader;
+	programFile << "void " << initials << "::";
+        headerFile << "void ";
+        fnHeader << "copyBackNonArrayEnvVariables(TaskEnvironment *environment";
+	fnHeader << paramSeparator << "TaskGlobals *taskGlobals)";
+	programFile << fnHeader.str();
+        headerFile << fnHeader.str() << stmtSeparator;
+
+        // open function definition
+        programFile << " {\n";
+
+	// convert the generic task environment object into an instance of the task specific subclass so that its
+	// properties can be accessed
+	programFile << indent << initials << "::TaskEnvironmentImpl *taskEnv = ";
+	programFile << "(" << initials << "::TaskEnvironmentImpl *) environment" << stmtSeparator;
+	
+	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
+	for (int i = 0; i < envLinkList->NumElements(); i++) {
+		
+		EnvironmentLink *link = envLinkList->Nth(i);
+		const char *varName = link->getVariable()->getName();
+		DataStructure *structure = rootLps->getStructure(varName);
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		StaticArrayType *staticArray = dynamic_cast<StaticArrayType*>(structure->getType());
+		if (array != NULL && staticArray == NULL) continue;
+
+		if (staticArray == NULL) {
+			programFile << indent << "taskEnv->" << varName << " = ";
+			programFile << "taskGlobals->" << varName << stmtSeparator;
+		} else {
+			int dimensions = array->getDimensionality();
+			for (int d = 0; d < dimensions; d++) {
+				programFile << indent << "taskEnv->" << varName << "[" << d << "] = ";
+				programFile << "taskGlobals->" << varName;
+				programFile << "[" << d << "]" << stmtSeparator;
+			}
+		}
+	}
+
+	// close function definition	
 	programFile << "}\n";
 	
 	headerFile.close();

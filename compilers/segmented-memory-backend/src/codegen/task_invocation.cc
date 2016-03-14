@@ -434,6 +434,8 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	
 	// execute all task end environment manipulation instructions and cleanup the non-environmental variables
 	programFile << indent << "// doing task end environmental processing and memory cleanup\n"; 
+	programFile << indent << "copyBackNonArrayEnvVariables(environment" << paramSeparator;
+	programFile << "&taskGlobals)" << stmtSeparator;
 	programFile << indent << "environment->executeTaskCompletionInstructions()" << stmtSeparator;
 	programFile << indent << "delete taskData" << stmtSeparator;
 	

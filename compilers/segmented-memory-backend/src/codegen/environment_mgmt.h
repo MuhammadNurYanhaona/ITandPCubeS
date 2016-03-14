@@ -36,6 +36,12 @@ void generateFnToPreconfigureLpsAllocations(TaskDef *taskDef,
                 const char *headerFile,
                 const char *programFile);
 
-
+/* Non array environmental variables are accessed and updated through a task-globals object during a task's execution. 
+ * Their values need to be copied back into proper task environment properties at the end of the execution. This function 
+ * generates a routine that do the copying. */
+void generateFnToCopyBackNonArrayVars(TaskDef *taskDef,
+                const char *initials,
+                const char *headerFile,
+                const char *programFile);
 
 #endif

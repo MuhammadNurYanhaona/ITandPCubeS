@@ -180,6 +180,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	generateTaskEnvironmentClass(taskDef, initials, headerFile, programFile);
 	generateFnToInitEnvLinksFromEnvironment(taskDef, initials, headerFile, programFile);
 	generateFnToPreconfigureLpsAllocations(taskDef, initials, headerFile, programFile);
+	generateFnToCopyBackNonArrayVars(taskDef, initials, headerFile, programFile);
 
 	// generate task executor and associated functions
 	generateTaskExecutor(this);
