@@ -170,7 +170,7 @@ void FlowStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
 	}
 }
 
-void FlowStage::prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
+void FlowStage::prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
 	if (accessMap == NULL) {
 		accessMap = this->accessMap;
 	}

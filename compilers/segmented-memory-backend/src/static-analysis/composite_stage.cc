@@ -314,10 +314,10 @@ void CompositeStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessLis
 	}
 }
 
-void CompositeStage::prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
+void CompositeStage::prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
-		stage->prepateTaskEnvStat(taskStat);
+		stage->prepareTaskEnvStat(taskStat);
 	}
 }
 
@@ -1308,11 +1308,11 @@ void RepeatCycle::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) 
 	CompositeStage::fillInTaskEnvAccessList(envAccessList);
 }
 
-void RepeatCycle::prepateTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
+void RepeatCycle::prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
 	if (repeatConditionAccessMap != NULL) {
-		FlowStage::prepateTaskEnvStat(taskStat, repeatConditionAccessMap);
+		FlowStage::prepareTaskEnvStat(taskStat, repeatConditionAccessMap);
 	}
-	CompositeStage::prepateTaskEnvStat(taskStat);
+	CompositeStage::prepareTaskEnvStat(taskStat);
 }
 
 void RepeatCycle::performEpochUsageAnalysis() {

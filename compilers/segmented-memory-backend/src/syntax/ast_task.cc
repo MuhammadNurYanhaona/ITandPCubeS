@@ -190,24 +190,31 @@ void TaskDef::validateComputeSection(Scope *parentScope) {
 // Note that the ordering of the function calls within the whole analysis procedure is important as 
 // there are internal depdendency among these analyses through their input/output data structures. 
 void TaskDef::analyseCode() {
+	
 	Scope *scope = symbol->getNestedScope();
-	// determine what task global variable is been used where to prepare for dependency analysis
+	
+	//------------------------------------------------------------- Computation Flow Construction
+	// determine what task global variable is been used where to prepare for rest of the analyses
 	if (initialize != NULL) initialize->performVariableAccessAnalysis(scope);
 	compute->performVariableAccessAnalysis(scope);
 	// convert the body of the compute section into a flow definition for execution control and 
 	// data movements	
 	PartitionHierarchy *hierarchy = partition->getPartitionHierarchy();
 	compute->constructComputationFlow(hierarchy->getRootSpace());
-	// determine the read-write dependencies that occur as flow of computation moves along stages	
-	compute->performDependencyAnalysis(hierarchy);
+
+	//------------------------------------------------------------- Detailed Data Access Analyses
 	// transfer variable access information to partition hierarchy to aid memory management
 	compute->getComputation()->calculateLPSUsageStatistics();
 	// determine how many versions of different data structures need to be maintained at runtime
 	compute->getComputation()->performEpochUsageAnalysis();
 	// flag LPSes those have computation stages in them to decide about LPU generation
 	compute->getComputation()->setLpsExecutionFlags();
+
+	//------------------------------------------------------------------ Data Dependency Analysis
 	// assign stages stage, group, and nesting indexes to aid latter analysis
 	compute->getComputation()->assignIndexAndGroupNo(0, 0, 0);
+	// determine the read-write dependencies that occur as flow of computation moves along stages	
+	compute->performDependencyAnalysis(hierarchy);
 	// determine what dependency relationships should be translated into synchronization require-
 	// ments and recursively mark the sources of these synchronization signals	
 	compute->getComputation()->analyzeSynchronizationNeeds();
@@ -236,7 +243,7 @@ TaskEnvStat *TaskDef::getAfterExecutionEnvStat() {
 	List<VariableAccess*> *envAccessList = getAccessLogOfEnvVariables();
 	Space *rootLps = getPartitionHierarchy()->getRootSpace();
 	TaskEnvStat *taskStat = new TaskEnvStat(envAccessList, rootLps);
-	compute->getComputation()->prepateTaskEnvStat(taskStat);
+	compute->getComputation()->prepareTaskEnvStat(taskStat);
 	return taskStat;
 }
 

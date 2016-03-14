@@ -40,6 +40,8 @@ void generateTaskEnvironmentClass(TaskDef *taskDef, const char *initials,
 	bool scalarFound = false;
 	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
 	Space *rootLps = taskDef->getPartitionHierarchy()->getRootSpace();
+	// if the task environment contains non-array variables, they should be zero initialized in the constructor 
+	std::ostringstream constructorContents;
 	for (int i = 0; i < envLinkList->NumElements(); i++) {
 		EnvironmentLink *link = envLinkList->Nth(i);
 		const char *varName = link->getVariable()->getName();
@@ -52,13 +54,38 @@ void generateTaskEnvironmentClass(TaskDef *taskDef, const char *initials,
 			headerFile << "  public:\n";
 			scalarFound = true;
 		}
+
+		// declare a property of the appropriate type for the non-array variable 
 		Type *type = structure->getType();
 		headerFile << indent << type->getCppDeclaration(varName) << stmtSeparator;
+
+		// if the object is of a user defined type then call its constructor to initialize the property
+		NamedType *userDefinedType = dynamic_cast<NamedType*>(type);
+		if (userDefinedType != NULL) {
+			constructorContents << doubleIndent << varName;
+			constructorContents << " = " << type->getCType() << "()" << stmtSeparator;
+			continue;
+		}
+
+		// at this momemt, we are skipping static array initialization as such an array may have other
+		// static arrays as elements and we need to capture such repetition is an elegant way
+		if (staticArray == NULL) {
+			// zero initialize the built in types 
+			if (type == Type::boolType) {
+				constructorContents << doubleIndent << varName  << " = false" << stmtSeparator;
+			} else {
+				constructorContents << doubleIndent << varName  << " = 0" << stmtSeparator;
+			}
+		}
 	}
 
 	// definitions for the two functions each task environment subclass needs to provide implementations for
 	headerFile << "  public:\n";
-	headerFile << indent << "TaskEnvironmentImpl() : TaskEnvironment() {}\n";
+	headerFile << indent << "TaskEnvironmentImpl() : TaskEnvironment() {";
+	if (scalarFound) {
+		headerFile << '\n' << constructorContents.str() << indent;
+	}
+	headerFile << "}\n";
 	headerFile << indent << "void prepareItemMaps()" << stmtSeparator;
 	headerFile << indent << "void setDefaultTaskCompletionInstrs()" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
