@@ -2,8 +2,8 @@ Program (args) {
         mmEnv = new TaskEnvironment(name: "Matrix Multiply")
 	bind_input(mmEnv, "a", args.input_file_1)
 	bind_input(mmEnv, "b", args.input_file_2)
-        bind_output(mmEnv, "c", args.output_file)
         execute("Matrix Multiply"; mmEnv; Partition: args.k, args.l, args.q)
+        bind_output(mmEnv, "c", args.output_file)
 }
 
 Task "Matrix Multiply":

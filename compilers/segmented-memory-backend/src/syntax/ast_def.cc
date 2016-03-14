@@ -158,7 +158,6 @@ List<TupleDef*> *ProgramDef::getTuples() {
                 Node *node = components->Nth(i);
                 TaskDef *taskDef = dynamic_cast<TaskDef*>(node);
                 if (taskDef != NULL) {
-			tupleList->Append(taskDef->getEnvTuple());
 			tupleList->Append(taskDef->getPartitionTuple());	
 			continue;	
 		}

@@ -1,12 +1,12 @@
 Program (args) {         
 	pfwEnv = new TaskEnvironment(name: "Padded File Write")
-        bind_output(pfwEnv, "plate", args.output_file)
 	length = args.length
 	k = args.k
 	l = args.l
 	m = args.m
 	n = args.n
         execute("Padded File Write"; pfwEnv; Initialize: length; Partition: k, l, m, n)
+        bind_output(pfwEnv, "plate", args.output_file)
 }
 
 Task "Padded File Write":

@@ -9,6 +9,8 @@
 #include "../communication/part_config.h"
 #include "../partition-lib/partition.h"
 
+#include <mpi.h>
+
 //--------------------------------------------------------------- Part Info --------------------------------------------------------------/
 
 void PartInfo::clear() {
@@ -228,4 +230,26 @@ int PartHandler::getStorageIndex(List<int> *partIndex, Dimension *partDimensions
 		multiplier *= partDimensions[i].length;
 	}
 	return storeIndex;
+}
+
+//-------------------------------------------------------------- Part Writer -------------------------------------------------------------/
+
+void PartWriter::processParts() {
+
+	// wait for the previous writer to complete
+	if (writerId != 0) {
+                int predecessorDone = 0;
+                MPI_Status status;
+                MPI_Recv(&predecessorDone, 1, MPI_INT, writerId - 1, 0, MPI_COMM_WORLD, &status);
+        }
+
+	// do the writing
+	PartHandler::processParts();
+	
+	// signal the next writer to begin writing
+	if (writerId < writersCount - 1) {
+		MPI_Request sendRequest;
+		int writingDone = 1;
+		MPI_Isend(&writingDone, 1, MPI_INT, writerId + 1, 0, MPI_COMM_WORLD, &sendRequest);
+	}
 }

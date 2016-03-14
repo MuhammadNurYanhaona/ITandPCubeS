@@ -137,18 +137,4 @@ class ChangeNotifyInstruction : public TaskEndEnvInstruction {
 	void doAdditionalProcessing() {};
 };
 
-/* instruction for recording that a particular data item should be written to output file/files after task completion or
- * at the end of the program 
- */
-class WriteToFileInstruction : public TaskEndEnvInstruction {
-  protected:
-	const char *fileName;
-  public:
-	WriteToFileInstruction(TaskItem *envItem) : TaskEndEnvInstruction(envItem) {}
-	void setFileName(const char *fileName) { this->fileName = fileName; }
-	void updateProgramEnv() {};
-	void doAdditionalProcessing() {};
-}; 
-
-
 #endif

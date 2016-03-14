@@ -375,19 +375,11 @@ void BindOutput::generateCode(std::ostringstream &stream, int indentLevel, Space
 	Expr *arg2 = arguments->Nth(1);
 	Expr *arg3 = arguments->Nth(2);
 
-	stream << '\n' << indents << "{ // scope starts for binding output\n";
-	stream << indents << "TaskItem *item = ";
+	stream << indents;
 	arg1->translate(stream, indentLevel);
-	stream << "->getItem(";
+	stream << "->writeItemToFile(";
 	arg2->translate(stream, indentLevel);
-	stream << ")" << stmtSeparator;
-	stream << indents << "WriteToFileInstruction *instr = new WriteToFileInstruction(item)";
-	stream << stmtSeparator;
-	stream << indents << "instr->setFileName(";
+	stream << paramSeparator;	
 	arg3->translate(stream, indentLevel);
 	stream << ")" << stmtSeparator;
-	stream << indents; 
-	arg1->translate(stream, indentLevel);
-	stream << "->addEndEnvInstruction(instr)" << stmtSeparator;
-	stream << indents << "} // scope ends for binding output\n\n";
 }

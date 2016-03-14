@@ -70,7 +70,7 @@ class PartHandler {
 	bool doesNeedToExcludePadding() { return needToExcludePadding; }
 	
 	// this routine iterates the data section of all parts one-by-one for reading/writing   
-	void processParts();
+	virtual void processParts();
 	// function to be called immediately after a new part has been selected for processing and before anything else 
 	// has been done with it
 	void calculateCurrentPartInfo();
@@ -133,6 +133,12 @@ class PartWriter : public PartHandler {
 		this->writerId = writerId;
 	}
 	void setWritersCount(int writersCount) { this->writersCount = writersCount; }
+
+	// Currently file writing happens sequentially. The first segment writes then notifies the second, then the 
+	// second segment writes and notifies the third, and so on. There needs to be signals that indicate when a 
+	// segment can start writing and when it is done. To send/receive these signals, part-writer overrides the
+	// base clase function.
+	void processParts();
 
 	// like the PartReader, this class also override the processElement() method to make writing process explicit
 	// for task specific subclasses  

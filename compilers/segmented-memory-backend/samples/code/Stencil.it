@@ -1,9 +1,6 @@
 Program (args) {         
 	stencilEnv = new TaskEnvironment(name: "Five Points Stencil")
-       
 	bind_input(stencilEnv, "plate", args.input_file)
-        bind_output(stencilEnv, "plate", args.output_file)
-
 	iterations = args.iterations
 	p = args.p
 	k = args.k
@@ -11,6 +8,7 @@ Program (args) {
 	m = args.m
 	n = args.n
         execute("Five Points Stencil"; stencilEnv; Initialize: iterations; Partition: p, k, l, m, n)
+        bind_output(stencilEnv, "plate", args.output_file)
 }
 
 Task "Five Points Stencil":

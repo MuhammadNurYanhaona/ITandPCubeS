@@ -787,11 +787,8 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 
 	// include the PartDimension class from compiler library to store metadata information for environment
 	// references
-	headerFile << "#include \"../../src/runtime/structure.h\"\n"; 
+	headerFile << "#include \"../../src/runtime/structure.h\"\n\n"; 
 	
-	// include the environment base class that stores input/output instructions for tasks' data structures       
-	headerFile << "#include \"../../src/input-output/environment_base.h\"\n\n"; 
-
 	// first have a list of forward declarations for all tuples to avoid having errors during 
 	// compilation of individual classes
 	for (int i = 0; i < tupleDefList->NumElements(); i++) {

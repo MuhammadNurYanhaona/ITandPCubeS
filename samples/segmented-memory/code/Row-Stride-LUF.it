@@ -1,10 +1,10 @@
 Program (args) { 
         lufEnv = new TaskEnvironment(name: "LU Factorization")
         bind_input(lufEnv, "a", args.input_file)
+        execute("LU Factorization"; lufEnv)
         bind_output(lufEnv, "u", args.output_file_1)
         bind_output(lufEnv, "l", args.output_file_2)
         bind_output(lufEnv, "p", args.output_file_3)
-        execute("LU Factorization"; lufEnv)
 }
 
 Task "LU Factorization":

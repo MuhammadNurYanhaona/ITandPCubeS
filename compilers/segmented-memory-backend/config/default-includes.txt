@@ -47,7 +47,6 @@
 #include "../../src/runtime/allocator.h"
 #include "../../src/input-output/stream.h"
 #include "../../src/input-output/data_handler.h"
-#include "../../src/input-output/environment_base.h"
 
 // for communication
 #include "../../src/communication/part_folding.h"

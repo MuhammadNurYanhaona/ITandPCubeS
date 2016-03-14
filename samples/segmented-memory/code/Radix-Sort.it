@@ -1,13 +1,11 @@
 Program (args) {         
         rdSortEnv = new TaskEnvironment(name: "Radix Sort")
-       
         bind_input(rdSortEnv, "keys", args.input_file)
-        bind_output(rdSortEnv, "keys", args.output_file)
-
         digits = args.digits
         key_size = args.key_size
         p = args.p
         execute("Radix Sort"; rdSortEnv; Initialize: digits, key_size; Partition: p)
+        bind_output(rdSortEnv, "keys", args.output_file)
 }
 
 Task "Radix Sort":

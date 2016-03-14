@@ -362,6 +362,13 @@ bool TaskItem::isEmpty() {
 	return noPartsListFound;
 }
 
+const char *TaskItem::getFirstAllocationsLpsId() {
+	Iterator<LpsAllocation*>  iterator =  allocations->GetIterator();
+	LpsAllocation *allocation = iterator.GetNextValue();
+	if (allocation == NULL) return NULL;
+	else return allocation->getLpsId();
+}
+
 //-------------------------------------------------------- Task Environment -----------------------------------------------------------/
 
 int TaskEnvironment::CURRENT_ENV_ID = 0;
@@ -400,6 +407,21 @@ void TaskEnvironment::setDefaultEnvInitInstrs() {
 		initInstrs.push_back(instr);
 	}
 }
+
+void TaskEnvironment::writeItemToFile(const char *itemName, const char *filePath) {
+	
+	TaskItem *item = envItems->Lookup(itemName);
+	const char *allocatorLps = item->getFirstAllocationsLpsId();
+	if (allocatorLps == NULL) return;
+	
+	ostringstream writerId;
+	writerId << itemName << "InSpace" << allocatorLps << "Writer";
+	PartWriter *writer = writersMap->Lookup(writerId.str().c_str()); 
+	if (writer == NULL) return;
+
+	writer->setFileName(filePath);
+	writer->processParts();
+}	
 
 void TaskEnvironment::addInitEnvInstruction(TaskInitEnvInstruction *instr) { 
 	

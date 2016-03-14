@@ -234,6 +234,7 @@ class LpsAllocation {
 	PartsList *partsList;
   public:
 	LpsAllocation(const char *lpsId, DataPartitionConfig *partitionConfig);
+	const char *getLpsId() { return lpsId; }
 	void setPartitionConfig(DataPartitionConfig *config) { partitionConfig = config; }
 	void setPartContainerTree(PartIdContainer *containerTree) {
 		this->partContainerTree = containerTree;
@@ -270,6 +271,7 @@ class TaskItem {
 	void setDimension(int dimNo, Dimension dimension) { rootDimensions->Nth(dimNo) = dimension; }
 	EnvItemType getType() { return type; }
 	bool isEmpty();
+	const char *getFirstAllocationsLpsId();
 };
 
 /* This is the super-class for all task environments. Compiler will generate task specific environment objects to provide
@@ -302,6 +304,9 @@ class TaskEnvironment {
 	void setWritersMap(Hashtable<PartWriter*> *writersMap) { this->writersMap = writersMap; }
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	void setDefaultEnvInitInstrs();
+
+	// function to write output to a file in response to a bind-output command
+	void writeItemToFile(const char *itemName, const char *filePath);
 
 	// task specific environment subclasses should provide implementation of the following two library functions
 	virtual void prepareItemsMap() {}
