@@ -224,6 +224,7 @@ void TaskDef::analyseCode() {
 	//------------------------------------------------------------------ Data Dependency Analysis
 	// assign stages stage, group, and nesting indexes to aid latter analysis
 	computation->assignIndexAndGroupNo(0, 0, 0);
+	computation->setRepeatIndex(-1);
 	// determine the read-write dependencies that occur as flow of computation moves along stages	
 	compute->performDependencyAnalysis(hierarchy);
 	// determine what dependency relationships should be translated into synchronization require-
@@ -262,7 +263,9 @@ void TaskDef::print() {
 	printf("------------------------------------------------------------------\n");
 	printf("Task: %s", id->getName());
 	printf("\n------------------------------------------------------------------\n");
-	initialize->printUsageStatistics();
+	if (initialize != NULL) {
+		initialize->printUsageStatistics();
+	}
 	compute->print();
 }
 
