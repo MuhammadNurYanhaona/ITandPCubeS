@@ -171,6 +171,7 @@ void FlowStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
 }
 
 void FlowStage::prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap) {
+
 	if (accessMap == NULL) {
 		accessMap = this->accessMap;
 	}
@@ -187,12 +188,10 @@ void FlowStage::prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAcce
 		// if there is no stat object for the variable access in the environment then it is not an environment variable
 		if (varStat == NULL) continue;
 
-		DataStructure *structure = space->getStructure(varName);
-		Space *allocatorLps = structure->getAllocator();
 		if (accessLog->isModified()) {
-			varStat->flagWriteOnLps(allocatorLps);
+			varStat->flagWriteOnLps(space);
 		} else {
-			varStat->flagReadOnLps(allocatorLps);
+			varStat->flagReadOnLps(space);
 		}
 	}
 }

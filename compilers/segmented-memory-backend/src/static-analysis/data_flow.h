@@ -238,7 +238,7 @@ class SyncStage : public FlowStage {
 	void analyzeSynchronizationNeeds();
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	
-	// For now usage statistics is not been gathered for sync stages 
+	// For now, usage statistics is not been gathered for sync stages 
 	void calculateLPSUsageStatistics() {}
 	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {}
 

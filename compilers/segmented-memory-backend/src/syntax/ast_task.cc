@@ -203,28 +203,39 @@ void TaskDef::analyseCode() {
 	compute->constructComputationFlow(hierarchy->getRootSpace());
 
 	//------------------------------------------------------------- Detailed Data Access Analyses
+	CompositeStage *computation = compute->getComputation();
 	// transfer variable access information to partition hierarchy to aid memory management
-	compute->getComputation()->calculateLPSUsageStatistics();
+	computation->calculateLPSUsageStatistics();
 	// determine how many versions of different data structures need to be maintained at runtime
-	compute->getComputation()->performEpochUsageAnalysis();
+	computation->performEpochUsageAnalysis();
 	// flag LPSes those have computation stages in them to decide about LPU generation
-	compute->getComputation()->setLpsExecutionFlags();
+	computation->setLpsExecutionFlags();
 
+	//------------------------------------------------ Stage Augmentation for LPS Synchronization
+	// generate after execution environment statistics that tells about stale/fresh data items
+	TaskEnvStat *taskEnvStat = getAfterExecutionEnvStat();
+	// create list of sync stages for LPSes that have their copy of some data being stale
+	List<FlowStage*> *syncStagesForStaleLpses = taskEnvStat->generateSyncStagesForStaleLpses();
+	// append the sync stages to the computation flow
+	for (int i = 0; i < syncStagesForStaleLpses->NumElements(); i++) {
+		computation->addStageAtEnd(syncStagesForStaleLpses->Nth(i));
+	}
+	
 	//------------------------------------------------------------------ Data Dependency Analysis
 	// assign stages stage, group, and nesting indexes to aid latter analysis
-	compute->getComputation()->assignIndexAndGroupNo(0, 0, 0);
+	computation->assignIndexAndGroupNo(0, 0, 0);
 	// determine the read-write dependencies that occur as flow of computation moves along stages	
 	compute->performDependencyAnalysis(hierarchy);
 	// determine what dependency relationships should be translated into synchronization require-
 	// ments and recursively mark the sources of these synchronization signals	
-	compute->getComputation()->analyzeSynchronizationNeeds();
+	computation->analyzeSynchronizationNeeds();
 	// similar to the above determine the sync stages for all synchronization signals
-	compute->getComputation()->deriveSynchronizationDependencies();
+	computation->deriveSynchronizationDependencies();
 	// then lift up all sync sources to their proper upper level composite stages
-	compute->getComputation()->analyzeSynchronizationNeedsForComposites();
+	computation->analyzeSynchronizationNeedsForComposites();
 	// finally determine which sync stage for a synchronization  will reset the synchronization
 	// primitives so that they can be reused (e.g., for latter iterations)
-	compute->getComputation()->setReactivatorFlagsForSyncReqs();
+	computation->setReactivatorFlagsForSyncReqs();
 }
 
 List<VariableAccess*> *TaskDef::getAccessLogOfEnvVariables() {
