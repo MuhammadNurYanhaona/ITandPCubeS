@@ -125,11 +125,19 @@ void generateFnForItemsMapPreparation(TaskDef *taskDef, const char *initials, st
 		int dimensionality = type->getDimensions();
 		int linkId = i;
 
-		programFile << indent << "EnvironmentLinkKey *key" << linkId << " = new EnvironmentLinkKey(";
+		// New items are added to the environment only if they are not already there. In the situation
+		// of the same task being invoked multiple times with the same environment parameter, we do not 
+		// want to replace the existing task items with new items. Rather, we want to update them. During 
+		// the update process, we can do necessary changes in the program environment too. If we throw 
+		// away old items, we will loose old associations between the task and program environments. 
+		programFile << indent << "if (envItems->Lookup(\"" << varName << "\") == NULL) {\n";
+		
+		programFile << doubleIndent << "EnvironmentLinkKey *key";
+		programFile << linkId << " = new EnvironmentLinkKey(";
 		programFile << "\"" << varName << "\"" << paramSeparator;
 		programFile << linkId << ")" << stmtSeparator;
 
-		programFile << indent << "TaskItem *item" << linkId << " = new TaskItem(";
+		programFile << doubleIndent << "TaskItem *item" << linkId << " = new TaskItem(";
 		programFile << "key" << linkId << paramSeparator;
 
 		LinkageType linkageType = link->getMode();
@@ -144,9 +152,13 @@ void generateFnForItemsMapPreparation(TaskDef *taskDef, const char *initials, st
 		programFile << dimensionality << paramSeparator;
 		Type *elementType = type->getTerminalElementType();
 		programFile << "sizeof(" << elementType->getCType() << "))" << stmtSeparator;
+		programFile << doubleIndent << "item" << linkId << "->setEnvironment(this)" << stmtSeparator;
 		
-		programFile << indent << "envItems->Enter(\"" << varName << "\"" << paramSeparator;
+		programFile << doubleIndent << "envItems->Enter(\"" << varName << "\"" << paramSeparator;
 		programFile << "item" << linkId << ")" << stmtSeparator;
+		
+		// closing the if block	
+		programFile << indent << "}\n";
 	}
 	
 	programFile << "}\n";

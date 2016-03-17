@@ -55,6 +55,7 @@ template <class Type> class TypedInputStream {
 		stream.seekg(dataBegins, ios_base::beg);
 	}
 	void close() { stream.close(); }
+	List<Dimension*> *getDimensionList() { return dimLengths; }
 
 	// read an element at a specific index of the array 
 	Type readElement(List<int> *index) {

@@ -74,7 +74,7 @@ class ArrayTransferConfig {
 	// of the part-dimension array passed as the first argument; note that this assume that dimension transfer 
 	// information for the concerned dimensions are available
 	void copyDimensions(PartDimension *PartDimensions, int dimCount);
-  private:
+	
 	// recursively find the range of the first dimension transfer from the current configuration to the source 
 	// for the dimension number passed as the argument 
 	Range getNearestDimTransferRange(int dimensionNo);	

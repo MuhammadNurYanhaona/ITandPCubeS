@@ -8,8 +8,8 @@
 				 Environment Instructions to be Processed At Task Initialization
 -------------------------------------------------------------------------------------------------------------------------------------*/
 
-// this is the base class for all types of instructions for initializing an environmental data structure that a task going to 
-// access/create as part of its execution 
+// this is the base class for all types of instructions for initializing an environmental data structure that a task going 
+// to access/create as part of its execution 
 class TaskInitEnvInstruction {
   protected:
 	// the item in the task environment this instruction is going to operate on
@@ -18,7 +18,7 @@ class TaskInitEnvInstruction {
 	TaskInitEnvInstruction(TaskItem *itemToUpdate) { this->itemToUpdate = itemToUpdate; }
 	TaskItem *getItemToUpdate() { return itemToUpdate; }
 	
-	// this function should be called before the task has been scheduled for execution as without dimension lengths
+	// this function should be called before the task has been scheduled for execution because without dimension lengths
 	// information, partition configuration and other necessary metadata for parts of the data structure cannot be
 	// constructed, precluding any further processing of data parts
 	virtual void setupDimensions() = 0;
@@ -37,7 +37,26 @@ class TaskInitEnvInstruction {
 	virtual void postprocessProgramEnv() = 0;		
 
 	// each subclass should return an unique type number to enable instructions retrieval by type
-	virtual int getType() = 0;	
+	virtual int getType() = 0;
+  protected:
+	//------------------------------------------------- a group of helper functions to be used by sub-classes to provide 
+	// ------------------------------------------------ implementations for the virtual functions
+	
+	// function to let go of any existing parts-list references to the program environment for the target task item and
+	// initiate garbage collection if applicable 
+	void removeOldPartsListReferences();
+
+	// allocates memory for the data parts of different LPS allocations of the target task item	
+	void allocatePartsLists();
+
+	// generates a new data source key for the target item
+	void assignDataSourceKeyForItem();
+
+	// creates a new object-version-manager and initialize it in the program environment for a newly created data item 
+	void initiateVersionManagement();
+
+	// flags parts-lists already existing in the environment for the underlying data item as fresh 
+	void recordFreshPartsListVersions();	
 };
 
 /* This is the default instruction for linked task environmental variables. If there is no other instruction associated with
@@ -48,10 +67,19 @@ class TaskInitEnvInstruction {
 class StaleRefreshInstruction : public TaskInitEnvInstruction {
   public:
 	StaleRefreshInstruction(TaskItem *itemToUpdate) : TaskInitEnvInstruction(itemToUpdate) {}
-	void setupDimensions() {};
-	void preprocessProgramEnv() {};
+	
+	// refreshing a probably stale parts list of an existing data item does not change its dimension information  
+	void setupDimensions() {}
+
+	// no program environment preprocessing is required for this instruction 
+	void preprocessProgramEnv() {}
+
 	void setupPartsList() {};
-	void postprocessProgramEnv() {};
+
+	// At the end of parts-list setup -- may it cause data transfer or not -- all parts-lists of the underlying item are
+	// fresh again. So they should be flagged fresh in the program environment.
+	void postprocessProgramEnv() { recordFreshPartsListVersions(); }
+
 	int getType() { return 0; }			
 };
 
@@ -61,10 +89,21 @@ class StaleRefreshInstruction : public TaskInitEnvInstruction {
 class CreateFreshInstruction : public TaskInitEnvInstruction {
   public:	
 	CreateFreshInstruction(TaskItem *itemToUpdate) : TaskInitEnvInstruction(itemToUpdate) {}
-	void setupDimensions() {};
-	void preprocessProgramEnv() {};
-	void setupPartsList() {};
-	void postprocessProgramEnv() {};			
+	
+	// items created because of the task execution gets their dimension set-up by the task initializer section; there is
+	// no need for their dimensions to be initialized, neither there is any scope for it
+	void setupDimensions() {}
+
+	// if a new data item is going to be created for the underlying variable in the task then the task should let go of
+	// its reference for the parts list of the same variable that has been created during an earlier execution of the task 	
+	void preprocessProgramEnv() { removeOldPartsListReferences(); }
+
+	// setting up parts list should involve just allocating memory for the parts and prepare an item key source reference
+	void setupPartsList();
+
+	// a fresh version manager should be instantiated as the item is a created data structure
+	void postprocessProgramEnv() { initiateVersionManagement(); }		
+	
 	int getType() { return 1; }			
 };
 
@@ -79,16 +118,28 @@ class ReadFromFileInstruction : public TaskInitEnvInstruction {
 	}
 	void setFileName(const char *fileName) { this->fileName = fileName; }
 	
-	void setupDimensions() {};
-	void preprocessProgramEnv() {};
-	void setupPartsList() {};
-	void postprocessProgramEnv() {};			
+	// read the dimension metadata that appears at the beginning of the data file and copy back that information in the
+	// dimension properties of the task-item
+	void setupDimensions();
+
+	// Reading contents from a file means the task is letting go of its earlier data item for the underlying variable. So
+	// the task's reference to any earlier parts-list, if exists, maintained in the program environment should be removed.
+	void preprocessProgramEnv() { removeOldPartsListReferences(); }
+
+	void setupPartsList();
+
+	// As reading contents from a file results in generation of a new data item, a new version manager should be started
+	// for this case too.   
+	void postprocessProgramEnv() { initiateVersionManagement(); }
+			
 	int getType() { return 2; }			
 };
 
 /* This encodes an explicit object assignment from one task to another task environment in the form envA.a = envB.b; note
  * that only portion of the data item can be assigned from the source to the destination task's environment using the array
  * sub-range expression.
+ * TODO: note that at the initial phase, we are assuming that the source and the destination items have the same dimension to
+ * do make the implementation simplar. This restriction does not hold in general and we should remove it in the future.
  */
 class DataTransferInstruction : public TaskInitEnvInstruction {
   protected:
@@ -100,10 +151,20 @@ class DataTransferInstruction : public TaskInitEnvInstruction {
 	void setTransferConfig(ArrayTransferConfig *config) { transferConfig = config; }
 	ArrayTransferConfig *getTransferConfig() { return transferConfig; }
 	
-	void setupDimensions() {};
-	void preprocessProgramEnv() {};
+	// the root dimension for the destination should be determined from the dimension transfer information available in 
+	// the transfer config object
+	void setupDimensions();
+	
+	// data transfer from some other task's item to the target item of the underlying task should result in removal of the
+	// current references the task has for the item as the item is now going to hold a different data content
+	void preprocessProgramEnv() { removeOldPartsListReferences(); }
+
 	void setupPartsList() {};
-	void postprocessProgramEnv() {};			
+	
+	// Data transfer instruction is always related to some existing data version manager and after the parts-list setup
+	// current task-item's LPS allocations are fresh. Thus we need to record their freshness in the program environment.
+	void postprocessProgramEnv() { recordFreshPartsListVersions(); }	
+		
 	int getType() { return 3; }			
 };
 
@@ -119,7 +180,7 @@ class TaskEndEnvInstruction {
   protected:
 	TaskItem *envItem;
   public:
-	TaskEndEnvInstruction(TaskItem *envItem);
+	TaskEndEnvInstruction(TaskItem *envItem) { this->envItem = envItem; }
 	void execute() {
 		updateProgramEnv();
 		doAdditionalProcessing();

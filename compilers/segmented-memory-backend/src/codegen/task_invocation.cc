@@ -465,8 +465,17 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
 	// do MPI initialization
 	stream << indent << "MPI_Init(&argc, &argv)" << stmtSeparator << std::endl;
 
+	// create a program environment variable to coordinate environmental exchanges among tasks
+	stream << indent << "// program environment management structure\n";
+	stream << indent << "ProgramEnvironment *programEnv = new ProgramEnvironment()" << stmtSeparator;
+	
+	// create an integer identifier that will be increased during each task invocation to serve as an
+	// identifier for the task
+	stream << std::endl<< indent << "// task invocation index tracking variable\n";
+	stream << indent << "int taskId = 0" << stmtSeparator;
+
 	// retrieve the segment id for the current process
-        stream << indent << "// retreiving segmentation identifier\n";
+        stream << std::endl << indent << "// retreiving segmentation identifier\n";
 	stream << indent << "int segmentId = 0" << stmtSeparator;
         stream << indent << "MPI_Comm_rank(MPI_COMM_WORLD, &segmentId)" << stmtSeparator << std::endl;
 

@@ -17,6 +17,7 @@
  * related data structures. These two sets go hand-in-hand as program environment gets updated by execution of each task. 
  */
 
+class TaskEnvironment;
 class TaskInitEnvInstruction;
 class TaskEndEnvInstruction;
 
@@ -183,6 +184,7 @@ class ObjectVersionManager {
 	void markNonMatchingVersionsStale(ListReferenceKey *matchingKey);
 	void addFreshVersionKey(ListReferenceKey *freshKey);
 	List<PartsListReference*> *getFreshVersions();
+	int getVersionCount();
 };
 
 /* The program environment is at the end a collection of object-version-managers for different data items 
@@ -193,7 +195,8 @@ class ProgramEnvironment {
   public:
 	ProgramEnvironment();
 	void addNewDataItem(ObjectIdentifier *identifier, PartsListReference* sourceReference);
-	ObjectVersionManager *getVersionManager(const char *dataItemKey);	
+	ObjectVersionManager *getVersionManager(const char *dataItemKey);
+	void cleanupPossiblyEmptyVersionManager(const char *dataItemKey);	
 };
 
 /*------------------------------------------------------------------------------------------------------------------------
@@ -236,6 +239,7 @@ class LpsAllocation {
 	LpsAllocation(const char *lpsId, DataPartitionConfig *partitionConfig);
 	const char *getLpsId() { return lpsId; }
 	void setPartitionConfig(DataPartitionConfig *config) { partitionConfig = config; }
+	DataPartitionConfig *getPartitionConfig() { return partitionConfig; }
 	void setPartContainerTree(PartIdContainer *containerTree) {
 		this->partContainerTree = containerTree;
 	}
@@ -259,19 +263,25 @@ class TaskItem {
 	List<Dimension> *rootDimensions;
 	Hashtable<LpsAllocation*> *allocations;
 	int elementSize;
+	// a back pointer to the environment object hold ing this task item to access features such as file reader/writers
+	TaskEnvironment *environment;
   public:
 	TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality, int elementSize);
 	void setRootDimensions(Dimension *dimensions);
 	void setRootDimensions(List<Dimension> *dimensionList) { this->rootDimensions = dimensionList; }
+	void setEnvironment(TaskEnvironment *environment);
+	TaskEnvironment *getEnvironment();
 	List<Dimension> *getRootDimensions() { return rootDimensions; }
 	EnvironmentLinkKey *getEnvLinkKey() { return key; }
 	void preConfigureLpsAllocation(const char *lpsId, DataPartitionConfig *partitionConfig);
 	LpsAllocation *getLpsAllocation(const char *lpsId) { return allocations->Lookup(lpsId); }
+	Hashtable<LpsAllocation*> *getAllAllocations() { return allocations; }
 	Dimension getDimension(int dimNo) { return rootDimensions->Nth(dimNo); }
 	void setDimension(int dimNo, Dimension dimension) { rootDimensions->Nth(dimNo) = dimension; }
 	EnvItemType getType() { return type; }
 	bool isEmpty();
 	const char *getFirstAllocationsLpsId();
+	int getDimensionality() { return rootDimensions->NumElements(); }
 };
 
 /* This is the super-class for all task environments. Compiler will generate task specific environment objects to provide
@@ -291,6 +301,10 @@ class TaskEnvironment {
 	Hashtable<PartWriter*> *writersMap;
 	// a stream for logging events during task environment processing
         std::ofstream *logFile;
+	// a back pointer to the program environment to be accessed during instructions processing
+	ProgramEnvironment *progEnv;
+	// execution index of the current task invocation that this environment is used for
+	int taskId; 
   public:
 	// this variable does not have any practical purpose; it is there just to keep track of the name of the task the
 	// environment object has been created for 
@@ -299,15 +313,21 @@ class TaskEnvironment {
 	static int CURRENT_ENV_ID;	
   public:
 	TaskEnvironment();
+	int getEnvId() { return envId; }
+	void setTaskId(int taskId) { this->taskId = taskId; }
+	int getTaskId() { return taskId; } 
 	TaskItem *getItem(const char *itemName) { return envItems->Lookup(itemName); }
 	void setReadersMap(Hashtable<PartReader*> *readersMap) { this->readersMap = readersMap; }
 	void setWritersMap(Hashtable<PartWriter*> *writersMap) { this->writersMap = writersMap; }
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
+	void setProgramEnvironment(ProgramEnvironment *progEnv) { this->progEnv = progEnv; }
+	ProgramEnvironment *getProgramEnvironment() { return progEnv; }
+	PartReader *getPartReader(const char *itemName, const char *lpsId);
 	void setDefaultEnvInitInstrs();
 
 	// function to write output to a file in response to a bind-output command
 	void writeItemToFile(const char *itemName, const char *filePath);
-
+	
 	// task specific environment subclasses should provide implementation of the following two library functions
 	virtual void prepareItemsMap() {}
 	virtual void setDefaultTaskCompletionInstrs() {}

@@ -198,6 +198,7 @@ void ObjectVersionManager::removeVersion(ListReferenceKey *versionKey) {
 	
 	const char *stringKey = versionKey->generateKey();
 	PartsListReference *version = dataVersions->Lookup(stringKey);
+	dataVersions->Remove(stringKey, version);
 	PartsList *partsList = version->getPartsList();
 	delete version;
 	
@@ -258,6 +259,16 @@ List<PartsListReference*> *ObjectVersionManager::getFreshVersions() {
 	return freshVersions;	
 }
 
+int ObjectVersionManager::getVersionCount() {
+	int versionCount = 0;
+	Iterator<PartsListReference*> iterator = dataVersions->GetIterator();
+	PartsListReference *version = NULL;
+	while ((version = iterator.GetNextValue()) != NULL) {
+		versionCount++;
+	} 
+	return versionCount;
+}
+
 //----------------------------------------------------------- Program Environment ------------------------------------------------------/
 
 ProgramEnvironment::ProgramEnvironment() {
@@ -274,6 +285,15 @@ ObjectVersionManager *ProgramEnvironment::getVersionManager(const char *dataItem
 	return envObjects->Lookup(dataItemKey);	
 }
 
+void ProgramEnvironment::cleanupPossiblyEmptyVersionManager(const char *dataItemKey) {
+	ObjectVersionManager *manager = envObjects->Lookup(dataItemKey);
+	int versionCount = manager->getVersionCount();
+	if (versionCount == 0) {
+		envObjects->Remove(dataItemKey, manager);
+		delete manager;
+	}
+}
+
 //---------------------------------------------------------- Environment Link Key ------------------------------------------------------/
 
 EnvironmentLinkKey::EnvironmentLinkKey(const char *varName, int linkId) {
@@ -287,10 +307,8 @@ void EnvironmentLinkKey::flagAsDataSource(int taskId) {
 }
 
 const char *EnvironmentLinkKey::generateKey(int taskId) {
-	ostringstream stream;
-	stream << "task-" << taskId;
-	stream << "link-" << linkId;
-	return strdup(stream.str().c_str());
+	ObjectIdentifier identifier = ObjectIdentifier(taskId, linkId);
+	return identifier.generateKey();
 }
 
 ObjectIdentifier *EnvironmentLinkKey::generateObjectIdentifier(int taskId) {
@@ -335,7 +353,14 @@ TaskItem::TaskItem(EnvironmentLinkKey *key, EnvItemType type, int dimensionality
 	}
 	allocations = new Hashtable<LpsAllocation*>;
 	this->elementSize = elementSize;
+	this->environment = NULL;
 }
+
+void TaskItem::setEnvironment(TaskEnvironment *environment) {
+	this->environment = environment;
+}
+
+TaskEnvironment *TaskItem::getEnvironment() { return environment; }
 
 void TaskItem::setRootDimensions(Dimension *dimensions) {
 	for (int i = 0; i < rootDimensions->NumElements(); i++) {
@@ -382,9 +407,16 @@ TaskEnvironment::TaskEnvironment() {
 	this->name = NULL;
 	this->readersMap = NULL;
 	this->writersMap = NULL;
+	this->progEnv = NULL;
 
 	prepareItemsMap();
 	resetEnvInstructions();
+}
+
+PartReader *TaskEnvironment::getPartReader(const char *itemName, const char *lpsId) {
+	ostringstream readerId;
+	readerId << itemName << "InSpace" << lpsId << "Reader";
+	return readersMap->Lookup(readerId.str().c_str());
 }
 
 void TaskEnvironment::setDefaultEnvInitInstrs() {

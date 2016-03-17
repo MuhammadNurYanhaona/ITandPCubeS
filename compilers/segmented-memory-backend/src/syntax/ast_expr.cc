@@ -852,6 +852,11 @@ void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, S
 	stream << indent.str() << environment->getName();
 	stream << "->setupItemsDimensions()" << stmtSeparator;        
 
+	// assign a task invocation Id to the environment for the upcoming task and increase the inocation id for
+	// later usage
+	stream << indent.str() << environment->getName() << "->setTaskId(taskId)" << stmtSeparator;
+	stream << indent.str() << "taskId++" << stmtSeparator;
+	
 	// create a partition object for the task
 	stream << indent.str() << partitionTuple->getId()->getName() << " partition" << stmtSeparator;
 
@@ -1050,9 +1055,20 @@ void ObjectCreate::translate(std::ostringstream &stream, int indentLevel, int cu
 }
 
 void ObjectCreate::generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel) {
+	
+	// generate property transfer statements for individual arguments passed to the controller
 	for (int i = 0; i < initArgs->NumElements(); i++) {
 		InitializerArg *currentArg = initArgs->Nth(i);
 		currentArg->generateAssignment(object, stream, indentLevel);
+	}
+
+	// for task-environment objects, we need to assign a back pointer to the sole program environment instance created
+	// in the coordinator function for environmental data structures management
+	NamedType *userType = dynamic_cast<NamedType*>(object->getType());
+	if (userType != NULL && userType->isEnvironmentType()) {
+		for (int i = 0; i < indentLevel; i++) stream << '\t';
+		object->translate(stream, indentLevel);
+		stream << "->setProgramEnvironment(programEnv)" << ";\n";
 	}
 }
 
