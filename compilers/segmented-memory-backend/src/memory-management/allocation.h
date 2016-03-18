@@ -198,7 +198,7 @@ class DataPartsList {
 
 	// each PPU-controller within a segment should get an iterator for each data part list that to be used later 
 	// for part searching
-	PartIterator *createIterator() { return partContainer->getIterator(); }
+	PartIterator *createIterator();
 };
 
 #endif

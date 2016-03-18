@@ -163,7 +163,7 @@ void DataPartsList::initializePartsList(DataPartitionConfig *partConfig,
 		PartIdContainer *partContainer, 
 		int partElementSize) {
 
-	partContainer = partContainer;
+	this->partContainer = partContainer;
         int partCount = partContainer->getPartCount();
 	if (partCount > 0) {
 		partList = new List<DataPart*>(partCount);
@@ -197,4 +197,8 @@ DataPart *DataPartsList::getPart(List<int*> *partId, PartIterator *iterator) {
 	PartLocator *partLocator = reinterpret_cast<PartLocator*>(part);
 	int index = partLocator->getPartListIndex();
 	return partList->Nth(index);
+}
+
+PartIterator *DataPartsList::createIterator() {
+	return (partContainer == NULL) ? NULL : partContainer->getIterator();
 }
