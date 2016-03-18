@@ -106,7 +106,7 @@ void generateFnForItemsMapPreparation(TaskDef *taskDef, const char *initials, st
 	decorator::writeSubsectionHeader(programFile, message);
 
 	programFile << '\n';
-	programFile << "void " << initials << "::" << "TaskEnvironmentImpl::prepareItemMaps() {\n";
+	programFile << "void " << initials << "::" << "TaskEnvironmentImpl::prepareItemsMap() {\n";
 
 	List<EnvironmentLink*> *envLinkList = taskDef->getEnvironmentLinks();
 	for (int i = 0; i < envLinkList->NumElements(); i++) {
