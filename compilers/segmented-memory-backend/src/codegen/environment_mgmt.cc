@@ -86,7 +86,7 @@ void generateTaskEnvironmentClass(TaskDef *taskDef, const char *initials,
 		headerFile << '\n' << constructorContents.str() << indent;
 	}
 	headerFile << "}\n";
-	headerFile << indent << "void prepareItemMaps()" << stmtSeparator;
+	headerFile << indent << "void prepareItemsMap()" << stmtSeparator;
 	headerFile << indent << "void setDefaultTaskCompletionInstrs()" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
 
