@@ -62,7 +62,7 @@ void generateTaskEnvironmentClass(TaskDef *taskDef, const char *initials,
 		// if the object is of a user defined type then call its constructor to initialize the property
 		NamedType *userDefinedType = dynamic_cast<NamedType*>(type);
 		if (userDefinedType != NULL) {
-			constructorContents << doubleIndent << varName;
+			constructorContents << indent << varName;
 			constructorContents << " = " << type->getCType() << "()" << stmtSeparator;
 			continue;
 		}
@@ -72,20 +72,27 @@ void generateTaskEnvironmentClass(TaskDef *taskDef, const char *initials,
 		if (staticArray == NULL) {
 			// zero initialize the built in types 
 			if (type == Type::boolType) {
-				constructorContents << doubleIndent << varName  << " = false" << stmtSeparator;
+				constructorContents << indent << varName  << " = false" << stmtSeparator;
 			} else {
-				constructorContents << doubleIndent << varName  << " = 0" << stmtSeparator;
+				constructorContents << indent << varName  << " = 0" << stmtSeparator;
 			}
 		}
 	}
 
-	// definitions for the two functions each task environment subclass needs to provide implementations for
+	// generate the constructor in the program file
+	const char *message2 = "Constructor";
+	decorator::writeSubsectionHeader(programFile, message2);
+	programFile << '\n';
+	programFile << initials << "::" << "TaskEnvironmentImpl::TaskEnvironmentImpl() : TaskEnvironment() {\n";
+	programFile << constructorContents.str();
+	programFile << indent << "prepareItemsMap()" << stmtSeparator;
+	programFile << indent << "resetEnvInstructions()" << stmtSeparator;
+	programFile << "}\n";
+
+	// definitions for the constructor and two functions each task environment subclass needs to provide 
+	// implementations for
 	headerFile << "  public:\n";
-	headerFile << indent << "TaskEnvironmentImpl() : TaskEnvironment() {";
-	if (scalarFound) {
-		headerFile << '\n' << constructorContents.str() << indent;
-	}
-	headerFile << "}\n";
+	headerFile << indent << "TaskEnvironmentImpl()" << stmtSeparator;
 	headerFile << indent << "void prepareItemsMap()" << stmtSeparator;
 	headerFile << indent << "void setDefaultTaskCompletionInstrs()" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;

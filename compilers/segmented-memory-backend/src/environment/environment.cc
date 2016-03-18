@@ -408,9 +408,6 @@ TaskEnvironment::TaskEnvironment() {
 	this->readersMap = NULL;
 	this->writersMap = NULL;
 	this->progEnv = NULL;
-
-	prepareItemsMap();
-	resetEnvInstructions();
 }
 
 PartReader *TaskEnvironment::getPartReader(const char *itemName, const char *lpsId) {

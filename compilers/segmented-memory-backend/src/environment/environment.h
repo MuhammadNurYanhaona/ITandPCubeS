@@ -329,8 +329,8 @@ class TaskEnvironment {
 	void writeItemToFile(const char *itemName, const char *filePath);
 	
 	// task specific environment subclasses should provide implementation of the following two library functions
-	virtual void prepareItemsMap() {}
-	virtual void setDefaultTaskCompletionInstrs() {}
+	virtual void prepareItemsMap() = 0;
+	virtual void setDefaultTaskCompletionInstrs() = 0;
 
 	// functions to register an environment object manipulation instruction
 	void addInitEnvInstruction(TaskInitEnvInstruction *instr);
