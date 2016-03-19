@@ -369,6 +369,12 @@ void TaskItem::setRootDimensions(Dimension *dimensions) {
 	}
 }
 
+void TaskItem::setDimension(int dimNo, Dimension dimension) { 
+	rootDimensions->RemoveAt(dimNo);
+	rootDimensions->InsertAt(dimension, dimNo);
+}
+
+
 void TaskItem::preConfigureLpsAllocation(const char *lpsId, DataPartitionConfig *partitionConfig) {
 	LpsAllocation *lpsAllocation = new LpsAllocation(lpsId, partitionConfig);
 	allocations->Enter(lpsId, lpsAllocation);

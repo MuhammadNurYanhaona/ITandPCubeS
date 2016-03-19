@@ -277,7 +277,7 @@ class TaskItem {
 	LpsAllocation *getLpsAllocation(const char *lpsId) { return allocations->Lookup(lpsId); }
 	Hashtable<LpsAllocation*> *getAllAllocations() { return allocations; }
 	Dimension getDimension(int dimNo) { return rootDimensions->Nth(dimNo); }
-	void setDimension(int dimNo, Dimension dimension) { rootDimensions->Nth(dimNo) = dimension; }
+	void setDimension(int dimNo, Dimension dimension);
 	EnvItemType getType() { return type; }
 	bool isEmpty();
 	const char *getFirstAllocationsLpsId();
