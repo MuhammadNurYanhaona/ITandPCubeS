@@ -134,6 +134,9 @@ class DependencyArc {
 	// Indicates that update signal has been issued for this dependency already; therefore, there is no need to further
 	// consider it from the source side 
 	bool signaled;
+	// Indicates that this particular data dependency signal coincides with some other signal; therefore, no explicit 
+	// signaling is needed for this.
+	bool signalingNotRequired;
 	// An Id to indicate the index of the arc in the source's list; it is used to determine the variable name correspond
 	// to the arc 
 	int arcId;
@@ -155,6 +158,8 @@ class DependencyArc {
 	void deactivate() { active = false; }
 	bool isSignaled() { return signaled; }
 	void signal() { signaled = true; }
+	void disableSignaling() { signalingNotRequired = true; }
+	bool doesRequireSignal() { return !signalingNotRequired; }
 	void setNestingIndex(int nestingIndex) { this->nestingIndex = nestingIndex; }
 	int getNestingIndex();
 	void setArcId(int id) { this->arcId = id; }

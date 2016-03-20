@@ -759,8 +759,11 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	// then update all synchronization counters that depend on the execution of this stage for their activation
 	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
 	for (int i = 0; i < syncList->NumElements(); i++) {
-		stream << nextIndent.str() << syncList->Nth(i)->getDependencyArc()->getArcName();
-		stream << " += stage" << index << "Executed;\n";
+		DependencyArc *arc = syncList->Nth(i)->getDependencyArc();
+		if (arc->doesRequireSignal()) {
+			stream << nextIndent.str() << arc->getArcName();
+			stream << " += stage" << index << "Executed;\n";
+		}
 	}
 
 	/*----------------------------------------------- Turned off	

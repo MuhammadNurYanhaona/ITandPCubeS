@@ -387,7 +387,7 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 	// if the index is 0 then it is the first composite stage representing the entire compution. We declare
 	// any synchronization counter that is applicable outside all repeat-cycle boundaries
 	if (this->index == 0) {
-		declareSynchronizationCounters(stream, indentation, this->repeatIndex);
+		declareSynchronizationCounters(stream, indentation, this->repeatIndex + 1);
 	}
 
 	// if their is an LPS transition due to entering this stage then create a while loop traversing LPUs

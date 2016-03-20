@@ -350,6 +350,7 @@ void VariableSyncReqs::deactivateRedundantSyncReqs() {
 				arc->deactivate();
 			} else {
 				lastArc->signal();
+				lastArc->disableSignaling();
 				nearestDependentsByLpses->RemoveAt(lastArcIndex);
 				nearestDependentsByLpses->InsertAt(arc, lastArcIndex);
 				candidatePredecessors.push_back(arc);
@@ -385,6 +386,7 @@ void VariableSyncReqs::deactivateRedundantSyncReqs() {
 				arc->deactivate();
 			} else {
 				successorArc->signal();
+				successorArc->disableSignaling();
 				filteredPredecessors.push_back(arc);
 			}		
 		} else {
