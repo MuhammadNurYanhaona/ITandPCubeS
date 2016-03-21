@@ -74,11 +74,27 @@ DataPart::DataPart(PartMetadata *metadata, int epochCount, int elementSize) {
 
 DataPart::~DataPart() {
 	delete metadata;
-	while (dataVersions->size() > 0) {
-		void *version = dataVersions->front();
-		delete[] version;
+	for (int i = 0; i < epochCount; i++) {
+		void *version = dataVersions->at(i);
+		free(version);
 	}
 	delete dataVersions;
+}
+
+void DataPart::allocate(int versionThreshold) {
+	
+	int size = metadata->getSize();
+	int allocationSize = elementSize * size;
+
+	for (int i = versionThreshold; i < epochCount; i++) {
+		void *allocation = malloc(sizeof(char) * allocationSize);
+		Assert(allocation != NULL);
+		char *data = (char *) allocation;
+		for (int j = 0; j < allocationSize; j++) {
+			data[j] = 0;
+		}
+		dataVersions->push_back(allocation);
+	}
 }
 
 void *DataPart::getData() {
@@ -120,20 +136,6 @@ void DataPart::clone(DataPart *other) {
 	if (currentEpoch < epochCount - 1) {
 		allocate(currentEpoch + 1);
 		synchronizeAllVersions();
-	}
-}
-
-void DataPart::allocate(int versionThreshold) {
-	
-	int size = metadata->getSize();
-	int allocationSize = elementSize * size;
-
-	for (int i = versionThreshold; i < epochCount; i++) {
-		char *data = new char[allocationSize];
-		for (int j = 0; j < allocationSize; j++) {
-			data[j] = 0;
-		}
-		dataVersions->push_back((void *) data);
 	}
 }
 
@@ -191,6 +193,15 @@ void DataPartsList::initializePartsList(DataPartitionConfig *partConfig,
 	}
 
 }
+
+void DataPartsList::allocateParts() {
+	if (invalid) return;
+	for (int i = 0; i < partList->NumElements(); i++) {
+		DataPart *dataPart = partList->Nth(i);
+		dataPart->allocate();
+	}
+}
+
 
 DataPart *DataPartsList::getPart(List<int*> *partId, PartIterator *iterator) {
 	SuperPart *part = partContainer->getPart(partId, iterator, metadata->getDimensions());	

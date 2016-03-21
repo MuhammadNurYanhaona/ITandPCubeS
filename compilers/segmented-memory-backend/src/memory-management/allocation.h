@@ -87,24 +87,10 @@ class DataPart {
 	DataPart(PartMetadata *metadata, int epochCount, int elementSize);
 	~DataPart();
 
-	// because this is a templated function, its implementation needs to be in the header file
-	template <class type> static void allocate(DataPart *dataPart) {
-		int size = dataPart->metadata->getSize();
-		Assert(size > 0);
-		int versionCount = dataPart->epochCount;
-		std::vector<void*> *dataVersions = dataPart->dataVersions;
-		for (int i = 0; i < versionCount; i++) {
-			void *data = new type[size];
-			Assert(data != NULL);
-			char *charData = reinterpret_cast<char*>(data);
-			int charSize = size * dataPart->elementSize;
-			for (int i = 0; i < charSize; i++) {
-				charData[i] = 0;
-			}
-			dataVersions->push_back(data);
-		}
-	}
-
+	// allocate memories for the data part; the version threshold dictates what versions should be allocated;
+	// version numbers that are below the threshold are ignored 	
+	void allocate(int versionThreshold = 0);
+	
 	inline PartMetadata *getMetadata() { return metadata; }
 
 	// returns the memory reference of the allocation unit at the current epoch-head
@@ -120,17 +106,13 @@ class DataPart {
 	// all versions have the content. 
 	void synchronizeAllVersions();
 
-	// These two functions are added to support data part allocation and content-copying from the environment
+	// This functions is added to support data part allocation and content-copying from the environment
 	// management module. 
 	// Note that cloning of content from a data part in the program environment to a part in a task's 
 	// execution environment will be taken place only when both data-parts are expected to contain the same 
 	// regions of the underlying data structure.
 	void clone(DataPart *other);
-	// The location in the environment management module where data part allocation may take place does not
-	// have content's data type information. Therefore an allocation mechanism is needed that is independent 
-	// of the element type. The default -1 value of the parameter means that all versions of should be 
-	// allocated. Otherwise, only those versions that are on or above the threshold should be allocated
-	void allocate(int versionThreshold = 0);	
+	
 };
 
 /* This class provides generic information about all the parts of an LPS data structure that a segment holds */
@@ -178,17 +160,7 @@ class DataPartsList {
 	void initializePartsList(DataPartitionConfig *partConfig, 
 			PartIdContainer *partContainer, 
 			int partElementSize);
-
-	// because this is a templated function, its implementation needs to be in the header file
-	template <class type> static void allocateParts(DataPartsList *dataPartsList) {
-		if (dataPartsList->invalid) return;
-		List<DataPart*> *parts = dataPartsList->partList;
-		for (int i = 0; i < parts->NumElements(); i++) {
-			DataPart *dataPart = parts->Nth(i);
-			DataPart::allocate<type>(dataPart);
-		}
-	} 
-	
+	void allocateParts();
 	inline ListMetadata *getMetadata() { return metadata; }
 	inline PartIdContainer *getPartContainer() { return partContainer; }
 	inline int getEpochCount() { return epochCount; }

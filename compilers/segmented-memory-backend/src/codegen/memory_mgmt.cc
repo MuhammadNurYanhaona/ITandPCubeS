@@ -422,8 +422,7 @@ void genRoutineForLpsContent(std::ofstream &headerFile, std::ofstream &programFi
 
 		// if the data structure is not part of the task environment then allocate memory for its data parts
 		if (!string_utils::contains(envArrayList, varName)) {
-			programFile << indent << "DataPartsList::allocateParts ";
-			programFile << "<" << cType << "> (" << varName << "Parts)" << stmtSeparator;
+			programFile << indent << varName << "Parts->allocateParts()" << stmtSeparator;
 		// otherwise send the initialized parts list and other associated information to the task environment
 		} else {
 			programFile << indent << "TaskItem *" << varName << "Item = environment->";
