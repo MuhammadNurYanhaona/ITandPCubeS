@@ -57,6 +57,7 @@ SyncRequirement::SyncRequirement(const char *syncTypeName) {
 	this->arc = NULL;
 	this->index = -1;
 	counterRequirement = true;
+	replacementSync = NULL;
 }
 
 void SyncRequirement::print(int indent) {
@@ -351,6 +352,7 @@ void VariableSyncReqs::deactivateRedundantSyncReqs() {
 			} else {
 				lastArc->signal();
 				lastArc->disableSignaling();
+				lastArc->setSignalingReplacement(arc);
 				nearestDependentsByLpses->RemoveAt(lastArcIndex);
 				nearestDependentsByLpses->InsertAt(arc, lastArcIndex);
 				candidatePredecessors.push_back(arc);
@@ -387,6 +389,7 @@ void VariableSyncReqs::deactivateRedundantSyncReqs() {
 			} else {
 				successorArc->signal();
 				successorArc->disableSignaling();
+				successorArc->setSignalingReplacement(arc);
 				filteredPredecessors.push_back(arc);
 			}		
 		} else {
@@ -401,6 +404,23 @@ void VariableSyncReqs::deactivateRedundantSyncReqs() {
 		if (syncReq->isActive()) filteredList->Append(syncReq);
 	}
 	syncList = filteredList;
+
+	// any sync requirement for which signaling is disabled should get a reference to the sync requirements that does
+	// signaling for it
+	for (int i = 0; i < syncList->NumElements(); i++) {
+		SyncRequirement *syncReq = syncList->Nth(i);
+		DependencyArc *arc = syncReq->getDependencyArc();
+		if (!arc->doesRequireSignal()) {
+			DependencyArc *replacementArc = arc->getSignalingReplacement();
+			for (int j = 0; j < syncList->NumElements(); j++) {
+				SyncRequirement *otherReq = syncList->Nth(j);
+				if (otherReq->getDependencyArc() == replacementArc) {
+					syncReq->setReplacementSync(otherReq);
+					break;
+				}
+			}
+		}	
+	}
 }
 
 void VariableSyncReqs::print(int indent) {

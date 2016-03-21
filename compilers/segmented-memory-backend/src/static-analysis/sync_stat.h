@@ -108,6 +108,15 @@ class SyncRequirement {
 	// is due to some compiler injected sync-stage, however, their is no conditional execution and there
 	// is no need for a counter variable either. Following variable distinguishes between these two cases.   
 	bool counterRequirement;
+
+	// Signaling for some sync requirements are redundant due to the existing of earlier signals from the
+	// same source LPS to the same destination LPS for the same underlying data structures. Although the
+	// signaling may be redundant but the receiving/waiting is not as the concerned sync requirements may
+	// be active in different nesting levels. Thus we cannot get rid of sync requirements with redundant
+	// signals. The code generation for such partially redundant syncs is tricky. We adopt the strategy 
+	// of calling wait or receiving data on the earlier replacement sync whenever a sync with a redundant
+	// signal is encountered. This property keeps track of the replacement sync to aid code generation. 
+	SyncRequirement *replacementSync;
   public:
 	SyncRequirement(const char *syncTypeName);
 	virtual ~SyncRequirement() {}
@@ -123,7 +132,9 @@ class SyncRequirement {
 	int getIndex() { return index; }
 	bool isActive() { return arc->isActive(); }
 	void deactivate() { arc->deactivate(); }
-	void signal() { arc->signal(); }	
+	void signal() { arc->signal(); }
+	void setReplacementSync(SyncRequirement *other) { replacementSync = other; }
+	SyncRequirement *getReplacementSync() { return replacementSync; }
 	virtual void print(int indent);
 	void writeDescriptiveComment(std::ofstream &stream, bool forDependent);
 	const char *getSyncName();

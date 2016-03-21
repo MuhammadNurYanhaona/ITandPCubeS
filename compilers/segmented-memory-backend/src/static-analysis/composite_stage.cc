@@ -799,7 +799,18 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 	
 	// Write the code for forwards communication requirements.
 	for (int i = 0; i < forwardDependencies->NumElements(); i++) {
+		
 		SyncRequirement *comm = forwardDependencies->Nth(i);
+
+		// if the data send for this communicator has been replaced with some earlier communicator then the data receive
+		// is done using that earlier communicator too 
+		SyncRequirement *commReplacement = comm->getReplacementSync();
+		bool signalReplaced = false;
+		if (commReplacement != NULL) {
+			comm = commReplacement;
+			signalReplaced = true;
+		}	
+
 		int commIndex = comm->getIndex();
 		Space *dependentLps = comm->getDependentLps();
 		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << dependentLps->getName();
@@ -812,16 +823,29 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 		stream << indentStr.str() << indent << "}\n";
 		stream << indentStr.str() << "}\n";
 
-		// the counter should be advanced regardless of this PPU's participation in communication to keep the counter
-		// value uniform across all PPUs and segments
-		stream << indentStr.str() << "commCounter" << commIndex << "++" << stmtSeparator;
+		// The counter should be advanced regardless of this PPU's participation in communication to keep the counter
+		// value uniform across all PPUs and segments. The exeception is when the data send signal has been replaced
+		// by some other communicator. This is because, we will have two receive calls for the replacement communicator
+		// then and we would want to make the second call to bypass any data processing. 
+		if (!signalReplaced) {
+			stream << indentStr.str() << "commCounter" << commIndex << "++" << stmtSeparator;
+		}
 	}
 
 	// write the code for backword sync requirements within an if block
 	if (backwardDependencies->NumElements() > 0) {
 		stream << indentStr.str() << "if (repeatIteration > 0) {\n";
 		for (int i = 0; i < backwardDependencies->NumElements(); i++) {
+			
 			SyncRequirement *comm = backwardDependencies->Nth(i);
+			
+			SyncRequirement *commReplacement = comm->getReplacementSync();
+			bool signalReplaced = false;
+			if (commReplacement != NULL) {
+				comm = commReplacement;
+				signalReplaced = true;
+			}	
+
 			int commIndex = comm->getIndex();
 			Space *dependentLps = comm->getDependentLps();
 			stream << indentStr.str() << indent; 
@@ -838,7 +862,10 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 			stream << indentStr.str() << indent << "}\n";
 
 			// again the counter is advanced outside the if condition to keep it in sync with all other PPUs
-			stream << indentStr.str() << indent << "commCounter" << commIndex << "++" << stmtSeparator;
+			if (!signalReplaced) {
+				stream << indentStr.str() << indent << "commCounter";
+				stream << commIndex << "++" << stmtSeparator;
+			}
 		}
 		stream << indentStr.str() << "}\n";
 	}

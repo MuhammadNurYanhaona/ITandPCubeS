@@ -141,6 +141,7 @@ DependencyArc::DependencyArc(FlowStage *source, FlowStage *destination, const ch
 	active = true;
 	signaled = false;
 	signalingNotRequired = false;
+	signalingReplacement = NULL;
 	nestingIndex = -1;
 	arcName = NULL;
 	DataDependencies *sourceDependencies = source->getDataDependencies();
