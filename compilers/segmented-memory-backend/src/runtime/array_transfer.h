@@ -56,6 +56,8 @@ class ArrayTransferConfig {
   public:
 	ArrayTransferConfig();
 	void setSource(void *source, const char *propertyName = NULL);
+	void *getSource() { return source; }
+	const char *getPropertyName() { return propertyName; }
 	void recordTransferDimConfig(int dimId, int index);
 	void recordTransferDimConfig(int dimId, Range transferRange);
 	void setParent(ArrayTransferConfig *parent);

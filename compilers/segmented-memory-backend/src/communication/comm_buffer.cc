@@ -105,7 +105,7 @@ void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
 		PartIdContainer *partContainerTree,
 		DataItemConfig *dataConfig) {
 
-	DataPartSpec *dataPartSpec = new DataPartSpec(dataPartList, dataConfig);
+	DataPartSpec *dataPartSpec = new DataPartSpec(dataPartList->getPartList(), dataConfig);
 	vector<XformedIndexInfo*> *transformVector = new vector<XformedIndexInfo*>;
 	transformVector->reserve(dataDimensions);
 	for (int i = 0; i < dataDimensions; i++) {
@@ -145,7 +145,7 @@ void PhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 			logFile << "start reading data for communication buffer: " << bufferTag << "\n";
 		}
 		
-		DataPartSpec *partSpec = new DataPartSpec(senderPartList, senderDataConfig);
+		DataPartSpec *partSpec = new DataPartSpec(senderPartList->getPartList(), senderDataConfig);
 		TransferSpec *readSpec = new TransferSpec(DATA_PART_TO_COMM_BUFFER, elementSize);
 		transferData(readSpec, partSpec, senderTree, loggingEnabled, logFile);
 		delete partSpec;
@@ -163,7 +163,7 @@ void PhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream &logFile) {
 			logFile << "start writing data from communication buffer: " << bufferTag << "\n";
 		}
 		
-		DataPartSpec *partSpec = new DataPartSpec(receiverPartList, receiverDataConfig);
+		DataPartSpec *partSpec = new DataPartSpec(receiverPartList->getPartList(), receiverDataConfig);
 		TransferSpec *writeSpec = new TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize);
 		transferData(writeSpec, partSpec, receiverTree, loggingEnabled, logFile);
 		delete partSpec;
@@ -258,10 +258,10 @@ void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 			logFile << bufferTag << "\n";
 		}
 	
-		DataPartSpec *readPartSpec = new DataPartSpec(senderPartList, senderDataConfig);
+		DataPartSpec *readPartSpec = new DataPartSpec(senderPartList->getPartList(), senderDataConfig);
 		TransferSpec *readTransferSpec = new TransferSpec(DATA_PART_TO_COMM_BUFFER, elementSize);
 
-		DataPartSpec *writePartSpec = new DataPartSpec(receiverPartList, receiverDataConfig);
+		DataPartSpec *writePartSpec = new DataPartSpec(receiverPartList->getPartList(), receiverDataConfig);
 		TransferSpec *writeTransferSpec = new TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize);
 
 		Assert(senderDataConfig != receiverDataConfig);
@@ -323,6 +323,13 @@ void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 			logFile << "\tData writes: " << writeCount << "\n";
 			logFile << "data transferring done for communication buffer " << bufferTag << "\n";
 		}
+
+		delete readPartSpec;
+		delete readTransferSpec;
+		delete writePartSpec;
+		delete writeTransferSpec;
+		delete transformVector;
+		delete dataEntry;
 	}
 }
 

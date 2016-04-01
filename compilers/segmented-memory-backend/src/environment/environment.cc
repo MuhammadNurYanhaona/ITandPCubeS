@@ -17,6 +17,47 @@
 
 using namespace std;
 
+//---------------------------------------------------------- Segment Data Content -------------------------------------------------------/
+
+SegmentDataContent::SegmentDataContent(int segmentId, const char *stringFoldDesc) {
+	this->segmentId = segmentId;
+	this->stringFoldDesc = stringFoldDesc;
+}
+
+SegmentDataContent::~SegmentDataContent() {
+	delete stringFoldDesc;
+}
+
+List<MultidimensionalIntervalSeq*> *SegmentDataContent::generateFold() {
+	return MultidimensionalIntervalSeq::constructSetFromString(stringFoldDesc);
+}
+
+//--------------------------------------------------------- Parts List Attributes -------------------------------------------------------/
+
+PartsListAttributes::PartsListAttributes() {
+	referenceCount = 1;
+	fresh = true;
+	dirty = false;
+	segmentMappingKnown = false;
+	segmentsContents = NULL;
+}
+
+PartsListAttributes::~PartsListAttributes() {
+	if (segmentsContents != NULL) {
+		while (segmentsContents->NumElements() > 0) {
+			SegmentDataContent *segmentContent = segmentsContents->Nth(0);
+			segmentsContents->RemoveAt(0);
+			delete segmentContent;
+		}
+		delete segmentsContents;
+	}
+}
+
+void PartsListAttributes::setSegmentsContents(List<SegmentDataContent*> *segmentsContents) {
+	this->segmentsContents = segmentsContents;
+	segmentMappingKnown = true;
+}
+
 //--------------------------------------------------------------- Parts List ------------------------------------------------------------/
 
 PartsList::PartsList(List<DataPart*> *parts) {
@@ -65,17 +106,48 @@ ListReferenceAttributes::~ListReferenceAttributes() {
 }
 
 void ListReferenceAttributes::computeSegmentFold() {
+	segmentFold = ListReferenceAttributes::computeSegmentFold(partitionConfig, partContainerTree);
+}
+
+bool ListReferenceAttributes::isSuperFold(List<MultidimensionalIntervalSeq*> *first, 
+		List<MultidimensionalIntervalSeq*> *second) {
 	
-	if (partContainerTree == NULL) {
-		segmentFold = NULL;
-		return;
+	if (first == NULL && second != NULL) return false;
+	else if (second == NULL) return true;
+
+	int elementsCount = 0;
+	int coveredElements = 0;
+
+	for (int i = 0; i < second->NumElements(); i++) {
+		MultidimensionalIntervalSeq *otherSeq = second->Nth(i);	
+		elementsCount += otherSeq->getNumOfElements();
+		for (int j = 0; j < first->NumElements(); j++) {
+			MultidimensionalIntervalSeq *mySeq = first->Nth(j);
+			List<MultidimensionalIntervalSeq*> *intersect = mySeq->computeIntersection(otherSeq);
+			if (intersect == NULL) continue;
+			while (intersect->NumElements() > 0) {
+				MultidimensionalIntervalSeq *commonPart = intersect->Nth(0);
+				coveredElements += commonPart->getNumOfElements();	
+				intersect->RemoveAt(0);
+				delete commonPart;
+			} 
+			delete intersect;
+		}
 	}
+	
+	return elementsCount == coveredElements;
+}
+
+List<MultidimensionalIntervalSeq*> *ListReferenceAttributes::computeSegmentFold(DataPartitionConfig *partConfig, 
+                        PartIdContainer *containerTree) {
+	
+	if (containerTree == NULL) return NULL;
 
 	List<PartFolding*> *folds = new List<PartFolding*>;
-	partContainerTree->foldContainer(folds);
-	DataItemConfig *dataItemConfig = partitionConfig->generateStateFulVersion();
+	containerTree->foldContainer(folds);
+	DataItemConfig *dataItemConfig = partConfig->generateStateFulVersion();
 
-	segmentFold = new List<MultidimensionalIntervalSeq*>;
+	List<MultidimensionalIntervalSeq*> *segmentFold = new List<MultidimensionalIntervalSeq*>;
 	for (int i = 0; i < folds->NumElements(); i++) {
 		PartFolding *fold = folds->Nth(i);
 		List<MultidimensionalIntervalSeq*> *foldDesc = fold->generateIntervalDesc(dataItemConfig);
@@ -90,34 +162,7 @@ void ListReferenceAttributes::computeSegmentFold() {
 		delete fold;
 	}
 	delete folds;
-}
-
-bool ListReferenceAttributes::isSuperFold(List<MultidimensionalIntervalSeq*> *otherFold) {
-	
-	if (segmentFold == NULL && otherFold != NULL) return false;
-	else if (otherFold == NULL) return true;
-
-	int elementsCount = 0;
-	int coveredElements = 0;
-
-	for (int i = 0; i < otherFold->NumElements(); i++) {
-		MultidimensionalIntervalSeq *otherSeq = otherFold->Nth(i);	
-		elementsCount += otherSeq->getNumOfElements();
-		for (int j = 0; j < segmentFold->NumElements(); j++) {
-			MultidimensionalIntervalSeq *mySeq = segmentFold->Nth(j);
-			List<MultidimensionalIntervalSeq*> *intersect = mySeq->computeIntersection(otherSeq);
-			if (intersect == NULL) continue;
-			while (intersect->NumElements() > 0) {
-				MultidimensionalIntervalSeq *commonPart = intersect->Nth(0);
-				coveredElements += commonPart->getNumOfElements();	
-				intersect->RemoveAt(0);
-				delete commonPart;
-			} 
-			delete intersect;
-		}
-	}
-	
-	return elementsCount == coveredElements;
+	return segmentFold;
 }
 
 //----------------------------------------------------------- List Reference Key --------------------------------------------------------/
@@ -240,6 +285,16 @@ void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchi
 	freshVersionKeys->AppendAll(&updatedList);
 }
 
+bool ObjectVersionManager::foundMatchingFreshVersion(ListReferenceKey *matchingKey) {
+	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
+		ListReferenceKey *includedKey = freshVersionKeys->Nth(i);
+		if (includedKey->matchesPattern(matchingKey)) {
+			return true;
+		}
+	}
+	return false;	
+}
+
 void ObjectVersionManager::addFreshVersionKey(ListReferenceKey *freshKey) {
 	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
 		ListReferenceKey *includedKey = freshVersionKeys->Nth(i);
@@ -257,6 +312,12 @@ List<PartsListReference*> *ObjectVersionManager::getFreshVersions() {
 		delete stringKey;
 	}
 	return freshVersions;	
+}
+
+PartsListReference *ObjectVersionManager::getFirstFreshVersion() {
+	ListReferenceKey *firstFreshKey = freshVersionKeys->Nth(0);
+	const char *stringKey = firstFreshKey->generateKey();
+	return dataVersions->Lookup(stringKey);
 }
 
 int ObjectVersionManager::getVersionCount() {
@@ -340,6 +401,16 @@ PartsListReference *LpsAllocation::generatePartsListReference(int envId,
 	attributes->setPartContainerTree(partContainerTree);
 	attributes->computeSegmentFold();
 	return new PartsListReference(attributes, versionKey, partsList); 
+}
+
+void LpsAllocation::allocatePartsList() {
+	List<DataPart*> *dataParts = partsList->getDataParts();
+	if (dataParts != NULL) {
+		for (int i = 0; i < dataParts->NumElements(); i++) {
+			DataPart *dataPart = dataParts->Nth(i);
+			dataPart->allocate();
+		}
+	}
 }
 
 //--------------------------------------------------------------- Task Item ------------------------------------------------------------/

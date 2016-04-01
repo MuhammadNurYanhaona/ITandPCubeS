@@ -8,7 +8,7 @@
 				 Environment Instructions to be Processed At Task Initialization
 -------------------------------------------------------------------------------------------------------------------------------------*/
 
-// this is the base class for all types of instructions for initializing an environmental data structure that a task going 
+// this is the base class for all types of instructions for initializing an environmental data structure that a task is about 
 // to access/create as part of its execution 
 class TaskInitEnvInstruction {
   protected:
@@ -36,7 +36,7 @@ class TaskInitEnvInstruction {
 	// the program environment
 	virtual void postprocessProgramEnv() = 0;		
 
-	// each subclass should return an unique type number to enable instructions retrieval by type
+	// each subclass should return an unique type number to enable instructions retrieval by types
 	virtual int getType() = 0;
   protected:
 	//------------------------------------------------- a group of helper functions to be used by sub-classes to provide 
@@ -56,7 +56,18 @@ class TaskInitEnvInstruction {
 	void initiateVersionManagement();
 
 	// flags parts-lists already existing in the environment for the underlying data item as fresh 
-	void recordFreshPartsListVersions();	
+	void recordFreshPartsListVersions();
+
+	// determines if the parts lists present in the environment for a particular task item are fresh or stale
+	bool isFresh(TaskItem *envItem);
+
+	// copies the actual memory allocation references from data parts stored in the program environment under a specific 
+	// key and version reference into a destination parts list to be used during task execution; it also allocates 
+	// memories within the parts of the destination list if the parts require more epoch versions then originially 
+	// present in the source parts they are fed from
+	void cloneDataFromPartsList(const char *itemKey, 
+			ListReferenceKey *sourcePartsListKey, 
+			PartsList *destination);	
 };
 
 /* This is the default instruction for linked task environmental variables. If there is no other instruction associated with
@@ -74,7 +85,7 @@ class StaleRefreshInstruction : public TaskInitEnvInstruction {
 	// no program environment preprocessing is required for this instruction 
 	void preprocessProgramEnv() {}
 
-	void setupPartsList() {};
+	void setupPartsList();
 
 	// At the end of parts-list setup -- may it cause data transfer or not -- all parts-lists of the underlying item are
 	// fresh again. So they should be flagged fresh in the program environment.
@@ -159,7 +170,7 @@ class DataTransferInstruction : public TaskInitEnvInstruction {
 	// current references the task has for the item as the item is now going to hold a different data content
 	void preprocessProgramEnv() { removeOldPartsListReferences(); }
 
-	void setupPartsList() {};
+	void setupPartsList();
 	
 	// Data transfer instruction is always related to some existing data version manager and after the parts-list setup
 	// current task-item's LPS allocations are fresh. Thus we need to record their freshness in the program environment.
@@ -194,7 +205,11 @@ class TaskEndEnvInstruction {
 class ChangeNotifyInstruction : public TaskEndEnvInstruction {
   public:
 	ChangeNotifyInstruction(TaskItem *envItem) : TaskEndEnvInstruction(envItem) {}
-	void updateProgramEnv() {};
+	
+	// all parts list versions for the underlying data structure that is not associated with the current task should be
+	// flagged stale as the current task has updated the structure
+	void updateProgramEnv();
+
 	void doAdditionalProcessing() {};
 };
 

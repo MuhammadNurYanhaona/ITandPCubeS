@@ -4,8 +4,10 @@
 #include "comm_buffer.h"
 #include "../utils/list.h"
 #include "../utils/utility.h"
+
 #include <vector>
 #include <climits>
+#include <mpi.h>
 
 using namespace std;
 

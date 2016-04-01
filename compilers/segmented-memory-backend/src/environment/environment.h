@@ -11,6 +11,7 @@
 #include "../runtime/structure.h"
 
 #include <vector>
+#include <fstream>
 
 /* This library holds all the data structure definitionss related to enviornment managements of a multi-tasked IT program. 
  * The first set of classes are for program environment related data structures and the seconds are for task environment
@@ -24,6 +25,23 @@ class TaskEndEnvInstruction;
 /*------------------------------------------------------------------------------------------------------------------------
 						Program Environment
 ------------------------------------------------------------------------------------------------------------------------*/
+
+/* When data transfers become necessary for preparing an environmental variable for a task (for example, if one item from
+ * an already executed task's is assigned to a subsequent task), we need to determine what segment has what data parts for
+ * that variable. This process of finding segments' data content itself requires two all-to-all communications, which is
+ * costly if done repeatedly. So this class has been provided to store the segment to data content information associated
+ * with the parts list of an environment variable once that information is gathered. 
+ */
+class SegmentDataContent {
+  private:
+	int segmentId;
+	const char *stringFoldDesc;
+  public:
+	SegmentDataContent(int segmentId, const char *stringFoldDesc);
+	~SegmentDataContent();
+	int getSegmentId() { return segmentId; }
+	List<MultidimensionalIntervalSeq*> *generateFold();  			
+};
 
 /* The underlying data structures that the system retain is a set of parts lists for each data item used in the program.
  * There might be multiple parts lists due to different tasks using different partition configurations. Even a single task
@@ -41,12 +59,13 @@ class PartsListAttributes {
 	bool fresh;
 	// if this flag is set to true then it means some task is currently updating the list
 	bool dirty;
+	// two properties to determine if parts content to segment mappings are known for the associated parts list and if
+	// YES what are the mappings
+	bool segmentMappingKnown;
+	List<SegmentDataContent*> *segmentsContents;
   public:
-	PartsListAttributes() {
-		referenceCount = 1;
-		fresh = true;
-		dirty = false;
-	}
+	PartsListAttributes();
+	~PartsListAttributes();
 	void increaseReferenceCount() { referenceCount++; }
 	void decreaseReferenceCount() { referenceCount--; }
 	int getReferenceCount() { return referenceCount; }
@@ -55,6 +74,9 @@ class PartsListAttributes {
 	bool isFresh() { return fresh; }
 	void setDirtyBit(bool value) { dirty = value; }
 	bool isDirty() { return dirty; }
+	void setSegmentsContents(List<SegmentDataContent*> *segmentsContents);
+	bool isSegmentMappingKnown() { return segmentMappingKnown; }
+	List<SegmentDataContent*> *getSegmentMapping() { return segmentsContents; }
 };
 
 /* This class represents a list of parts a segment holds for a data item for a particular partition configuration. Note
@@ -97,9 +119,16 @@ class ListReferenceAttributes {
 	PartIdContainer *getPartContainerTree() { return partContainerTree; }
 	void computeSegmentFold();
 	List<MultidimensionalIntervalSeq*> *getSegmentFold() { return segmentFold; }
-	// tells if the current fold contains all data elements included in the argument folds; this function is useful
-	// to determine if the data need for a new reference can be satisfied with locally available contents
-	bool isSuperFold(List<MultidimensionalIntervalSeq*> *otherFold);	
+
+
+	// tells if the first fold contains all data elements included in the second fold; this function is useful to 
+	// determine if the data need for a new reference can be satisfied with locally available contents
+	static bool isSuperFold(List<MultidimensionalIntervalSeq*> *first, 
+			List<MultidimensionalIntervalSeq*> *second);
+	
+	// an utility function to compute segment fold from different places
+	static List<MultidimensionalIntervalSeq*> *computeSegmentFold(DataPartitionConfig *partConfig, 
+			PartIdContainer *containerTree);
 };
 
 /* We mentioned before that some parts lists for a data item may be stale as multiple tasks can manipulate a single data 
@@ -121,10 +150,12 @@ class ListReferenceKey {
 	void setTaskEnvId(int taskEnvId) { this->taskEnvId = taskEnvId; }
 	void setVarName(const char *varName) { this->varName = varName; }
 	void setAllocatorLps(const char *allocatorLpsName) { this->allocatorLpsName = allocatorLpsName; }
+	
 	// generates a dummy key for pattern matching against existing keys; if the user set any value for any property
 	// on the pattern key then that property will be compared during the matching process; otherwise, that property
 	// will be ignored 
-	ListReferenceKey *initiatePatternKey() { return new ListReferenceKey(-1, NULL, NULL); }
+	static ListReferenceKey *initiatePatternKey() { return new ListReferenceKey(-1, NULL, NULL); }
+	
 	const char *generateKey();
 	bool isEqual(ListReferenceKey *other);
 	bool matchesPattern(ListReferenceKey *pattern);	
@@ -182,8 +213,10 @@ class ObjectVersionManager {
 	void removeVersion(ListReferenceKey *versionKey);
 	PartsListReference *getVersion(const char *versionKey);
 	void markNonMatchingVersionsStale(ListReferenceKey *matchingKey);
+	bool foundMatchingFreshVersion(ListReferenceKey *matchingKey);
 	void addFreshVersionKey(ListReferenceKey *freshKey);
 	List<PartsListReference*> *getFreshVersions();
+	PartsListReference *getFirstFreshVersion();
 	int getVersionCount();
 };
 
@@ -243,11 +276,13 @@ class LpsAllocation {
 	void setPartContainerTree(PartIdContainer *containerTree) {
 		this->partContainerTree = containerTree;
 	}
+	PartIdContainer *getContainerTree() { return partContainerTree; }
 	void setPartsList(PartsList *partsList) { this->partsList = partsList; }
 	PartsList *getPartsList() { return partsList; }	
 	ListReferenceKey *generatePartsListReferenceKey(int envId, const char *varName);	
 	PartsListReference *generatePartsListReference(int envId, 
 		const char *varName, List<Dimension> *rootDimensions);	
+	void allocatePartsList();
 };
 
 /* The linkage type of an task-item needs to be retained to determine what should we do about the item if no explicit 
@@ -282,6 +317,7 @@ class TaskItem {
 	bool isEmpty();
 	const char *getFirstAllocationsLpsId();
 	int getDimensionality() { return rootDimensions->NumElements(); }
+	int getElementSize() { return elementSize; }
 };
 
 /* This is the super-class for all task environments. Compiler will generate task specific environment objects to provide
@@ -320,6 +356,7 @@ class TaskEnvironment {
 	void setReadersMap(Hashtable<PartReader*> *readersMap) { this->readersMap = readersMap; }
 	void setWritersMap(Hashtable<PartWriter*> *writersMap) { this->writersMap = writersMap; }
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
+	std::ofstream *getLogFile() { return logFile; }
 	void setProgramEnvironment(ProgramEnvironment *progEnv) { this->progEnv = progEnv; }
 	ProgramEnvironment *getProgramEnvironment() { return progEnv; }
 	PartReader *getPartReader(const char *itemName, const char *lpsId);

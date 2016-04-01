@@ -2,8 +2,10 @@
 #include "../utils/utility.h"
 #include "scalar_communicator.h"
 #include "communicator.h"
+
 #include <vector>
 #include <iostream>
+#include <mpi.h>
 
 using namespace std;
 

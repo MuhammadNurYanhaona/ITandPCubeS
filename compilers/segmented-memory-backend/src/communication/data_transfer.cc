@@ -34,8 +34,8 @@ void TransferSpec::performTransfer(char *dataPartLocation) {
 
 //--------------------------------------------------- Data Part Specification -----------------------------------------------------/
 
-DataPartSpec::DataPartSpec(DataPartsList *dataParts, DataItemConfig *dataConfig) {
-	this->dataParts = dataParts;
+DataPartSpec::DataPartSpec(List<DataPart*> *partList, DataItemConfig *dataConfig) {
+	this->partList = partList;
 	this->dataConfig = dataConfig;
 	dimensionality = dataConfig->getDimensionality();
 	dataDimensions = new Dimension[dimensionality];
@@ -56,7 +56,6 @@ void DataPartSpec::initPartTraversalReference(vector<int> *dataIndex, vector<Xfo
 char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, vector<int> *partIndex, int dataItemSize) {
 
 	int partNo = partLocator->getPartListIndex();
-	List<DataPart*> *partList = dataParts->getPartList();
 	DataPart *dataPart = partList->Nth(partNo);
 	PartMetadata *metadata = dataPart->getMetadata();
 	Dimension *partDimensions = metadata->getBoundary();

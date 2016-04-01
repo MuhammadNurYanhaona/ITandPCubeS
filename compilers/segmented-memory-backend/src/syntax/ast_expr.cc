@@ -1063,12 +1063,16 @@ void ObjectCreate::generateCodeForProperties(Expr *object, std::ostringstream &s
 	}
 
 	// for task-environment objects, we need to assign a back pointer to the sole program environment instance created
-	// in the coordinator function for environmental data structures management
+	// in the coordinator function for environmental data structures management; at the same time, we assign the log
+	// file created for the segment to the environment to track all environment management activities
 	NamedType *userType = dynamic_cast<NamedType*>(object->getType());
 	if (userType != NULL && userType->isEnvironmentType()) {
 		for (int i = 0; i < indentLevel; i++) stream << '\t';
 		object->translate(stream, indentLevel);
 		stream << "->setProgramEnvironment(programEnv)" << ";\n";
+		for (int i = 0; i < indentLevel; i++) stream << '\t';
+		object->translate(stream, indentLevel);
+		stream << "->setLogFile(&logFile)" << ";\n";	
 	}
 }
 

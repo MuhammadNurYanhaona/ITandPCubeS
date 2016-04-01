@@ -41,6 +41,7 @@ class TransferSpec {
 	std::vector<int> *dataIndex;
   public:
 	TransferSpec(TransferDirection direction, int elementSize);
+	TransferDirection getDirection() { return direction; }
 	virtual ~TransferSpec() {}
 	void setBufferEntry(char *bufferEntry, std::vector<int> *dataIndex);
 	inline std::vector<int> *getDataIndex() { return dataIndex; }
@@ -78,12 +79,13 @@ class DataPartSpec {
   private:
 	int dimensionality;
 	Dimension *dataDimensions;
-	DataPartsList *dataParts;
+	List<DataPart*> *partList;
 	DataItemConfig *dataConfig;
   public:
-	DataPartSpec(DataPartsList *dataParts, DataItemConfig *dataConfig);
+	DataPartSpec(List<DataPart*> *partList, DataItemConfig *dataConfig);
 	~DataPartSpec() { delete[] dataDimensions; }
 	inline DataItemConfig *getConfig() { return dataConfig; }
+	int getDimensionality() { return dimensionality; }
 
 	// The identification of the memory address for a transaction with the communication buffer involves applying
 	// transformation to the original data index from the buffer at each point of the part-container tree traversal.
