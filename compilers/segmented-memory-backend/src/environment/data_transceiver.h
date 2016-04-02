@@ -17,6 +17,7 @@
 #include "../memory-management/part_tracking.h"
 
 #include <mpi.h>
+#include <fstream>
 
 class DataExchange;
 
@@ -36,7 +37,7 @@ class TransferConfig {
 	TransferConfig(ProgramEnvironment *progEnv, 
 		const char *dataItemId, 
 		ListReferenceKey *svk, 
-		LpsAllocation *recv, TaskItem *rtk, int eSize);
+		LpsAllocation *recv, TaskItem *rtk);
 
 	const char *getDataItemId() { return dataItemId; }
 	ProgramEnvironment *getProgEnv() { return progEnv; }
@@ -63,7 +64,7 @@ class CommunicationReqFinder {
   public:
 	CommunicationReqFinder(List<MultidimensionalIntervalSeq*> *sourceFold, 
 			List<MultidimensionalIntervalSeq*> *targetFold);
-	bool isCrossSegmentCommRequired();
+	bool isCrossSegmentCommRequired(std::ofstream &logFile);
 };
 
 /* This class collects data parts to segments mapping information once it has been determined that cross segment communication
@@ -73,7 +74,7 @@ class SegmentMappingPreparer {
 	List<MultidimensionalIntervalSeq*> *localSegmentContent;
   public:
 	SegmentMappingPreparer(List<MultidimensionalIntervalSeq*> *localSegmentContent);
-	List<SegmentDataContent*> *shareSegmentsContents();
+	List<SegmentDataContent*> *shareSegmentsContents(std::ofstream &logFile);
 };
 
 /* This class determines if their is a scope for local data transfer from the source parts list to the destination parts list
@@ -102,7 +103,7 @@ class LocalTransferrer {
 	PartIdContainer *getTargetPartsTree() { return targetPartsTree; }
 	List<DataPart*> *getTargetPartList() { return targetPartList; }
 	 
-	void transferData();
+	void transferData(std::ofstream &logFile);
 };
 
 /* This class holds a communication data buffer for a data transfer between the local segment and a remote segment. It also
@@ -121,14 +122,14 @@ class TransferBuffer {
 			DataPartSpec *partListSpec, TransferSpec *transferSpec, 
 			PartIdContainer *partContainerTree);
 	~TransferBuffer();
-	void preprocessBuffer();
+	void preprocessBuffer(std::ofstream &logFile);
 	int getBufferTag() { return bufferTag; }
 	char *getData() { return data; }
-	void postProcessBuffer();
+	void postProcessBuffer(std::ofstream &logFile);
 	int compareTo(TransferBuffer *other);
 	int getSize();
   private:
-	void processBuffer();
+	void processBuffer(std::ofstream &logFile);
 };
 
 /* This class prepare data transfer buffers for both incoming and outgoing communications */
@@ -160,9 +161,9 @@ class BufferTransferrer {
   public:
 	BufferTransferrer(bool mode, List<TransferBuffer*> *bufferList);
 	~BufferTransferrer();
-	void sendDataAsync();
-	void receiveDataAsync();
-	void waitForTransferComplete();	
+	void sendDataAsync(std::ofstream &logFile);
+	void receiveDataAsync(std::ofstream &logFile);
+	void waitForTransferComplete(std::ofstream &logFile);	
 };
 
 /* This class handles all aspects of data transfer from a parts list in the environment to one of its alternatives in the
@@ -176,11 +177,21 @@ class DataTransferManager {
         // that are generated/retrieved during execution of the data transfer manager for latter storing in the program
 	// environment. 
         List<SegmentDataContent*> *sourceContentMap;
-        List<SegmentDataContent*> *targetContentMap; 
+        List<SegmentDataContent*> *targetContentMap;
+
+	// For the target parts list segment to data mapping, we may sometimes want to calculate the segment fold anew, e.g.,
+	// if the same task has been invoked again with a different set of partition arguments. This property tells us what
+	// choice to make under a particular calling context
+	bool computeTargetFoldAfresh; 
+
+	// a stream for logging events during data transfer
+        std::ofstream *logFile;
   public:
-	DataTransferManager(TransferConfig *transferConfig);
+	DataTransferManager(TransferConfig *transferConfig, bool computeTargetFoldAfresh);
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	List<SegmentDataContent*> *getSourceContentMap() { return sourceContentMap; }
 	List<SegmentDataContent*> *getTargetContentMap() { return targetContentMap; }
+
 	void handleTransfer();
 };
 

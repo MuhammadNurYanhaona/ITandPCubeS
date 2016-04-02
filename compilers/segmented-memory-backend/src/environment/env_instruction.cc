@@ -1,5 +1,6 @@
 #include "env_instruction.h"
 #include "environment.h"
+#include "data_transceiver.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../memory-management/allocation.h"
@@ -26,6 +27,7 @@ void TaskInitEnvInstruction::removeOldPartsListReferences() {
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
 	EnvironmentLinkKey *envKey = itemToUpdate->getEnvLinkKey();
 	const char *itemName = envKey->getVarName();
+	std::ofstream *logFile = taskEnv->getLogFile();
 
 	// if the task item has a valid source key assigned to it then it is not the first invocation of the task using the 
 	// current environment, and we need to let go of the older parts list reference the task has for the item 
@@ -44,11 +46,19 @@ void TaskInitEnvInstruction::removeOldPartsListReferences() {
 
 		// if current task's references to the item were the last then the item should be garbage collected
 		progEnv->cleanupPossiblyEmptyVersionManager(sourceKey);
+		
+		*logFile << "removed old parts list version reference for " << itemName;
+		*logFile << " in task " << taskEnv->name << "\n";
 	}
 }
 
 void TaskInitEnvInstruction::allocatePartsLists() {
 	
+	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	std::ofstream *logFile = taskEnv->getLogFile();
+	EnvironmentLinkKey *envKey = itemToUpdate->getEnvLinkKey();
+	const char *itemName = envKey->getVarName();
+
 	Hashtable<LpsAllocation*> *allocationMap = itemToUpdate->getAllAllocations();
 	Iterator<LpsAllocation*> iterator = allocationMap->GetIterator();
 	LpsAllocation *allocation = NULL;
@@ -61,7 +71,11 @@ void TaskInitEnvInstruction::allocatePartsLists() {
 		for (int i = 0; i < dataParts->NumElements(); i++) {
 			dataParts->Nth(i)->allocate();	
 		}
+
+		*logFile << "allocated memory for parts list of " << itemName << " for LPS ";
+		*logFile << allocation->getLpsId() << " in task " << taskEnv->name << "\n";
 	}
+	
 }
 
 void TaskInitEnvInstruction::assignDataSourceKeyForItem() {
@@ -74,6 +88,7 @@ void TaskInitEnvInstruction::assignDataSourceKeyForItem() {
 void TaskInitEnvInstruction::initiateVersionManagement() {
 	
 	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	std::ofstream *logFile = taskEnv->getLogFile();
 	int envId = taskEnv->getEnvId();
 	int taskId = taskEnv->getTaskId();
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
@@ -122,11 +137,15 @@ void TaskInitEnvInstruction::initiateVersionManagement() {
 
 		versionManager->addFreshVersionKey(versionKey);
 	}
+
+	*logFile << "version management started for an item created for " << itemName;
+	*logFile << " in task " << taskEnv->name << "\n";
 }
 
 void TaskInitEnvInstruction::recordFreshPartsListVersions() {
 	
 	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	std::ofstream *logFile = taskEnv->getLogFile();
 	int envId = taskEnv->getEnvId();
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
 	EnvironmentLinkKey *envKey = itemToUpdate->getEnvLinkKey();
@@ -141,6 +160,8 @@ void TaskInitEnvInstruction::recordFreshPartsListVersions() {
 		ListReferenceKey *versionKey = allocation->generatePartsListReferenceKey(envId, itemName);
 		versionManager->addFreshVersionKey(versionKey);
 	}
+	*logFile << "registered new fresh data parts versions for " << itemName;
+	*logFile << " in task " << taskEnv->name << "\n";
 }
 
 bool TaskInitEnvInstruction::isFresh(TaskItem *envItem) {
@@ -170,6 +191,7 @@ void TaskInitEnvInstruction::cloneDataFromPartsList(const char *itemKey,
 		PartsList *destination) {
 	
 	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	std::ofstream *logFile = taskEnv->getLogFile();
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
         ObjectVersionManager *versionManager = progEnv->getVersionManager(itemKey);
 	
@@ -187,6 +209,9 @@ void TaskInitEnvInstruction::cloneDataFromPartsList(const char *itemKey,
 		DataPart *sourcePart = sourceParts->Nth(i);
 		destPart->clone(sourcePart);
 	}
+	
+	*logFile << "registered new fresh data parts versions for ";
+	*logFile << itemToUpdate->getEnvLinkKey()->getVarName() << " in task " << taskEnv->name << "\n";
 }
 
 //--------------------------------------------------- StaleRefreshInstruction -----------------------------------------------------
@@ -202,12 +227,14 @@ void StaleRefreshInstruction::setupPartsList() {
 	}
 
 	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	std::ofstream *logFile = taskEnv->getLogFile();
 	int envId = taskEnv->getEnvId();
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
 	EnvironmentLinkKey *itemKey = itemToUpdate->getEnvLinkKey();
 	const char *itemName = itemKey->getVarName();
 	const char *itemSourceKey = itemKey->getSourceKey();
         ObjectVersionManager *versionManager = progEnv->getVersionManager(itemSourceKey);
+	*logFile << "Processing " << itemName << " of " << taskEnv->name << " for parts list freshness\n";
 
 	// If the parts lists for the item reference are still fresh in the environment then we only need to copy the
 	// contents of the data parts from environmental parts lists to the parts lists manipulated by the task executor.
@@ -230,6 +257,7 @@ void StaleRefreshInstruction::setupPartsList() {
 			// there is no need for data reorganization
 			if (allocationConfig->isEquivalent(envRefConfig)) {
 				cloneDataFromPartsList(itemSourceKey, versionKey, allocation->getPartsList());
+				*logFile << "\tCloned parts for LPS " << allocation->getLpsId() << "\n";
 				continue;
 			}
 			// otherwise, there needs to be a reorganization of data parts which will most likely lead to
@@ -239,6 +267,13 @@ void StaleRefreshInstruction::setupPartsList() {
 			allocation->allocatePartsList();
 			
 			// then we need to generate a communicator to transfer data from the source to the allocation
+			*logFile << "\tPerforming data transfers for reordered allocation in LPS ";
+			*logFile << allocation->getLpsId() << "\n";
+			TransferConfig *transferConfig = new TransferConfig(progEnv, 
+					itemSourceKey, versionKey, allocation, itemToUpdate);
+			DataTransferManager *transferManager = new DataTransferManager(transferConfig, true);
+			transferManager->setLogFile(logFile);
+			transferManager->handleTransfer();
 			
 			// then we need to remove the source parts list reference from the version manager
 			versionManager->removeVersion(versionKey);
@@ -250,8 +285,12 @@ void StaleRefreshInstruction::setupPartsList() {
 			attr->setPartContainerTree(allocation->getContainerTree());
 			attr->computeSegmentFold();
 			PartsList *partsList = allocation->getPartsList();
+			partsList->getAttributes()->setSegmentsContents(transferManager->getTargetContentMap());
 			PartsListReference *versionRef = new PartsListReference(attr, versionKey, partsList);
 			versionManager->addNewVersion(versionRef);
+
+			delete transferConfig;
+			delete transferManager;
 		}
 		return;	
 	}
@@ -265,6 +304,7 @@ void StaleRefreshInstruction::setupPartsList() {
 	// Otherwise, the first fresh version is retrieved to maintain uniformity across segments and necessary steps 
 	// are taken for data transfers from that version to the LPS allocation's parts list after memory allocation has
 	// been done for the latter's data parts.
+	*logFile << "\tGoing to move data from some other task's parts list\n";
 	List<PartsListReference*> *freshVersionList = versionManager->getFreshVersions();
 	Hashtable<LpsAllocation*> *allocationMap = itemToUpdate->getAllAllocations();
 	LpsAllocation *allocation = NULL;
@@ -288,11 +328,20 @@ void StaleRefreshInstruction::setupPartsList() {
 			cloneDataFromPartsList(itemSourceKey, versionKey, allocation->getPartsList());
 			// increase the reference count of the parts list in the environment
 			sourceVersion->getPartsList()->getAttributes()->increaseReferenceCount();
+			*logFile << "\tCloned parts for LPS " << allocation->getLpsId() << "\n";
 		} {
 			// allocate memory for the LPS allocation's parts list
 			allocation->allocatePartsList();
 
 			// create a communicator to transfer data from the environment reference to the LPS allocation
+			*logFile << "\tPerforming data transfers for allocation in LPS ";
+			*logFile << allocation->getLpsId() << "\n";
+			ListReferenceKey *referenceKey = sourceVersion->getKey();
+			TransferConfig *transferConfig = new TransferConfig(progEnv, 
+					itemSourceKey, referenceKey, allocation, itemToUpdate);
+			DataTransferManager *transferManager = new DataTransferManager(transferConfig, false);
+			transferManager->setLogFile(logFile);
+			transferManager->handleTransfer();
 
 			// register a new version for the allocation's parts list in the environment
 			ListReferenceKey *versionKey = allocation->generatePartsListReferenceKey(envId, itemName);
@@ -303,6 +352,9 @@ void StaleRefreshInstruction::setupPartsList() {
 			PartsList *partsList = allocation->getPartsList();
 			PartsListReference *versionRef = new PartsListReference(attr, versionKey, partsList);
 			versionManager->addNewVersion(versionRef);
+			
+			delete transferConfig;
+			delete transferManager;
 		}
 	}
 }
@@ -335,6 +387,7 @@ void ReadFromFileInstruction::setupPartsList() {
 	allocatePartsLists();
 	
 	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	std::ofstream *logFile = taskEnv->getLogFile();
 	EnvironmentLinkKey *envKey = itemToUpdate->getEnvLinkKey();
 	const char *itemName = envKey->getVarName();
 	Hashtable<LpsAllocation*> *allocationMap = itemToUpdate->getAllAllocations();
@@ -350,7 +403,9 @@ void ReadFromFileInstruction::setupPartsList() {
 		PartReader *partReader = taskEnv->getPartReader(itemName, lpsId);		
 		partReader->setFileName(fileName);
 		partReader->processParts();
-	}	
+	}
+	*logFile << "initiated parts lists from files for " << itemName;
+	*logFile << " in task " << taskEnv->name << "\n";	
 	
 	assignDataSourceKeyForItem();	
 }
@@ -380,6 +435,7 @@ void DataTransferInstruction::setupPartsList() {
 	}
 
 	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	std::ofstream *logFile = taskEnv->getLogFile();
 	int envId = taskEnv->getEnvId();
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
 	EnvironmentLinkKey *envKey = itemToUpdate->getEnvLinkKey();
@@ -403,6 +459,9 @@ void DataTransferInstruction::setupPartsList() {
 	// referring to the same data structure in the environment
 	const char *dataSourceKey = sourceItem->getEnvLinkKey()->getSourceKey();
 	itemToUpdate->getEnvLinkKey()->setSourceKey(dataSourceKey);
+
+	*logFile << "Processing " << itemName << " of " << taskEnv->name << " to be initialized from ";
+	*logFile << sourceItem->getEnvLinkKey()->getVarName() << " of " << sourceEnv->name << "\n";
 
 	// Iterate over the LPS allocations of the to be updated task item to be filled with data-parts associated with 
 	// the source task item. First, existing parts-list reference in the program environment for the LPS allocation
@@ -441,12 +500,20 @@ void DataTransferInstruction::setupPartsList() {
 		if (matchingFound) {
 			cloneDataFromPartsList(dataSourceKey, referenceKey, allocation->getPartsList());
 			envReference->getPartsList()->getAttributes()->increaseReferenceCount();
+			*logFile << "\tCloned parts for LPS " << allocation->getLpsId() << "\n";
 		} else {
 			// allocate memories for the parts in the LPS allocation
 			allocation->allocatePartsList();
 	
 			// generate a communicator to transfer data from the source version reference in the environment
 			// to the LPS allocation
+			*logFile << "\tPerforming data transfers for allocation in LPS ";
+			*logFile << allocation->getLpsId() << "\n";
+			TransferConfig *transferConfig = new TransferConfig(progEnv, 
+					dataSourceKey, referenceKey, allocation, itemToUpdate);
+			DataTransferManager *transferManager = new DataTransferManager(transferConfig, false);
+			transferManager->setLogFile(logFile);
+			transferManager->handleTransfer();
 
 			// generate a new version reference for the LPS allocation and add that to the version manager 
 			ListReferenceKey *versionKey = allocation->generatePartsListReferenceKey(envId, itemName);
@@ -456,16 +523,31 @@ void DataTransferInstruction::setupPartsList() {
 			PartsList *partsList = allocation->getPartsList();
 			PartsListReference *versionRef = new PartsListReference(attr, versionKey, partsList);
 			versionManager->addNewVersion(versionRef);
+			
+			delete transferConfig;
+			delete transferManager;
 		}
 
 		// in either case, verify if the selected source parts list version is stale or fresh; if it is stale
 		// then identify a fresh list and do data transfer from the selected fresh version to the parts list of 
 		// the current allocation
 		if (!envReference->getPartsList()->getAttributes()->isFresh()) {
+
+			*logFile << "\tSource parts list version found to be stale\n";
 			PartsListReference *freshVersionRef = versionManager->getFirstFreshVersion();
 
 			// create communicator to transfer data from the fresh parts list version to the data parts of
-			// the current allocation			
+			// the current allocation
+			*logFile << "\tPerforming data transfers for allocation in LPS from a fresh version ";
+			*logFile << allocation->getLpsId() << "\n";
+			ListReferenceKey *freshVersionKey = freshVersionRef->getKey();			
+			TransferConfig *transferConfig = new TransferConfig(progEnv, 
+					dataSourceKey, freshVersionKey, allocation, itemToUpdate);
+			DataTransferManager *transferManager = new DataTransferManager(transferConfig, false);
+			transferManager->setLogFile(logFile);
+			transferManager->handleTransfer();
+			delete transferConfig;
+			delete transferManager;
 		} 	
 	}
 }

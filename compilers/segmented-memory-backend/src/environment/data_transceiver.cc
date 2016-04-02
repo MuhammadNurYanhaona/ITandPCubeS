@@ -13,6 +13,7 @@
 #include <vector>
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <string.h>
 
 using namespace std;
@@ -22,13 +23,13 @@ using namespace std;
 TransferConfig::TransferConfig(ProgramEnvironment *progEnv, 
 		const char *dataItemId, 
 		ListReferenceKey *svk, 
-		LpsAllocation *recv, TaskItem *rtk, int eSize) {
+		LpsAllocation *recv, TaskItem *rtk) {
 	this->progEnv = progEnv;
 	this->dataItemId = dataItemId;
 	this->sourceVersionKey = svk;
 	this->receiver = recv;
 	this->receiverTaskItem = rtk;
-	this->elementSize = eSize;
+	this->elementSize = rtk->getElementSize();
 }
 
 PartsListReference *TransferConfig::getSourceReference() {
@@ -37,20 +38,6 @@ PartsListReference *TransferConfig::getSourceReference() {
 }
 
 List<MultidimensionalIntervalSeq*> *TransferConfig::getLocalDestinationFold() {
-
-	// first check if there is already a segment fold computed and stored in an environment version reference of the 
-	// data item under concern and if the answer is YES then return it
-	int envId = receiverTaskItem->getEnvironment()->getEnvId();
-	const char *itemName = receiverTaskItem->getEnvLinkKey()->getVarName();
-	ListReferenceKey *receiverKey = receiver->generatePartsListReferenceKey(envId, itemName);
-	PartsListReference *destReference = progEnv->getVersionManager(
-			dataItemId)->getVersion(receiverKey->generateKey());
-	delete receiverKey;
-	if (destReference != NULL) {
-		return destReference->getAttributes()->getSegmentFold();
-	}		
-
-	// otherwise, compute a segment fold from the LPS allocation and return it
 	DataPartitionConfig *partConfig = receiver->getPartitionConfig();
 	PartIdContainer *containerTree = receiver->getContainerTree();
 	return ListReferenceAttributes::computeSegmentFold(partConfig, containerTree);	
@@ -89,7 +76,7 @@ CommunicationReqFinder::CommunicationReqFinder(List<MultidimensionalIntervalSeq*
 	this->localTargetFold = targetFold;
 }
 
-bool CommunicationReqFinder::isCrossSegmentCommRequired() {
+bool CommunicationReqFinder::isCrossSegmentCommRequired(std::ofstream &logFile) {
 	
 	bool localDataSufficient = ListReferenceAttributes::isSuperFold(localSourceFold, localTargetFold);
 	int transferReqValue = localDataSufficient ? 0 : 1;
@@ -112,7 +99,7 @@ SegmentMappingPreparer::SegmentMappingPreparer(List<MultidimensionalIntervalSeq*
 	this->localSegmentContent = localSegmentContent;
 }
 
-List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents() {
+List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::ofstream &logFile) {
 	
 	int foldSize = 0;
 	const char *foldString = NULL;
@@ -188,7 +175,7 @@ LocalTransferrer::LocalTransferrer(TransferConfig *transferConfig) {
 	this->elementSize = receiverItem->getElementSize();
 }
 
-void LocalTransferrer::transferData() {
+void LocalTransferrer::transferData(std::ofstream &logFile) {
 	
 	if (sourceFold == NULL || targetFold == NULL) return;
 
@@ -258,17 +245,17 @@ TransferBuffer::~TransferBuffer() {
 	delete transferSpec;
 }
 
-void TransferBuffer::preprocessBuffer() {
+void TransferBuffer::preprocessBuffer(std::ofstream &logFile) {
 	TransferDirection direction = transferSpec->getDirection();
 	if (direction == DATA_PART_TO_COMM_BUFFER) {
-		processBuffer();
+		processBuffer(logFile);
 	}
 }
 
-void TransferBuffer::postProcessBuffer() {
+void TransferBuffer::postProcessBuffer(std::ofstream &logFile) {
 	TransferDirection direction = transferSpec->getDirection();
 	if (direction == COMM_BUFFER_TO_DATA_PART) {
-		processBuffer();
+		processBuffer(logFile);
 	}
 }
 
@@ -278,7 +265,7 @@ int TransferBuffer::compareTo(TransferBuffer *other) {
 	return 0;
 }
 
-void TransferBuffer::processBuffer() {
+void TransferBuffer::processBuffer(std::ofstream &logFile) {
 	
 	int dataDimensions = partListSpec->getDimensionality();
 	int elementSize = transferSpec->getStepSize();
@@ -405,7 +392,7 @@ BufferTransferrer::~BufferTransferrer() {
 	}
 }
 
-void BufferTransferrer::sendDataAsync() {
+void BufferTransferrer::sendDataAsync(std::ofstream &logFile) {
 	
 	if (!sendMode) {
 		cout << "cannot use a buffer transferrer that is configured for receive to send data\n";
@@ -419,7 +406,7 @@ void BufferTransferrer::sendDataAsync() {
 
 	for (int i = 0; i < bufferList->NumElements(); i++) {
 		TransferBuffer *buffer = bufferList->Nth(i);
-		buffer->preprocessBuffer();
+		buffer->preprocessBuffer(logFile);
 		int size = buffer->getSize();
 		char *data = buffer->getData();
 		int tag = buffer->getBufferTag();
@@ -431,7 +418,7 @@ void BufferTransferrer::sendDataAsync() {
 	}
 }
         
-void BufferTransferrer::receiveDataAsync() {
+void BufferTransferrer::receiveDataAsync(std::ofstream &logFile) {
 	
 	if (sendMode) {
 		cout << "cannot use a buffer transferrer that is configured for send to receive data\n";
@@ -456,7 +443,7 @@ void BufferTransferrer::receiveDataAsync() {
 	}
 }
 
-void BufferTransferrer::waitForTransferComplete() {
+void BufferTransferrer::waitForTransferComplete(std::ofstream &logFile) {
 
 	if (bufferList != NULL && bufferList->NumElements() > 0) {
 		int transferCount = bufferList->NumElements();
@@ -468,7 +455,7 @@ void BufferTransferrer::waitForTransferComplete() {
 		if (!sendMode) {
 			for (int i = 0; i < bufferList->NumElements(); i++) {
 				TransferBuffer *buffer = bufferList->Nth(i);
-				buffer->postProcessBuffer();
+				buffer->postProcessBuffer(logFile);
 			}
 		}
 	}
@@ -476,25 +463,28 @@ void BufferTransferrer::waitForTransferComplete() {
 
 //----------------------------------------------------- Data Transfer Manager ---------------------------------------------------------
 
-DataTransferManager::DataTransferManager(TransferConfig *transferConfig) {
+DataTransferManager::DataTransferManager(TransferConfig *transferConfig, bool computeTargetFoldAfresh) {
 	this->transferConfig = transferConfig;
 	this->sourceContentMap = NULL;
 	this->targetContentMap = NULL;
+	this->computeTargetFoldAfresh = computeTargetFoldAfresh;
 }
 
 void DataTransferManager::handleTransfer() {
 
 	// First determine if there is a need for locally moving data from the source parts list version in the program
 	// environment to the target LPS allocation. If there is a need then do the local transfer first
+	*logFile << "\t\tGoing to perform local data movement from source to the target\n";
 	LocalTransferrer localTransferrer = LocalTransferrer(transferConfig);
-	localTransferrer.transferData();
+	localTransferrer.transferData(*logFile);
 
 	// Then determine if there is a need for cross-segment communications for the transfer configuration. If the local
 	// transfer suffices then exit
 	List<MultidimensionalIntervalSeq*> *localSourceFold = localTransferrer.getSourceFold();
 	List<MultidimensionalIntervalSeq*> *localTargetFold = localTransferrer.getTargetFold();
 	CommunicationReqFinder commReqFinder = CommunicationReqFinder(localSourceFold, localTargetFold);
-	if (!commReqFinder.isCrossSegmentCommRequired()) return;
+	if (!commReqFinder.isCrossSegmentCommRequired(*logFile)) return;
+	*logFile << "\t\tGoing to perform cross-segment data transfer\n";
 
 	// When there is a need for cross-segment communications, each segment needs to know what other segments have for
 	// the source and target parts lists. A checking is first made if that information is already available. If not 
@@ -505,7 +495,8 @@ void DataTransferManager::handleTransfer() {
 		sourceContentMap = sourceAttrs->getSegmentMapping();
 	} else {
 		SegmentMappingPreparer mappingPreparer = SegmentMappingPreparer(localSourceFold);
-		sourceContentMap = mappingPreparer.shareSegmentsContents();
+		sourceContentMap = mappingPreparer.shareSegmentsContents(*logFile);
+		*logFile << "\t\tGoing to collect segment to data mapping information for the source parts list\n";
 		sourceAttrs->setSegmentsContents(sourceContentMap);
 	}
 	const char *dataItemId = transferConfig->getDataItemId();
@@ -513,7 +504,7 @@ void DataTransferManager::handleTransfer() {
 	ProgramEnvironment *progEnv = transferConfig->getProgEnv();
 	PartsListReference *targetRef = progEnv->getVersionManager(dataItemId)->getVersion(targetKey);
 	bool targetMappingRetrieved = false;
-	if (targetRef != NULL) {
+	if (targetRef != NULL && !computeTargetFoldAfresh) {
 		PartsListAttributes *targetAttrs = targetRef->getPartsList()->getAttributes();
 		if (targetAttrs->isSegmentMappingKnown()) {
 			targetContentMap = targetAttrs->getSegmentMapping();
@@ -521,12 +512,14 @@ void DataTransferManager::handleTransfer() {
 		}
 	}
 	if (!targetMappingRetrieved) {
+		*logFile << "\t\tGoing to collect segment to data mapping information for the target parts list\n";
 		SegmentMappingPreparer mappingPreparer = SegmentMappingPreparer(localTargetFold);
-		targetContentMap = mappingPreparer.shareSegmentsContents();
+		targetContentMap = mappingPreparer.shareSegmentsContents(*logFile);
 	}
 
 	// then prepare transfer buffers for all the incoming and outgoing messages; note that the way segment content map
 	// is organized, it is ensured that buffers are placed in proper order (by tags) in the resulting lists
+	*logFile << "\t\tPreparing incoming and outgoing transfer buffers\n";
 	int elementSize = transferConfig->getElementSize();
 	DataItemConfig *sourceConfig = localTransferrer.getSourceConfig()->generateStateFulVersion();
 	List<DataPart*> *sourceParts = localTransferrer.getSourcePartList();
@@ -547,12 +540,13 @@ void DataTransferManager::handleTransfer() {
 
 	// then first issue asynchronous receives for all incoming buffers then issue asynchronous sends for all outgoing
 	// buffers; then wait for all transfers to finish
+	*logFile << "\t\tGoing to do the MPI send and receive\n";
 	BufferTransferrer *buffReceiver = new BufferTransferrer(false, incomingBuffers);
-	buffReceiver->receiveDataAsync();
+	buffReceiver->receiveDataAsync(*logFile);
 	BufferTransferrer *buffSender = new BufferTransferrer(true, outgoingBuffers);
-	buffSender->sendDataAsync();
-	buffSender->waitForTransferComplete();
-	buffReceiver->waitForTransferComplete();
+	buffSender->sendDataAsync(*logFile);
+	buffSender->waitForTransferComplete(*logFile);
+	buffReceiver->waitForTransferComplete(*logFile);
 
 	// delete all the transfer buffers
 	if (incomingBuffers != NULL) {
