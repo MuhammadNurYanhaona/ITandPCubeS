@@ -184,8 +184,8 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
 	List<MultidimensionalIntervalSeq*> *intersect = DataExchange::getCommonRegion(&sender, &receiver);
 	if (intersect == NULL) return;
 
-	DataExchange exchange = DataExchange(&sender, &receiver, intersect);
-	ExchangeIterator iterator = ExchangeIterator(&exchange);
+	DataExchange *exchange = new DataExchange(&sender, &receiver, intersect);
+	ExchangeIterator *iterator = new ExchangeIterator(exchange);
 
 	DataItemConfig *sendConfig = sourceConfig->generateStateFulVersion();	
 	DataPartSpec *readPartSpec = new DataPartSpec(sourcePartList, sendConfig);
@@ -202,9 +202,9 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
 	}
 
 	char *dataEntry = new char[elementSize];
-	while (iterator.hasMoreElements()) {
+	while (iterator->hasMoreElements()) {
 
-		vector<int> *dataItemIndex = iterator.getNextElement();
+		vector<int> *dataItemIndex = iterator->getNextElement();
 
 		readTransferSpec->setBufferEntry(dataEntry, dataItemIndex);
 		readPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
@@ -215,6 +215,9 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
                 targetPartsTree->transferData(transformVector, writeTransferSpec, writePartSpec, false, cout);
 	}
 
+	delete intersect;
+	delete exchange;
+	delete iterator;
 	delete sendConfig;
 	delete readPartSpec;
 	delete readTransferSpec;
@@ -485,6 +488,7 @@ void DataTransferManager::handleTransfer() {
 	CommunicationReqFinder commReqFinder = CommunicationReqFinder(localSourceFold, localTargetFold);
 	if (!commReqFinder.isCrossSegmentCommRequired(*logFile)) return;
 	*logFile << "\t\tGoing to perform cross-segment data transfer\n";
+	logFile->flush();
 
 	// When there is a need for cross-segment communications, each segment needs to know what other segments have for
 	// the source and target parts lists. A checking is first made if that information is already available. If not 
@@ -497,6 +501,7 @@ void DataTransferManager::handleTransfer() {
 		SegmentMappingPreparer mappingPreparer = SegmentMappingPreparer(localSourceFold);
 		sourceContentMap = mappingPreparer.shareSegmentsContents(*logFile);
 		*logFile << "\t\tGoing to collect segment to data mapping information for the source parts list\n";
+		logFile->flush();
 		sourceAttrs->setSegmentsContents(sourceContentMap);
 	}
 	const char *dataItemId = transferConfig->getDataItemId();
@@ -513,6 +518,7 @@ void DataTransferManager::handleTransfer() {
 	}
 	if (!targetMappingRetrieved) {
 		*logFile << "\t\tGoing to collect segment to data mapping information for the target parts list\n";
+		logFile->flush();
 		SegmentMappingPreparer mappingPreparer = SegmentMappingPreparer(localTargetFold);
 		targetContentMap = mappingPreparer.shareSegmentsContents(*logFile);
 	}
@@ -520,6 +526,7 @@ void DataTransferManager::handleTransfer() {
 	// then prepare transfer buffers for all the incoming and outgoing messages; note that the way segment content map
 	// is organized, it is ensured that buffers are placed in proper order (by tags) in the resulting lists
 	*logFile << "\t\tPreparing incoming and outgoing transfer buffers\n";
+	logFile->flush();
 	int elementSize = transferConfig->getElementSize();
 	DataItemConfig *sourceConfig = localTransferrer.getSourceConfig()->generateStateFulVersion();
 	List<DataPart*> *sourceParts = localTransferrer.getSourcePartList();
@@ -541,6 +548,7 @@ void DataTransferManager::handleTransfer() {
 	// then first issue asynchronous receives for all incoming buffers then issue asynchronous sends for all outgoing
 	// buffers; then wait for all transfers to finish
 	*logFile << "\t\tGoing to do the MPI send and receive\n";
+	logFile->flush();
 	BufferTransferrer *buffReceiver = new BufferTransferrer(false, incomingBuffers);
 	buffReceiver->receiveDataAsync(*logFile);
 	BufferTransferrer *buffSender = new BufferTransferrer(true, outgoingBuffers);

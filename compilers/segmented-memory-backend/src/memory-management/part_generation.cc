@@ -971,6 +971,7 @@ bool DataPartitionConfig::isEquivalent(DataPartitionConfig *other) {
 		for (int j = 0; j < dimensionCount; j++) {
 			DimPartitionConfig *dimConfig1 = configVector1->at(j);
 			DimPartitionConfig *dimConfig2 = configVector2->at(j);
+			if (dimConfig1 == NULL && dimConfig2 == NULL) continue;
 			if ((dimConfig1 == NULL && dimConfig2 != NULL) 
 					|| (dimConfig1 != NULL && dimConfig2 == NULL)
 					|| (dimConfig1->doesReorderIndices() != dimConfig2->doesReorderIndices())) {

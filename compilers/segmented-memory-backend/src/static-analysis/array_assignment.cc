@@ -396,24 +396,24 @@ void AssignmentDirective::generateCodeForReference(std::ostringstream &stream, i
 				stream << "[" << dimNo << "].storage = storeDim" << dimNo << stmtSeparator;
 			}  
 		}
+	}
 		
-		// assign the transfer configuration of the right side as the parrent to the configuration for
-		// the left side
-		stream << indents << "destConfig->setParent(sourceConfig)" << stmtSeparator; 
-	
-		// finally, if the left-side array is a local variable then update the partition dimensions
-		// using the destination transfer configuration object
-		if (leftLocal) {
-			ArrayType *leftType = assigneeArray->getType();
-			int dimensionality = leftType->getDimensions();
-			stream << indents << "destConfig->copyDimensions(" << leftMetaPrefix;
-			stream << paramSeparator << dimensionality << ")" << stmtSeparator;
-			
-		// otherwise, record the transfer instruction in the environment object holding the left array
-		} else {
-			stream << indents << assigneeArray->getEnvObjName();
-			stream << "->addInitEnvInstruction(instr)" << stmtSeparator;
-		}
+	// assign the transfer configuration of the right side as the parrent to the configuration for
+	// the left side
+	stream << indents << "destConfig->setParent(sourceConfig)" << stmtSeparator; 
+
+	// finally, if the left-side array is a local variable then update the partition dimensions
+	// using the destination transfer configuration object
+	if (leftLocal) {
+		ArrayType *leftType = assigneeArray->getType();
+		int dimensionality = leftType->getDimensions();
+		stream << indents << "destConfig->copyDimensions(" << leftMetaPrefix;
+		stream << paramSeparator << dimensionality << ")" << stmtSeparator;
+		
+	// otherwise, record the transfer instruction in the environment object holding the left array
+	} else {
+		stream << indents << assigneeArray->getEnvObjName();
+		stream << "->addInitEnvInstruction(instr)" << stmtSeparator;
 	}
 
 	// close scope

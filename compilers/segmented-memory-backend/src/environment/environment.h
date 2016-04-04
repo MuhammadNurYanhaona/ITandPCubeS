@@ -119,6 +119,7 @@ class ListReferenceAttributes {
 	PartIdContainer *getPartContainerTree() { return partContainerTree; }
 	void computeSegmentFold();
 	List<MultidimensionalIntervalSeq*> *getSegmentFold() { return segmentFold; }
+	void printSegmentFold(std::ofstream &stream);
 
 
 	// tells if the first fold contains all data elements included in the second fold; this function is useful to 

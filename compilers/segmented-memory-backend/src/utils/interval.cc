@@ -232,7 +232,7 @@ List<IntervalSeq*> *IntervalSeq::computeIntersection(IntervalSeq *other) {
 
 	// check for equality fist and return the current interval if the two are the same
 	if (this->isEqual(other)) {
-		intersect->Append(this);
+		intersect->Append(new IntervalSeq(begin, length, period, count));
 		return intersect;
 	}
 
@@ -440,8 +440,8 @@ MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
 }
 
 MultidimensionalIntervalSeq::~MultidimensionalIntervalSeq() {
-	while (intervals.size() > 0) {
-		IntervalSeq *seq = intervals.front();
+	for (int i = 0; i < dimensionality; i++) {
+		IntervalSeq *seq = intervals[i];
 		delete seq;
 	}
 }

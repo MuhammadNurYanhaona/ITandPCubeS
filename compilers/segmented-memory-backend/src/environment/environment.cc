@@ -109,6 +109,18 @@ void ListReferenceAttributes::computeSegmentFold() {
 	segmentFold = ListReferenceAttributes::computeSegmentFold(partitionConfig, partContainerTree);
 }
 
+void ListReferenceAttributes::printSegmentFold(std::ofstream &stream) {
+	std::ostringstream desc;
+	desc << "Segment Fold:\n";
+	if (segmentFold != NULL) {
+		for (int i = 0; i < segmentFold->NumElements(); i++) {
+			MultidimensionalIntervalSeq *seq = segmentFold->Nth(i);
+			seq->draw(1, desc);
+		}
+	}
+	stream << desc.str();
+}
+
 bool ListReferenceAttributes::isSuperFold(List<MultidimensionalIntervalSeq*> *first, 
 		List<MultidimensionalIntervalSeq*> *second) {
 	
@@ -549,7 +561,6 @@ void TaskEnvironment::addInitEnvInstruction(TaskInitEnvInstruction *instr) {
 	if (oldInstrIndex != -1) {
 		TaskInitEnvInstruction *oldInstr = initInstrs[oldInstrIndex];
 		initInstrs[oldInstrIndex] = instr;
-		delete oldInstr;
 	} else initInstrs.push_back(instr); 
 }
         
