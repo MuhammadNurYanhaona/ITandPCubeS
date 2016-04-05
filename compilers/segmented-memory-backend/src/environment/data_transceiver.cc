@@ -1,6 +1,8 @@
 #include "data_transceiver.h"
 #include "environment.h"
 #include "../utils/interval.h"
+#include "../utils/common_utils.h"
+#include "../utils/id_generation.h"
 #include "../utils/list.h"
 #include "../memory-management/allocation.h"
 #include "../memory-management/part_generation.h"
@@ -113,14 +115,14 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	MPI_Comm_size(MPI_COMM_WORLD, &segmentCount);
 
-	int foldSizes[segmentCount];
-	int status = MPI_Allgather(&foldSize, 1, MPI_INT, foldSizes, segmentCount, MPI_INT, MPI_COMM_WORLD);
+	int *foldSizes = new int[segmentCount];
+	int status = MPI_Allgather(&foldSize, 1, MPI_INT, foldSizes, 1, MPI_INT, MPI_COMM_WORLD);
         if (status != MPI_SUCCESS) {
                 cout << rank << ": could not determine the data content sizes of different segments\n";
                 exit(EXIT_FAILURE);
         }
 
-	int displacements[segmentCount];
+	int *displacements = new int[segmentCount];
 	int currentIndex = 0;
 	for (int i = 0; i < segmentCount; i++) {
 		displacements[i] = currentIndex;
@@ -143,7 +145,7 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 		int beginIndex = currentIndex;
 		int endIndex = currentIndex + length - 1;
 		if (i != rank) {
-			char *contentStr = new char[length] + 1;
+			char *contentStr = new char[length + 1];
 			char *indexStart = foldDescBuffer + beginIndex;
 			strncpy(contentStr, indexStart, length);
 			contentStr[length] = '\0';
@@ -152,6 +154,8 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 		currentIndex += foldSizes[i];
 	}
 
+	delete[] foldSizes;
+	delete[] displacements;
 	return segmentContentMap;
 }
 
@@ -180,12 +184,12 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
 	
 	if (sourceFold == NULL || targetFold == NULL) return;
 
-	Participant sender = Participant(SEND, NULL, sourceFold);
-	Participant receiver = Participant(RECEIVE, NULL, targetFold);
-	List<MultidimensionalIntervalSeq*> *intersect = DataExchange::getCommonRegion(&sender, &receiver);
+	Participant *sender = new Participant(SEND, NULL, sourceFold);
+	Participant *receiver = new Participant(RECEIVE, NULL, targetFold);
+	List<MultidimensionalIntervalSeq*> *intersect = DataExchange::getCommonRegion(sender, receiver);
 	if (intersect == NULL) return;
 
-	DataExchange *exchange = new DataExchange(&sender, &receiver, intersect);
+	DataExchange *exchange = new DataExchange(sender, receiver, intersect);
 	ExchangeIterator *iterator = new ExchangeIterator(exchange);
 
 	DataItemConfig *sendConfig = sourceConfig->generateStateFulVersion();	
@@ -231,10 +235,12 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
 
 //-------------------------------------------------------- Transfer Buffer ------------------------------------------------------------
 
-TransferBuffer::TransferBuffer(int bufferTag, DataExchange *exchange,
+TransferBuffer::TransferBuffer(int sender, int receiver, 
+		DataExchange *exchange,
 		DataPartSpec *partListSpec, TransferSpec *transferSpec,
 		PartIdContainer *partContainerTree) {
-	this->bufferTag = bufferTag;
+	this->sender = sender;
+	this->receiver = receiver;
 	this->exchange = exchange;
 	this->partListSpec = partListSpec;
 	this->transferSpec = transferSpec;
@@ -316,11 +322,13 @@ TransferBuffersPreparer::TransferBuffersPreparer(int elementSize,
 }
 
 List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForOutgoingTransfers(PartIdContainer *sourceContainer,
-		List<SegmentDataContent*> *targetContentMap) {
+		List<SegmentDataContent*> *targetContentMap, std::ofstream &logFile) {
 	
-	int localSegmentId;
-	MPI_Comm_rank(MPI_COMM_WORLD, &localSegmentId);
-
+	int senderId, segmentCount;
+	MPI_Comm_rank(MPI_COMM_WORLD, &senderId);
+	MPI_Comm_size(MPI_COMM_WORLD, &segmentCount);
+	int digits = countDigits(segmentCount); 
+	
 	if (localSourceContent == NULL) return NULL;
 	if (targetContentMap == NULL || targetContentMap->NumElements() == 0) return NULL;
 
@@ -337,24 +345,30 @@ List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForOutgoingTransfer
 			delete receiver;
 			continue;
 		}
-
+		int receiverId = segmentContent->getSegmentId();
 		DataExchange *exchange = new DataExchange(sender, receiver, intersect);
-		int bufferTag = localSegmentId;
 		DataPartSpec *partListSpec = sourcePartsListSpec;
 		PartIdContainer *containerTree = sourceContainer;
 		TransferSpec *transferSpec = new TransferSpec(DATA_PART_TO_COMM_BUFFER, elementSize);
-		TransferBuffer *buffer = new TransferBuffer(bufferTag, 
+		TransferBuffer *buffer = new TransferBuffer(senderId, receiverId, 
 				exchange, partListSpec, transferSpec, containerTree);
+		int bufferTag = idutils::concateIds(senderId, receiverId, digits);
+		buffer->setBufferTag(bufferTag);
 		transferBufferList->Append(buffer);
 	}
 	return transferBufferList;
 }
 
 List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForIncomingTransfers(PartIdContainer *targetContainer,
-                        List<SegmentDataContent*> *sourceContentMap) {
+                        List<SegmentDataContent*> *sourceContentMap, std::ofstream &logFile) {
 
 	if (localTargetContent == NULL) return NULL;
 	if (sourceContentMap == NULL || sourceContentMap->NumElements() == 0) return NULL;
+	
+	int receiverId, segmentCount;
+	MPI_Comm_rank(MPI_COMM_WORLD, &receiverId);
+	MPI_Comm_size(MPI_COMM_WORLD, &segmentCount);
+	int digits = countDigits(segmentCount); 
 
 	Participant *receiver = new Participant(RECEIVE, NULL, localTargetContent);
 	List<TransferBuffer*> *transferBufferList = new List<TransferBuffer*>;
@@ -369,14 +383,15 @@ List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForIncomingTransfer
 			delete sender;
 			continue;
 		}
-
+		int senderId = segmentContent->getSegmentId();
 		DataExchange *exchange = new DataExchange(sender, receiver, intersect);
-		int bufferTag = segmentContent->getSegmentId();
 		DataPartSpec *partListSpec = targetPartsListSpec;
 		PartIdContainer *containerTree = targetContainer;
 		TransferSpec *transferSpec = new TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize);
-		TransferBuffer *buffer = new TransferBuffer(bufferTag, 
+		TransferBuffer *buffer = new TransferBuffer(senderId, receiverId, 
 				exchange, partListSpec, transferSpec, containerTree);
+		int bufferTag = idutils::concateIds(senderId, receiverId, digits);
+		buffer->setBufferTag(bufferTag);
 		transferBufferList->Append(buffer);
 	}
 	return transferBufferList;
@@ -413,8 +428,9 @@ void BufferTransferrer::sendDataAsync(std::ofstream &logFile) {
 		buffer->preprocessBuffer(logFile);
 		int size = buffer->getSize();
 		char *data = buffer->getData();
+		int receiver = buffer->getReceiver();
 		int tag = buffer->getBufferTag();
-		int status = MPI_Isend(data, size, MPI_CHAR, tag, tag, MPI_COMM_WORLD, &transferRequests[i]);
+		int status = MPI_Isend(data, size, MPI_CHAR, receiver, tag, MPI_COMM_WORLD, &transferRequests[i]);
 		if (status != MPI_SUCCESS) {
 			cout << "Segment " << rank << ": could not issue asynchronous send\n";
 			exit(EXIT_FAILURE);
@@ -438,8 +454,9 @@ void BufferTransferrer::receiveDataAsync(std::ofstream &logFile) {
 		TransferBuffer *buffer = bufferList->Nth(i);
 		int size = buffer->getSize();
 		char *data = buffer->getData();
+		int sender = buffer->getSender();
 		int tag = buffer->getBufferTag();
-		int status = MPI_Irecv(data, size, MPI_CHAR, tag, tag, MPI_COMM_WORLD, &transferRequests[i]);
+		int status = MPI_Irecv(data, size, MPI_CHAR, sender, tag, MPI_COMM_WORLD, &transferRequests[i]);
 		if (status != MPI_SUCCESS) {
 			cout << "Segment " << rank << ": could not issue asynchronous receive\n";
 			exit(EXIT_FAILURE);
@@ -501,10 +518,10 @@ void DataTransferManager::handleTransfer() {
 	if (sourceAttrs->isSegmentMappingKnown()) {
 		sourceContentMap = sourceAttrs->getSegmentMapping();
 	} else {
-		SegmentMappingPreparer mappingPreparer = SegmentMappingPreparer(localSourceFold);
-		sourceContentMap = mappingPreparer.shareSegmentsContents(*logFile);
 		*logFile << "\t\tGoing to collect segment to data mapping information for the source parts list\n";
 		logFile->flush();
+		SegmentMappingPreparer mappingPreparer = SegmentMappingPreparer(localSourceFold);
+		sourceContentMap = mappingPreparer.shareSegmentsContents(*logFile);
 		sourceAttrs->setSegmentsContents(sourceContentMap);
 	}
 	const char *dataItemId = transferConfig->getDataItemId();
@@ -542,11 +559,11 @@ void DataTransferManager::handleTransfer() {
 	PartIdContainer *sourceContainer = localTransferrer.getSourcePartsTree();
 	PartIdContainer *targetContainer = localTransferrer.getTargetPartsTree();
 	List<TransferBuffer*> *incomingBuffers 
-			= buffersPreparer.createBuffersForIncomingTransfers(
-					targetContainer, sourceContentMap);
+			= buffersPreparer.createBuffersForIncomingTransfers(targetContainer, 
+					sourceContentMap, *logFile);
 	List<TransferBuffer*> *outgoingBuffers 
-			= buffersPreparer.createBuffersForOutgoingTransfers(
-					sourceContainer, targetContentMap);
+			= buffersPreparer.createBuffersForOutgoingTransfers(sourceContainer, 
+					targetContentMap, *logFile);
 
 	// then first issue asynchronous receives for all incoming buffers then issue asynchronous sends for all outgoing
 	// buffers; then wait for all transfers to finish

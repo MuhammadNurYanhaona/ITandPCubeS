@@ -114,17 +114,23 @@ class LocalTransferrer {
 class TransferBuffer {
   private:
 	char *data;
+	int sender;
+	int receiver;
 	int bufferTag;
 	DataExchange *exchange;
 	DataPartSpec *partListSpec;
 	TransferSpec *transferSpec;
 	PartIdContainer *partContainerTree;
   public:
-	TransferBuffer(int bufferTag, DataExchange *exchange, 
+	TransferBuffer(int sender, int receiver, 
+			DataExchange *exchange, 
 			DataPartSpec *partListSpec, TransferSpec *transferSpec, 
 			PartIdContainer *partContainerTree);
 	~TransferBuffer();
 	void preprocessBuffer(std::ofstream &logFile);
+	int getSender() { return sender; }
+	int getReceiver() { return receiver; }
+	void setBufferTag(int bufferTag) { this->bufferTag = bufferTag; }
 	int getBufferTag() { return bufferTag; }
 	char *getData() { return data; }
 	void postProcessBuffer(std::ofstream &logFile);
@@ -149,9 +155,11 @@ class TransferBuffersPreparer {
 			List<MultidimensionalIntervalSeq*> *localTargetContent, 
 			DataPartSpec *targetPartsListSpec);
 	List<TransferBuffer*> *createBuffersForOutgoingTransfers(PartIdContainer *sourceContainer, 
-			List<SegmentDataContent*> *targetContentMap);
+			List<SegmentDataContent*> *targetContentMap,
+			std::ofstream &logFile);
 	List<TransferBuffer*> *createBuffersForIncomingTransfers(PartIdContainer *targetContainer, 
-			List<SegmentDataContent*> *sourceContentMap);
+			List<SegmentDataContent*> *sourceContentMap,
+			std::ofstream &logFile);
 };
 
 /* This class does the MPI data transfers between buffers of current segment with buffers of segments it interacts with */

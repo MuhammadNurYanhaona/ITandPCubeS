@@ -3,6 +3,9 @@
 
 #include "list.h"
 #include <vector>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
 
 namespace idutils {
 
@@ -37,6 +40,16 @@ namespace idutils {
 			}
 		}
 		return true;
+	}
+
+	inline int concateIds(int id1, int id2, int digitCount) {
+		int result;
+		std::ostringstream ostream;
+		ostream << std::setfill('0') << std::setw(digitCount) << id1;
+		ostream << std::setfill('0') << std::setw(digitCount) << id2;
+		std::istringstream istream(ostream.str());
+		istream >> result;
+		return result;
 	}
 }
 

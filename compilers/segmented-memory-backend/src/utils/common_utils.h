@@ -2,6 +2,8 @@
 #define _H_common_utils
 
 #include "../utils/list.h"
+#include <math.h>
+#include <cstdlib>
 
 inline int min(int x, int y) { return x < y ? x : y; }
 
@@ -17,6 +19,11 @@ inline int gcd(int a, int b) {
 
 inline int lcm(int a, int b) {
 	return (a * b) / gcd(a, b);
+}
+
+inline int countDigits (int n) {
+    if (n == 0) return 1;
+    return floor (log10(abs (n))) + 1;
 }
 
 namespace common_utils {
