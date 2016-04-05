@@ -33,6 +33,7 @@ class TransferConfig {
 	LpsAllocation *receiver;
 	TaskItem *receiverTaskItem;
 	int elementSize;
+	std::ofstream *logFile;
   public:
 	TransferConfig(ProgramEnvironment *progEnv, 
 		const char *dataItemId, 
@@ -44,7 +45,8 @@ class TransferConfig {
 	LpsAllocation *getReceiver() { return receiver; }
 	TaskItem *getReceiverTaskItem() { return receiverTaskItem; }
 	PartsListReference *getSourceReference();
-	int getElementSize() { return elementSize; }	
+	int getElementSize() { return elementSize; }
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }	
 
 	// retrieves or generates an interval description for the local data need in the target LPS allocation
 	List<MultidimensionalIntervalSeq*> *getLocalDestinationFold();

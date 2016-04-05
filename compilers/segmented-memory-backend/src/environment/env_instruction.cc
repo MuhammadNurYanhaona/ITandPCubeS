@@ -120,7 +120,7 @@ void TaskInitEnvInstruction::initiateVersionManagement() {
 		DataPartitionConfig *partConfig = allocation->getPartitionConfig();
 		ListReferenceAttributes *versionAttr = new ListReferenceAttributes(partConfig, rootDimensions);
 		versionAttr->setPartContainerTree(allocation->getContainerTree());
-		versionAttr->computeSegmentFold();
+		versionAttr->computeSegmentFold(logFile);
 		PartsList *partsList = allocation->getPartsList();
 		PartsListReference *versionRef = new PartsListReference(versionAttr, versionKey, partsList);
 		
@@ -283,7 +283,7 @@ void StaleRefreshInstruction::setupPartsList() {
 			ListReferenceAttributes *attr 
 					= new ListReferenceAttributes(allocationConfig, rootDimensions);
 			attr->setPartContainerTree(allocation->getContainerTree());
-			attr->computeSegmentFold();
+			attr->computeSegmentFold(logFile);
 			PartsList *partsList = allocation->getPartsList();
 			partsList->getAttributes()->setSegmentsContents(transferManager->getTargetContentMap());
 			PartsListReference *versionRef = new PartsListReference(attr, versionKey, partsList);
@@ -348,7 +348,7 @@ void StaleRefreshInstruction::setupPartsList() {
 			ListReferenceAttributes *attr 
 					= new ListReferenceAttributes(allocationConfig, rootDimensions);
 			attr->setPartContainerTree(allocation->getContainerTree());
-			attr->computeSegmentFold();
+			attr->computeSegmentFold(logFile);
 			PartsList *partsList = allocation->getPartsList();
 			PartsListReference *versionRef = new PartsListReference(attr, versionKey, partsList);
 			versionManager->addNewVersion(versionRef);
@@ -519,7 +519,7 @@ void DataTransferInstruction::setupPartsList() {
 			ListReferenceKey *versionKey = allocation->generatePartsListReferenceKey(envId, itemName);
 			ListReferenceAttributes *attr = new ListReferenceAttributes(destConfig, rootDimensions);
 			attr->setPartContainerTree(allocation->getContainerTree());
-			attr->computeSegmentFold();
+			attr->computeSegmentFold(logFile);
 			PartsList *partsList = allocation->getPartsList();
 			PartsListReference *versionRef = new PartsListReference(attr, versionKey, partsList);
 			versionManager->addNewVersion(versionRef);

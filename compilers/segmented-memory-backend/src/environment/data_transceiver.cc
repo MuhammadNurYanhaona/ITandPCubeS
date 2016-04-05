@@ -30,6 +30,7 @@ TransferConfig::TransferConfig(ProgramEnvironment *progEnv,
 	this->receiver = recv;
 	this->receiverTaskItem = rtk;
 	this->elementSize = rtk->getElementSize();
+	this->logFile = NULL;
 }
 
 PartsListReference *TransferConfig::getSourceReference() {
@@ -40,7 +41,7 @@ PartsListReference *TransferConfig::getSourceReference() {
 List<MultidimensionalIntervalSeq*> *TransferConfig::getLocalDestinationFold() {
 	DataPartitionConfig *partConfig = receiver->getPartitionConfig();
 	PartIdContainer *containerTree = receiver->getContainerTree();
-	return ListReferenceAttributes::computeSegmentFold(partConfig, containerTree);	
+	return ListReferenceAttributes::computeSegmentFold(partConfig, containerTree, logFile);	
 }
 
 const char *TransferConfig::generateTargetVersionkey() {
@@ -127,7 +128,7 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 	}
 	char *foldDescBuffer = new char[currentIndex];
 
-	status = MPI_Allgatherv(foldString, foldSize, MPI_CHAR, 
+	status = MPI_Allgatherv((void *) foldString, foldSize, MPI_CHAR, 
 			foldDescBuffer, foldSizes, displacements, MPI_CHAR, MPI_COMM_WORLD);
         if (status != MPI_SUCCESS) {
                 cout << rank << ": could not gather fold descriptions from all segments\n";
@@ -478,6 +479,8 @@ void DataTransferManager::handleTransfer() {
 	// First determine if there is a need for locally moving data from the source parts list version in the program
 	// environment to the target LPS allocation. If there is a need then do the local transfer first
 	*logFile << "\t\tGoing to perform local data movement from source to the target\n";
+	logFile->flush();
+	transferConfig->setLogFile(logFile);
 	LocalTransferrer localTransferrer = LocalTransferrer(transferConfig);
 	localTransferrer.transferData(*logFile);
 

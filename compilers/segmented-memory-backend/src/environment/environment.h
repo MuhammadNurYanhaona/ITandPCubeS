@@ -117,7 +117,7 @@ class ListReferenceAttributes {
 		this->partContainerTree = containerTree;
 	}
 	PartIdContainer *getPartContainerTree() { return partContainerTree; }
-	void computeSegmentFold();
+	void computeSegmentFold(std::ofstream *logFile = NULL);
 	List<MultidimensionalIntervalSeq*> *getSegmentFold() { return segmentFold; }
 	void printSegmentFold(std::ofstream &stream);
 
@@ -129,7 +129,8 @@ class ListReferenceAttributes {
 	
 	// an utility function to compute segment fold from different places
 	static List<MultidimensionalIntervalSeq*> *computeSegmentFold(DataPartitionConfig *partConfig, 
-			PartIdContainer *containerTree);
+			PartIdContainer *containerTree, 
+			std::ofstream *logFile = NULL);
 };
 
 /* We mentioned before that some parts lists for a data item may be stale as multiple tasks can manipulate a single data 

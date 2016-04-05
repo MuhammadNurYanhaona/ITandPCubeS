@@ -105,8 +105,10 @@ ListReferenceAttributes::~ListReferenceAttributes() {
 	}
 }
 
-void ListReferenceAttributes::computeSegmentFold() {
-	segmentFold = ListReferenceAttributes::computeSegmentFold(partitionConfig, partContainerTree);
+void ListReferenceAttributes::computeSegmentFold(std::ofstream *logFile) {
+
+	segmentFold = ListReferenceAttributes::computeSegmentFold(partitionConfig, 
+			partContainerTree, logFile);
 }
 
 void ListReferenceAttributes::printSegmentFold(std::ofstream &stream) {
@@ -151,7 +153,7 @@ bool ListReferenceAttributes::isSuperFold(List<MultidimensionalIntervalSeq*> *fi
 }
 
 List<MultidimensionalIntervalSeq*> *ListReferenceAttributes::computeSegmentFold(DataPartitionConfig *partConfig, 
-                        PartIdContainer *containerTree) {
+                        PartIdContainer *containerTree, std::ofstream *logFile) {
 	
 	if (containerTree == NULL) return NULL;
 

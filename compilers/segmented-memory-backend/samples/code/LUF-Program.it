@@ -3,7 +3,7 @@ Program (args) {
 	initEnv = new TaskEnvironment(name: "Initiate LU")
 	initEnv.x = 10
 	bind_input(initEnv, "a", args.input_file)
-	execute("Initiate LU"; initEnv)
+	execute("Initiate LU"; initEnv; Partition: blockSize)
 	luEnv = new TaskEnvironment(name: "Transposed LU Factorization")
 	luEnv.u = initEnv.u
 	luEnv.l = initEnv.l
@@ -47,9 +47,9 @@ Task "Initiate LU":
 			do { u[j][i] = a[i][j] } for i, j in a
 			do { l[i][i] = 1 } for i in l
 		}
-	Partition:
+	Partition(b):
 		Space A <1D> {
-			a<dim2>, u<dim1>, l<dim1>: stride()
+			a<dim2>, u<dim1>, l<dim1>: block_stride(b)
 		}	
 
 Task "Transposed LU Factorization":
@@ -113,7 +113,7 @@ Task "Transposed LU Factorization":
 		}	
 		Repeat: from "Select Pivot" for k in k_range
 	Partition (b):
-		Space A <un-partitioned> { p, p_column, l_column, l }
+		Space A <un-partitioned> { p, p_column, l_column }
 		Space B <1D> divides Space A partitions {
 			u<dim1>, l<dim1>, l_column: block_stride(b)
 			l_row, p_column: replicated
