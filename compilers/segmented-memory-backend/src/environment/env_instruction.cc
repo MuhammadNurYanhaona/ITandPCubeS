@@ -214,6 +214,26 @@ void TaskInitEnvInstruction::cloneDataFromPartsList(const char *itemKey,
 	*logFile << itemToUpdate->getEnvLinkKey()->getVarName() << " in task " << taskEnv->name << "\n";
 }
 
+void TaskInitEnvInstruction::generatePartsListReferenceForClone(ListReferenceKey *sourcePartsListKey, 
+		LpsAllocation *allocation, List<Dimension> *rootDimensions) {
+	
+	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
+	int envId = taskEnv->getEnvId();
+	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
+	EnvironmentLinkKey *itemKey = itemToUpdate->getEnvLinkKey();
+	const char *itemName = itemKey->getVarName();
+	const char *itemSourceKey = itemKey->getSourceKey();
+        ObjectVersionManager *versionManager = progEnv->getVersionManager(itemSourceKey);
+	
+	PartsListReference *sourceReference = versionManager->getVersion(sourcePartsListKey->generateKey());
+	PartsList *source = sourceReference->getPartsList();
+	
+	PartsListReference *clonedReference = allocation->generatePartsListReference(envId,
+                	itemName, rootDimensions);
+	clonedReference->setPartsList(source);
+	versionManager->addNewVersion(clonedReference);
+}
+
 //--------------------------------------------------- StaleRefreshInstruction -----------------------------------------------------
 
 void StaleRefreshInstruction::setupPartsList() {
@@ -501,6 +521,10 @@ void DataTransferInstruction::setupPartsList() {
 			cloneDataFromPartsList(dataSourceKey, referenceKey, allocation->getPartsList());
 			envReference->getPartsList()->getAttributes()->increaseReferenceCount();
 			*logFile << "\tCloned parts for LPS " << allocation->getLpsId() << "\n";
+			
+			// we also need to register a new version reference even in case of a cloned transfer so that we
+			// can locate the same parts list using different version keys
+			generatePartsListReferenceForClone(referenceKey, allocation, rootDimensions);
 		} else {
 			// allocate memories for the parts in the LPS allocation
 			allocation->allocatePartsList();

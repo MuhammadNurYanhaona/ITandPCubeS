@@ -182,6 +182,7 @@ class PartsListReference {
 	}
 	ListReferenceAttributes *getAttributes() { return attributes; }
 	ListReferenceKey *getKey() { return key; }
+	void setPartsList(PartsList *partsList) { this->partsList = partsList; }
 	PartsList *getPartsList() { return partsList; }		
 };
 
