@@ -22,7 +22,7 @@ class AccessFlags {
 	bool redirect;
 	bool reduce;
   public:
-	AccessFlags() { read = write = reduce = false; }
+	AccessFlags() { read = write = reduce = redirect = false; }
 	void flagAsRead() { read = true; }
 	void flagAsRedirected() { redirect = true; }
 	void flagAsWritten() { write = true; }

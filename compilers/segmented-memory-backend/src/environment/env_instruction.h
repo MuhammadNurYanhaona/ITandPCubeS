@@ -16,6 +16,7 @@ class TaskInitEnvInstruction {
 	TaskItem *itemToUpdate;
   public:
 	TaskInitEnvInstruction(TaskItem *itemToUpdate) { this->itemToUpdate = itemToUpdate; }
+	virtual ~TaskInitEnvInstruction() {}
 	TaskItem *getItemToUpdate() { return itemToUpdate; }
 	
 	// this function should be called before the task has been scheduled for execution because without dimension lengths
