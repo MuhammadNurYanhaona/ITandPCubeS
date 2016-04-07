@@ -220,7 +220,6 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
                 targetPartsTree->transferData(transformVector, writeTransferSpec, writePartSpec, false, cout);
 	}
 
-	delete intersect;
 	delete exchange;
 	delete iterator;
 	delete sendConfig;
@@ -230,7 +229,7 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
 	delete writePartSpec;
 	delete writeTransferSpec;
 	delete transformVector;
-	delete dataEntry;
+	delete[] dataEntry;
 }
 
 //-------------------------------------------------------- Transfer Buffer ------------------------------------------------------------

@@ -9,11 +9,23 @@
 //---------------------------------------------------------------- Part Metadata ---------------------------------------------------------------/
 
 PartMetadata::PartMetadata(int dimensionality, List<int*> *idList, Dimension *boundary, int *padding) {
+	
 	Assert(dimensionality > 0 && idList != NULL && boundary != NULL);
+
 	this->dimensionality = dimensionality;
-	this->idList = idList;
 	this->boundary = boundary;
 	this->padding = padding;
+
+	this->idList = new List<int*>;
+        Assert(this->idList != NULL);
+        for (int i = 0; i < idList->NumElements(); i++) {
+                int *idAtLevel = new int[dimensionality];
+                Assert(idAtLevel != NULL);
+                for (int d = 0; d < dimensionality; d++) {
+                        idAtLevel[d] = idList->Nth(i)[d];
+                }
+                this->idList->Append(idAtLevel);
+        }
 }
 
 PartMetadata::~PartMetadata() {

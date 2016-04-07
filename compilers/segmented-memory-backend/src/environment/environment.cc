@@ -25,7 +25,7 @@ SegmentDataContent::SegmentDataContent(int segmentId, const char *stringFoldDesc
 }
 
 SegmentDataContent::~SegmentDataContent() {
-	delete stringFoldDesc;
+	delete[] stringFoldDesc;
 }
 
 List<MultidimensionalIntervalSeq*> *SegmentDataContent::generateFold() {
@@ -90,8 +90,6 @@ ListReferenceAttributes::ListReferenceAttributes(DataPartitionConfig *partitionC
 }
         
 ListReferenceAttributes::~ListReferenceAttributes() {
-	delete partitionConfig;
-	delete rootDimensions;
 	if (partContainerTree != NULL) {
 		delete partContainerTree;
 	}
@@ -282,6 +280,7 @@ PartsListReference *ObjectVersionManager::getVersion(const char *versionKey) {
 }
 
 void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchingKey) {
+	
 	List<ListReferenceKey*> updatedList;
 	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
 		ListReferenceKey *includedKey = freshVersionKeys->Nth(i);
@@ -293,10 +292,18 @@ void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchi
 		PartsListReference *version = dataVersions->Lookup(stringKey);
 		PartsList *partsList = version->getPartsList();
 		partsList->getAttributes()->flagStale();
-		delete stringKey;
 	}
+
 	freshVersionKeys->clear();
 	freshVersionKeys->AppendAll(&updatedList);
+
+	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
+		ListReferenceKey *freshKey = freshVersionKeys->Nth(i);
+		const char *stringKey = freshKey->generateKey();
+		PartsListReference *version = dataVersions->Lookup(stringKey);
+		PartsList *partsList = version->getPartsList();
+		partsList->getAttributes()->flagFresh();
+	}
 }
 
 bool ObjectVersionManager::foundMatchingFreshVersion(ListReferenceKey *matchingKey) {
@@ -323,7 +330,6 @@ List<PartsListReference*> *ObjectVersionManager::getFreshVersions() {
 		ListReferenceKey *freshKey = freshVersionKeys->Nth(i);
 		const char *stringKey = freshKey->generateKey();
 		freshVersions->Append(dataVersions->Lookup(stringKey));
-		delete stringKey;
 	}
 	return freshVersions;	
 }

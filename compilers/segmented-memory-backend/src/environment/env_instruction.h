@@ -200,6 +200,7 @@ class TaskEndEnvInstruction {
 	TaskItem *envItem;
   public:
 	TaskEndEnvInstruction(TaskItem *envItem) { this->envItem = envItem; }
+	virtual ~TaskEndEnvInstruction() {}
 	void execute() {
 		updateProgramEnv();
 		doAdditionalProcessing();
