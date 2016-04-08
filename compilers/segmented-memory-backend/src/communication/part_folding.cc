@@ -5,6 +5,7 @@
 #include <iostream>
 #include <vector>
 #include <deque>
+#include <fstream>
 
 using namespace std;
 
@@ -146,7 +147,7 @@ void PartFolding::pruneFolding(int lowerLevelBound, DataItemConfig *dataConfig) 
 	}
 }
 
-List<MultidimensionalIntervalSeq*> *PartFolding::generateIntervalDesc(DataItemConfig *dataConfig) {
+List<MultidimensionalIntervalSeq*> *PartFolding::generateIntervalDesc(DataItemConfig *dataConfig, std::ofstream *logFile) {
 	List<MultidimensionalIntervalSeq*> *dataDesc = new List<MultidimensionalIntervalSeq*>;
 	List<FoldStrain*> *foldStrainList = extractStrains();
 	for (int i = 0; i < foldStrainList->NumElements(); i++) {
@@ -170,7 +171,7 @@ void FoldStrain::print(std::ostream &stream) {
 	stream << "[dim: " << dimNo << ", range: " << idRange.min << "-" << idRange.max << "]";
 }
 
-List<MultidimensionalIntervalSeq*> *FoldStrain::generateIntervalDesc(DataItemConfig *dataConfig) {
+List<MultidimensionalIntervalSeq*> *FoldStrain::generateIntervalDesc(DataItemConfig *dataConfig, std::ofstream *logFile) {
 
 	List<DimensionFold*> *dimensionFoldList = DimensionFold::separateDimensionFolds(this);
 	List<List<IntervalSeq*>*> *dimensionalIntervalDesc = new List<List<IntervalSeq*>*>;
@@ -282,7 +283,7 @@ void DimensionFold::print(std::ostream &stream, int indentLevel) {
 	stream << ']' << "\n";
 }
 
-List<IntervalSeq*> *DimensionFold::generateIntervalDesc(DataItemConfig *dataConfig) {
+List<IntervalSeq*> *DimensionFold::generateIntervalDesc(DataItemConfig *dataConfig, std::ofstream *logFile) {
 	int foldLength = fold->size();
 	List<Range> *idRangeList = new List<Range>;
 	for (int i = 0; i < foldLength; i++) {

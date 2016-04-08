@@ -51,7 +51,6 @@ const char *TransferConfig::generateTargetVersionkey() {
 	const char *itemName = receiverTaskItem->getEnvLinkKey()->getVarName();
 	ListReferenceKey *receiverKey = receiver->generatePartsListReferenceKey(envId, itemName);
 	const char *versionKey = receiverKey->generateKey();
-	delete receiverKey;
 	return versionKey;
 }
 
@@ -151,11 +150,12 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 			contentStr[length] = '\0';
 			segmentContentMap->Append(new SegmentDataContent(i, contentStr));
 		}
-		currentIndex += foldSizes[i];
+		currentIndex += length;
 	}
 
 	delete[] foldSizes;
 	delete[] displacements;
+	delete[] foldDescBuffer;
 	return segmentContentMap;
 }
 

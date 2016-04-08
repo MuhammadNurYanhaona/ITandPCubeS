@@ -162,7 +162,8 @@ List<MultidimensionalIntervalSeq*> *ListReferenceAttributes::computeSegmentFold(
 	List<MultidimensionalIntervalSeq*> *segmentFold = new List<MultidimensionalIntervalSeq*>;
 	for (int i = 0; i < folds->NumElements(); i++) {
 		PartFolding *fold = folds->Nth(i);
-		List<MultidimensionalIntervalSeq*> *foldDesc = fold->generateIntervalDesc(dataItemConfig);
+		List<MultidimensionalIntervalSeq*> *foldDesc 
+				= fold->generateIntervalDesc(dataItemConfig, logFile);
 		segmentFold->AppendAll(foldDesc);
 		delete foldDesc;
 	}
@@ -281,11 +282,11 @@ PartsListReference *ObjectVersionManager::getVersion(const char *versionKey) {
 
 void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchingKey) {
 	
-	List<ListReferenceKey*> updatedList;
+	List<ListReferenceKey*> *updatedList;
 	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
 		ListReferenceKey *includedKey = freshVersionKeys->Nth(i);
 		if (includedKey->matchesPattern(matchingKey)) {
-			updatedList.Append(includedKey);
+			updatedList->Append(includedKey);
 			continue;
 		}
 		const char *stringKey = includedKey->generateKey();
@@ -295,7 +296,8 @@ void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchi
 	}
 
 	freshVersionKeys->clear();
-	freshVersionKeys->AppendAll(&updatedList);
+	freshVersionKeys->AppendAll(updatedList);
+	delete updatedList;
 
 	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
 		ListReferenceKey *freshKey = freshVersionKeys->Nth(i);

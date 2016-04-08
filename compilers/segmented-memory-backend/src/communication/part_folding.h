@@ -13,6 +13,7 @@
 #include "part_config.h"
 #include <cstdlib>
 #include <iostream>
+#include <fstream>
 #include <vector>
 
 class FoldStrain;
@@ -56,7 +57,8 @@ class PartFolding {
 	void pruneFolding(int lowerLevelBound, DataItemConfig *dataConfig);
 
 	// generates an interval description as a list of multidimensional interval sequences for the entire fold
-	List<MultidimensionalIntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig);
+	List<MultidimensionalIntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig, 
+			std::ofstream *logFile = NULL);
 };
 
 // this class represents a single path in a part-folding; the path progresses bottom up; i.e., initial reference holds 
@@ -85,7 +87,8 @@ class FoldStrain {
 	FoldStrain *copy() { return new FoldStrain(dimNo, level, idRange); }
 
 	// generates an interval description as a list of multidimensional interval sequences for the current strain
-	List<MultidimensionalIntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig);
+	List<MultidimensionalIntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig, 
+			std::ofstream *logFile = NULL);
 };
 
 // this class is used to generate separate folding chains per dimensions from a strain of part folding
@@ -108,7 +111,8 @@ class DimensionFold {
 
 	// generates an interval description as a list of one dimensional interval sequences for the current dimension
 	// of some fold strain
-	List<IntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig);
+	List<IntervalSeq*> *generateIntervalDesc(DataItemConfig *dataConfig, 
+			std::ofstream *logFile = NULL);
 
 	// Since the dimensions of sibling parts at any level of the partition hierarchy may be of different lengths,
 	// it is not right to just generate interval description for a range of parts by assuming that they have the
