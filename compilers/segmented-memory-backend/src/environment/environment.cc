@@ -282,7 +282,7 @@ PartsListReference *ObjectVersionManager::getVersion(const char *versionKey) {
 
 void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchingKey) {
 	
-	List<ListReferenceKey*> *updatedList;
+	List<ListReferenceKey*> *updatedList = new List<ListReferenceKey*>;
 	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
 		ListReferenceKey *includedKey = freshVersionKeys->Nth(i);
 		if (includedKey->matchesPattern(matchingKey)) {
