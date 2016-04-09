@@ -24,6 +24,7 @@ class PartitionConfig {
 	int lpsId;
   public:
 	PartitionConfig(int dimensions);
+	~PartitionConfig();
 	void setInstruction(int dimNo, PartitionInstr *instruction);
 	PartitionInstr *getInstruction(int dimNo);
 	void setLpsId(int lpsId) { this->lpsId = lpsId; }
@@ -39,6 +40,7 @@ class DataItemConfig {
 	std::vector<PartitionConfig*> partitionConfigs;
   public:
 	DataItemConfig(int dimensions, int levels);
+	~DataItemConfig();
 	void setDimension(int dimNo, Dimension dimension);
 	Dimension getDimension(int dimNo);
 	void setPartitionInstr(int levelNo, int dimNo, PartitionInstr *instruction);

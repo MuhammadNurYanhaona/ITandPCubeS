@@ -23,7 +23,7 @@ using namespace std;
 //-------------------------------------------------------- Transfer Config ------------------------------------------------------------
 
 TransferConfig::TransferConfig(ProgramEnvironment *progEnv, 
-		const char *dataItemId, 
+		char *dataItemId, 
 		ListReferenceKey *svk, 
 		LpsAllocation *recv, TaskItem *rtk) {
 	this->progEnv = progEnv;
@@ -36,8 +36,10 @@ TransferConfig::TransferConfig(ProgramEnvironment *progEnv,
 }
 
 PartsListReference *TransferConfig::getSourceReference() {
-	const char *stringKey = sourceVersionKey->generateKey();
-	return progEnv->getVersionManager(dataItemId)->getVersion(stringKey);
+	char *stringKey = sourceVersionKey->generateKey();
+	PartsListReference *reference = progEnv->getVersionManager(dataItemId)->getVersion(stringKey);
+	free(stringKey);
+	return reference;
 }
 
 List<MultidimensionalIntervalSeq*> *TransferConfig::getLocalDestinationFold() {
@@ -46,12 +48,11 @@ List<MultidimensionalIntervalSeq*> *TransferConfig::getLocalDestinationFold() {
 	return ListReferenceAttributes::computeSegmentFold(partConfig, containerTree, logFile);	
 }
 
-const char *TransferConfig::generateTargetVersionkey() {
+char *TransferConfig::generateTargetVersionkey() {
 	int envId = receiverTaskItem->getEnvironment()->getEnvId();
 	const char *itemName = receiverTaskItem->getEnvLinkKey()->getVarName();
 	ListReferenceKey *receiverKey = receiver->generatePartsListReferenceKey(envId, itemName);
-	const char *versionKey = receiverKey->generateKey();
-	return versionKey;
+	return receiverKey->generateKey();
 }
 
 ListReferenceAttributes *TransferConfig::prepareTargetVersionAttributes() {
@@ -104,7 +105,7 @@ SegmentMappingPreparer::SegmentMappingPreparer(List<MultidimensionalIntervalSeq*
 List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::ofstream &logFile) {
 	
 	int foldSize = 0;
-	const char *foldString = NULL;
+	char *foldString = NULL;
 	if (localSegmentContent != NULL) {
 		foldString = MultidimensionalIntervalSeq::convertSetToString(localSegmentContent);
 		foldSize = strlen(foldString);
@@ -129,7 +130,7 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 	}
 	char *foldDescBuffer = new char[currentIndex];
 
-	status = MPI_Allgatherv((void *) foldString, foldSize, MPI_CHAR, 
+	status = MPI_Allgatherv(foldString, foldSize, MPI_CHAR, 
 			foldDescBuffer, foldSizes, displacements, MPI_CHAR, MPI_COMM_WORLD);
         if (status != MPI_SUCCESS) {
                 cout << rank << ": could not gather fold descriptions from all segments\n";
@@ -156,6 +157,7 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 	delete[] foldSizes;
 	delete[] displacements;
 	delete[] foldDescBuffer;
+	free(foldString);
 	return segmentContentMap;
 }
 
@@ -523,8 +525,8 @@ void DataTransferManager::handleTransfer() {
 		sourceContentMap = mappingPreparer.shareSegmentsContents(*logFile);
 		sourceAttrs->setSegmentsContents(sourceContentMap);
 	}
-	const char *dataItemId = transferConfig->getDataItemId();
-	const char *targetKey = transferConfig->generateTargetVersionkey();
+	char *dataItemId = transferConfig->getDataItemId();
+	char *targetKey = transferConfig->generateTargetVersionkey();
 	ProgramEnvironment *progEnv = transferConfig->getProgEnv();
 	PartsListReference *targetRef = progEnv->getVersionManager(dataItemId)->getVersion(targetKey);
 	bool targetMappingRetrieved = false;

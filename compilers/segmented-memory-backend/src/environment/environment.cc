@@ -19,7 +19,7 @@ using namespace std;
 
 //---------------------------------------------------------- Segment Data Content -------------------------------------------------------/
 
-SegmentDataContent::SegmentDataContent(int segmentId, const char *stringFoldDesc) {
+SegmentDataContent::SegmentDataContent(int segmentId, char *stringFoldDesc) {
 	this->segmentId = segmentId;
 	this->stringFoldDesc = stringFoldDesc;
 }
@@ -50,6 +50,7 @@ PartsListAttributes::~PartsListAttributes() {
 			delete segmentContent;
 		}
 		delete segmentsContents;
+		segmentsContents = NULL;
 	}
 }
 
@@ -186,7 +187,7 @@ ListReferenceKey::ListReferenceKey(int taskEnvId, const char *varName, const cha
 	this->allocatorLpsName = allocatorLpsName;
 }
 
-const char *ListReferenceKey::generateKey() {
+char *ListReferenceKey::generateKey() {
 	ostringstream stream;
 	stream << "env-" << taskEnvId;
 	stream << "var-" << varName;
@@ -217,7 +218,7 @@ ObjectIdentifier::ObjectIdentifier(int sourceTaskId, int envLinkId) {
 	this->envLinkId = envLinkId;
 }
         
-const char *ObjectIdentifier::generateKey() {
+char *ObjectIdentifier::generateKey() {
 	ostringstream stream;
 	stream << "task-" << sourceTaskId;
 	stream << "link-" << envLinkId;
@@ -227,7 +228,7 @@ const char *ObjectIdentifier::generateKey() {
 //---------------------------------------------------------- Object Version Manager -----------------------------------------------------/
 
 ObjectVersionManager::ObjectVersionManager(ObjectIdentifier *objectIdentifier, PartsListReference* sourceReference) {
-	this->objectIdentifer = objectIdentifier;
+	this->objectIdentifier = objectIdentifier;
 	this->freshVersionKeys = new List<ListReferenceKey*>;
 	ListReferenceKey *sourceKey = sourceReference->getKey();
 	freshVersionKeys->Append(sourceKey);
@@ -236,7 +237,7 @@ ObjectVersionManager::ObjectVersionManager(ObjectIdentifier *objectIdentifier, P
 }
 
 ObjectVersionManager::~ObjectVersionManager() {
-	delete objectIdentifer;
+	delete objectIdentifier;
 	while (freshVersionKeys->NumElements() > 0) {
 		ListReferenceKey *key = freshVersionKeys->Nth(0);
 		freshVersionKeys->RemoveAt(0);
@@ -248,17 +249,19 @@ ObjectVersionManager::~ObjectVersionManager() {
 
 void ObjectVersionManager::addNewVersion(PartsListReference *versionReference) {
 	ListReferenceKey *sourceKey = versionReference->getKey();
-	const char *stringKey = sourceKey->generateKey();
+	char *stringKey = sourceKey->generateKey();
 	dataVersions->Enter(stringKey, versionReference);
+	free(stringKey);
 }
 
 void ObjectVersionManager::removeVersion(ListReferenceKey *versionKey) {
 	
-	const char *stringKey = versionKey->generateKey();
+	char *stringKey = versionKey->generateKey();
 	PartsListReference *version = dataVersions->Lookup(stringKey);
 	dataVersions->Remove(stringKey, version);
 	PartsList *partsList = version->getPartsList();
 	delete version;
+	free(stringKey);
 	
 	int referenceCount = partsList->getAttributes()->getReferenceCount();
 	if (referenceCount > 1) {
@@ -276,7 +279,7 @@ void ObjectVersionManager::removeVersion(ListReferenceKey *versionKey) {
 	}
 }
 
-PartsListReference *ObjectVersionManager::getVersion(const char *versionKey) {
+PartsListReference *ObjectVersionManager::getVersion(char *versionKey) {
 	return dataVersions->Lookup(versionKey);
 }
 
@@ -289,10 +292,11 @@ void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchi
 			updatedList->Append(includedKey);
 			continue;
 		}
-		const char *stringKey = includedKey->generateKey();
+		char *stringKey = includedKey->generateKey();
 		PartsListReference *version = dataVersions->Lookup(stringKey);
 		PartsList *partsList = version->getPartsList();
 		partsList->getAttributes()->flagStale();
+		free(stringKey);
 	}
 
 	freshVersionKeys->clear();
@@ -301,10 +305,11 @@ void ObjectVersionManager::markNonMatchingVersionsStale(ListReferenceKey *matchi
 
 	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
 		ListReferenceKey *freshKey = freshVersionKeys->Nth(i);
-		const char *stringKey = freshKey->generateKey();
+		char *stringKey = freshKey->generateKey();
 		PartsListReference *version = dataVersions->Lookup(stringKey);
 		PartsList *partsList = version->getPartsList();
 		partsList->getAttributes()->flagFresh();
+		free(stringKey);
 	}
 }
 
@@ -330,16 +335,19 @@ List<PartsListReference*> *ObjectVersionManager::getFreshVersions() {
 	List<PartsListReference*> *freshVersions = new List<PartsListReference*>;
 	for (int i = 0; i < freshVersionKeys->NumElements(); i++) {
 		ListReferenceKey *freshKey = freshVersionKeys->Nth(i);
-		const char *stringKey = freshKey->generateKey();
+		char *stringKey = freshKey->generateKey();
 		freshVersions->Append(dataVersions->Lookup(stringKey));
+		free(stringKey);
 	}
 	return freshVersions;	
 }
 
 PartsListReference *ObjectVersionManager::getFirstFreshVersion() {
 	ListReferenceKey *firstFreshKey = freshVersionKeys->Nth(0);
-	const char *stringKey = firstFreshKey->generateKey();
-	return dataVersions->Lookup(stringKey);
+	char *stringKey = firstFreshKey->generateKey();
+	PartsListReference *version = dataVersions->Lookup(stringKey);
+	free(stringKey);
+	return version;
 }
 
 int ObjectVersionManager::getVersionCount() {
@@ -359,16 +367,17 @@ ProgramEnvironment::ProgramEnvironment() {
 }
 
 void ProgramEnvironment::addNewDataItem(ObjectIdentifier *identifier, PartsListReference* sourceReference) {
-	const char *objectKey = identifier->generateKey();
+	char *objectKey = identifier->generateKey();
 	ObjectVersionManager *versionManager = new ObjectVersionManager(identifier, sourceReference);
 	envObjects->Enter(objectKey, versionManager);
+	free(objectKey);
 }
 
-ObjectVersionManager *ProgramEnvironment::getVersionManager(const char *dataItemKey) {
+ObjectVersionManager *ProgramEnvironment::getVersionManager(char *dataItemKey) {
 	return envObjects->Lookup(dataItemKey);	
 }
 
-void ProgramEnvironment::cleanupPossiblyEmptyVersionManager(const char *dataItemKey) {
+void ProgramEnvironment::cleanupPossiblyEmptyVersionManager(char *dataItemKey) {
 	ObjectVersionManager *manager = envObjects->Lookup(dataItemKey);
 	int versionCount = manager->getVersionCount();
 	if (versionCount == 0) {
@@ -389,7 +398,7 @@ void EnvironmentLinkKey::flagAsDataSource(int taskId) {
 	sourceKey = generateKey(taskId);
 }
 
-const char *EnvironmentLinkKey::generateKey(int taskId) {
+char *EnvironmentLinkKey::generateKey(int taskId) {
 	ObjectIdentifier identifier = ObjectIdentifier(taskId, linkId);
 	return identifier.generateKey();
 }

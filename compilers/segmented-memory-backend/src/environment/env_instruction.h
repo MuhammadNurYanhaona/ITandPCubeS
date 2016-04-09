@@ -66,7 +66,7 @@ class TaskInitEnvInstruction {
 	// key and version reference into a destination parts list to be used during task execution; it also allocates 
 	// memories within the parts of the destination list if the parts require more epoch versions then originially 
 	// present in the source parts they are fed from
-	void cloneDataFromPartsList(const char *itemKey, 
+	void cloneDataFromPartsList(char *itemKey, 
 			ListReferenceKey *sourcePartsListKey, 
 			PartsList *destination);
 

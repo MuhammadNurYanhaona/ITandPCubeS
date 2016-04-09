@@ -20,6 +20,13 @@ PartitionConfig::PartitionConfig(int dimensions) {
 	lpsId = -1;
 }
 
+PartitionConfig::~PartitionConfig() {
+	for (int i = 0; i < dimensions; i++) {
+		PartitionInstr *instr = instructions[i];
+		delete instr;
+	}
+}
+
 void PartitionConfig::setInstruction(int dimNo, PartitionInstr *instruction) {
 	instructions[dimNo] = instruction;
 }
@@ -40,6 +47,13 @@ DataItemConfig::DataItemConfig(int dimensions, int levels) {
 	partitionConfigs.reserve(levels);
 	for (int i = 0; i < levels; i++) {
 		partitionConfigs.insert(partitionConfigs.begin() + i, new PartitionConfig(dimensions));
+	}
+}
+
+DataItemConfig::~DataItemConfig() {
+	for (int levelNo = 0; levelNo < levels; levelNo++) {
+		PartitionConfig *partitionConfig = partitionConfigs[levelNo];
+		delete partitionConfig;
 	}
 }
 

@@ -96,10 +96,11 @@ class IntervalSeq {
 	// returns true if the interval sequence contains the point; otherwise returns false
 	bool contains(int point);
 
-	// two functions for conversion between an interval sequence and its character string representation; the string
+	// three functions for conversion between an interval sequence and its character string representation; the string
 	// representation is needed to transfer the interval description over the network
-	const char *toString();
-	static IntervalSeq *fromString(const char *str);
+	char *toString();
+	static IntervalSeq *fromString(std::string str);
+	static IntervalSeq *fromString(char *str) { return IntervalSeq::fromString(std::string(str)); }
 };
 
 /* A multidimensional sequence of intervals to represent multidimensional data structure parts
@@ -142,12 +143,15 @@ class MultidimensionalIntervalSeq {
 
 	// functions for conversion between a multidimensional interval sequence and its character string representation;
 	// the string representation is needed to transfer the interval description over the network
-	const char *toString();
-	static MultidimensionalIntervalSeq *fromString(const char *str);
+	char *toString();
+	static MultidimensionalIntervalSeq *fromString(std::string desc);
+	static MultidimensionalIntervalSeq *fromString(char *str) { 
+		return MultidimensionalIntervalSeq::fromString(std::string(str));
+	}
 
 	// these two functions are used when a set of multidimensional interval descriptions are communicated on the wire
-	static const char *convertSetToString(List<MultidimensionalIntervalSeq*> *intervals);
-	static List<MultidimensionalIntervalSeq*> *constructSetFromString(const char *str);
+	static char *convertSetToString(List<MultidimensionalIntervalSeq*> *intervals);
+	static List<MultidimensionalIntervalSeq*> *constructSetFromString(char *str);
   private:
 	// a recursive helper routine to generate multidimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(int dimensionality,
@@ -186,6 +190,7 @@ class SequenceIterator {
 	int currentElementNo;
   public:
 	SequenceIterator(MultidimensionalIntervalSeq *sequence);
+	~SequenceIterator();
 	bool hasMoreElements() { return currentElementNo < elementCount; }
 
 	// returns the next index element in the sequence; it returns NULL if there are no more elements and reset its state

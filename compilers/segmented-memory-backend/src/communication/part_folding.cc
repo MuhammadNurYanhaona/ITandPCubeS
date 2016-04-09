@@ -148,18 +148,23 @@ void PartFolding::pruneFolding(int lowerLevelBound, DataItemConfig *dataConfig) 
 }
 
 List<MultidimensionalIntervalSeq*> *PartFolding::generateIntervalDesc(DataItemConfig *dataConfig, std::ofstream *logFile) {
+	
 	List<MultidimensionalIntervalSeq*> *dataDesc = new List<MultidimensionalIntervalSeq*>;
 	List<FoldStrain*> *foldStrainList = extractStrains();
+	
 	for (int i = 0; i < foldStrainList->NumElements(); i++) {
 		FoldStrain *strain = foldStrainList->Nth(i);
 		List<MultidimensionalIntervalSeq*> *strainSequences = strain->generateIntervalDesc(dataConfig);
 		dataDesc->AppendAll(strainSequences);
 	}
+	
 	while (foldStrainList->NumElements() > 0) {
 		FoldStrain *strain = foldStrainList->Nth(0);
 		foldStrainList->RemoveAt(0);
 		delete strain;
 	}
+	
+	delete foldStrainList;
 	return dataDesc;
 }
 

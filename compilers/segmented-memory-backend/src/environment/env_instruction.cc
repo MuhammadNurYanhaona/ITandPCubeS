@@ -31,7 +31,7 @@ void TaskInitEnvInstruction::removeOldPartsListReferences() {
 
 	// if the task item has a valid source key assigned to it then it is not the first invocation of the task using the 
 	// current environment, and we need to let go of the older parts list reference the task has for the item 
-	const char *sourceKey = envKey->getSourceKey();	
+	char *sourceKey = envKey->getSourceKey();	
 	if (sourceKey != NULL) {
 		
 		// delete parts list references for different LPS allocations the task have for the item
@@ -186,8 +186,7 @@ bool TaskInitEnvInstruction::isFresh(TaskItem *envItem) {
 	return versionManager->foundMatchingFreshVersion(patternKey);
 }
 
-void TaskInitEnvInstruction::cloneDataFromPartsList(const char *itemKey, 
-		ListReferenceKey *sourcePartsListKey, 
+void TaskInitEnvInstruction::cloneDataFromPartsList(char *itemKey, ListReferenceKey *sourcePartsListKey, 
 		PartsList *destination) {
 	
 	TaskEnvironment *taskEnv = itemToUpdate->getEnvironment();
@@ -222,7 +221,7 @@ void TaskInitEnvInstruction::generatePartsListReferenceForClone(ListReferenceKey
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
 	EnvironmentLinkKey *itemKey = itemToUpdate->getEnvLinkKey();
 	const char *itemName = itemKey->getVarName();
-	const char *itemSourceKey = itemKey->getSourceKey();
+	char *itemSourceKey = itemKey->getSourceKey();
         ObjectVersionManager *versionManager = progEnv->getVersionManager(itemSourceKey);
 	
 	PartsListReference *sourceReference = versionManager->getVersion(sourcePartsListKey->generateKey());
@@ -252,7 +251,7 @@ void StaleRefreshInstruction::setupPartsList() {
 	ProgramEnvironment *progEnv = taskEnv->getProgramEnvironment();
 	EnvironmentLinkKey *itemKey = itemToUpdate->getEnvLinkKey();
 	const char *itemName = itemKey->getVarName();
-	const char *itemSourceKey = itemKey->getSourceKey();
+	char *itemSourceKey = itemKey->getSourceKey();
         ObjectVersionManager *versionManager = progEnv->getVersionManager(itemSourceKey);
 	*logFile << "Processing " << itemName << " of " << taskEnv->name << " for parts list freshness\n";
 
@@ -477,7 +476,7 @@ void DataTransferInstruction::setupPartsList() {
 
 	// setup the data item key for the to-be-updated task item to be the same as that of the source item as both are
 	// referring to the same data structure in the environment
-	const char *dataSourceKey = sourceItem->getEnvLinkKey()->getSourceKey();
+	char *dataSourceKey = sourceItem->getEnvLinkKey()->getSourceKey();
 	itemToUpdate->getEnvLinkKey()->setSourceKey(dataSourceKey);
 
 	*logFile << "Processing " << itemName << " of " << taskEnv->name << " to be initialized from ";

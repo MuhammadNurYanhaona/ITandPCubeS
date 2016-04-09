@@ -65,9 +65,16 @@ LpsContent::LpsContent(int id) {
 LpsContent::~LpsContent() {
 	Iterator<DataItems*> iterator = dataItemsMap->GetIterator();
 	DataItems *items = NULL;
+	List<DataItems*> *itemsList = new List<DataItems*>;
 	while ((items = iterator.GetNextValue()) != NULL) {
-		delete items;
+		itemsList->Append(items);
 	}
+	while (itemsList->NumElements() > 0) {
+		DataItems *nextItem = itemsList->Nth(0);
+		itemsList->RemoveAt(0);
+		delete nextItem;	
+	}
+	delete itemsList;
 	delete dataItemsMap;
 }
 
@@ -106,10 +113,18 @@ TaskData::TaskData() {
 TaskData::~TaskData() {
 	Iterator<LpsContent*> iterator = lpsContentMap->GetIterator();
 	LpsContent *lpsContent = NULL;
+	List<LpsContent*> *contentList = new List<LpsContent*>;
 	while ((lpsContent = iterator.GetNextValue()) != NULL) {
-		delete lpsContent;
+		contentList->Append(lpsContent);
 	}
-	delete lpsContentMap;	
+	while (contentList->NumElements() > 0) {
+		LpsContent *nextContent = contentList->Nth(0);
+		contentList->RemoveAt(0);
+		delete nextContent;
+	}
+	delete contentList;
+	delete lpsContentMap;
+	lpsContentMap = NULL;	
 }
 
 void TaskData::addLpsContent(const char *lpsId, LpsContent *content) { 

@@ -28,7 +28,7 @@ class DataExchange;
 class TransferConfig {
   private:
 	ProgramEnvironment *progEnv;
-	const char *dataItemId;
+	char *dataItemId;
 	ListReferenceKey *sourceVersionKey;
 	LpsAllocation *receiver;
 	TaskItem *receiverTaskItem;
@@ -36,11 +36,11 @@ class TransferConfig {
 	std::ofstream *logFile;
   public:
 	TransferConfig(ProgramEnvironment *progEnv, 
-		const char *dataItemId, 
+		char *dataItemId, 
 		ListReferenceKey *svk, 
 		LpsAllocation *recv, TaskItem *rtk);
 
-	const char *getDataItemId() { return dataItemId; }
+	char *getDataItemId() { return dataItemId; }
 	ProgramEnvironment *getProgEnv() { return progEnv; }
 	LpsAllocation *getReceiver() { return receiver; }
 	TaskItem *getReceiverTaskItem() { return receiverTaskItem; }
@@ -54,7 +54,7 @@ class TransferConfig {
 	// in the program environment
 	ListReferenceAttributes *prepareTargetVersionAttributes();
 	// create a key for the would be receiver reference for searching for a possibly already existant version
-	const char *generateTargetVersionkey();
+	char *generateTargetVersionkey();
 };
 
 /* This class determines if there is any need for cross segment communication for the data synchronization for the target LPS

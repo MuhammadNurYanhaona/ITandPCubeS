@@ -135,7 +135,9 @@ void DataPart::synchronizeAllVersions() {
 void DataPart::clone(DataPart *other) {
 	
 	while (dataVersions->size() > 0) {
+		void *data = dataVersions->back(); 
 		dataVersions->pop_back();
+		free(data);
 	}	
 	
 	int currentEpoch = 0;

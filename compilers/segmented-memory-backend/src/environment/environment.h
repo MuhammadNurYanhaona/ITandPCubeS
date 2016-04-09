@@ -35,9 +35,9 @@ class TaskEndEnvInstruction;
 class SegmentDataContent {
   private:
 	int segmentId;
-	const char *stringFoldDesc;
+	char *stringFoldDesc;
   public:
-	SegmentDataContent(int segmentId, const char *stringFoldDesc);
+	SegmentDataContent(int segmentId, char *stringFoldDesc);
 	~SegmentDataContent();
 	int getSegmentId() { return segmentId; }
 	List<MultidimensionalIntervalSeq*> *generateFold();  			
@@ -158,7 +158,7 @@ class ListReferenceKey {
 	// will be ignored 
 	static ListReferenceKey *initiatePatternKey() { return new ListReferenceKey(-1, NULL, NULL); }
 	
-	const char *generateKey();
+	char *generateKey();
 	bool isEqual(ListReferenceKey *other);
 	bool matchesPattern(ListReferenceKey *pattern);	
 };
@@ -199,14 +199,14 @@ class ObjectIdentifier {
 	int envLinkId;
   public:
 	ObjectIdentifier(int sourceTaskId, int envLinkId);
-	const char *generateKey();
+	char *generateKey();
 };
 
 /* This class holds all the references and parts lists corresponding to a single data item
  */
 class ObjectVersionManager {
   protected:
-	ObjectIdentifier *objectIdentifer;
+	ObjectIdentifier *objectIdentifier;
 	List<ListReferenceKey*> *freshVersionKeys;
 	Hashtable<PartsListReference*> *dataVersions;
   public:
@@ -214,7 +214,7 @@ class ObjectVersionManager {
 	~ObjectVersionManager();
 	void addNewVersion(PartsListReference *versionReference);
 	void removeVersion(ListReferenceKey *versionKey);
-	PartsListReference *getVersion(const char *versionKey);
+	PartsListReference *getVersion(char *versionKey);
 	void markNonMatchingVersionsStale(ListReferenceKey *matchingKey);
 	bool foundMatchingFreshVersion(ListReferenceKey *matchingKey);
 	void addFreshVersionKey(ListReferenceKey *freshKey);
@@ -231,8 +231,8 @@ class ProgramEnvironment {
   public:
 	ProgramEnvironment();
 	void addNewDataItem(ObjectIdentifier *identifier, PartsListReference* sourceReference);
-	ObjectVersionManager *getVersionManager(const char *dataItemKey);
-	void cleanupPossiblyEmptyVersionManager(const char *dataItemKey);	
+	ObjectVersionManager *getVersionManager(char *dataItemKey);
+	void cleanupPossiblyEmptyVersionManager(char *dataItemKey);	
 };
 
 /*------------------------------------------------------------------------------------------------------------------------
@@ -249,14 +249,14 @@ class EnvironmentLinkKey {
 	int linkId;
 	// in case the task is going to use an existing environmental data item for the particular key -- as opposed to 
 	// creating it -- a source identifier is needed to locate the group for the data item in the program environment. 
-	const char *sourceKey;
+	char *sourceKey;
   public:
 	EnvironmentLinkKey(const char *varName, int linkId);
 	const char *getVarName() { return varName; }
-	void setSourceKey(const char *sourceKey) { this->sourceKey = sourceKey; }
-	const char *getSourceKey() { return sourceKey; }
+	void setSourceKey(char *sourceKey) { this->sourceKey = sourceKey; }
+	char *getSourceKey() { return sourceKey; }
 	void flagAsDataSource(int taskId);
-	const char *generateKey(int taskId);
+	char *generateKey(int taskId);
 	ObjectIdentifier *generateObjectIdentifier(int taskId);	
 	bool isEqual(EnvironmentLinkKey *other);
 };
