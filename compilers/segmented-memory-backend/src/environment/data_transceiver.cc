@@ -80,6 +80,9 @@ CommunicationReqFinder::CommunicationReqFinder(List<MultidimensionalIntervalSeq*
 }
 
 bool CommunicationReqFinder::isCrossSegmentCommRequired(std::ofstream &logFile) {
+
+	logFile << "\tdetermining if cross segment communication is needed\n";
+	logFile.flush();
 	
 	bool localDataSufficient = ListReferenceAttributes::isSuperFold(localSourceFold, localTargetFold);
 	int transferReqValue = localDataSufficient ? 0 : 1;
@@ -93,6 +96,9 @@ bool CommunicationReqFinder::isCrossSegmentCommRequired(std::ofstream &logFile) 
                 exit(EXIT_FAILURE);
         }
 
+	logFile << "\tdetermination successful\n";
+	logFile.flush();
+	
 	return (sum > 0);
 }
 
@@ -104,6 +110,9 @@ SegmentMappingPreparer::SegmentMappingPreparer(List<MultidimensionalIntervalSeq*
 
 List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::ofstream &logFile) {
 	
+	logFile << "\tdetermining the data contents of different segments\n";
+	logFile.flush();
+
 	int foldSize = 0;
 	char *foldString = NULL;
 	if (localSegmentContent != NULL) {
@@ -121,6 +130,9 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
                 cout << rank << ": could not determine the data content sizes of different segments\n";
                 exit(EXIT_FAILURE);
         }
+	
+	logFile << "\tdetermined the lengths of segment folds in different segments\n";
+	logFile.flush();
 
 	int *displacements = new int[segmentCount];
 	int currentIndex = 0;
@@ -136,6 +148,9 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
                 cout << rank << ": could not gather fold descriptions from all segments\n";
                 exit(EXIT_FAILURE);
         }
+	
+	logFile << "\tretreived the segment folds of different segments\n";
+	logFile.flush();
 	
 	List<SegmentDataContent*> *segmentContentMap = new List<SegmentDataContent*>;
 	currentIndex = 0;
@@ -158,6 +173,10 @@ List<SegmentDataContent*> *SegmentMappingPreparer::shareSegmentsContents(std::of
 	delete[] displacements;
 	delete[] foldDescBuffer;
 	free(foldString);
+	
+	logFile << "\tdetermination successful\n";
+	logFile.flush();
+	
 	return segmentContentMap;
 }
 
@@ -190,6 +209,10 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
 	Participant *receiver = new Participant(RECEIVE, NULL, targetFold);
 	List<MultidimensionalIntervalSeq*> *intersect = DataExchange::getCommonRegion(sender, receiver);
 	if (intersect == NULL) return;
+	
+	logFile << "\tgoing to do local source to target parts lists data transfer\n";
+	logFile.flush();
+	
 
 	DataExchange *exchange = new DataExchange(sender, receiver, intersect);
 	ExchangeIterator *iterator = new ExchangeIterator(exchange);
@@ -232,6 +255,9 @@ void LocalTransferrer::transferData(std::ofstream &logFile) {
 	delete writeTransferSpec;
 	delete transformVector;
 	delete[] dataEntry;
+	
+	logFile << "\tdata transfer successful\n";
+	logFile.flush();
 }
 
 //-------------------------------------------------------- Transfer Buffer ------------------------------------------------------------
@@ -278,6 +304,9 @@ int TransferBuffer::compareTo(TransferBuffer *other) {
 
 void TransferBuffer::processBuffer(std::ofstream &logFile) {
 	
+	logFile << "\tpre/post processing cross-segment transfer buffers\n";
+	logFile.flush();
+
 	int dataDimensions = partListSpec->getDimensionality();
 	int elementSize = transferSpec->getStepSize();
 
@@ -333,6 +362,9 @@ List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForOutgoingTransfer
 	if (localSourceContent == NULL) return NULL;
 	if (targetContentMap == NULL || targetContentMap->NumElements() == 0) return NULL;
 
+	logFile << "\tgoing to create outgoing transfer buffers\n";
+	logFile.flush();
+
 	Participant *sender = new Participant(SEND, NULL, localSourceContent);
 	List<TransferBuffer*> *transferBufferList = new List<TransferBuffer*>;
 	for (int i = 0; i < targetContentMap->NumElements(); i++) {
@@ -357,6 +389,10 @@ List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForOutgoingTransfer
 		buffer->setBufferTag(bufferTag);
 		transferBufferList->Append(buffer);
 	}
+	
+	logFile << "\t" << transferBufferList->NumElements() << "buffer has been created\n";
+	logFile.flush();
+
 	return transferBufferList;
 }
 
@@ -365,6 +401,9 @@ List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForIncomingTransfer
 
 	if (localTargetContent == NULL) return NULL;
 	if (sourceContentMap == NULL || sourceContentMap->NumElements() == 0) return NULL;
+	
+	logFile << "\tgoing to create incoming transfer buffers\n";
+	logFile.flush();
 	
 	int receiverId, segmentCount;
 	MPI_Comm_rank(MPI_COMM_WORLD, &receiverId);
@@ -395,6 +434,10 @@ List<TransferBuffer*> *TransferBuffersPreparer::createBuffersForIncomingTransfer
 		buffer->setBufferTag(bufferTag);
 		transferBufferList->Append(buffer);
 	}
+
+	logFile << "\t" << transferBufferList->NumElements() << "buffer has been created\n";
+	logFile.flush();
+
 	return transferBufferList;
 }
 
@@ -420,6 +463,9 @@ void BufferTransferrer::sendDataAsync(std::ofstream &logFile) {
 	}
 	if (bufferList == NULL || bufferList->NumElements() == 0) return;
 	
+	logFile << "\tissuing asynchronous data sends\n";
+	logFile.flush();
+
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	transferRequests = new MPI_Request[bufferList->NumElements()];
@@ -437,6 +483,9 @@ void BufferTransferrer::sendDataAsync(std::ofstream &logFile) {
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	logFile << "\tsends issued\n";
+	logFile.flush();
 }
         
 void BufferTransferrer::receiveDataAsync(std::ofstream &logFile) {
@@ -447,6 +496,9 @@ void BufferTransferrer::receiveDataAsync(std::ofstream &logFile) {
 	}
 	if (bufferList == NULL || bufferList->NumElements() == 0) return;
 	
+	logFile << "\tissuing asynchronous data receives\n";
+	logFile.flush();
+
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 	transferRequests = new MPI_Request[bufferList->NumElements()];
@@ -463,11 +515,18 @@ void BufferTransferrer::receiveDataAsync(std::ofstream &logFile) {
 			exit(EXIT_FAILURE);
 		}
 	}
+
+	logFile << "\tsends issued\n";
+	logFile.flush();
 }
 
 void BufferTransferrer::waitForTransferComplete(std::ofstream &logFile) {
 
 	if (bufferList != NULL && bufferList->NumElements() > 0) {
+		
+		logFile << "\twaiting for cross-segment data transfers to finish\n";
+		logFile.flush();
+
 		int transferCount = bufferList->NumElements();
 		int status = MPI_Waitall(transferCount, transferRequests, MPI_STATUSES_IGNORE);
         	if (status != MPI_SUCCESS) {
@@ -480,6 +539,9 @@ void BufferTransferrer::waitForTransferComplete(std::ofstream &logFile) {
 				buffer->postProcessBuffer(logFile);
 			}
 		}
+
+		logFile << "\tall transfer requests were successful\n";
+		logFile.flush();
 	}
 }	
 
