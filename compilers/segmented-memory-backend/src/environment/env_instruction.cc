@@ -359,6 +359,9 @@ void StaleRefreshInstruction::setupPartsList() {
 			DataPartitionConfig *envRefConfig = envReference->getAttributes()->getPartitionConfig();
 			if (!allocationConfig->isEquivalent(envRefConfig)) {
 				allocation->allocatePartsList();
+			} else {
+				cloneDataFromPartsList(itemSourceKey, versionKey, allocation->getPartsList());
+				*logFile << "\tCloned stale parts for LPS " << allocation->getLpsId() << "\n";
 			}
 
 			// create a communicator to transfer data from the environment reference to the LPS allocation
