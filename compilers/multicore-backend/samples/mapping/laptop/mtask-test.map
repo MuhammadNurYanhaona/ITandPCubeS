@@ -1,0 +1,16 @@
+"First Task" {
+	// syntax LPS ':' PPS
+	Space A: 1	// hyperthread
+}
+
+"Second Task" {
+	Space A: 1	// hyperthread
+}
+
+"Third Task" {
+	Space A: 1	// hyperthread
+}
+
+"Last Task" {
+	Space A: 1	// hyperthread
+}
