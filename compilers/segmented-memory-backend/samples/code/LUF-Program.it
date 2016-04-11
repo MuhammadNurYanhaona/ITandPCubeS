@@ -1,7 +1,6 @@
 Program (args) { 
 	blockSize = args.block_size
 	initEnv = new TaskEnvironment(name: "Initiate LU")
-	initEnv.x = 10
 	bind_input(initEnv, "a", args.input_file)
 	execute("Initiate LU"; initEnv; Partition: blockSize)
 	luEnv = new TaskEnvironment(name: "Transposed LU Factorization")
@@ -10,7 +9,6 @@ Program (args) {
 	rows = initEnv.a.dimension1.range
 	max1 = rows.max
 	max2 = initEnv.a.dimension2.range.max
-	yy = initEnv.y
 
 	do in sequence {
 		lastRow = k + blockSize - 1
@@ -34,11 +32,9 @@ Program (args) {
 Task "Initiate LU":
 	Define:
 		a, u, l: 2D Array of Real double-precision
-		x: Integer
-		y: Real double-precision
 	Environment:
-		a, x: link
-		u, l, y: create
+		a: link
+		u, l: create
 	Initialize:
 		u.dimension1 = l.dimension1 = a.dimension2
                 u.dimension2 = l.dimension2 = a.dimension1
