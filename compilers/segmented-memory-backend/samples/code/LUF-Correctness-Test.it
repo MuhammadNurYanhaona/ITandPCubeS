@@ -37,10 +37,6 @@ Program (args) {
 			execute("SAXPY"; mMultEnv; Partition: blockSize)
 		}
 	} for i in iter_range
-
-        bind_output(luEnv, "u", args.output_file_1)
-        bind_output(luEnv, "l", args.output_file_2)
-        bind_output(luEnv, "p", args.output_file_3)
 	
 	//----------------------------------------------------------------------------------------------------
 	
@@ -48,13 +44,17 @@ Program (args) {
 
 	blufEnv = new TaskEnvironment(name: "Block LU Factorization")
         bind_input(blufEnv, "a", args.input_file)
-	
         execute("Block LU Factorization"; blufEnv; Initialize: iter_range; Partition: blockSize)
-        bind_output(blufEnv, "u", args.output_file_4)
-        bind_output(blufEnv, "l", args.output_file_5)
-        bind_output(blufEnv, "p", args.output_file_6)
 
 	//----------------------------------------------------------------------------------------------------
+        
+	bind_output(luEnv, "u", args.output_file_1)
+        bind_output(blufEnv, "u", args.output_file_4)
+        bind_output(luEnv, "l", args.output_file_2)
+        bind_output(blufEnv, "l", args.output_file_5)
+        bind_output(luEnv, "p", args.output_file_3)
+        bind_output(blufEnv, "p", args.output_file_6)
+
 }
 	
 Task "Initiate LU":
@@ -263,10 +263,12 @@ Task "Block LU Factorization":
 				} for i, j in l and i >= row_range.min and i <= row_range.max and j > row_range.max
 			}
 			"Block MM_Multiply Subtract" (Space C) {
-				do {	do { total = reduce ("sum", u_block[i][m] * l_block[m][j]) 
-					} for m in u_block
-					u[i][j] = u[i][j] - total
-				} for i, j in u and i > row_range.max and j > row_range.max
+				if (iter < iter_range.max) {
+					do {	do { total = reduce ("sum", u_block[i][m] * l_block[m][j]) 
+						} for m in u_block
+						u[i][j] = u[i][j] - total
+					} for i, j in u and i > row_range.max and j > row_range.max
+				}
 			}
 			Repeat: from "Block MM_Multiply Subtract" foreach Space C sub-partition
 		}
