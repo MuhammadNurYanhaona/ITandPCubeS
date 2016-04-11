@@ -10,7 +10,7 @@ Program (args) {
         secondEnv.a = firstEnv.a[threshold...(length - 1)][threshold...(length - 1)]
         execute("Second Task"; secondEnv; Partition: p, q)
         execute("First Task"; firstEnv; Initialize: length; Partition: m)
-        store_array(firstEnv.a, args.output_file)
+	bind_output(firstEnv, "a", args.output_file)
 }
 
 Task "First Task":
