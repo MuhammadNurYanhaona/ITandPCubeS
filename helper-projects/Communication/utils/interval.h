@@ -122,6 +122,7 @@ public:
 	IntervalSeq *getIntervalForDim(int dimensionNo);
 	bool isEqual(MultidimensionalIntervalSeq *other);
 	void draw();
+	void draw(Dimension dim);
 
 	// This function is used to determine the order of multidimensional sequences in a sorted list; the sequence with
 	// component intervals beginning at an earlier point should come before the other. Note that both sequences are

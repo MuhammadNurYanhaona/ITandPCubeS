@@ -532,6 +532,18 @@ void MultidimensionalIntervalSeq::draw() {
 	}
 }
 
+void MultidimensionalIntervalSeq::draw(Dimension dim) {
+	for (int i = 0; i < dimensionality; i++) {
+		IntervalSeq *interval = intervals[i];
+		int begin = 0;
+		int end = interval->begin + interval->period * interval->count;
+		DrawingLine drawLine = DrawingLine(dim, 10);
+		interval->draw(&drawLine);
+		cout << "Dimension No: " << i + 1;
+		drawLine.draw();
+	}
+}
+
 const char *MultidimensionalIntervalSeq::toString() {
 	ostringstream stream;
 	stream << dimensionality;

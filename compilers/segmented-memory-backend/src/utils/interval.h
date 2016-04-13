@@ -111,6 +111,7 @@ class MultidimensionalIntervalSeq {
 	std::vector<IntervalSeq*> intervals;
   public:
 	MultidimensionalIntervalSeq(int dimensionality);
+	~MultidimensionalIntervalSeq();
 
 	// returns the total number of 1's included in this multidimensional interval sequence
 	int getNumOfElements();
@@ -151,6 +152,10 @@ class MultidimensionalIntervalSeq {
 	// these two functions are used when a set of multidimensional interval descriptions are communicated on the wire
 	static char *convertSetToString(List<MultidimensionalIntervalSeq*> *intervals);
 	static List<MultidimensionalIntervalSeq*> *constructSetFromString(char *str);
+
+	// this function should be used to check if the set to string conversion and back and forth is working properly
+	static bool areSetsEqual(List<MultidimensionalIntervalSeq*> *set1, 
+			List<MultidimensionalIntervalSeq*> *set2);
   private:
 	// a recursive helper routine to generate multidimensional interval sequences
 	static List<MultidimensionalIntervalSeq*> *generateIntervalsFromList(int dimensionality,

@@ -438,6 +438,13 @@ MultidimensionalIntervalSeq::MultidimensionalIntervalSeq(int dimensionality) {
 	}
 }
 
+MultidimensionalIntervalSeq::~MultidimensionalIntervalSeq() {
+        for (int i = 0; i < dimensionality; i++) {
+                IntervalSeq *seq = intervals[i];
+                delete seq;
+        }
+}
+
 int MultidimensionalIntervalSeq::getNumOfElements() {
 	int count = intervals[0]->getNumOfElements();
 	for (int i = 1; i < dimensionality; i++) {
@@ -447,7 +454,10 @@ int MultidimensionalIntervalSeq::getNumOfElements() {
 }
 
 void MultidimensionalIntervalSeq::copyIntervals(vector<IntervalSeq*> *templateVector) {
-	intervals = vector<IntervalSeq*>(*templateVector);
+        for (int i = 0; i < dimensionality; i++) {
+                IntervalSeq *seq = templateVector->at(i);
+                intervals[i] = new IntervalSeq(seq->begin, seq->length, seq->period, seq->count);
+        }
 }
 
 void MultidimensionalIntervalSeq::setIntervalForDim(int dimensionNo, IntervalSeq *intervalSeq) {
@@ -617,6 +627,17 @@ List<MultidimensionalIntervalSeq*> *MultidimensionalIntervalSeq::constructSetFro
 	}
 	delete intervalDescs;
 	return intervalSeqs;
+}
+
+bool MultidimensionalIntervalSeq::areSetsEqual(List<MultidimensionalIntervalSeq*> *set1, 
+		List<MultidimensionalIntervalSeq*> *set2) {
+	if (set2->NumElements() != set1->NumElements()) return false;
+	for (int i = 0; i < set1->NumElements(); i++) {
+		MultidimensionalIntervalSeq *first = set1->Nth(i);
+		MultidimensionalIntervalSeq *second = set2->Nth(i);
+		if (!first->isEqual(second)) return false;
+	}
+	return true;
 }
 
 //---------------------------------------------------------- Sequence Iterator ----------------------------------------------------------/
