@@ -262,6 +262,13 @@ List<IntervalSeq*> *IntervalSeq::computeIntersection(IntervalSeq *other) {
 	int i2 = (b1 >= (b2 + l2)) ? (b1 - b2) / p2 : 0;
 	int bi1 = i1 * p1 + b1;
 	int bi2 = i2 * p2 + b2;
+	if (b2 >= bi1 + l1) {
+		bi1 += p1;
+		i1++;
+	} else if (b1 >= bi2 + l2) {
+		bi2 += p2;
+		i2++;
+	}	
 
 	// if the two periods are the same and one is drifted from the other by a sufficient margin then the
 	// two interval sequences never intersect

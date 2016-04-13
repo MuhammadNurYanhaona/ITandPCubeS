@@ -79,7 +79,7 @@ public:
 	/* Returns the overlapping region of this interval sequence with another as a form of list of interval sequences;
 	 * Returns NULL if the two sequences do not overlap
 	 * */
-	List<IntervalSeq*> *computeIntersection(IntervalSeq *other);
+	List<IntervalSeq*> *computeIntersection(IntervalSeq *other, bool logSteps=false);
 
 	// returns the total number of 1's included in the interval sequence
 	int getNumOfElements() { return length * count; }
