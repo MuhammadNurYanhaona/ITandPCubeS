@@ -1,0 +1,14 @@
+"Initiate LU" {
+	Space A: 2	// Cores
+}
+
+"Transposed LU Factorization" {
+	Space A: 4	// Node
+	Space B: 2	// Cores
+}
+
+"SAXPY" {
+	Space A: 1	// hyperthreads
+}
+
+

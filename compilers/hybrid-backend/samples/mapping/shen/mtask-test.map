@@ -1,0 +1,16 @@
+"First Task" {
+	// syntax LPS ':' PPS
+	Space A: 3	// CPU
+}
+
+"Second Task" {
+	Space A: 3	// CPU
+}
+
+"Third Task" {
+	Space A: 3	// CPU
+}
+
+"Last Task" {
+	Space A: 3	// CPU
+}
