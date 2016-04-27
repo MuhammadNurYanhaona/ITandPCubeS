@@ -11,6 +11,23 @@
 #include "../utils/hashtable.h"
 #include "../runtime/structure.h"
 
+/* For computation over valid transformed indexes we need to copy in the storage and partition dimension information of each data 
+ * part in the GPU. A part-dimension object (a part of an LPU) is not suitable for directly being copied into the GPU memory due to
+ * its hierarchical nature. So we have the following class to transform the part-dimension object into a GPU friendly format.
+ */
+class PartDimRanges {
+  private:
+	int size;
+	int depth;
+	Range *ranges;
+  public:
+	PartDimRanges(int dimensionality, PartDimension *partDimensions);
+	~PartDimRanges();
+	int getSize() { return size; }	
+	int getDepth() { return depth; }
+	void copyIntoBuffer(int *buffer);
+};
+
 /* This class is used to extract any particular array and its associated information that is part of an LPU. We cannot retain the
  * LPU references directly as the current system uses just a single LPU object for a particular LPS and change the properties within
  * it as computation progresses from one LPU to the next. In addition, note that data parts are originally retrieved from the memory
@@ -22,10 +39,12 @@
 class LpuDataPart {
   private:
 	int dimensionality;
-	PartDimension *dimensions;
+	PartDimRanges *partDimRanges;
 	void *data;
 	// this tells the size of each element inside the data part
 	int elementSize;
+	// this tells the total element count in the data part
+	int elementCount;
 	// this is the part Id of the storage unit (not the partition unit) that host the data for this LPU part
 	List<int*> *partId;
 	// read only data parts need not be retrieved back from the GPU at the end of the kernel executions
@@ -36,7 +55,8 @@ class LpuDataPart {
 			void *data, 
 			int elementSize, 
 			List<int*> *partId);
-	~LpuDataPart();
+	~LpuDataPart() { delete partDimRanges; }
+	PartDimRanges *getPartDimRanges() { return partDimRanges; }
 	void *getData() { return data; }
 	List<int*> *getId() { return partId; }
 	bool isMatchingId(List<int*> *candidateId);
@@ -92,6 +112,7 @@ class GpuBufferReferences {
   public:
 	void *dataBuffer;
 	int *partIndexBuffer;
+	int *partRangeBuffer;
 	int *partBeginningBuffer;
 };
 
@@ -106,12 +127,18 @@ class PropertyBufferManager {
 	int bufferSize;
 	int bufferEntryCount;
 	int bufferReferenceCount;
+	int partRangeDepth;
+	int partRangeBufferSize;
+
 	char *cpuBuffer;
 	int *cpuPartIndexBuffer;
+	int *cpuPartRangeBuffer;
 	int *cpuPartBeginningBuffer;
+
 	char *gpuBuffer;
 	int *gpuPartIndexBuffer;
 	int *gpuPartBeginningBuffer;
+	int *gpuPartRangeBuffer;
   public:
 	PropertyBufferManager();
 	~PropertyBufferManager();

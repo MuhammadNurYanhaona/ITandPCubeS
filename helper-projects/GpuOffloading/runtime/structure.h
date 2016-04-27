@@ -110,6 +110,9 @@ class PartDimension {
 	PartDimension getSubrange(int begin, int end); // This function generate a new part-dimension object that 
 					// represent a sub-range of the current object. The storage dimension is copied
 					// as it is and the new partition dimension is determined from the arguments.   
+	
+	int getDepth();			// Tells the number of part-dimension objects that forms a path to lead to the
+					// current part-dimension object 
 					
 	void print(std::ofstream &stream, int indentLevel);
 };

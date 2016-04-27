@@ -7,6 +7,40 @@
 #include <cuda_runtime.h>
 #include <cstdlib>
 
+//--------------------------------------------------------------- Part Dim Ranges ---------------------------------------------------------------/
+
+PartDimRanges::PartDimRanges(int dimensionality, PartDimension *partDimensions) {
+	
+	depth = partDimensions[0].getDepth();
+	int entryCount = dimensionality * (depth + 1); // depth number of partition range and one storage range is needed
+	ranges = new Range[entryCount];
+	size = entryCount * 2 * sizeof(int); // each range has a min and max attributes	
+
+	// first copy in the storage dimension range
+	int currentIndex = 0;
+	for (; currentIndex < dimensionality; currentIndex++) {
+		ranges[currentIndex] = partDimensions[currentIndex].storage.range;
+	}
+
+	// then copy in the partition dimension in the bottom up fashion
+	for (int i = 0; i < dimensionality; i++) {
+		PartDimension *dimension = &(partDimensions[i]);
+		for (int d = 0; d < depth; d++) {
+			ranges[currentIndex] = dimension->partition.range;
+			dimension = dimension->parent;
+			currentIndex++;
+		}
+	}
+}
+
+PartDimRanges::~PartDimRanges() {
+	delete[] ranges;
+}
+
+void PartDimRanges::copyIntoBuffer(int *buffer) {
+	memcpy(buffer, ranges, size);
+}
+
 //---------------------------------------------------------------- LPU Data Part ----------------------------------------------------------------/
 
 LpuDataPart::LpuDataPart(int dimensionality,
@@ -14,22 +48,17 @@ LpuDataPart::LpuDataPart(int dimensionality,
 		void *data,
 		int elementSize,
 		List<int*> *partId) {
+	
 	this->dimensionality = dimensionality;
 	this->partId = partId;
 	this->elementSize = elementSize;
 	this->readOnly = false;
-
-	// dimension lengths and ranges are copied from the LPU as opposed to assigned to a local reference as that information 
-	// comes a local property of the single LPU instance and get changed as the instance is updated to refer to a different
-	// LPU.  
-	this->dimensions = new PartDimension[dimensionality];
+	this->partDimRanges = new PartDimRanges(dimensionality, dimensions);
+	
+	elementCount = 1;
 	for (int i = 0; i < dimensionality; i++) {
-		this->dimensions[i] = dimensions[i];
+		elementCount *= dimensions[i].storage.getLength();
 	}
-}
-
-LpuDataPart::~LpuDataPart() {
-	delete[] dimensions;
 }
 
 bool LpuDataPart::isMatchingId(List<int*> *candidateId) {
@@ -44,11 +73,7 @@ bool LpuDataPart::isMatchingId(List<int*> *candidateId) {
 }
 
 int LpuDataPart::getSize() {
-	int size = 1;
-	for (int i = 0; i < dimensionality; i++) {
-		size *= dimensions[i].storage.getLength();
-	}
-	return size * elementSize;
+	return elementCount * elementSize;
 }
 
 //--------------------------------------------------------- GPU Memory Consumption Stat ---------------------------------------------------------/
@@ -130,11 +155,14 @@ PropertyBufferManager::PropertyBufferManager() {
 	bufferSize = 0;
 	bufferEntryCount = 0;
 	bufferReferenceCount = 0;
+	partRangeDepth = 0;
 	cpuBuffer = NULL;
         cpuPartIndexBuffer = NULL;
+	cpuPartRangeBuffer = NULL;
         cpuPartBeginningBuffer = NULL;
         gpuBuffer = NULL;
         gpuPartIndexBuffer = NULL;
+	gpuPartRangeBuffer = NULL;
         gpuPartBeginningBuffer = NULL;
 }
 
@@ -154,14 +182,23 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	cpuBuffer = (char *) malloc(bufferSize);
 	cpuPartBeginningBuffer = (int *) malloc(bufferEntryCount * sizeof(int));
 
+	PartDimRanges *dimRanges = dataPartsList->Nth(0)->getPartDimRanges();
+	partRangeDepth = dimRanges->getDepth();
+	int dimRangeInfoSize = dimRanges->getSize();
+	partRangeBufferSize = bufferEntryCount * dimRangeInfoSize;
+	cpuPartRangeBuffer = (int *) malloc(partRangeBufferSize);
+
 	int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
 		
 		LpuDataPart *dataPart = dataPartsList->Nth(i);
 		void *data = dataPart->getData();
 		int size = dataPart->getSize();
-		char *start = cpuBuffer + currentIndex;
-		memcpy(start, data, size);
+		char *dataStart = cpuBuffer + currentIndex;
+		memcpy(dataStart, data, size);
+
+		int *infoRangeStart = cpuPartRangeBuffer + (dimRangeInfoSize * i);
+		dataPart->getPartDimRanges()->copyIntoBuffer(infoRangeStart);
 
 		cpuPartBeginningBuffer[i] = currentIndex;
 		currentIndex += size;
@@ -184,6 +221,9 @@ void PropertyBufferManager::prepareGpuBuffers() {
 	cudaMemcpy(gpuPartIndexBuffer, cpuPartIndexBuffer, 
 			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice);
 	
+	cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize);
+	cudaMemcpy(gpuPartRangeBuffer, cpuPartRangeBuffer, partRangeBufferSize, cudaMemcpyHostToDevice);
+	
 	cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int));
 	cudaMemcpy(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 
 			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice);
@@ -193,6 +233,7 @@ GpuBufferReferences PropertyBufferManager::getGpuBufferReferences() {
 	GpuBufferReferences bufferRef;
 	bufferRef.dataBuffer = gpuBuffer;
 	bufferRef.partIndexBuffer = gpuPartIndexBuffer;
+	bufferRef.partRangeBuffer = gpuPartRangeBuffer;
 	bufferRef.partBeginningBuffer = gpuPartBeginningBuffer;
 	return bufferRef;
 }
@@ -217,11 +258,14 @@ void PropertyBufferManager::cleanupBuffers() {
 	bufferSize = 0;
 	bufferEntryCount = 0;
 	bufferReferenceCount = 0;
+	partRangeDepth = 0;
 	
 	free(cpuBuffer);
 	cpuBuffer = NULL;
 	free(cpuPartIndexBuffer); 
         cpuPartIndexBuffer = NULL;
+	free(cpuPartRangeBuffer); 
+        cpuPartRangeBuffer = NULL;
 	free(cpuPartBeginningBuffer);
         cpuPartBeginningBuffer = NULL;
        
@@ -229,6 +273,8 @@ void PropertyBufferManager::cleanupBuffers() {
 	gpuBuffer = NULL;
 	cudaFree(gpuPartIndexBuffer);
         gpuPartIndexBuffer = NULL;
+	cudaFree(gpuPartRangeBuffer);
+        gpuPartRangeBuffer = NULL;
 	cudaFree(gpuPartBeginningBuffer);
         gpuPartBeginningBuffer = NULL;
 }

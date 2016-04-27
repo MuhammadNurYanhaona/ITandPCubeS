@@ -105,6 +105,11 @@ PartDimension PartDimension::getSubrange(int begin, int end) {
 	return subDimension;
 }
 
+int PartDimension::getDepth() {
+	if (parent == NULL) return 1;
+	else return parent->getDepth() + 1;
+}
+
 //--------------------------------------------- PPU ID --------------------------------------------------/
 
 void PPU_Ids::print(std::ofstream &stream) {
