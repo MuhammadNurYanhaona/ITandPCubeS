@@ -130,6 +130,15 @@ bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName)
 	}
 }
 
+bool LpuDataPartTracker::isAlreadyIncluded(List<int*> *dataPartId, const char *varName) {
+	List<LpuDataPart*> *dataPartList = dataPartMap->Lookup(varName);
+	for (int i = 0; i < dataPartList->NumElements(); i++) {
+		LpuDataPart *includedPart = dataPartList->Nth(i);
+		if (includedPart->isMatchingId(dataPartId)) return true;
+	}
+	return false;	
+}
+
 void LpuDataPartTracker::clear() {
 	
 	List<int> *indexList = NULL;
@@ -235,6 +244,7 @@ GpuBufferReferences PropertyBufferManager::getGpuBufferReferences() {
 	bufferRef.partIndexBuffer = gpuPartIndexBuffer;
 	bufferRef.partRangeBuffer = gpuPartRangeBuffer;
 	bufferRef.partBeginningBuffer = gpuPartBeginningBuffer;
+	bufferRef.partRangeDepth = partRangeDepth;
 	return bufferRef;
 }
 
@@ -317,7 +327,17 @@ void LpuDataBufferManager::reset() {
 
 //------------------------------------------------------------- LPU Batch Controller ------------------------------------------------------------/
 
-LpuBatchController::LpuBatchController(int lpuCountThreshold, 
+LpuBatchController::LpuBatchController() {
+	propertyNames = NULL;
+	toBeModifiedProperties = NULL;
+	batchLpuCountThreshold = 1;
+	currentBatchSize = 0;
+	gpuMemStat = NULL;
+	dataPartTracker = NULL;
+	bufferManager = NULL;
+}
+
+void LpuBatchController::initialize(int lpuCountThreshold, 
 		long memoryConsumptionLimit, 
 		List<const char*> *propertyNames,
 		List<const char*> *toBeModifiedProperties) {

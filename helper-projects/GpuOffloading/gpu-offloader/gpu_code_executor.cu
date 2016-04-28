@@ -12,15 +12,22 @@ GpuCodeExecutor::GpuCodeExecutor(LpuBatchController *lpuBatchController) {
 }
 
 void GpuCodeExecutor::submitNextLpu(LPU *lpu) {
-	
+
 	if (lpuBatchController->canAddNewLpu() && lpuBatchController->canHoldLpu(lpu)) {
+		if (lpuBatchController->isEmptyBatch()) {
+			currentBatchLpuRange = Range(lpu->id);
+		} else {
+			currentBatchLpuRange.max++;
+		}
 		lpuBatchController->addLpuToTheCurrentBatch(lpu);
 		return;	
 	}
 	if (!lpuBatchController->isEmptyBatch()) {
 		execute();
 	}
+
 	lpuBatchController->addLpuToTheCurrentBatch(lpu);
+	currentBatchLpuRange = Range(lpu->id);
 }
 
 void GpuCodeExecutor::forceExecution() {
@@ -36,3 +43,7 @@ void GpuCodeExecutor::execute() {
 	lpuBatchController->updateBatchDataPartsFromGpuResults();
 	lpuBatchController->resetController();
 }
+
+void GpuCodeExecutor::initialize() {}
+
+void GpuCodeExecutor::cleanup() { cudaDeviceReset(); }

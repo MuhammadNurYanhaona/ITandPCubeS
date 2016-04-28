@@ -19,7 +19,7 @@ CUDA_SRCS = $(shell find . -name "*.cu" -path "./gpu*")
 C_OBJS = $(patsubst %.cc, %.o, $(filter %.cc,$(C_SRCS)))
 CUDA_OBJS = $(patsubst %.cu, %.co, $(filter %.cu,$(CUDA_SRCS)))
 
-SRC_JUNK = ./*.o ./*/*.o ./*.co ./*/*.co
+SRC_JUNK = ./*.o ./*/*.o ./*.co ./*/*.co ./*/*/*.co
 
 # Define the tools we are going to use
 CXX= $(C_COMPILER)

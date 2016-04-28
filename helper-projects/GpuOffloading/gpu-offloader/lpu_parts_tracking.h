@@ -98,12 +98,17 @@ class LpuDataPartTracker {
 	List<int> *getPartIndexList(const char *varName) { return partIndexMap->Lookup(varName); }
 	List<LpuDataPart*> *getDataPartList(const char *varName) { return dataPartMap->Lookup(varName); } 
 	
-	// An addition of a new LPU data part for a particular property may fail as that part may have been already included as part
-	// of a previous LPU. The return value of this function indicates if the add operation was successful so that the caller can 
-	// delete the data part if not needed.		
+        // An addition of a new LPU data part for a particular property may fail as that part may have been already included as part
+        // of a previous LPU. The return value of this function indicates if the add operation was successful so that the caller can 
+        // delete the data part if not needed.
+	// Note that even already included data parts must be attempted to be added through this function as the partIndexMap needs
+	// to be updated even for redundant data parts.
 	bool addDataPart(LpuDataPart *dataPart, const char *varName);
 
-	// delete all data parts of the current batch	
+	// this tells if a candidate data part has already been included in the part tracker
+	bool isAlreadyIncluded(List<int*> *dataPartId, const char *varName);
+
+	// this function deletes all data parts of the current batch	
 	void clear();	   	
 };
 
@@ -114,6 +119,9 @@ class GpuBufferReferences {
 	int *partIndexBuffer;
 	int *partRangeBuffer;
 	int *partBeginningBuffer;
+
+	// this non-pointer variable is needed to determine how to read information from the part-range-buffer
+	int partRangeDepth;
 };
 
 /* Since data parts can be very small and numerous, there might be a significant cost in staging than in and out of GPU card memory. 
@@ -169,7 +177,7 @@ class LpuDataBufferManager {
  * using the earlier classes of this library and try to reuse those buffers, if possible, for multiple batch submissions to the GPU.
  */
 class LpuBatchController {
-  private:
+  protected:
 	int batchLpuCountThreshold;
 	int currentBatchSize;
 	List<const char*> *propertyNames;
@@ -178,11 +186,12 @@ class LpuBatchController {
 	LpuDataBufferManager *bufferManager; 		
 	GpuMemoryConsumptionStat *gpuMemStat;
   public:
-	LpuBatchController(int lpuCountThreshold, 
+	LpuBatchController();
+
+	void initialize(int lpuCountThreshold, 
 			long memoryConsumptionLimit, 
 			List<const char*> *propertyNames,
 			List<const char*> *toBeModifiedProperties);
-
 	bool canAddNewLpu() { return currentBatchSize < batchLpuCountThreshold; }
 	bool canHoldLpu(LPU *lpu);
 	void submitCurrentBatchToGpu();

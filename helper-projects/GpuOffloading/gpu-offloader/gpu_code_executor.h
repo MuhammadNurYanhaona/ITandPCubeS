@@ -22,12 +22,29 @@
 #include "../runtime/structure.h"
 
 class GpuCodeExecutor {
-  private:
+  protected:
+	// these two parameters are needed to construct multidimensional LPU IDs inside the offloaded GPU kernels as opposed
+	// to passing the IDs as a separate array
+	int *lpuCount;
+	Range currentBatchLpuRange;
+
 	LpuBatchController *lpuBatchController;
   public:
 	GpuCodeExecutor(LpuBatchController *lpuBatchController);
+	void setLpuCount(int *lpuCount) { this->lpuCount = lpuCount; }
+	
+	// function to add a new LPU for batch execution in the GPU
 	void submitNextLpu(LPU *lpu);
+	// function to force execution of partially filled batch of LPUs
 	void forceExecution();
+
+	// Subclasses should override these two functions to do any processing that needs to be done for all LPUs. For 
+	// example, if scalar variables are accessed and modified within the compute stages that will execute inside the off-
+	// loaded kernels then those variables should be copied in the GPU memory before the first batch of LPUs run and  
+	// brought back to the host at the end of last batch execution. The default implementation of initialize does nothing
+	// and the default implementation of cleanup tears down the CUDA context.  
+	virtual void initialize();
+	virtual void cleanup();
   protected:
 	// subclasses should provide implementation for this function should that invokes the proper sequence of GPU kernels 
 	// to perform the compute stages relevant to the current context 
