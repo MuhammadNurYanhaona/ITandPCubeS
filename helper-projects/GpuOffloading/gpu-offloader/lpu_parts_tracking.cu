@@ -14,7 +14,7 @@ PartDimRanges::PartDimRanges(int dimensionality, PartDimension *partDimensions) 
 	depth = partDimensions[0].getDepth();
 	int entryCount = dimensionality * (depth + 1); // depth number of partition range and one storage range is needed
 	ranges = new Range[entryCount];
-	size = entryCount * 2 * sizeof(int); // each range has a min and max attributes	
+	size = entryCount * 2; // each range has a min and max attributes	
 
 	// first copy in the storage dimension range
 	int currentIndex = 0;
@@ -38,7 +38,7 @@ PartDimRanges::~PartDimRanges() {
 }
 
 void PartDimRanges::copyIntoBuffer(int *buffer) {
-	memcpy(buffer, ranges, size);
+	memcpy(buffer, ranges, size * sizeof(int));
 }
 
 //---------------------------------------------------------------- LPU Data Part ----------------------------------------------------------------/
@@ -195,7 +195,7 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	partRangeDepth = dimRanges->getDepth();
 	int dimRangeInfoSize = dimRanges->getSize();
 	partRangeBufferSize = bufferEntryCount * dimRangeInfoSize;
-	cpuPartRangeBuffer = (int *) malloc(partRangeBufferSize);
+	cpuPartRangeBuffer = (int *) malloc(partRangeBufferSize * sizeof(int));
 
 	int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {

@@ -115,7 +115,7 @@ class LpuDataPartTracker {
 /* This is a helper class introduced to reduce the number of parameters need to be passed to GPU kernels for LPU data references */
 class GpuBufferReferences {
   public:
-	void *dataBuffer;
+	char *dataBuffer;
 	int *partIndexBuffer;
 	int *partRangeBuffer;
 	int *partBeginningBuffer;
