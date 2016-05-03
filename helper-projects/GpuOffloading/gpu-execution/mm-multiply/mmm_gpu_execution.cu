@@ -186,7 +186,7 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 			// here we should load sub-section of A and B from the GPU card memory to the local memory
 			// what about C? Or should we directly perform all computation on the card memory and rely
 			// on the hardware's caching machanism to do the global and shared memory interactions?
-
+		
 			// In the multicore and segmented memory architecture cases the matrix-matrix multiplication 
 			// code starts here. In the GPU, the existing partition scheme will result in only one warp 
 			// within an SM doing computation for the user code. Rather the user should have the 
@@ -202,7 +202,7 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 			int spaceBLpuCount = spaceBLpuCount1 * spaceBLpuCount2;
 
 			// distribute the Space B LPUs among the warps
-			for (int spaceBLpu = warpId; spaceBLpu < spaceBLpuCount; spaceBLpu += WARP_SIZE) {
+			for (int spaceBLpu = warpId; spaceBLpu < spaceBLpuCount; spaceBLpu += WARP_COUNT) {
 				
 				// construct the 2 dimensional LPU ID from the linear LPU Id
 				int spaceBLpuId[2];
@@ -266,18 +266,32 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 				int iEnd = iterableRanges[1];
 				int iStep = indexesAndSteps[1];
 				for (int i = iStart; i <= iEnd; i += iStep) {
+
+					int c_i = i - cSRanges[0][0];
+					int a_i = i - aSRanges[0][0];
+				
 					// iterate over the columns
 					int jStart = indexesAndSteps[2];
 					int jEnd = iterableRanges[3];
 					int jStep = indexesAndSteps[3];
 					for (int j = jStart; j <= jEnd; j+= jStep) {
+	
+						int c_j = j - cSRanges[1][0];
+						int b_j = j - bSRanges[1][0];
+						
 						// iterate over the common dimension
 						int kStart = aSpaceBPRanges[1][0];
 						int kEnd = aSpaceBPRanges[1][1];
 						for (int k = kStart; k <= kEnd; k++) {
-							// Here we should have the index transformations and the
-							// add + multiply operation. Is index transformation should
-							// be different in GPU from how it is done in the host?
+							
+							int a_k = k - aSRanges[1][0];
+							int b_k = k - bSRanges[0][0];
+
+							int cIndex = c_i * (cSRanges[1][1] - cSRanges[1][0] + 1) + c_j;
+							int aIndex = a_i * (aSRanges[1][1] - aSRanges[1][0] + 1) + a_k;
+							int bIndex = b_k * (bSRanges[1][1] - bSRanges[1][0] + 1) + b_j;
+
+							c[cIndex] += a[aIndex] * b[bIndex];	
 						}
 					}
 				}
