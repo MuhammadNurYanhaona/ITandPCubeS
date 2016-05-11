@@ -2,6 +2,7 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../runtime/structure.h"
+#include "../gpu-utils/gpu_utils.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -55,6 +56,7 @@ LpuDataPart::LpuDataPart(int dimensionality,
 	this->elementSize = elementSize;
 	this->readOnly = false;
 	this->partDimRanges = new PartDimRanges(dimensionality, dimensions);
+	this->data = data;
 	
 	elementCount = 1;
 	for (int i = 0; i < dimensionality; i++) {
@@ -238,19 +240,20 @@ void PropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
 	logFile << "Copying buffers from the CPU to the GPU\n";
 	logFile.flush();
 
-	cudaMalloc((void **) &gpuBuffer, bufferSize);
-	cudaMemcpy(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice);
+	check_error(cudaMalloc((void **) &gpuBuffer, bufferSize), logFile);
+	check_error(cudaMemcpy(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice), logFile);
 	
-	cudaMalloc((void **) &gpuPartIndexBuffer, bufferReferenceCount * sizeof(int));
-	cudaMemcpy(gpuPartIndexBuffer, cpuPartIndexBuffer, 
-			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice);
+	check_error(cudaMalloc((void **) &gpuPartIndexBuffer, bufferReferenceCount * sizeof(int)), logFile);
+	check_error(cudaMemcpy(gpuPartIndexBuffer, cpuPartIndexBuffer, 
+			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice), logFile);
 	
-	cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize);
-	cudaMemcpy(gpuPartRangeBuffer, cpuPartRangeBuffer, partRangeBufferSize, cudaMemcpyHostToDevice);
+	check_error(cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize), logFile);
+	check_error(cudaMemcpy(gpuPartRangeBuffer, cpuPartRangeBuffer, 
+			partRangeBufferSize, cudaMemcpyHostToDevice), logFile);
 	
-	cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int));
-	cudaMemcpy(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 
-			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice);
+	check_error(cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int)), logFile);
+	check_error(cudaMemcpy(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 
+			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice), logFile);
 }
 
 GpuBufferReferences PropertyBufferManager::getGpuBufferReferences() {
@@ -268,7 +271,7 @@ void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPart
 	logFile << "Retrieving updated data from the GPU to synchronize data parts in the CPU\n";
 	logFile.flush();
 
-	cudaMemcpy(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost);
+	check_error(cudaMemcpy(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost), logFile);
 
 	int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {

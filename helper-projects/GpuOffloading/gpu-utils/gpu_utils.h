@@ -3,6 +3,7 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <fstream>
 
 // Given a set of index ranges to be iterated by an warp that wants to distribute the work among its thread, 
 // this routines provides the loop iteration start indexes and step sizes for the threads. Distribution of
@@ -15,5 +16,10 @@ __device__ void determineLoopIndexesAndSteps(int nestingLevels,
 		int threadId, 
 		int *indexRanges, 
 		int *indexStartsAndSteps);
+
+// prints the error message, if exists, from the return status of any CUDA operation and exits the program
+// if there is an error  
+void check_error(cudaError e, std::ofstream &logFile);
+
 
 #endif

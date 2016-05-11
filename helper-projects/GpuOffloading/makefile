@@ -34,7 +34,7 @@ NVCC = $(CUDA_COMPILER)
 CPPFLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
 
 # settings for CUDA compiler
-CUDAFLAGS= -x cu -dc
+CUDAFLAGS= -x cu -dc -g
 
 # settings for newer GPGPU target hardwares 
 GPUARCH = sm_30

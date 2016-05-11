@@ -3,6 +3,8 @@
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <cstdlib>
+#include <fstream>
 
 __device__ void determineLoopIndexesAndSteps(int nestingLevels,
                 int threadId,
@@ -32,3 +34,10 @@ __device__ void determineLoopIndexesAndSteps(int nestingLevels,
 	indexStartsAndSteps[position + 1] = WARP_SIZE;
 }
 
+void check_error(cudaError e, std::ofstream &logFile) {
+        if (e != cudaSuccess) {
+                logFile << "CUDA error: " <<  cudaGetErrorString(e) << "\n";
+		logFile.flush();
+                std::exit(EXIT_FAILURE);
+        }
+}

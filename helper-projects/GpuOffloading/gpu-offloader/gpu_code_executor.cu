@@ -1,6 +1,7 @@
 #include "gpu_code_executor.h"
 #include "lpu_parts_tracking.h"
 #include "../runtime/structure.h"
+#include "../gpu-utils/gpu_utils.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -37,9 +38,13 @@ void GpuCodeExecutor::forceExecution() {
 }
 
 void GpuCodeExecutor::execute() {
+	
 	lpuBatchController->submitCurrentBatchToGpu();
+	
 	offloadFunction();
 	cudaThreadSynchronize();
+	check_error(cudaGetLastError(), *logFile);
+
 	lpuBatchController->updateBatchDataPartsFromGpuResults();
 	lpuBatchController->resetController();
 }
