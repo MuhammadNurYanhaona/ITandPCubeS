@@ -6,6 +6,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cstdlib>
+#include <fstream>
 
 //--------------------------------------------------------------- Part Dim Ranges ---------------------------------------------------------------/
 
@@ -179,7 +180,12 @@ PropertyBufferManager::~PropertyBufferManager() {
 	cleanupBuffers();
 }
 
-void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, List<int> *partIndexList) {
+void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
+		List<int> *partIndexList, 
+		std::ofstream &logFile) {
+
+	logFile << "Preparing the CPU buffers for the batch\n";
+	logFile.flush();
 	
 	bufferEntryCount = dataPartsList->NumElements();
 	bufferReferenceCount = partIndexList->NumElements();
@@ -188,7 +194,7 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 		bufferSize += dataPartsList->Nth(i)->getSize();
 	}
 
-	cpuBuffer = (char *) malloc(bufferSize);
+	cpuBuffer = (char *) malloc(bufferSize * sizeof(char));
 	cpuPartBeginningBuffer = (int *) malloc(bufferEntryCount * sizeof(int));
 
 	PartDimRanges *dimRanges = dataPartsList->Nth(0)->getPartDimRanges();
@@ -196,6 +202,9 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	int dimRangeInfoSize = dimRanges->getSize();
 	partRangeBufferSize = bufferEntryCount * dimRangeInfoSize;
 	cpuPartRangeBuffer = (int *) malloc(partRangeBufferSize * sizeof(int));
+
+	logFile << "Allocated the part data, beginning index, and range buffers\n";
+	logFile.flush();
 
 	int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
@@ -213,6 +222,9 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 		currentIndex += size;
 	}
 
+	logFile << "Copied data into the previously allocated buffers; going to prepared the part index buffer\n";
+	logFile.flush();
+
 	cpuPartIndexBuffer = (int *) malloc(bufferReferenceCount * sizeof(int));
 	for (int i = 0; i < partIndexList->NumElements(); i++) {
 		int index = partIndexList->Nth(i);
@@ -221,8 +233,11 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	}
 }
 
-void PropertyBufferManager::prepareGpuBuffers() {
+void PropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
 	
+	logFile << "Copying buffers from the CPU to the GPU\n";
+	logFile.flush();
+
 	cudaMalloc((void **) &gpuBuffer, bufferSize);
 	cudaMemcpy(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice);
 	
@@ -248,8 +263,11 @@ GpuBufferReferences PropertyBufferManager::getGpuBufferReferences() {
 	return bufferRef;
 }
 
-void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList) {
+void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile) {
 	
+	logFile << "Retrieving updated data from the GPU to synchronize data parts in the CPU\n";
+	logFile.flush();
+
 	cudaMemcpy(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost);
 
 	int currentIndex = 0;
@@ -301,10 +319,11 @@ LpuDataBufferManager::LpuDataBufferManager(List<const char*> *propertyNames) {
 
 void LpuDataBufferManager::copyPartsInGpu(const char *propertyName, 
 		List<LpuDataPart*> *dataPartsList, 
-		List<int> *partIndexList) {
+		List<int> *partIndexList,
+		std::ofstream &logFile) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
-	propertyManager->prepareCpuBuffers(dataPartsList, partIndexList);
-	propertyManager->prepareGpuBuffers();
+	propertyManager->prepareCpuBuffers(dataPartsList, partIndexList, logFile);
+	propertyManager->prepareGpuBuffers(logFile);
 }
 
 GpuBufferReferences LpuDataBufferManager::getGpuBufferReferences(const char *propertyName) {
@@ -312,9 +331,11 @@ GpuBufferReferences LpuDataBufferManager::getGpuBufferReferences(const char *pro
 	return propertyManager->getGpuBufferReferences();	
 }
 
-void LpuDataBufferManager::retrieveUpdatesFromGpu(const char *propertyName, List<LpuDataPart*> *dataPartsList) {
+void LpuDataBufferManager::retrieveUpdatesFromGpu(const char *propertyName, 
+		List<LpuDataPart*> *dataPartsList, 
+		std::ofstream &logFile) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
-	propertyManager->syncDataPartsFromBuffer(dataPartsList);
+	propertyManager->syncDataPartsFromBuffer(dataPartsList, logFile);
 }
 
 void LpuDataBufferManager::reset() {
@@ -335,6 +356,7 @@ LpuBatchController::LpuBatchController() {
 	gpuMemStat = NULL;
 	dataPartTracker = NULL;
 	bufferManager = NULL;
+	this->logFile = NULL;
 }
 
 void LpuBatchController::initialize(int lpuCountThreshold, 
@@ -361,9 +383,13 @@ void LpuBatchController::submitCurrentBatchToGpu() {
 	if (currentBatchSize > 0) {
 		for (int i = 0; i < propertyNames->NumElements(); i++) {
 			const char *varName = propertyNames->Nth(i);
+			
+			*logFile << "Preparing buffers for property '" << varName << "'\n";
+			logFile->flush();
+			
 			List<int> *partIndexes = dataPartTracker->getPartIndexList(varName);
 			List<LpuDataPart*> *parts = dataPartTracker->getDataPartList(varName);
-			bufferManager->copyPartsInGpu(varName, parts, partIndexes);
+			bufferManager->copyPartsInGpu(varName, parts, partIndexes, *logFile);
 		}		
 	}
 }
@@ -373,7 +399,7 @@ void LpuBatchController::updateBatchDataPartsFromGpuResults() {
 		for (int i = 0; i < toBeModifiedProperties->NumElements(); i++) {
 			const char *property = toBeModifiedProperties->Nth(i);
 			List<LpuDataPart*> *parts = dataPartTracker->getDataPartList(property);
-			bufferManager->retrieveUpdatesFromGpu(property, parts);
+			bufferManager->retrieveUpdatesFromGpu(property, parts, *logFile);
 		}
 	}
 }

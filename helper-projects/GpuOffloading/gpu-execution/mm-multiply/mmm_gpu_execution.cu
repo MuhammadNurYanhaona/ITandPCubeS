@@ -66,6 +66,8 @@ void MMMLpuBatchController::addLpuToTheCurrentBatch(LPU *lpu) {
 	if (!notRedundant) {
 		delete cPart;
 	}
+
+	LpuBatchController::addLpuToTheCurrentBatch(lpu);
 }
 
 //------------------------------------------------------ Offloading GPU Kernels ------------------------------------------------------/
@@ -93,69 +95,66 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 	double *a, *b, *c;
 
 	// variables for tracking storage and partition dimensions of the top space LPU's data parts
-	int aSRanges[2][2], bSRanges[2][2], cSRanges[2][2];
-	int aPRanges[2][2], bPRanges[2][2], cPRanges[2][2];
+	__shared__ int aSRanges[2][2], bSRanges[2][2], cSRanges[2][2];
+	__shared__ int aPRanges[2][2], bPRanges[2][2], cPRanges[2][2];
 
 	// SMs stride over different indexes to get different LPUs to operate on
 	Range lpuIdRange = batchRange.lpuIdRange;
 	for (int linearId = lpuIdRange.min + smId; linearId <= lpuIdRange.max; linearId += BLOCK_COUNT) {
 
-		// create the multidimensional LPU ID from the current linear LPU ID as in some computation and also
-		// for sub-space LPUs construction often requires the actual ID of the current LPU
-		int lpuId[2];
-		lpuId[0] = linearId / batchRange.lpuCount2;
-		lpuId[1] = linearId % batchRange.lpuCount2;
-
 		// point the a, b, c matrix references to the memory addresses where corresponding data parts for the
 		// current LPUs starts 
 
-		// -------------------------------------------------------------------- retrieve a and its dimensions
-		int lpuIndex = linearId - lpuIdRange.min;
-		int aIndex = aBuffers.partIndexBuffer[lpuIndex];
-		int aStartsAt = aBuffers.partBeginningBuffer[aIndex];
-		a = (double *) aBuffers.dataBuffer[aStartsAt];
-		int aDimRangeStart = lpuIndex * 2 * 2 * 2; // there are storage and partition ranges each has two
-							   // integers and the data structure is 2D
-		aSRanges[0][0] = aBuffers.partBeginningBuffer[aDimRangeStart];
-		aSRanges[0][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 1];
-		aSRanges[1][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 2];
-		aSRanges[1][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 3];
+		if (warpId == 0 && threadId == 0) {
+			//------------------------------------------------------------- retrieve a and its dimensions
+			int lpuIndex = linearId - lpuIdRange.min;
+			int aIndex = aBuffers.partIndexBuffer[lpuIndex];
+			int aStartsAt = aBuffers.partBeginningBuffer[aIndex];
+			a = (double *) aBuffers.dataBuffer[aStartsAt];
+			int aDimRangeStart = lpuIndex * 2 * 2 * 2; // there are storage and partition ranges each has
+								   // two integers and the data structure is 2D
+			aSRanges[0][0] = aBuffers.partBeginningBuffer[aDimRangeStart];
+			aSRanges[0][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 1];
+			aSRanges[1][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 2];
+			aSRanges[1][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 3];
 
-		aPRanges[0][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 4];
-		aPRanges[0][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 5];
-		aPRanges[1][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 6];
-		aPRanges[1][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 7];
-		
-		// -------------------------------------------------------------------- retrieve b and its dimensions
-		int bIndex = bBuffers.partIndexBuffer[lpuIndex];
-		int bStartsAt = bBuffers.partBeginningBuffer[bIndex];
-		b = (double *) bBuffers.dataBuffer[bStartsAt];
-		int bDimRangeStart = lpuIndex * 2 * 2 * 2; 
-		bSRanges[0][0] = bBuffers.partBeginningBuffer[bDimRangeStart];
-		bSRanges[0][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 1];
-		bSRanges[1][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 2];
-		bSRanges[1][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 3];
+			aPRanges[0][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 4];
+			aPRanges[0][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 5];
+			aPRanges[1][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 6];
+			aPRanges[1][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 7];
+			
+			//------------------------------------------------------------- retrieve b and its dimensions
+			int bIndex = bBuffers.partIndexBuffer[lpuIndex];
+			int bStartsAt = bBuffers.partBeginningBuffer[bIndex];
+			b = (double *) bBuffers.dataBuffer[bStartsAt];
+			int bDimRangeStart = lpuIndex * 2 * 2 * 2; 
+			bSRanges[0][0] = bBuffers.partBeginningBuffer[bDimRangeStart];
+			bSRanges[0][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 1];
+			bSRanges[1][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 2];
+			bSRanges[1][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 3];
 
-		bPRanges[0][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 4];
-		bPRanges[0][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 5];
-		bPRanges[1][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 6];
-		bPRanges[1][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 7];
- 		
-		// -------------------------------------------------------------------- retrieve c and its dimensions
-		int cIndex = cBuffers.partIndexBuffer[lpuIndex];
-		int cStartsAt = cBuffers.partBeginningBuffer[cIndex];
-		c = (double *) cBuffers.dataBuffer[cStartsAt];
-		int cDimRangeStart = lpuIndex * 2 * 2 * 2; 
-		cSRanges[0][0] = cBuffers.partBeginningBuffer[cDimRangeStart];
-		cSRanges[0][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 1];
-		cSRanges[1][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 2];
-		cSRanges[1][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 3];
-		
-		cPRanges[0][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 4];
-		cPRanges[0][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 5];
-		cPRanges[1][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 6];
-		cPRanges[1][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 7];
-	
+			bPRanges[0][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 4];
+			bPRanges[0][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 5];
+			bPRanges[1][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 6];
+			bPRanges[1][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 7];
+			
+			//------------------------------------------------------------- retrieve c and its dimensions
+			int cIndex = cBuffers.partIndexBuffer[lpuIndex];
+			int cStartsAt = cBuffers.partBeginningBuffer[cIndex];
+			c = (double *) cBuffers.dataBuffer[cStartsAt];
+			int cDimRangeStart = lpuIndex * 2 * 2 * 2; 
+			cSRanges[0][0] = cBuffers.partBeginningBuffer[cDimRangeStart];
+			cSRanges[0][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 1];
+			cSRanges[1][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 2];
+			cSRanges[1][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 3];
+			
+			cPRanges[0][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 4];
+			cPRanges[0][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 5];
+			cPRanges[1][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 6];
+			cPRanges[1][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 7];	
+		}
+		__syncthreads();
+
 		/*--------------------------------------------------------------------------------------------------------------------
 						Space A-Sub: Compiler Generated Space for Subpartition 
 		--------------------------------------------------------------------------------------------------------------------*/
@@ -164,24 +163,26 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 		// we can determine the sub-partition space's Lpu count
 		int subpartitionCount = block_size_part_count(bPRanges[0], partition.blockSize);
 		
-		int aPSubRanges[2][2], bPSubRanges[2][2];
+		__shared__ int aPSubRanges[2][2], bPSubRanges[2][2];
 
 		// the subpartitioned LPUs are processed one by one; remember that LPUs of sub-partitioned LPSes are
 		// not supposed to be distributed
 		for (int subLpu = 0; subLpu < subpartitionCount; subLpu++) {
 			
-			int lpuId = subLpu;
-	
-			// first we need to determine the partition dimension ranges of the two subpartitioned data
-			// structures, which are matrix A and B
-			aPSubRanges[0][0] = aPRanges[0][0];
-			aPSubRanges[0][1] = aPRanges[0][1];
-			block_size_part_range(aPSubRanges[1], aPRanges[1],
-                			subpartitionCount, lpuId, partition.blockSize, 0, 0); 
-			block_size_part_range(bPSubRanges[0], bPRanges[0],
-                			subpartitionCount, lpuId, partition.blockSize, 0, 0); 
-			bPSubRanges[1][0] = bPRanges[1][0];
-			bPSubRanges[1][1] = bPRanges[1][1];
+			if (warpId == 0 && threadId == 0) {	
+				// first we need to determine the partition dimension ranges of the two sub-
+				// partitioned data structures, which are matrix A and B
+				int lpuId = subLpu;
+				aPSubRanges[0][0] = aPRanges[0][0];
+				aPSubRanges[0][1] = aPRanges[0][1];
+				block_size_part_range(aPSubRanges[1], aPRanges[1],
+						subpartitionCount, lpuId, partition.blockSize, 0, 0); 
+				block_size_part_range(bPSubRanges[0], bPRanges[0],
+						subpartitionCount, lpuId, partition.blockSize, 0, 0); 
+				bPSubRanges[1][0] = bPRanges[1][0];
+				bPSubRanges[1][1] = bPRanges[1][1];
+			}
+			__syncthreads();
 
 			// here we should load sub-section of A and B from the GPU card memory to the local memory
 			// what about C? Or should we directly perform all computation on the card memory and rely
@@ -197,6 +198,14 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 							   Space B: Lowest User Defined Space 
 			------------------------------------------------------------------------------------------------------------*/
 
+			// Space B LPUs will be distributed among the warps; so the parts' dimension configuration
+			// should be different for different warps and we cannot have a single shared object per
+			// part information as we have done in the previous LPSes. Rather, we will have a shared
+			// memory pannel having 1 entry per warp to hold relevant part's dimension configuration.
+			__shared__ int aSpaceBPRanges[WARP_COUNT][2][2];
+			__shared__ int bSpaceBPRanges[WARP_COUNT][2][2];
+			__shared__ int cSpaceBPRanges[WARP_COUNT][2][2];
+
 			int spaceBLpuCount1 = block_size_part_count(cPRanges[0], 1);
 			int spaceBLpuCount2 = block_size_part_count(cPRanges[1], partition.blockSize);
 			int spaceBLpuCount = spaceBLpuCount1 * spaceBLpuCount2;
@@ -204,32 +213,32 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 			// distribute the Space B LPUs among the warps
 			for (int spaceBLpu = warpId; spaceBLpu < spaceBLpuCount; spaceBLpu += WARP_COUNT) {
 				
-				// construct the 2 dimensional LPU ID from the linear LPU Id
-				int spaceBLpuId[2];
-				spaceBLpuId[0] = spaceBLpu / spaceBLpuCount2;
-				spaceBLpuId[1] = spaceBLpu % spaceBLpuCount2;
-				
-				// determine the partition dimensions for A, B, C matrix sub-blocks a warp's LPU 
-				// consists of
-				int aSpaceBPRanges[2][2], bSpaceBPRanges[2][2], cSpaceBPRanges[2][2];
+				if (threadId == 0) {
+					// construct the 2 dimensional LPU ID from the linear LPU Id
+					int spaceBLpuId[2];
+					spaceBLpuId[0] = spaceBLpu / spaceBLpuCount2;
+					spaceBLpuId[1] = spaceBLpu % spaceBLpuCount2;
+					
+					//---------------------------------------------------- A part dimensions
+					block_size_part_range(aSpaceBPRanges[warpId][0], aPSubRanges[0],
+							spaceBLpuCount1, spaceBLpuId[0], 1, 0, 0); 
+					aSpaceBPRanges[warpId][1][0] = aPSubRanges[1][0];
+					aSpaceBPRanges[warpId][1][1] = aPSubRanges[1][1];
 
-				//------------------------------------------------------------ A part dimensions
-				block_size_part_range(aSpaceBPRanges[0], aSpaceBPRanges[0],
-                				spaceBLpuCount1, spaceBLpuId[0], 1, 0, 0); 
-				aSpaceBPRanges[1][0] = aPSubRanges[1][0];
-				aSpaceBPRanges[1][1] = aPSubRanges[1][1];
-
-				//------------------------------------------------------------ B part dimensions
-				bSpaceBPRanges[0][0] = bPSubRanges[0][0];
-				bSpaceBPRanges[0][1] = bPSubRanges[0][1];
-				block_size_part_range(bSpaceBPRanges[1], bSpaceBPRanges[1],
-                				spaceBLpuCount2, spaceBLpuId[1], 1, 0, 0); 
-				
-				//------------------------------------------------------------ C part dimensions
-				block_size_part_range(cSpaceBPRanges[0], cSpaceBPRanges[0],
-                				spaceBLpuCount1, spaceBLpuId[0], 1, 0, 0); 
-				block_size_part_range(cSpaceBPRanges[1], cSpaceBPRanges[1],
-                				spaceBLpuCount2, spaceBLpuId[1], 1, 0, 0); 
+					//---------------------------------------------------- B part dimensions
+					bSpaceBPRanges[warpId][0][0] = bPSubRanges[0][0];
+					bSpaceBPRanges[warpId][0][1] = bPSubRanges[0][1];
+					block_size_part_range(bSpaceBPRanges[warpId][1], bPSubRanges[1],
+							spaceBLpuCount2, spaceBLpuId[1], 1, 0, 0); 
+					
+					//---------------------------------------------------- C part dimensions
+					block_size_part_range(cSpaceBPRanges[warpId][0], cPRanges[0],
+							spaceBLpuCount1, spaceBLpuId[0], 1, 0, 0); 
+					block_size_part_range(cSpaceBPRanges[warpId][1], cPRanges[1],
+							spaceBLpuCount2, spaceBLpuId[1], 1, 0, 0);
+				} 
+				// there is no syncthread operation needed here as updates done by a thread in a
+				// warp is visible to all other threads in that warp
 					
 				/*----------------------------------------------------------------------------------------------------
 								  Translated Computation Stage 
@@ -254,10 +263,10 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 				// The initial solution for this is incorporated in GPU utility library that, given,
 				// a set of ranges to iterate, provides loop starting indexes and step sizes.   
 				int iterableRanges[4];
-				iterableRanges[0] = cSpaceBPRanges[0][0];
-				iterableRanges[1] = cSpaceBPRanges[0][1];
-				iterableRanges[2] = cSpaceBPRanges[1][0];
-				iterableRanges[3] = cSpaceBPRanges[1][1];
+				iterableRanges[0] = cSpaceBPRanges[warpId][0][0];
+				iterableRanges[1] = cSpaceBPRanges[warpId][0][1];
+				iterableRanges[2] = cSpaceBPRanges[warpId][1][0];
+				iterableRanges[3] = cSpaceBPRanges[warpId][1][1];
 				int indexesAndSteps[4];
 				determineLoopIndexesAndSteps(2, threadId, iterableRanges, indexesAndSteps); 
 				
@@ -280,8 +289,8 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 						int b_j = j - bSRanges[1][0];
 						
 						// iterate over the common dimension
-						int kStart = aSpaceBPRanges[1][0];
-						int kEnd = aSpaceBPRanges[1][1];
+						int kStart = aSpaceBPRanges[warpId][1][0];
+						int kEnd = aSpaceBPRanges[warpId][1][1];
 						for (int k = kStart; k <= kEnd; k++) {
 							
 							int a_k = k - aSRanges[1][0];
@@ -299,6 +308,7 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 		}
 	}
 }
+
 
 //------------------------------------------------------- MMM GPU Code Executor ------------------------------------------------------/
 

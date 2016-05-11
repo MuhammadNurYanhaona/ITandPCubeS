@@ -21,6 +21,8 @@
 #include "lpu_parts_tracking.h"
 #include "../runtime/structure.h"
 
+#include <fstream>
+
 class GpuCodeExecutor {
   protected:
 	// these two parameters are needed to construct multidimensional LPU IDs inside the offloaded GPU kernels as opposed
@@ -29,9 +31,11 @@ class GpuCodeExecutor {
 	Range currentBatchLpuRange;
 
 	LpuBatchController *lpuBatchController;
+	std::ofstream *logFile;
   public:
 	GpuCodeExecutor(LpuBatchController *lpuBatchController);
 	void setLpuCount(int *lpuCount) { this->lpuCount = lpuCount; }
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	
 	// function to add a new LPU for batch execution in the GPU
 	void submitNextLpu(LPU *lpu);

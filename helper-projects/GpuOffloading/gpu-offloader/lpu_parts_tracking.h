@@ -11,6 +11,8 @@
 #include "../utils/hashtable.h"
 #include "../runtime/structure.h"
 
+#include <fstream>
+
 /* For computation over valid transformed indexes we need to copy in the storage and partition dimension information of each data 
  * part in the GPU. A part-dimension object (a part of an LPU) is not suitable for directly being copied into the GPU memory due to
  * its hierarchical nature. So we have the following class to transform the part-dimension object into a GPU friendly format.
@@ -150,10 +152,12 @@ class PropertyBufferManager {
   public:
 	PropertyBufferManager();
 	~PropertyBufferManager();
-	void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, List<int> *partIndexList);
-	void prepareGpuBuffers();
+	void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
+			List<int> *partIndexList, 
+			std::ofstream &logFile);
+	void prepareGpuBuffers(std::ofstream &logFile);
 	GpuBufferReferences getGpuBufferReferences();
-	void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList);
+	void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile);
 	void cleanupBuffers();
 };
 
@@ -167,9 +171,12 @@ class LpuDataBufferManager {
 	LpuDataBufferManager(List<const char*> *propertyNames);
 	void copyPartsInGpu(const char *propertyName, 
 			List<LpuDataPart*> *dataPartsList, 
-			List<int> *partIndexList);
+			List<int> *partIndexList, 
+			std::ofstream &logFile);
 	GpuBufferReferences getGpuBufferReferences(const char *propertyName);
-	void retrieveUpdatesFromGpu(const char *propertyName, List<LpuDataPart*> *dataPartsList);
+	void retrieveUpdatesFromGpu(const char *propertyName, 
+			List<LpuDataPart*> *dataPartsList, 
+			std::ofstream &logFile);
 	void reset();
 };
 
@@ -185,17 +192,18 @@ class LpuBatchController {
 	LpuDataPartTracker *dataPartTracker;
 	LpuDataBufferManager *bufferManager; 		
 	GpuMemoryConsumptionStat *gpuMemStat;
+	std::ofstream *logFile;
   public:
 	LpuBatchController();
-
 	void initialize(int lpuCountThreshold, 
 			long memoryConsumptionLimit, 
 			List<const char*> *propertyNames,
 			List<const char*> *toBeModifiedProperties);
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	bool canAddNewLpu() { return currentBatchSize < batchLpuCountThreshold; }
 	bool canHoldLpu(LPU *lpu);
 	void submitCurrentBatchToGpu();
-	bool isEmptyBatch() { return currentBatchSize > 0; }
+	bool isEmptyBatch() { return currentBatchSize == 0; }
 	int getBatchLpuCountThreshold() { return batchLpuCountThreshold; }
 	int getCurrentBatchSize() { return currentBatchSize; }
 	GpuBufferReferences getGpuBufferReferences(const char *propertyName) { 

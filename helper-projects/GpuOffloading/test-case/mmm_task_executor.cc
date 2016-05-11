@@ -1,5 +1,7 @@
 #include <mpi.h>
 #include <iostream>
+#include <sstream>
+#include <fstream>
 #include <cstdlib>
 
 #include "mmm_structure.h"
@@ -32,6 +34,15 @@ int main(int argc, char *argv[]) {
 
 	A_MD[0].setLength(matrixLength);
 	C_MD[1] = C_MD[0] = B_MD[1] = B_MD[0] = A_MD[1] = A_MD[0];
+
+	// create a log file
+        std::ostringstream fileName;
+        fileName << "process_" << segmentId << ".log";
+	std::ofstream logFile;
+        logFile.open(fileName.str().c_str(), std::ofstream::out | std::ofstream::app);
+        if (!logFile.is_open()) {
+                std::cout << "Could not open log file for Process-" << segmentId << "\n";
+        }
 
 	// initialize useful scalar data structures needed for both host and GPU computations
 	mmm::Partition partition;
@@ -67,9 +78,11 @@ int main(int argc, char *argv[]) {
 	int batchSize = 100;
 	MMMLpuBatchController *lpuBatchController 
 			= new MMMLpuBatchController(batchSize, memLimit);
+	lpuBatchController->setLogFile(&logFile);	
 	MMMGpuCodeExecutor *gpuExecutor = new MMMGpuCodeExecutor(lpuBatchController, 
 			partition, arrayMetadata, taskGlobals, threadLocals);
 	gpuExecutor->setLpuCount(lpuCount);
+	gpuExecutor->setLogFile(&logFile);
 	gpuExecutor->initialize();
 
 	// offload LPUs to the gpu code executor
