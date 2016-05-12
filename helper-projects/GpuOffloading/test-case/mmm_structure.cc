@@ -51,7 +51,7 @@ void MatrixPart::duplicate(MatrixPart *copy) {
 	copy->storageDims[0] = this->storageDims[0];
 	copy->storageDims[1] = this->storageDims[1];
 	copy->partId = this->partId;
-	int partSize = storageDims[1].getLength() * storageDims[1].getLength();
+	int partSize = storageDims[0].getLength() * storageDims[1].getLength();
 	copy->data = new double[partSize];
 	memcpy(copy->data, this->data, partSize * sizeof(double));
 }
