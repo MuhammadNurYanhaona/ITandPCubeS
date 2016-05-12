@@ -230,8 +230,7 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	cpuPartIndexBuffer = (int *) malloc(bufferReferenceCount * sizeof(int));
 	for (int i = 0; i < partIndexList->NumElements(); i++) {
 		int index = partIndexList->Nth(i);
-		int partStartsAt = cpuPartBeginningBuffer[index];
-		cpuPartIndexBuffer[i] = partStartsAt;
+		cpuPartIndexBuffer[i] = index;
 	}
 }
 
