@@ -10,6 +10,8 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 
+#include <fstream>
+
 // This namespace contains the classes that we dynamically generate for individual task to track scalar variables' state,
 // dimensionality of the originial data structures used inside a task, and task partition information. All of these may be
 // needed during the execution of a compute stage.
@@ -78,6 +80,8 @@ class MatrixPart {
 		data = NULL;
 		partId = NULL;
 	}
+	void duplicate(MatrixPart *copy);
+	bool sameContent(MatrixPart *other);
 };
 
 class MatrixPartGenerator {
@@ -114,6 +118,8 @@ class MatrixPartMap {
         bool cPartExists(List<int*> *partId) { return isIdInList(partId, cPartList); }
         void addCPart(MatrixPart *part) { cPartList->Append(part); }
 	MatrixPart *getCPart(List<int*> *partId) { return getPart(partId, cPartList); }
+	MatrixPartMap *duplicate();
+	void matchParts(MatrixPartMap *otherMap, std::ofstream &logFile);
   private:
 	bool isIdInList(List<int*> *partId, List<MatrixPart*> *partList);
 	MatrixPart *getPart(List<int*> *partId, List<MatrixPart*> *partList);

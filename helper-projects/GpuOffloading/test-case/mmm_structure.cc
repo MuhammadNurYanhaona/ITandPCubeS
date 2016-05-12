@@ -4,6 +4,10 @@
 #include "../utils/hashtable.h"
 #include "../utils/partition.h"
 
+#include <iostream>
+#include <cstdlib>
+#include <time.h>
+
 //---------------------------------------------------------------- ID Generator --------------------------------------------------------------/
 
 IdGenerator::IdGenerator(int *lpuCount) {
@@ -41,6 +45,27 @@ List<int*> *IdGenerator::getCPartId(int linearLpuId) {
 	return partIdList;	
 }
 
+//----------------------------------------------------------------- Matrix Part --------------------------------------------------------------/
+
+void MatrixPart::duplicate(MatrixPart *copy) {
+	copy->storageDims[0] = this->storageDims[0];
+	copy->storageDims[1] = this->storageDims[1];
+	copy->partId = this->partId;
+	int partSize = storageDims[1].getLength() * storageDims[1].getLength();
+	copy->data = new double[partSize];
+	memcpy(copy->data, this->data, partSize * sizeof(double));
+}
+
+bool MatrixPart::sameContent(MatrixPart *other) {
+	int partSize = storageDims[1].getLength() * storageDims[1].getLength();
+	double *myData = data;
+	double *otherData = other->data;
+	for (int i = 0; i < partSize; i++) {
+		if (myData[i] != otherData[i]) return false;
+	}
+	return true;
+}
+
 //------------------------------------------------------------ Matrix Part Generator ---------------------------------------------------------/
 
 MatrixPartGenerator::MatrixPartGenerator(int *lpuCount, 
@@ -64,7 +89,12 @@ MatrixPart *MatrixPartGenerator::generateAPart(List<int*> *partId) {
 	Dimension dimension2 = parentDim2;
 	
 	int partSize = dimension1.getLength() * dimension2.getLength();
+	
 	double *data = new double[partSize];
+	for (int i = 0; i < partSize; i++) {
+		data[i] = ((rand() % 100) / 75.00);
+	}
+	
 	MatrixPart *part = new MatrixPart();
 	part->storageDims[0] = dimension1;
 	part->storageDims[1] = dimension2;
@@ -83,7 +113,12 @@ MatrixPart *MatrixPartGenerator::generateBPart(List<int*> *partId) {
 	Dimension dimension2 = block_size_getRange(parentDim2, lpuCount[1], dim2Id, blockSize, 0, 0);
 	
 	int partSize = dimension1.getLength() * dimension2.getLength();
+	
 	double *data = new double[partSize];
+	for (int i = 0; i < partSize; i++) {
+		data[i] = ((rand() % 100) / 75.00);
+	}
+
 	MatrixPart *part = new MatrixPart();
 	part->storageDims[0] = dimension1;
 	part->storageDims[1] = dimension2;
@@ -104,6 +139,10 @@ MatrixPart *MatrixPartGenerator::generateCPart(List<int*> *partId) {
 	
 	int partSize = dimension1.getLength() * dimension2.getLength();
 	double *data = new double[partSize];
+	for (int i = 0; i < partSize; i++) {
+		data[i] = 0.0;
+	}
+
 	MatrixPart *part = new MatrixPart();
 	part->storageDims[0] = dimension1;
 	part->storageDims[1] = dimension2;
@@ -139,6 +178,60 @@ MatrixPart *MatrixPartMap::getPart(List<int*> *partId, List<MatrixPart*> *partLi
 		if (queryId[0] == foundId[0] && queryId[1] == foundId[1]) return part;
 	}
 	return NULL;
+}
+
+MatrixPartMap *MatrixPartMap::duplicate() {
+	
+	MatrixPartMap *otherMap = new MatrixPartMap();
+
+	for (int i = 0; i < aPartList->NumElements(); i++) {
+		MatrixPart *aPart = aPartList->Nth(i);
+		MatrixPart *copy = new MatrixPart();
+		aPart->duplicate(copy);
+		otherMap->aPartList->Append(copy);
+	}
+	for (int i = 0; i < bPartList->NumElements(); i++) {
+		MatrixPart *bPart = bPartList->Nth(i);
+		MatrixPart *copy = new MatrixPart();
+		bPart->duplicate(copy);
+		otherMap->bPartList->Append(copy);
+	}
+	for (int i = 0; i < cPartList->NumElements(); i++) {
+		MatrixPart *cPart = cPartList->Nth(i);
+		MatrixPart *copy = new MatrixPart();
+		cPart->duplicate(copy);
+		otherMap->cPartList->Append(copy);
+	}
+
+	return otherMap;
+}
+
+void MatrixPartMap::matchParts(MatrixPartMap *otherMap, std::ofstream &logFile) {
+	
+	for (int i = 0; i < aPartList->NumElements(); i++) {
+		MatrixPart *aPart1 = aPartList->Nth(i);
+		MatrixPart *aPart2 = otherMap->aPartList->Nth(i);
+		if (!aPart1->sameContent(aPart2)) {
+			logFile << "A part mismatch\n";
+			logFile.flush();
+		}
+	}
+	for (int i = 0; i < bPartList->NumElements(); i++) {
+		MatrixPart *bPart1 = bPartList->Nth(i);
+		MatrixPart *bPart2 = otherMap->bPartList->Nth(i);
+		if (!bPart1->sameContent(bPart2)) {
+			logFile << "B part mismatch\n";
+			logFile.flush();
+		}
+	}
+	for (int i = 0; i < cPartList->NumElements(); i++) {
+		MatrixPart *cPart1 = cPartList->Nth(i);
+		MatrixPart *cPart2 = otherMap->cPartList->Nth(i);
+		if (!cPart1->sameContent(cPart2)) {
+			logFile << "C part mismatch\n";
+			logFile.flush();
+		}
+	}
 }
 
 //------------------------------------------------------------- Get Next LPU Routine ---------------------------------------------------------/
