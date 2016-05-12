@@ -92,7 +92,7 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 	int threadId = threadIdx.x % WARP_SIZE;
 	
 	// variables for holding the data part references for the top-space LPU
-	double *a, *b, *c;
+	__shared__ double *a, *b, *c;
 
 	// variables for tracking storage and partition dimensions of the top space LPU's data parts
 	__shared__ int aSRanges[2][2], bSRanges[2][2], cSRanges[2][2];
@@ -110,48 +110,48 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 			int lpuIndex = linearId - lpuIdRange.min;
 			int aIndex = aBuffers.partIndexBuffer[lpuIndex];
 			int aStartsAt = aBuffers.partBeginningBuffer[aIndex];
-			a = (double *) aBuffers.dataBuffer[aStartsAt];
+			a = (double *) (aBuffers.dataBuffer + aStartsAt);
 			int aDimRangeStart = lpuIndex * 2 * 2 * 2; // there are storage and partition ranges each has
 								   // two integers and the data structure is 2D
-			aSRanges[0][0] = aBuffers.partBeginningBuffer[aDimRangeStart];
-			aSRanges[0][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 1];
-			aSRanges[1][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 2];
-			aSRanges[1][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 3];
+			aSRanges[0][0] = aBuffers.partRangeBuffer[aDimRangeStart];
+			aSRanges[0][1] = aBuffers.partRangeBuffer[aDimRangeStart + 1];
+			aSRanges[1][0] = aBuffers.partRangeBuffer[aDimRangeStart + 2];
+			aSRanges[1][1] = aBuffers.partRangeBuffer[aDimRangeStart + 3];
 
-			aPRanges[0][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 4];
-			aPRanges[0][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 5];
-			aPRanges[1][0] = aBuffers.partBeginningBuffer[aDimRangeStart + 6];
-			aPRanges[1][1] = aBuffers.partBeginningBuffer[aDimRangeStart + 7];
+			aPRanges[0][0] = aBuffers.partRangeBuffer[aDimRangeStart + 4];
+			aPRanges[0][1] = aBuffers.partRangeBuffer[aDimRangeStart + 5];
+			aPRanges[1][0] = aBuffers.partRangeBuffer[aDimRangeStart + 6];
+			aPRanges[1][1] = aBuffers.partRangeBuffer[aDimRangeStart + 7];
 			
 			//------------------------------------------------------------- retrieve b and its dimensions
 			int bIndex = bBuffers.partIndexBuffer[lpuIndex];
 			int bStartsAt = bBuffers.partBeginningBuffer[bIndex];
-			b = (double *) bBuffers.dataBuffer[bStartsAt];
+			b = (double *) (bBuffers.dataBuffer + bStartsAt);
 			int bDimRangeStart = lpuIndex * 2 * 2 * 2; 
-			bSRanges[0][0] = bBuffers.partBeginningBuffer[bDimRangeStart];
-			bSRanges[0][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 1];
-			bSRanges[1][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 2];
-			bSRanges[1][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 3];
+			bSRanges[0][0] = bBuffers.partRangeBuffer[bDimRangeStart];
+			bSRanges[0][1] = bBuffers.partRangeBuffer[bDimRangeStart + 1];
+			bSRanges[1][0] = bBuffers.partRangeBuffer[bDimRangeStart + 2];
+			bSRanges[1][1] = bBuffers.partRangeBuffer[bDimRangeStart + 3];
 
-			bPRanges[0][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 4];
-			bPRanges[0][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 5];
-			bPRanges[1][0] = bBuffers.partBeginningBuffer[bDimRangeStart + 6];
-			bPRanges[1][1] = bBuffers.partBeginningBuffer[bDimRangeStart + 7];
+			bPRanges[0][0] = bBuffers.partRangeBuffer[bDimRangeStart + 4];
+			bPRanges[0][1] = bBuffers.partRangeBuffer[bDimRangeStart + 5];
+			bPRanges[1][0] = bBuffers.partRangeBuffer[bDimRangeStart + 6];
+			bPRanges[1][1] = bBuffers.partRangeBuffer[bDimRangeStart + 7];
 			
 			//------------------------------------------------------------- retrieve c and its dimensions
 			int cIndex = cBuffers.partIndexBuffer[lpuIndex];
 			int cStartsAt = cBuffers.partBeginningBuffer[cIndex];
-			c = (double *) cBuffers.dataBuffer[cStartsAt];
+			c = (double *) (cBuffers.dataBuffer + cStartsAt);
 			int cDimRangeStart = lpuIndex * 2 * 2 * 2; 
-			cSRanges[0][0] = cBuffers.partBeginningBuffer[cDimRangeStart];
-			cSRanges[0][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 1];
-			cSRanges[1][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 2];
-			cSRanges[1][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 3];
+			cSRanges[0][0] = cBuffers.partRangeBuffer[cDimRangeStart];
+			cSRanges[0][1] = cBuffers.partRangeBuffer[cDimRangeStart + 1];
+			cSRanges[1][0] = cBuffers.partRangeBuffer[cDimRangeStart + 2];
+			cSRanges[1][1] = cBuffers.partRangeBuffer[cDimRangeStart + 3];
 			
-			cPRanges[0][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 4];
-			cPRanges[0][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 5];
-			cPRanges[1][0] = cBuffers.partBeginningBuffer[cDimRangeStart + 6];
-			cPRanges[1][1] = cBuffers.partBeginningBuffer[cDimRangeStart + 7];	
+			cPRanges[0][0] = cBuffers.partRangeBuffer[cDimRangeStart + 4];
+			cPRanges[0][1] = cBuffers.partRangeBuffer[cDimRangeStart + 5];
+			cPRanges[1][0] = cBuffers.partRangeBuffer[cDimRangeStart + 6];
+			cPRanges[1][1] = cBuffers.partRangeBuffer[cDimRangeStart + 7];	
 		}
 		__syncthreads();
 

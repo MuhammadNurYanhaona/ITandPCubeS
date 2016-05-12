@@ -40,6 +40,8 @@ void GpuCodeExecutor::forceExecution() {
 void GpuCodeExecutor::execute() {
 	
 	lpuBatchController->submitCurrentBatchToGpu();
+	*logFile << "GPU memory preparation for the batch has been completed\n";
+	logFile->flush();
 	
 	offloadFunction();
 	cudaThreadSynchronize();
@@ -47,6 +49,8 @@ void GpuCodeExecutor::execute() {
 
 	lpuBatchController->updateBatchDataPartsFromGpuResults();
 	lpuBatchController->resetController();
+	*logFile << "Finished executing a batch\n";
+	logFile->flush();
 }
 
 void GpuCodeExecutor::initialize() {}
