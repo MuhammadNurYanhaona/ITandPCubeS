@@ -57,7 +57,7 @@ void MatrixPart::duplicate(MatrixPart *copy) {
 }
 
 bool MatrixPart::sameContent(MatrixPart *other) {
-	int partSize = storageDims[1].getLength() * storageDims[1].getLength();
+	int partSize = storageDims[0].getLength() * storageDims[1].getLength();
 	double *myData = data;
 	double *otherData = other->data;
 	for (int i = 0; i < partSize; i++) {
