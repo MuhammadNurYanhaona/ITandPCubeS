@@ -246,9 +246,9 @@ void PropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
 	check_error(cudaMemcpy(gpuPartIndexBuffer, cpuPartIndexBuffer, 
 			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice), logFile);
 	
-	check_error(cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize), logFile);
+	check_error(cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize * sizeof(int)), logFile);
 	check_error(cudaMemcpy(gpuPartRangeBuffer, cpuPartRangeBuffer, 
-			partRangeBufferSize, cudaMemcpyHostToDevice), logFile);
+			partRangeBufferSize * sizeof(int), cudaMemcpyHostToDevice), logFile);
 	
 	check_error(cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int)), logFile);
 	check_error(cudaMemcpy(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 

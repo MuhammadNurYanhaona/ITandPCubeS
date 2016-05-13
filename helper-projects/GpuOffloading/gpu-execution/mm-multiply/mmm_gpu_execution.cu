@@ -111,7 +111,7 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 			int aIndex = aBuffers.partIndexBuffer[lpuIndex];
 			int aStartsAt = aBuffers.partBeginningBuffer[aIndex];
 			a = (double *) (aBuffers.dataBuffer + aStartsAt);
-			int aDimRangeStart = lpuIndex * 2 * 2 * 2; // there are storage and partition ranges each has
+			int aDimRangeStart = aIndex * 2 * 2 * 2;   // there are storage and partition ranges each has
 								   // two integers and the data structure is 2D
 			aSRanges[0][0] = aBuffers.partRangeBuffer[aDimRangeStart];
 			aSRanges[0][1] = aBuffers.partRangeBuffer[aDimRangeStart + 1];
@@ -127,7 +127,7 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 			int bIndex = bBuffers.partIndexBuffer[lpuIndex];
 			int bStartsAt = bBuffers.partBeginningBuffer[bIndex];
 			b = (double *) (bBuffers.dataBuffer + bStartsAt);
-			int bDimRangeStart = lpuIndex * 2 * 2 * 2; 
+			int bDimRangeStart = bIndex * 2 * 2 * 2; 
 			bSRanges[0][0] = bBuffers.partRangeBuffer[bDimRangeStart];
 			bSRanges[0][1] = bBuffers.partRangeBuffer[bDimRangeStart + 1];
 			bSRanges[1][0] = bBuffers.partRangeBuffer[bDimRangeStart + 2];
@@ -142,7 +142,7 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 			int cIndex = cBuffers.partIndexBuffer[lpuIndex];
 			int cStartsAt = cBuffers.partBeginningBuffer[cIndex];
 			c = (double *) (cBuffers.dataBuffer + cStartsAt);
-			int cDimRangeStart = lpuIndex * 2 * 2 * 2; 
+			int cDimRangeStart = cIndex * 2 * 2 * 2; 
 			cSRanges[0][0] = cBuffers.partRangeBuffer[cDimRangeStart];
 			cSRanges[0][1] = cBuffers.partRangeBuffer[cDimRangeStart + 1];
 			cSRanges[1][0] = cBuffers.partRangeBuffer[cDimRangeStart + 2];
@@ -229,13 +229,15 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 					bSpaceBPRanges[warpId][0][0] = bPSubRanges[0][0];
 					bSpaceBPRanges[warpId][0][1] = bPSubRanges[0][1];
 					block_size_part_range(bSpaceBPRanges[warpId][1], bPSubRanges[1],
-							spaceBLpuCount2, spaceBLpuId[1], 1, 0, 0); 
+							spaceBLpuCount2, spaceBLpuId[1], 
+							partition.blockSize, 0, 0); 
 					
 					//---------------------------------------------------- C part dimensions
 					block_size_part_range(cSpaceBPRanges[warpId][0], cPRanges[0],
 							spaceBLpuCount1, spaceBLpuId[0], 1, 0, 0); 
 					block_size_part_range(cSpaceBPRanges[warpId][1], cPRanges[1],
-							spaceBLpuCount2, spaceBLpuId[1], 1, 0, 0);
+							spaceBLpuCount2, spaceBLpuId[1], 
+							partition.blockSize, 0, 0);
 				} 
 				// there is no syncthread operation needed here as updates done by a thread in a
 				// warp is visible to all other threads in that warp
