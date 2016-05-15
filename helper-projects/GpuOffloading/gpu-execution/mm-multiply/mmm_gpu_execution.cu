@@ -353,6 +353,8 @@ void MMMGpuCodeExecutor::offloadFunction() {
 
 void MMMGpuCodeExecutor::initialize() {
 
+	GpuCodeExecutor::initialize();
+
 	size_t taskGlobalsSize = sizeof(taskGlobalsCpu);
 	cudaMalloc((void **) &taskGlobalsGpu, taskGlobalsSize);
 	cudaMemcpy(taskGlobalsGpu, taskGlobalsCpu, taskGlobalsSize, cudaMemcpyHostToDevice);

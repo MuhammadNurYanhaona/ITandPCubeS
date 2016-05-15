@@ -23,6 +23,21 @@
 
 #include <fstream>
 
+// A statistics gathering class that records the total time spent handling different aspects of GPU LPU offloading
+class OffloadStats {
+  protected:
+	double timeSpentStagingIn;
+	double timeSpentExecution;
+	double timeSpentStagingOut;
+  public:
+	OffloadStats();
+	void addStagingInTime(double time) { timeSpentStagingIn += time; }
+	void addExecutionTime(double time) { timeSpentExecution += time; }
+	void addStagingOutTime(double time) { timeSpentStagingOut += time; }
+	void describe(std::ofstream &logFile);
+};
+
+// Interface class for GPU LPU execution
 class GpuCodeExecutor {
   protected:
 	// these two parameters are needed to construct multidimensional LPU IDs inside the offloaded GPU kernels as opposed
@@ -32,6 +47,7 @@ class GpuCodeExecutor {
 
 	LpuBatchController *lpuBatchController;
 	std::ofstream *logFile;
+	OffloadStats *offloadStats;
   public:
 	GpuCodeExecutor(LpuBatchController *lpuBatchController);
 	void setLpuCount(int *lpuCount) { this->lpuCount = lpuCount; }
@@ -45,8 +61,9 @@ class GpuCodeExecutor {
 	// Subclasses should override these two functions to do any processing that needs to be done for all LPUs. For 
 	// example, if scalar variables are accessed and modified within the compute stages that will execute inside the off-
 	// loaded kernels then those variables should be copied in the GPU memory before the first batch of LPUs run and  
-	// brought back to the host at the end of last batch execution. The default implementation of initialize does nothing
-	// and the default implementation of cleanup tears down the CUDA context.  
+	// brought back to the host at the end of last batch execution. The default implementation of initialize only creates
+	// a offload statistics accumulator, and the default implementation of cleanup tears down the CUDA context and prints
+	// the collected statistics. 
 	virtual void initialize();
 	virtual void cleanup();
   protected:

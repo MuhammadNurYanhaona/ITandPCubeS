@@ -7,6 +7,23 @@
 #include <cuda_runtime.h>
 #include <sys/time.h>
 
+//-------------------------------------------------------- Offload Statistics -------------------------------------------------------------/
+
+OffloadStats::OffloadStats() {
+	timeSpentStagingIn = 0;
+	timeSpentExecution = 0;
+	timeSpentStagingOut = 0;
+}
+
+void OffloadStats::describe(std::ofstream &logFile) {
+	logFile << "Overall time spent staging data into GPU from CPU: ";
+	logFile << timeSpentStagingIn << " Seconds\n";
+	logFile << "Overall time spent executing kernels for the LPUs: ";
+	logFile << timeSpentExecution << " Seconds\n";
+	logFile << "Overall time spent staging data out from GPU to CPU: ";
+	logFile << timeSpentStagingOut << "Seconds\n";
+}
+
 //--------------------------------------------------------- GPU Code Executor -------------------------------------------------------------/
 
 GpuCodeExecutor::GpuCodeExecutor(LpuBatchController *lpuBatchController) {
@@ -52,8 +69,10 @@ void GpuCodeExecutor::execute() {
 	gettimeofday(&tv, NULL);
         long endTime = tv.tv_sec * 1000000 + tv.tv_usec;
 	*logFile << "\tCPU to GPU data copying time: ";
-	*logFile << ((endTime - startTime)) / (1000 * 1000) << " seconds\n";
+	double timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
+	*logFile << timeTaken << " seconds\n";
 	logFile->flush();
+	offloadStats->addStagingInTime(timeTaken);
 
 	startTime = endTime;
 	
@@ -64,8 +83,10 @@ void GpuCodeExecutor::execute() {
 	gettimeofday(&tv, NULL);
         endTime = tv.tv_sec * 1000000 + tv.tv_usec;
 	*logFile << "\tGPU kernel(s) execution time: ";
-	*logFile << ((endTime - startTime)) / (1000 * 1000) << " seconds\n";
+	timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
+	*logFile << timeTaken << " seconds\n";
 	logFile->flush();
+	offloadStats->addExecutionTime(timeTaken);
 
 	startTime = endTime;
 
@@ -75,12 +96,19 @@ void GpuCodeExecutor::execute() {
 	gettimeofday(&tv, NULL);
         endTime = tv.tv_sec * 1000000 + tv.tv_usec;
 	*logFile << "\tGPU to CPU data synchronization tme: ";
-	*logFile << ((endTime - startTime)) / (1000 * 1000) << " seconds\n";
+	timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
+	*logFile << timeTaken << " seconds\n";
+	offloadStats->addStagingOutTime(timeTaken);
 
 	*logFile << "Finished executing a batch\n";
 	logFile->flush();
 }
 
-void GpuCodeExecutor::initialize() {}
+void GpuCodeExecutor::initialize() {
+	this->offloadStats = new OffloadStats();
+}
 
-void GpuCodeExecutor::cleanup() { cudaDeviceReset(); }
+void GpuCodeExecutor::cleanup() { 
+	cudaDeviceReset(); 
+	offloadStats->describe(*logFile);
+}
