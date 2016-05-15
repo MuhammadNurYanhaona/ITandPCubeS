@@ -61,7 +61,8 @@ bool MatrixPart::sameContent(MatrixPart *other) {
 	double *myData = data;
 	double *otherData = other->data;
 	for (int i = 0; i < partSize; i++) {
-		if (myData[i] != otherData[i]) return false;
+		if ((myData[i] - otherData[i]) > 0.01 
+			|| (otherData[i] - myData[i] > 0.01)) return false;
 	}
 	return true;
 }

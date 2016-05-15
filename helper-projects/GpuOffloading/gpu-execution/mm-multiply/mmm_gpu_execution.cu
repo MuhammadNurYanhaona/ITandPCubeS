@@ -102,6 +102,10 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 	Range lpuIdRange = batchRange.lpuIdRange;
 	for (int linearId = lpuIdRange.min + smId; linearId <= lpuIdRange.max; linearId += BLOCK_COUNT) {
 
+		// all threads should synchronize here to prevent the LPU metadata writer threads to overwrite the old
+		// values before the other threads are done using those values
+		__syncthreads();
+
 		// point the a, b, c matrix references to the memory addresses where corresponding data parts for the
 		// current LPUs starts 
 
