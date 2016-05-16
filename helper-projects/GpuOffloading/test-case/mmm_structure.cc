@@ -165,7 +165,9 @@ void PartIdContainer::addPartId(List<int> *partId, int position) {
 		int insertIndex = binsearch::locatePointOfInsert(partArray, idAtLevel);
 		partArray.insert(partArray.begin() + insertIndex, idAtLevel);	
 		if (position < idLevels - 1) {
-			nextContainers.insert(nextContainers.begin() + insertIndex, new PartIdContainer());		
+			PartIdContainer *nextContainer = new PartIdContainer();
+			nextContainers.insert(nextContainers.begin() + insertIndex, nextContainer);
+			nextContainer->addPartId(partId, position + 1);		
 		}
 	} else {
 		if (position < idLevels - 1) {
