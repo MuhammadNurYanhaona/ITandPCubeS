@@ -3,6 +3,7 @@
 #include <sstream>
 #include <fstream>
 #include <cstdlib>
+#include <sys/time.h>
 
 #include "mmm_structure.h"
 #include "../runtime/structure.h"
@@ -25,6 +26,11 @@ void computeCpuMMM(MMMLpu *lpu);
 int main(int argc, char *argv[]) {
 	
 	MPI_Init(&argc, &argv);
+
+	// start the execution timer
+	struct timeval tv;
+        gettimeofday(&tv, NULL);
+        long startTime = tv.tv_sec * 1000000 + tv.tv_usec;
 
         int segmentId;
         int segmentCount;
@@ -114,6 +120,12 @@ int main(int argc, char *argv[]) {
 	logFile << "comparing the result of CPU computation with that of the GPU\n";
 	logFile.flush();
 	partMap->matchParts(duplicatePartMap, logFile);
+        
+	// record program's running time
+	gettimeofday(&tv, NULL);
+        long endTime = tv.tv_sec * 1000000 + tv.tv_usec;
+        double timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
+	logFile << "Total time taken by the program: " << timeTaken << "\n";
 	
 	logFile << "finished task execution\n";
 	logFile.flush();
