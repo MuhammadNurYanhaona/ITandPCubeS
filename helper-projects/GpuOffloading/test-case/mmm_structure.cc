@@ -168,8 +168,9 @@ bool MatrixPartMap::aPartExists(List<int*> *partId) {
 	int location = getIdLocation(partId, aPartList, aSearchIndex);
 	if (location != -1) {
 		aSearchIndex = location;
+		return true;
 	}
-	return aSearchIndex;
+	return false;
 }
 
 MatrixPart *MatrixPartMap::getAPart(List<int*> *partId) {
@@ -185,8 +186,9 @@ bool MatrixPartMap::bPartExists(List<int*> *partId) {
 	int location = getIdLocation(partId, bPartList, bSearchIndex);
 	if (location != -1) {
 		bSearchIndex = location;
+		return true;
 	}
-	return bSearchIndex;
+	return false;
 }
 
 MatrixPart *MatrixPartMap::getBPart(List<int*> *partId) {
@@ -202,8 +204,9 @@ bool MatrixPartMap::cPartExists(List<int*> *partId) {
 	int location = getIdLocation(partId, cPartList, cSearchIndex);
 	if (location != -1) {
 		cSearchIndex = location;
+		return true;
 	}
-	return cSearchIndex;
+	return false;
 }
 
 MatrixPart *MatrixPartMap::getCPart(List<int*> *partId) {
