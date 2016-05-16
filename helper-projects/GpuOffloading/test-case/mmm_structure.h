@@ -105,24 +105,26 @@ class MatrixPartGenerator {
 class MatrixPartMap {
   private:
         List<MatrixPart*> *aPartList;
+	int aSearchIndex;
         List<MatrixPart*> *bPartList;
+	int bSearchIndex;
         List<MatrixPart*> *cPartList;
+	int cSearchIndex;
   public:
         MatrixPartMap();
-        bool aPartExists(List<int*> *partId) { return isIdInList(partId, aPartList); }
+        bool aPartExists(List<int*> *partId);
         void addAPart(MatrixPart *part) { aPartList->Append(part); }
-	MatrixPart *getAPart(List<int*> *partId) { return getPart(partId, aPartList); }
-        bool bPartExists(List<int*> *partId) { return isIdInList(partId, bPartList); }
+	MatrixPart *getAPart(List<int*> *partId);
+        bool bPartExists(List<int*> *partId);
         void addBPart(MatrixPart *part) { bPartList->Append(part); }
-	MatrixPart *getBPart(List<int*> *partId) { return getPart(partId, bPartList); }
-        bool cPartExists(List<int*> *partId) { return isIdInList(partId, cPartList); }
+	MatrixPart *getBPart(List<int*> *partId);
+        bool cPartExists(List<int*> *partId);
         void addCPart(MatrixPart *part) { cPartList->Append(part); }
-	MatrixPart *getCPart(List<int*> *partId) { return getPart(partId, cPartList); }
+	MatrixPart *getCPart(List<int*> *partId);
 	MatrixPartMap *duplicate();
 	void matchParts(MatrixPartMap *otherMap, std::ofstream &logFile);
   private:
-	bool isIdInList(List<int*> *partId, List<MatrixPart*> *partList);
-	MatrixPart *getPart(List<int*> *partId, List<MatrixPart*> *partList);
+	int getIdLocation(List<int*> *partId, List<MatrixPart*> *partList, int lastSearchedPlace);
 };
 
 void getNextLpu(int linearLpuId, 

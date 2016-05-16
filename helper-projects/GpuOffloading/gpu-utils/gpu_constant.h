@@ -13,6 +13,6 @@
 #define WARP_COUNT 16
 
 // number of SMs the GPU card has
-#define BLOCK_COUNT 15
+#define BLOCK_COUNT 13
 
 #endif

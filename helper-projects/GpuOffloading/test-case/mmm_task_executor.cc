@@ -8,6 +8,7 @@
 #include "../runtime/structure.h"
 #include "../utils/partition.h"
 #include "../gpu-execution/mm-multiply/mmm_gpu_execution.h"
+#include "../gpu-utils/gpu_constant.h"
 
 using namespace std;
 
@@ -33,6 +34,7 @@ int main(int argc, char *argv[]) {
 	int matrixLength, blockSize;
 	matrixLength = (argc > 1) ? atoi(argv[1]) : 1000;
 	blockSize = (argc > 2) ? atoi(argv[2]) : 32;
+	int batchSize = (argc > 3) ?  atoi(argv[3]) : BLOCK_COUNT * 10;
 
 	A_MD[0].setLength(matrixLength);
 	C_MD[1] = C_MD[0] = B_MD[1] = B_MD[0] = A_MD[1] = A_MD[0];
@@ -80,7 +82,6 @@ int main(int argc, char *argv[]) {
 	
 	// initialize GPU code executor
 	long memLimit = 3 * 1000 * 1000 * 1024l;
-	int batchSize = 100;
 	MMMLpuBatchController *lpuBatchController 
 			= new MMMLpuBatchController(batchSize, memLimit);
 	lpuBatchController->setLogFile(&logFile);	

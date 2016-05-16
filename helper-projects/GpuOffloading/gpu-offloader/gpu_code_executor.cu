@@ -21,7 +21,7 @@ void OffloadStats::describe(std::ofstream &logFile) {
 	logFile << "Overall time spent executing kernels for the LPUs: ";
 	logFile << timeSpentExecution << " Seconds\n";
 	logFile << "Overall time spent staging data out from GPU to CPU: ";
-	logFile << timeSpentStagingOut << "Seconds\n";
+	logFile << timeSpentStagingOut << " Seconds\n";
 }
 
 //--------------------------------------------------------- GPU Code Executor -------------------------------------------------------------/

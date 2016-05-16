@@ -157,28 +157,76 @@ MatrixPart *MatrixPartGenerator::generateCPart(List<int*> *partId) {
 
 MatrixPartMap::MatrixPartMap() {
 	aPartList = new List<MatrixPart*>;
+	aSearchIndex = 0;
 	bPartList = new List<MatrixPart*>;
+	bSearchIndex = 0;
 	cPartList = new List<MatrixPart*>;
+	cSearchIndex = 0;
 }
 
-bool MatrixPartMap::isIdInList(List<int*> *partId, List<MatrixPart*> *partList) {
-	for (int i = 0; i < partList->NumElements(); i++) {
-		MatrixPart *part = partList->Nth(i);
-		int *queryId = partId->Nth(0);
-		int *foundId = part->partId->Nth(0);
-		if (queryId[0] == foundId[0] && queryId[1] == foundId[1]) return true;
+bool MatrixPartMap::aPartExists(List<int*> *partId) {
+	int location = getIdLocation(partId, aPartList, aSearchIndex);
+	if (location != -1) {
+		aSearchIndex = location;
 	}
-	return false;
+	return aSearchIndex;
 }
 
-MatrixPart *MatrixPartMap::getPart(List<int*> *partId, List<MatrixPart*> *partList) {
-	for (int i = 0; i < partList->NumElements(); i++) {
-		MatrixPart *part = partList->Nth(i);
-		int *queryId = partId->Nth(0);
-		int *foundId = part->partId->Nth(0);
-		if (queryId[0] == foundId[0] && queryId[1] == foundId[1]) return part;
+MatrixPart *MatrixPartMap::getAPart(List<int*> *partId) {
+	int location = getIdLocation(partId, aPartList, aSearchIndex);
+	if (location != -1) {
+		aSearchIndex = location;
+		return aPartList->Nth(aSearchIndex);
 	}
 	return NULL;
+}
+
+bool MatrixPartMap::bPartExists(List<int*> *partId) {
+	int location = getIdLocation(partId, bPartList, bSearchIndex);
+	if (location != -1) {
+		bSearchIndex = location;
+	}
+	return bSearchIndex;
+}
+
+MatrixPart *MatrixPartMap::getBPart(List<int*> *partId) {
+	int location = getIdLocation(partId, bPartList, bSearchIndex);
+	if (location != -1) {
+		bSearchIndex = location;
+		return bPartList->Nth(bSearchIndex);
+	}
+	return NULL;
+}
+
+bool MatrixPartMap::cPartExists(List<int*> *partId) {
+	int location = getIdLocation(partId, cPartList, cSearchIndex);
+	if (location != -1) {
+		cSearchIndex = location;
+	}
+	return cSearchIndex;
+}
+
+MatrixPart *MatrixPartMap::getCPart(List<int*> *partId) {
+	int location = getIdLocation(partId, cPartList, cSearchIndex);
+	if (location != -1) {
+		cSearchIndex = location;
+		return cPartList->Nth(cSearchIndex);
+	}
+	return NULL;
+}
+
+int MatrixPartMap::getIdLocation(List<int*> *partId, List<MatrixPart*> *partList, int lastSearchedPlace) {
+	int partCount = partList->NumElements();
+	int searchedParts = 0;
+	while (searchedParts < partCount) {
+		int searchIndex = (lastSearchedPlace + searchedParts) % partCount;
+		MatrixPart *part = partList->Nth(searchIndex);
+		int *queryId = partId->Nth(0);
+		int *foundId = part->partId->Nth(0);
+		if (queryId[0] == foundId[0] && queryId[1] == foundId[1]) return searchIndex;
+		searchedParts++;
+	}
+	return -1;
 }
 
 MatrixPartMap *MatrixPartMap::duplicate() {
