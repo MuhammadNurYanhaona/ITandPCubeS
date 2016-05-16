@@ -10,7 +10,7 @@
 #define WARP_SIZE 32
 
 // number of warps to be employed per SM computation
-#define WARP_COUNT 16
+#define WARP_COUNT 32
 
 // number of SMs the GPU card has
 #define BLOCK_COUNT 13

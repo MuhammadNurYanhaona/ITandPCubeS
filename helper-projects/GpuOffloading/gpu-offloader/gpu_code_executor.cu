@@ -57,9 +57,6 @@ void GpuCodeExecutor::forceExecution() {
 
 void GpuCodeExecutor::execute() {
 	
-	*logFile << "Going to execute a batch\n";
-	logFile->flush();
-	
 	struct timeval tv;
         gettimeofday(&tv, NULL);
         long startTime = tv.tv_sec * 1000000 + tv.tv_usec;
@@ -68,10 +65,7 @@ void GpuCodeExecutor::execute() {
 
 	gettimeofday(&tv, NULL);
         long endTime = tv.tv_sec * 1000000 + tv.tv_usec;
-	*logFile << "\tCPU to GPU data copying time: ";
 	double timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
-	*logFile << timeTaken << " seconds\n";
-	logFile->flush();
 	offloadStats->addStagingInTime(timeTaken);
 
 	startTime = endTime;
@@ -82,10 +76,7 @@ void GpuCodeExecutor::execute() {
 	
 	gettimeofday(&tv, NULL);
         endTime = tv.tv_sec * 1000000 + tv.tv_usec;
-	*logFile << "\tGPU kernel(s) execution time: ";
 	timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
-	*logFile << timeTaken << " seconds\n";
-	logFile->flush();
 	offloadStats->addExecutionTime(timeTaken);
 
 	startTime = endTime;
@@ -95,13 +86,8 @@ void GpuCodeExecutor::execute() {
 
 	gettimeofday(&tv, NULL);
         endTime = tv.tv_sec * 1000000 + tv.tv_usec;
-	*logFile << "\tGPU to CPU data synchronization tme: ";
 	timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
-	*logFile << timeTaken << " seconds\n";
 	offloadStats->addStagingOutTime(timeTaken);
-
-	*logFile << "Finished executing a batch\n";
-	logFile->flush();
 }
 
 void GpuCodeExecutor::initialize() {

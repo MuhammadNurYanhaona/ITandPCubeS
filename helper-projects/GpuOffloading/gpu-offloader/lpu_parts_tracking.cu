@@ -186,9 +186,6 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 		List<int> *partIndexList, 
 		std::ofstream &logFile) {
 
-	logFile << "Preparing the CPU buffers for the batch\n";
-	logFile.flush();
-	
 	bufferEntryCount = dataPartsList->NumElements();
 	bufferReferenceCount = partIndexList->NumElements();
 	bufferSize = 0;
@@ -204,9 +201,6 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	int dimRangeInfoSize = dimRanges->getSize();
 	partRangeBufferSize = bufferEntryCount * dimRangeInfoSize;
 	cpuPartRangeBuffer = (int *) malloc(partRangeBufferSize * sizeof(int));
-
-	logFile << "Allocated the part data, beginning index, and range buffers\n";
-	logFile.flush();
 
 	int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
@@ -224,9 +218,6 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 		currentIndex += size;
 	}
 
-	logFile << "Copied data into the previously allocated buffers; going to prepared the part index buffer\n";
-	logFile.flush();
-
 	cpuPartIndexBuffer = (int *) malloc(bufferReferenceCount * sizeof(int));
 	for (int i = 0; i < partIndexList->NumElements(); i++) {
 		int index = partIndexList->Nth(i);
@@ -236,9 +227,6 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 
 void PropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
 	
-	logFile << "Copying buffers from the CPU to the GPU\n";
-	logFile.flush();
-
 	check_error(cudaMalloc((void **) &gpuBuffer, bufferSize), logFile);
 	check_error(cudaMemcpy(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice), logFile);
 	
@@ -267,9 +255,6 @@ GpuBufferReferences PropertyBufferManager::getGpuBufferReferences() {
 
 void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile) {
 	
-	logFile << "Retrieving updated data from the GPU to synchronize data parts in the CPU\n";
-	logFile.flush();
-
 	check_error(cudaMemcpy(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost), logFile);
 
 	int currentIndex = 0;
@@ -385,10 +370,6 @@ void LpuBatchController::submitCurrentBatchToGpu() {
 	if (currentBatchSize > 0) {
 		for (int i = 0; i < propertyNames->NumElements(); i++) {
 			const char *varName = propertyNames->Nth(i);
-			
-			*logFile << "Preparing buffers for property '" << varName << "'\n";
-			logFile->flush();
-			
 			List<int> *partIndexes = dataPartTracker->getPartIndexList(varName);
 			List<LpuDataPart*> *parts = dataPartTracker->getDataPartList(varName);
 			bufferManager->copyPartsInGpu(varName, parts, partIndexes, *logFile);
