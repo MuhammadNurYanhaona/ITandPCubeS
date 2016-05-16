@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
 	generateParts(myLpuRange, idGenerator, partGenerator, partMap); 
 
 	// create duplicates of the data parts to do the same computation in the CPU then compare the results
-	MatrixPartMap *duplicatePartMap = partMap->duplicate();
+	//MatrixPartMap *duplicatePartMap = partMap->duplicate();
 	
 	// initialize GPU code executor
 	long memLimit = 3 * 1000 * 1000 * 1024l;
@@ -105,8 +105,8 @@ int main(int argc, char *argv[]) {
 		gpuExecutor->submitNextLpu(lpu);
 		
 		// at the same time do a CPU execution of the same LPU on duplicate data for verification purpose
-		getNextLpu(lpuId, lpu, idGenerator, duplicatePartMap);
-		computeCpuMMM(lpu);
+		//getNextLpu(lpuId, lpu, idGenerator, duplicatePartMap);
+		//computeCpuMMM(lpu);
 	}
 	// this is needed to run the last, if exists, partially completed batch that has not run in the GPU 
 	gpuExecutor->forceExecution();
@@ -117,9 +117,9 @@ int main(int argc, char *argv[]) {
 	gpuExecutor->cleanup();
 
 	// compare CPU and GPU computations' data parts
-	logFile << "comparing the result of CPU computation with that of the GPU\n";
-	logFile.flush();
-	partMap->matchParts(duplicatePartMap, logFile);
+	//logFile << "comparing the result of CPU computation with that of the GPU\n";
+	//logFile.flush();
+	//partMap->matchParts(duplicatePartMap, logFile);
         
 	// record program's running time
 	gettimeofday(&tv, NULL);
@@ -159,13 +159,7 @@ void generateParts(Range myLpuRange,
 		}
 
 		List<int*> *cPartId = idGenerator->getCPartId(lpuId);
-		if (!partMap->cPartExists(cPartId)) {
-			partMap->addCPart(partGenerator->generateCPart(cPartId));
-		} else {
-			int *cId = cPartId->Nth(0);
-			delete[] cId;
-			delete cPartId;
-		}
+		partMap->addCPart(partGenerator->generateCPart(cPartId));
 	}	
 }
 

@@ -3,7 +3,9 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/partition.h"
+#include "../utils/binary_search.h"
 
+#include <vector>
 #include <iostream>
 #include <cstdlib>
 #include <time.h>
@@ -153,24 +155,66 @@ MatrixPart *MatrixPartGenerator::generateCPart(List<int*> *partId) {
 	return part;
 }
 
+//-------------------------------------------------------------- Part Id Container -----------------------------------------------------------/
+
+void PartIdContainer::addPartId(List<int> *partId, int position) {
+	int idAtLevel = partId->Nth(position);
+	int idLevels = partId->NumElements();
+	int location = binsearch::locateKey(partArray, idAtLevel);
+	if (location == KEY_NOT_FOUND) {
+		int insertIndex = binsearch::locatePointOfInsert(partArray, idAtLevel);
+		partArray.insert(partArray.begin() + insertIndex, idAtLevel);	
+		if (position < idLevels - 1) {
+			nextContainers.insert(nextContainers.begin() + insertIndex, new PartIdContainer());		
+		}
+	} else {
+		if (position < idLevels - 1) {
+			PartIdContainer *nextContainer = nextContainers[location];
+			nextContainer->addPartId(partId, position + 1);
+		}
+	}
+}
+
+bool PartIdContainer::doesIdExist(List<int> *partId, int position) {
+	int idAtLevel = partId->Nth(position);
+	int idLevels = partId->NumElements();
+	int location = binsearch::locateKey(partArray, idAtLevel);
+	if (location == KEY_NOT_FOUND) return false;
+	if (position < idLevels - 1) {
+		PartIdContainer *nextContainer = nextContainers[location];
+		return nextContainer->doesIdExist(partId, position + 1); 
+	}
+	return true;
+}
+
 //--------------------------------------------------------------- Matrix Part Map ------------------------------------------------------------/
 
 MatrixPartMap::MatrixPartMap() {
 	aPartList = new List<MatrixPart*>;
+	aIdContainer = new PartIdContainer();
 	aSearchIndex = 0;
 	bPartList = new List<MatrixPart*>;
+	bIdContainer = new PartIdContainer();
 	bSearchIndex = 0;
 	cPartList = new List<MatrixPart*>;
 	cSearchIndex = 0;
 }
 
 bool MatrixPartMap::aPartExists(List<int*> *partId) {
-	int location = getIdLocation(partId, aPartList, aSearchIndex);
-	if (location != -1) {
-		aSearchIndex = location;
-		return true;
-	}
-	return false;
+	List<int> idList;
+	int *firstId = partId->Nth(0);
+	idList.Append(firstId[0]);
+	idList.Append(firstId[1]);
+	return aIdContainer->doesIdExist(&idList);
+}
+
+void MatrixPartMap::addAPart(MatrixPart *part) { 
+	aPartList->Append(part); 
+	List<int> idList;
+	int *firstId = part->partId->Nth(0);
+	idList.Append(firstId[0]);
+	idList.Append(firstId[1]);
+	aIdContainer->addPartId(&idList);
 }
 
 MatrixPart *MatrixPartMap::getAPart(List<int*> *partId) {
@@ -183,12 +227,20 @@ MatrixPart *MatrixPartMap::getAPart(List<int*> *partId) {
 }
 
 bool MatrixPartMap::bPartExists(List<int*> *partId) {
-	int location = getIdLocation(partId, bPartList, bSearchIndex);
-	if (location != -1) {
-		bSearchIndex = location;
-		return true;
-	}
-	return false;
+	List<int> idList;
+	int *firstId = partId->Nth(0);
+	idList.Append(firstId[0]);
+	idList.Append(firstId[1]);
+	return bIdContainer->doesIdExist(&idList);
+}
+
+void MatrixPartMap::addBPart(MatrixPart *part) { 
+	bPartList->Append(part); 
+	List<int> idList;
+	int *firstId = part->partId->Nth(0);
+	idList.Append(firstId[0]);
+	idList.Append(firstId[1]);
+	bIdContainer->addPartId(&idList);
 }
 
 MatrixPart *MatrixPartMap::getBPart(List<int*> *partId) {

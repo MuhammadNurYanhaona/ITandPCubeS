@@ -10,6 +10,7 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 
+#include <vector>
 #include <fstream>
 
 // This namespace contains the classes that we dynamically generate for individual task to track scalar variables' state,
@@ -102,21 +103,36 @@ class MatrixPartGenerator {
         MatrixPart *generateCPart(List<int*> *partId);
 };
 
+class PartIdContainer {
+  protected:
+	std::vector<int> partArray;
+	std::vector<PartIdContainer*> nextContainers;
+  public:
+	PartIdContainer() {}
+	bool doesIdExist(List<int> *partId) { return  doesIdExist(partId, 0); }
+	void addPartId(List<int> *partId) { addPartId(partId, 0); }
+  private:
+	void addPartId(List<int> *partId, int position);	
+	bool doesIdExist(List<int> *partId, int position);
+};
+
 class MatrixPartMap {
   private:
         List<MatrixPart*> *aPartList;
+	PartIdContainer *aIdContainer;
 	int aSearchIndex;
         List<MatrixPart*> *bPartList;
+	PartIdContainer *bIdContainer;
 	int bSearchIndex;
         List<MatrixPart*> *cPartList;
 	int cSearchIndex;
   public:
         MatrixPartMap();
         bool aPartExists(List<int*> *partId);
-        void addAPart(MatrixPart *part) { aPartList->Append(part); }
+        void addAPart(MatrixPart *part);
 	MatrixPart *getAPart(List<int*> *partId);
         bool bPartExists(List<int*> *partId);
-        void addBPart(MatrixPart *part) { bPartList->Append(part); }
+        void addBPart(MatrixPart *part);
 	MatrixPart *getBPart(List<int*> *partId);
         bool cPartExists(List<int*> *partId);
         void addCPart(MatrixPart *part) { cPartList->Append(part); }
