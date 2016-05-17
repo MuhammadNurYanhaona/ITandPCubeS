@@ -21,5 +21,19 @@ __device__ void determineLoopIndexesAndSteps(int nestingLevels,
 // if there is an error  
 void check_error(cudaError e, std::ofstream &logFile);
 
+// This function is used to allocate pointers dynamically in the shared memory of an SM. The current CUDA
+// framework does not support more than one dynamically allocated (whose size is fixed during the kernel 
+// launch time)	shared memory variable. Hence we need to allocate different pointers for data parts of an 
+// LPU as taking disjoint ranges from that single dynamic memory.  
+__device__ void allocateInSharedMemory(char *memoryPanel, 
+		int *panelIndex, 	// a pointer for the index of the next available memory location
+		char *pointer, 		// the pointer to be allocated from the memory panel 
+		short dataItemSize, 	// actual data type size of the elements of the pointer
+		short dataItemCount); 	// total number of items in the pointer
+
+
+// Allocation of pointers from the dynamic shared memory pannel should always happen at some multiple of the
+// following constant to avoid any alignment problem.  
+#define MEMORY_PANNEL_ALIGNMENT_BOUNDARY 8
 
 #endif

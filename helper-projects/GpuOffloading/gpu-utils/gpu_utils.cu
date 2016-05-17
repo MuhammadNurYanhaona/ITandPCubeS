@@ -6,6 +6,10 @@
 #include <cstdlib>
 #include <fstream>
 
+// Notice that in all device function implementations we try to avoid declaring local variables as much 
+// as possible as CUDA merge device functions into the calling kernels that will result in too many local
+// variables per thread.
+
 __device__ void determineLoopIndexesAndSteps(int nestingLevels,
                 int threadId,
                 int *indexRanges,
@@ -16,22 +20,17 @@ __device__ void determineLoopIndexesAndSteps(int nestingLevels,
 	// of parallel threads.
 	int lastSustainedParallelLevel = 0;
 	for (int i = 0; i < nestingLevels; i++) {
-		int position = 2 * i;
-		int rangeStart = indexRanges[position];
-		int rangeEnd = indexRanges[position + 1];
-		int rangeLength = rangeEnd - rangeStart + 1;
-		indexStartsAndSteps[position] = indexRanges[position];
-		indexStartsAndSteps[position + 1] = 1;
-		if (rangeLength >= WARP_SIZE) {
+		indexStartsAndSteps[2 * i] = indexRanges[2 * i];
+		indexStartsAndSteps[2 * i + 1] = 1;
+		if ((indexRanges[2 * i + 1] - indexRanges[2 * i] + 1) >= WARP_SIZE) {
 			lastSustainedParallelLevel = i;
 		}
 	}
 
 	// Set the selected level's iteration to be started from different indexes for different threads 
 	// and make the step size to be equal to the WARP_SIZE
-	int position = 2 * lastSustainedParallelLevel;
-	indexStartsAndSteps[position] += threadId;
-	indexStartsAndSteps[position + 1] = WARP_SIZE;
+	indexStartsAndSteps[2 * lastSustainedParallelLevel] += threadId;
+	indexStartsAndSteps[2 * lastSustainedParallelLevel + 1] = WARP_SIZE;
 }
 
 void check_error(cudaError e, std::ofstream &logFile) {
@@ -40,4 +39,19 @@ void check_error(cudaError e, std::ofstream &logFile) {
 		logFile.flush();
                 std::exit(EXIT_FAILURE);
         }
+}
+
+__device__ void allocateInSharedMemory(char *memoryPanel, int *panelIndex,
+                char *pointer, 
+		short dataItemSize, short dataItemCount) {
+
+	// allocate the pointer at the current position of the panel index
+	pointer = &memoryPanel[*panelIndex];
+
+	// advance the panel index to the next allocation point; note that we always keep the allocation
+	// index at some alignment boundary
+	*panelIndex += ((dataItemSize * dataItemCount) / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
+			* MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+	*panelIndex += ((dataItemSize * dataItemCount) % MEMORY_PANNEL_ALIGNMENT_BOUNDARY)
+			* MEMORY_PANNEL_ALIGNMENT_BOUNDARY;	
 }
