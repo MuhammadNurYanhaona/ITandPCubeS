@@ -28,8 +28,8 @@ void check_error(cudaError e, std::ofstream &logFile);
 __device__ void allocateInSharedMemory(char *memoryPanel, 
 		int *panelIndex, 	// a pointer for the index of the next available memory location
 		char *pointer, 		// the pointer to be allocated from the memory panel 
-		short dataItemSize, 	// actual data type size of the elements of the pointer
-		short dataItemCount); 	// total number of items in the pointer
+		int dataItemSize, 	// actual data type size of the elements of the pointer
+		int dataItemCount); 	// total number of items in the pointer
 
 
 // Allocation of pointers from the dynamic shared memory pannel should always happen at some multiple of the

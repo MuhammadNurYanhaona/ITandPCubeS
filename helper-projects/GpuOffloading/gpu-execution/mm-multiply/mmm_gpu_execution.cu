@@ -178,6 +178,10 @@ __global__ void matrixMultiplyKernel(MMMLpuBatchRange batchRange,
 		// not supposed to be distributed
 		for (int subLpu = 0; subLpu < subpartitionCount; subLpu++) {
 			
+			// the first warp should not advance to the next sub-partition when other warps have not yet
+			// finish their computation for the current sub-partition		
+			__syncthreads();
+
 			if (warpId == 0 && threadId == 0) {	
 				// first we need to determine the partition dimension ranges of the two sub-
 				// partitioned data structures, which are matrix A and B
@@ -422,7 +426,33 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 			cPRanges[1][1] = cBuffers.partRangeBuffer[cDimRangeStart + 7];	
 		}
 		__syncthreads();
+		
+		/*--------------------------------------------------------------------------------------------------------------------
+							Copying C into shared memory 
+		--------------------------------------------------------------------------------------------------------------------*/
+		
+		// allocate enough space for C part in the dynamic shared memory panel
+		__shared__ double *c_shared;
+		if (warpId == 0 && threadId == 0) {
+			allocateInSharedMemory(MEMORY_PANEL, &FREE_MEMORY_INDEX, 
+				(char *) c_shared, sizeof(double),
+				((cPRanges[0][1] - cPRanges[0][0] + 1) 
+					* (cPRanges[1][1] - cPRanges[1][0] + 1)));
+		}
+		__syncthreads();	
 
+		// cooperatively load the current values of C from card memory part to the shared part
+		for (int i = cPRanges[0][0] + warpId; i <= cPRanges[0][1]; i += WARP_COUNT) {
+			for (int j = cPRanges[1][0] + threadId; j <= cPRanges[1][1]; j += WARP_SIZE) {
+				c_shared[(i - cPRanges[0][0]) 
+						* (cPRanges[1][1] - cPRanges[1][0] + 1) 
+						+ (j - cPRanges[1][0])]
+					=  c[(i - cSRanges[0][0]) 
+						* (cSRanges[1][1] - cSRanges[1][0] + 1)
+						+ (j - cSRanges[1][0])]; 
+			}
+		}
+	
 		/*--------------------------------------------------------------------------------------------------------------------
 						Space A-Sub: Compiler Generated Space for Subpartition 
 		--------------------------------------------------------------------------------------------------------------------*/
@@ -436,6 +466,10 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 		// the subpartitioned LPUs are processed one by one; remember that LPUs of sub-partitioned LPSes are
 		// not supposed to be distributed
 		for (int subLpu = 0; subLpu < subpartitionCount; subLpu++) {
+			
+			// the first warp should not advance to the next sub-partition when other warps have not yet
+			// finish their computation for the current sub-partition		
+			__syncthreads();
 			
 			if (warpId == 0 && threadId == 0) {	
 				// first we need to determine the partition dimension ranges of the two sub-
@@ -458,21 +492,21 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 			------------------------------------------------------------------------------------------------------------*/
 			
 			// allocate enough space for the two shared variables in the dynamic shared memory panel
-			__shared__ float *a_shared, *b_shared;
+			__shared__ double *a_shared, *b_shared;
 			if (warpId == 0 && threadId == 0) {
 				allocateInSharedMemory(MEMORY_PANEL, &FREE_MEMORY_INDEX, 
 					(char *) a_shared, sizeof(double),
-					(short) ((aPSubRanges[0][1] - aPSubRanges[0][0] + 1) 
+					((aPSubRanges[0][1] - aPSubRanges[0][0] + 1) 
 							* (aPSubRanges[1][1] - aPSubRanges[1][0] + 1)));		
 				allocateInSharedMemory(MEMORY_PANEL, &FREE_MEMORY_INDEX, 
 					(char *) b_shared, sizeof(double),
-					(short) ((bPSubRanges[0][1] - bPSubRanges[0][0] + 1) 
+					((bPSubRanges[0][1] - bPSubRanges[0][0] + 1) 
 							* (bPSubRanges[1][1] - bPSubRanges[1][0] + 1)));		
 			}
 			__syncthreads();
 
 			// copy data from the global memory to the SM memory
-			for (int i = aPSubRanges[0][0] + warpId; i <= aPSubRanges[1][0]; i += WARP_COUNT) {
+			for (int i = aPSubRanges[0][0] + warpId; i <= aPSubRanges[0][1]; i += WARP_COUNT) {
 				for (int j = aPSubRanges[1][0] + threadId; 
 						j <= aPSubRanges[1][1]; j += WARP_SIZE) {
 					a_shared[(i - aPSubRanges[0][0]) 	
@@ -483,7 +517,7 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 							+ (j - aSRanges[1][0])]; 
 				}
 			}
-			for (int i = bPSubRanges[0][0] + warpId; i <= bPSubRanges[1][0]; i += WARP_COUNT) {
+			for (int i = bPSubRanges[0][0] + warpId; i <= bPSubRanges[0][1]; i += WARP_COUNT) {
 				for (int j = bPSubRanges[1][0] + threadId; 
 						j <= bPSubRanges[1][1]; j += WARP_SIZE) {
 					b_shared[(i - bPSubRanges[0][0]) 	
@@ -594,7 +628,7 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 				int iStep = indexesAndSteps[1];
 				for (int i = iStart; i <= iEnd; i += iStep) {
 
-					int c_i = i - cSRanges[0][0];
+					int c_i = i - cPRanges[0][0];
 					int a_i = i - aPSubRanges[0][0];
 				
 					// iterate over the columns
@@ -603,7 +637,7 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 					int jStep = indexesAndSteps[3];
 					for (int j = jStart; j <= jEnd; j+= jStep) {
 	
-						int c_j = j - cSRanges[1][0];
+						int c_j = j - cPRanges[1][0];
 						int b_j = j - bPSubRanges[1][0];
 						
 						// iterate over the common dimension
@@ -614,17 +648,34 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 							int a_k = k - aPSubRanges[1][0];
 							int b_k = k - bPSubRanges[0][0];
 
-							int cIndex = c_i * (cSRanges[1][1] - cSRanges[1][0] + 1) + c_j;
+							int cIndex = c_i * (cPRanges[1][1] - cPRanges[1][0] + 1) + c_j;
 							int aIndex = a_i * (aPSubRanges[1][1] - aPSubRanges[1][0] + 1) + a_k;
 							int bIndex = b_k * (bPSubRanges[1][1] - bPSubRanges[1][0] + 1) + b_j;
 
-							c[cIndex] += a_shared[aIndex] * b_shared[bIndex];	
-						}
-					}
-				}
-			} 
+							c_shared[cIndex] += a_shared[aIndex] * b_shared[bIndex];	
+						} // k loop ends
+					} // j loop ends
+				} // i loop ends
+			} // Space B LPUs traversal ends
+		} // Space A sub-partition LPUs traveral ends
+
+		/*--------------------------------------------------------------------------------------------------------------------
+							Copying C Back to the Card Memory 
+		--------------------------------------------------------------------------------------------------------------------*/
+		
+		__syncthreads();	
+		for (int i = cPRanges[0][0] + warpId; i <= cPRanges[0][1]; i += WARP_COUNT) {
+			for (int j = cPRanges[1][0] + threadId; j <= cPRanges[1][1]; j += WARP_SIZE) {
+				c[(i - cSRanges[0][0]) 
+						* (cSRanges[1][1] - cSRanges[1][0] + 1)
+						+ (j - cSRanges[1][0])] 
+					= c_shared[(i - cPRanges[0][0]) 
+						* (cPRanges[1][1] - cPRanges[1][0] + 1) 
+						+ (j - cPRanges[1][0])];
+			}
 		}
-	}
+
+	} // Space A LPUs traversal ends
 }
 
 //------------------------------------------------------- MMM GPU Code Executor ------------------------------------------------------/

@@ -41,6 +41,7 @@ int main(int argc, char *argv[]) {
 	matrixLength = (argc > 1) ? atoi(argv[1]) : 1000;
 	blockSize = (argc > 2) ? atoi(argv[2]) : 32;
 	int batchSize = (argc > 3) ?  atoi(argv[3]) : BLOCK_COUNT * 10;
+	bool verifyCorrectness = (argc > 4) ? (atoi(argv[4]) == 1) : false;
 
 	A_MD[0].setLength(matrixLength);
 	C_MD[1] = C_MD[0] = B_MD[1] = B_MD[0] = A_MD[1] = A_MD[0];
@@ -84,7 +85,8 @@ int main(int argc, char *argv[]) {
 	generateParts(myLpuRange, idGenerator, partGenerator, partMap); 
 
 	// create duplicates of the data parts to do the same computation in the CPU then compare the results
-	//MatrixPartMap *duplicatePartMap = partMap->duplicate();
+	MatrixPartMap *duplicatePartMap = NULL;
+	if (verifyCorrectness) partMap->duplicate();
 	
 	// initialize GPU code executor
 	long memLimit = 3 * 1000 * 1000 * 1024l;
@@ -105,8 +107,10 @@ int main(int argc, char *argv[]) {
 		gpuExecutor->submitNextLpu(lpu);
 		
 		// at the same time do a CPU execution of the same LPU on duplicate data for verification purpose
-		//getNextLpu(lpuId, lpu, idGenerator, duplicatePartMap);
-		//computeCpuMMM(lpu);
+		if (verifyCorrectness) {
+			getNextLpu(lpuId, lpu, idGenerator, duplicatePartMap);
+			computeCpuMMM(lpu);
+		}
 	}
 	// this is needed to run the last, if exists, partially completed batch that has not run in the GPU 
 	gpuExecutor->forceExecution();
@@ -117,9 +121,11 @@ int main(int argc, char *argv[]) {
 	gpuExecutor->cleanup();
 
 	// compare CPU and GPU computations' data parts
-	//logFile << "comparing the result of CPU computation with that of the GPU\n";
-	//logFile.flush();
-	//partMap->matchParts(duplicatePartMap, logFile);
+	if (verifyCorrectness) {
+		logFile << "comparing the result of CPU computation with that of the GPU\n";
+		logFile.flush();
+		partMap->matchParts(duplicatePartMap, logFile);
+	}
         
 	// record program's running time
 	gettimeofday(&tv, NULL);

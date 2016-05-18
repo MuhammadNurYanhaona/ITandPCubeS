@@ -43,7 +43,7 @@ void check_error(cudaError e, std::ofstream &logFile) {
 
 __device__ void allocateInSharedMemory(char *memoryPanel, int *panelIndex,
                 char *pointer, 
-		short dataItemSize, short dataItemCount) {
+		int dataItemSize, int dataItemCount) {
 
 	// allocate the pointer at the current position of the panel index
 	pointer = &memoryPanel[*panelIndex];
@@ -52,6 +52,7 @@ __device__ void allocateInSharedMemory(char *memoryPanel, int *panelIndex,
 	// index at some alignment boundary
 	*panelIndex += ((dataItemSize * dataItemCount) / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
 			* MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
-	*panelIndex += ((dataItemSize * dataItemCount) % MEMORY_PANNEL_ALIGNMENT_BOUNDARY)
-			* MEMORY_PANNEL_ALIGNMENT_BOUNDARY;	
+	if (((dataItemSize * dataItemCount) % MEMORY_PANNEL_ALIGNMENT_BOUNDARY) != 0) {
+		*panelIndex += MEMORY_PANNEL_ALIGNMENT_BOUNDARY;	
+	}
 }
