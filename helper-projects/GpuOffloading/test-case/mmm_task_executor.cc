@@ -86,7 +86,9 @@ int main(int argc, char *argv[]) {
 
 	// create duplicates of the data parts to do the same computation in the CPU then compare the results
 	MatrixPartMap *duplicatePartMap = NULL;
-	if (verifyCorrectness) partMap->duplicate();
+	if (verifyCorrectness) { 
+		duplicatePartMap = partMap->duplicate();
+	}
 	
 	// initialize GPU code executor
 	long memLimit = 3 * 1000 * 1000 * 1024l;
