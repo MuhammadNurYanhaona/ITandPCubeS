@@ -6,9 +6,9 @@
  * the existing LPU and part generation libraries in this project would be to much hassle.
  */
 
-#include "../runtime/structure.h"
-#include "../utils/list.h"
-#include "../utils/hashtable.h"
+#include "../../runtime/structure.h"
+#include "../../utils/list.h"
+#include "../../utils/hashtable.h"
 
 #include <vector>
 #include <fstream>

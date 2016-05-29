@@ -1,9 +1,9 @@
 #include "mmm_structure.h"
-#include "../runtime/structure.h"
-#include "../utils/list.h"
-#include "../utils/hashtable.h"
-#include "../utils/partition.h"
-#include "../utils/binary_search.h"
+#include "../../runtime/structure.h"
+#include "../../utils/list.h"
+#include "../../utils/hashtable.h"
+#include "../../utils/partition.h"
+#include "../../utils/binary_search.h"
 
 #include <vector>
 #include <iostream>

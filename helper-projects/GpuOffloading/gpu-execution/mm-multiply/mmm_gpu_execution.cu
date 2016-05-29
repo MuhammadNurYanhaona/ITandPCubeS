@@ -2,7 +2,7 @@
 #include <cuda_runtime.h>
 
 #include "mmm_gpu_execution.h"
-#include "../../test-case/mmm_structure.h"
+#include "../../test-case/mmm/mmm_structure.h"
 #include "../../runtime/structure.h"
 #include "../../gpu-utils/gpu_constant.h"
 #include "../../gpu-offloader/gpu_code_executor.h"
@@ -434,10 +434,14 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 		// allocate enough space for C part in the dynamic shared memory panel
 		__shared__ double *c_shared;
 		if (warpId == 0 && threadId == 0) {
-			allocateInSharedMemory(MEMORY_PANEL, &FREE_MEMORY_INDEX, 
-				(char *) c_shared, sizeof(double),
-				((cPRanges[0][1] - cPRanges[0][0] + 1) 
-					* (cPRanges[1][1] - cPRanges[1][0] + 1)));
+			c_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
+			int cSize = (cPRanges[0][1] - cPRanges[0][0] + 1) 
+					* (cPRanges[1][1] - cPRanges[1][0] + 1) * sizeof(double);
+			FREE_MEMORY_INDEX += (cSize / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
+				* MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+			if (cSize % MEMORY_PANNEL_ALIGNMENT_BOUNDARY != 0) {
+				FREE_MEMORY_INDEX += MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+			}
 		}
 		__syncthreads();	
 
@@ -494,14 +498,24 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 			// allocate enough space for the two shared variables in the dynamic shared memory panel
 			__shared__ double *a_shared, *b_shared;
 			if (warpId == 0 && threadId == 0) {
-				allocateInSharedMemory(MEMORY_PANEL, &FREE_MEMORY_INDEX, 
-					(char *) a_shared, sizeof(double),
-					((aPSubRanges[0][1] - aPSubRanges[0][0] + 1) 
-							* (aPSubRanges[1][1] - aPSubRanges[1][0] + 1)));		
-				allocateInSharedMemory(MEMORY_PANEL, &FREE_MEMORY_INDEX, 
-					(char *) b_shared, sizeof(double),
-					((bPSubRanges[0][1] - bPSubRanges[0][0] + 1) 
-							* (bPSubRanges[1][1] - bPSubRanges[1][0] + 1)));		
+				
+				a_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
+				int aSize = (aPSubRanges[0][1] - aPSubRanges[0][0] + 1) 
+						* (aPSubRanges[1][1] - aPSubRanges[1][0] + 1) * sizeof(double);
+				FREE_MEMORY_INDEX += (aSize / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
+					* MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+				if (aSize % MEMORY_PANNEL_ALIGNMENT_BOUNDARY != 0) {
+					FREE_MEMORY_INDEX += MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+				}
+				
+				b_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
+				int bSize = (bPSubRanges[0][1] - bPSubRanges[0][0] + 1) 
+						* (bPSubRanges[1][1] - bPSubRanges[1][0] + 1) * sizeof(double);
+				FREE_MEMORY_INDEX += (bSize / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
+					* MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+				if (bSize % MEMORY_PANNEL_ALIGNMENT_BOUNDARY != 0) {
+					FREE_MEMORY_INDEX += MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+				}
 			}
 			__syncthreads();
 
@@ -707,8 +721,9 @@ void MMMGpuCodeExecutor::offloadFunction() {
 	batchRange.lpuCount2 = lpuCount[1];
 
 	int threadsPerBlock = WARP_SIZE * WARP_COUNT;
-	matrixMultiplyKernel<<< BLOCK_COUNT, threadsPerBlock >>>(batchRange,
-			partition, arrayMetadata, 
+	int shared_memory_size = 3 * partition.blockSize * partition.blockSize * sizeof(double);
+	matrixMultiplyKernelSharedMem <<< BLOCK_COUNT, threadsPerBlock, shared_memory_size >>>
+			(batchRange, partition, arrayMetadata, 
 			taskGlobalsGpu, threadLocalsGpu, 
 			aBuffers, bBuffers, cBuffers);
 }

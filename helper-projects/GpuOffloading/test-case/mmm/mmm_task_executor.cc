@@ -6,10 +6,10 @@
 #include <sys/time.h>
 
 #include "mmm_structure.h"
-#include "../runtime/structure.h"
-#include "../utils/partition.h"
-#include "../gpu-execution/mm-multiply/mmm_gpu_execution.h"
-#include "../gpu-utils/gpu_constant.h"
+#include "../../runtime/structure.h"
+#include "../../utils/partition.h"
+#include "../../gpu-execution/mm-multiply/mmm_gpu_execution.h"
+#include "../../gpu-utils/gpu_constant.h"
 
 using namespace std;
 

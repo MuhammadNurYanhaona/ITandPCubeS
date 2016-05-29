@@ -6,7 +6,7 @@
  * header file will be dynamically generated.
  */
 
-#include "../../test-case/mmm_structure.h"
+#include "../../test-case/mmm/mmm_structure.h"
 #include "../../runtime/structure.h"
 #include "../../gpu-offloader/gpu_code_executor.h"
 #include "../../gpu-offloader/lpu_parts_tracking.h"
