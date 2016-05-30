@@ -1,3 +1,6 @@
+#ifndef _H_stencil_structure
+#define _H_stencil_structure
+
 #include "../../runtime/structure.h"
 #include "../../utils/list.h"
 #include "../../utils/hashtable.h"
@@ -109,3 +112,5 @@ namespace stencil {
                         stencil::IdGenerator *idGenerator,
                         stencil::PlatePartMap *partMap);
 }
+
+#endif
