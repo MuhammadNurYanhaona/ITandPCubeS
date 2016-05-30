@@ -14,4 +14,9 @@ Dimension block_size_getRange(Dimension d,
 		int size,
                 int frontPadding, int backPadding);
 
+int block_count_partitionCount(Dimension d, int count);
+
+Dimension block_count_getRange(Dimension d, 
+		int lpuCount, int lpuId, 
+                int frontPadding, int backPadding);
 #endif

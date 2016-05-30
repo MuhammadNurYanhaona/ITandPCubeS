@@ -37,115 +37,116 @@ namespace mmm {
 	class ThreadLocals {
 	  public:
 	};
+
+	class MMMLpu : public LPU {
+	  public:
+		double *a;
+		List<int*> *aPartId;
+		PartDimension aPartDims[2];
+		double *b;
+		List<int*> *bPartId;
+		PartDimension bPartDims[2];
+		double *c;
+		List<int*> *cPartId;
+		PartDimension cPartDims[2];
+	  public:
+		MMMLpu() : LPU() {
+			a = NULL;
+			aPartId = NULL;
+			b = NULL;
+			bPartId = NULL;
+			c = NULL;
+			cPartId = NULL;
+		}
+	};
+
+	class IdGenerator {
+	  private:
+		int *lpuCount;
+	  public:
+		IdGenerator(int *lpuCount);
+		List<int*> *getAPartId(int linearLpuId);
+		List<int*> *getBPartId(int linearLpuId);
+		List<int*> *getCPartId(int linearLpuId);
+	};
+
+	class MatrixPart {
+	  public:
+		double *data;
+		Dimension storageDims[2];
+		List<int*> *partId;
+	  public:
+		MatrixPart() {
+			data = NULL;
+			partId = NULL;
+		}
+		void duplicate(MatrixPart *copy);
+		bool sameContent(MatrixPart *other);
+	};
+
+	class MatrixPartGenerator {
+	  private:
+		int *lpuCount;
+		int blockSize;
+		Dimension *aDims;
+		Dimension *bDims;
+		Dimension *cDims;
+	  public:
+		MatrixPartGenerator(int *lpuCount,
+				int blockSize, 
+				Dimension *aDims, 
+				Dimension *bDims, 
+				Dimension *cDims);
+		MatrixPart *generateAPart(List<int*> *partId);
+		MatrixPart *generateBPart(List<int*> *partId);
+		MatrixPart *generateCPart(List<int*> *partId);
+	};
+
+	class PartIdContainer {
+	  protected:
+		std::vector<int> partArray;
+		std::vector<PartIdContainer*> nextContainers;
+	  public:
+		PartIdContainer() {}
+		bool doesIdExist(List<int> *partId) { return  doesIdExist(partId, 0); }
+		void addPartId(List<int> *partId) { addPartId(partId, 0); }
+	  private:
+		void addPartId(List<int> *partId, int position);	
+		bool doesIdExist(List<int> *partId, int position);
+	};
+
+	class MatrixPartMap {
+	  private:
+		List<MatrixPart*> *aPartList;
+		PartIdContainer *aIdContainer;
+		int aSearchIndex;
+		List<MatrixPart*> *bPartList;
+		PartIdContainer *bIdContainer;
+		int bSearchIndex;
+		List<MatrixPart*> *cPartList;
+		int cSearchIndex;
+	  public:
+		MatrixPartMap();
+		bool aPartExists(List<int*> *partId);
+		void addAPart(MatrixPart *part);
+		MatrixPart *getAPart(List<int*> *partId);
+		bool bPartExists(List<int*> *partId);
+		void addBPart(MatrixPart *part);
+		MatrixPart *getBPart(List<int*> *partId);
+		bool cPartExists(List<int*> *partId);
+		void addCPart(MatrixPart *part) { cPartList->Append(part); }
+		MatrixPart *getCPart(List<int*> *partId);
+		MatrixPartMap *duplicate();
+		void matchParts(MatrixPartMap *otherMap, std::ofstream &logFile);
+	  private:
+		int getIdLocation(List<int*> *partId, List<MatrixPart*> *partList, int lastSearchedPlace);
+	};
+
+	void getNextLpu(int linearLpuId, 
+			mmm::MMMLpu *lpuInstance, 
+			mmm::IdGenerator *idGenerator, 
+			mmm::MatrixPartMap *partMap);
+
 }
-
-class MMMLpu : public LPU {
-  public:
-        double *a;
-        List<int*> *aPartId;
-        PartDimension aPartDims[2];
-        double *b;
-        List<int*> *bPartId;
-        PartDimension bPartDims[2];
-        double *c;
-        List<int*> *cPartId;
-        PartDimension cPartDims[2];
-  public:
-        MMMLpu() : LPU() {
-                a = NULL;
-                aPartId = NULL;
-                b = NULL;
-                bPartId = NULL;
-                c = NULL;
-                cPartId = NULL;
-        }
-};
-
-class IdGenerator {
-  private:
-        int *lpuCount;
-  public:
-	IdGenerator(int *lpuCount);
-        List<int*> *getAPartId(int linearLpuId);
-        List<int*> *getBPartId(int linearLpuId);
-        List<int*> *getCPartId(int linearLpuId);
-};
-
-class MatrixPart {
-  public:
-        double *data;
-        Dimension storageDims[2];
-        List<int*> *partId;
-  public:
-	MatrixPart() {
-		data = NULL;
-		partId = NULL;
-	}
-	void duplicate(MatrixPart *copy);
-	bool sameContent(MatrixPart *other);
-};
-
-class MatrixPartGenerator {
-  private:
-        int *lpuCount;
-	int blockSize;
-        Dimension *aDims;
-        Dimension *bDims;
-        Dimension *cDims;
-  public:
-        MatrixPartGenerator(int *lpuCount,
-			int blockSize, 
-			Dimension *aDims, 
-			Dimension *bDims, 
-			Dimension *cDims);
-        MatrixPart *generateAPart(List<int*> *partId);
-        MatrixPart *generateBPart(List<int*> *partId);
-        MatrixPart *generateCPart(List<int*> *partId);
-};
-
-class PartIdContainer {
-  protected:
-	std::vector<int> partArray;
-	std::vector<PartIdContainer*> nextContainers;
-  public:
-	PartIdContainer() {}
-	bool doesIdExist(List<int> *partId) { return  doesIdExist(partId, 0); }
-	void addPartId(List<int> *partId) { addPartId(partId, 0); }
-  private:
-	void addPartId(List<int> *partId, int position);	
-	bool doesIdExist(List<int> *partId, int position);
-};
-
-class MatrixPartMap {
-  private:
-        List<MatrixPart*> *aPartList;
-	PartIdContainer *aIdContainer;
-	int aSearchIndex;
-        List<MatrixPart*> *bPartList;
-	PartIdContainer *bIdContainer;
-	int bSearchIndex;
-        List<MatrixPart*> *cPartList;
-	int cSearchIndex;
-  public:
-        MatrixPartMap();
-        bool aPartExists(List<int*> *partId);
-        void addAPart(MatrixPart *part);
-	MatrixPart *getAPart(List<int*> *partId);
-        bool bPartExists(List<int*> *partId);
-        void addBPart(MatrixPart *part);
-	MatrixPart *getBPart(List<int*> *partId);
-        bool cPartExists(List<int*> *partId);
-        void addCPart(MatrixPart *part) { cPartList->Append(part); }
-	MatrixPart *getCPart(List<int*> *partId);
-	MatrixPartMap *duplicate();
-	void matchParts(MatrixPartMap *otherMap, std::ofstream &logFile);
-  private:
-	int getIdLocation(List<int*> *partId, List<MatrixPart*> *partList, int lastSearchedPlace);
-};
-
-void getNextLpu(int linearLpuId, 
-		MMMLpu *lpuInstance, 
-		IdGenerator *idGenerator, 
-		MatrixPartMap *partMap);
 
 #endif

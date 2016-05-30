@@ -17,11 +17,11 @@ Dimension A_MD[2], B_MD[2], C_MD[2];
 
 int *getLpuCount(Dimension dim1, Dimension dim2, int blockSize);
 void generateParts(Range myLpuRange, 
-		IdGenerator *idGenerator, 
-		MatrixPartGenerator *partGenerator, 
-		MatrixPartMap *partMap);
+		mmm::IdGenerator *idGenerator, 
+		mmm::MatrixPartGenerator *partGenerator, 
+		mmm::MatrixPartMap *partMap);
 
-void computeCpuMMM(MMMLpu *lpu);
+void computeCpuMMM(mmm::MMMLpu *lpu);
 
 int main(int argc, char *argv[]) {
 	
@@ -78,14 +78,14 @@ int main(int argc, char *argv[]) {
 	if (myLpuRange.max >= linearLpuCount) myLpuRange.max = linearLpuCount - 1;
 
 	// generate and save the data parts
-	IdGenerator *idGenerator = new IdGenerator(lpuCount);
-	MatrixPartGenerator *partGenerator = new MatrixPartGenerator(lpuCount, 
+	mmm::IdGenerator *idGenerator = new mmm::IdGenerator(lpuCount);
+	mmm::MatrixPartGenerator *partGenerator = new mmm::MatrixPartGenerator(lpuCount, 
 			blockSize, &A_MD[0], &B_MD[0], &C_MD[0]);
-	MatrixPartMap *partMap = new MatrixPartMap();
+	mmm::MatrixPartMap *partMap = new mmm::MatrixPartMap();
 	generateParts(myLpuRange, idGenerator, partGenerator, partMap); 
 
 	// create duplicates of the data parts to do the same computation in the CPU then compare the results
-	MatrixPartMap *duplicatePartMap = NULL;
+	mmm::MatrixPartMap *duplicatePartMap = NULL;
 	if (verifyCorrectness) { 
 		duplicatePartMap = partMap->duplicate();
 	}
@@ -102,15 +102,15 @@ int main(int argc, char *argv[]) {
 	gpuExecutor->initialize();
 
 	// offload LPUs to the gpu code executor
-	MMMLpu *lpu = new MMMLpu();
+	mmm::MMMLpu *lpu = new mmm::MMMLpu();
 	for (int lpuId = myLpuRange.min; lpuId <= myLpuRange.max; lpuId++) {
 		
-		getNextLpu(lpuId, lpu, idGenerator, partMap);
+		mmm::getNextLpu(lpuId, lpu, idGenerator, partMap);
 		gpuExecutor->submitNextLpu(lpu);
 		
 		// at the same time do a CPU execution of the same LPU on duplicate data for verification purpose
 		if (verifyCorrectness) {
-			getNextLpu(lpuId, lpu, idGenerator, duplicatePartMap);
+			mmm::getNextLpu(lpuId, lpu, idGenerator, duplicatePartMap);
 			computeCpuMMM(lpu);
 		}
 	}
@@ -142,9 +142,9 @@ int main(int argc, char *argv[]) {
 }
 
 void generateParts(Range myLpuRange,
-                IdGenerator *idGenerator,
-                MatrixPartGenerator *partGenerator,
-                MatrixPartMap *partMap) {
+                mmm::IdGenerator *idGenerator,
+                mmm::MatrixPartGenerator *partGenerator,
+                mmm::MatrixPartMap *partMap) {
 
 	for (int lpuId = myLpuRange.min; lpuId <= myLpuRange.max; lpuId++) {
 
@@ -178,7 +178,7 @@ int *getLpuCount(Dimension dim1, Dimension dim2, int blockSize) {
 	return count; 
 }
 
-void computeCpuMMM(MMMLpu *lpu) {
+void computeCpuMMM(mmm::MMMLpu *lpu) {
 
 	double *a, *b, *c;
 	a = lpu->a;

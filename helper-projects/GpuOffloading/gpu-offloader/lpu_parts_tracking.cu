@@ -79,6 +79,28 @@ int LpuDataPart::getSize() {
 	return elementCount * elementSize;
 }
 
+//----------------------------------------------------------- Versioned LPU Data Part -----------------------------------------------------------/
+
+VersionedLpuDataPart::VersionedLpuDataPart(int dimensionality,
+		PartDimension *dimensions,
+		List<void*> *dataVersions,
+		int elementSize,
+		List<int*> *partId) 
+		: LpuDataPart(dimensionality, dimensions, NULL, elementSize, partId) {
+	this->dataVersions = dataVersions;
+	this->versionCount = dataVersions->NumElements();
+	this->currVersionHead = 0;
+}
+
+void *VersionedLpuDataPart::getDataVersion(int version) {
+	int index = (currVersionHead + version) % versionCount;
+	return dataVersions->Nth(index);
+}
+        
+void VersionedLpuDataPart::advanceEpochVersion() {
+	currVersionHead = (currVersionHead + 1) % versionCount;
+}
+
 //--------------------------------------------------------- GPU Memory Consumption Stat ---------------------------------------------------------/
 
 GpuMemoryConsumptionStat::GpuMemoryConsumptionStat(long consumptionLimit) {
@@ -206,11 +228,10 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
 		
 		LpuDataPart *dataPart = dataPartsList->Nth(i);
-		void *data = dataPart->getData();
 		int size = dataPart->getSize();
 		char *dataStart = cpuBuffer + currentIndex;
-		memcpy(dataStart, data, size);
-
+		copyDataIntoBuffer(dataPart, dataStart);
+		
 		int *infoRangeStart = cpuPartRangeBuffer + (dimRangeInfoSize * i);
 		dataPart->getPartDimRanges()->copyIntoBuffer(infoRangeStart);
 
@@ -228,28 +249,28 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 void PropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
 	
 	check_error(cudaMalloc((void **) &gpuBuffer, bufferSize), logFile);
-	check_error(cudaMemcpy(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice), logFile);
+	check_error(cudaMemcpyAsync(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice, 0), logFile);
 	
 	check_error(cudaMalloc((void **) &gpuPartIndexBuffer, bufferReferenceCount * sizeof(int)), logFile);
-	check_error(cudaMemcpy(gpuPartIndexBuffer, cpuPartIndexBuffer, 
-			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice), logFile);
+	check_error(cudaMemcpyAsync(gpuPartIndexBuffer, cpuPartIndexBuffer, 
+			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice, 0), logFile);
 	
 	check_error(cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize * sizeof(int)), logFile);
-	check_error(cudaMemcpy(gpuPartRangeBuffer, cpuPartRangeBuffer, 
-			partRangeBufferSize * sizeof(int), cudaMemcpyHostToDevice), logFile);
+	check_error(cudaMemcpyAsync(gpuPartRangeBuffer, cpuPartRangeBuffer, 
+			partRangeBufferSize * sizeof(int), cudaMemcpyHostToDevice, 0), logFile);
 	
 	check_error(cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int)), logFile);
-	check_error(cudaMemcpy(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 
-			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice), logFile);
+	check_error(cudaMemcpyAsync(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 
+			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice, 0), logFile);
 }
 
-GpuBufferReferences PropertyBufferManager::getGpuBufferReferences() {
-	GpuBufferReferences bufferRef;
-	bufferRef.dataBuffer = gpuBuffer;
-	bufferRef.partIndexBuffer = gpuPartIndexBuffer;
-	bufferRef.partRangeBuffer = gpuPartRangeBuffer;
-	bufferRef.partBeginningBuffer = gpuPartBeginningBuffer;
-	bufferRef.partRangeDepth = partRangeDepth;
+GpuBufferReferences *PropertyBufferManager::getGpuBufferReferences() {
+	GpuBufferReferences *bufferRef = new GpuBufferReferences();
+	bufferRef->dataBuffer = gpuBuffer;
+	bufferRef->partIndexBuffer = gpuPartIndexBuffer;
+	bufferRef->partRangeBuffer = gpuPartRangeBuffer;
+	bufferRef->partBeginningBuffer = gpuPartBeginningBuffer;
+	bufferRef->partRangeDepth = partRangeDepth;
 	return bufferRef;
 }
 
@@ -260,10 +281,10 @@ void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPart
 	int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
 		LpuDataPart *dataPart = dataPartsList->Nth(i);
+		char *dataStart = cpuBuffer + currentIndex;
 		void *data = dataPart->getData();
 		int size = dataPart->getSize();
-		char *start = cpuBuffer + currentIndex;
-		memcpy(data, start, size);
+		memcpy(data, dataStart, size);
 		currentIndex += size;
 	}
 }
@@ -294,6 +315,94 @@ void PropertyBufferManager::cleanupBuffers() {
         gpuPartBeginningBuffer = NULL;
 }
 
+void PropertyBufferManager::copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer) {
+	void *data = dataPart->getData();
+	int size = dataPart->getSize();
+	memcpy(dataBuffer, data, size);
+}
+
+//------------------------------------------------------- Versioned Property Buffer Manager -----------------------------------------------------/
+
+void VersionedPropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
+                        List<int> *partIndexList, std::ofstream &logFile) {
+	
+	PropertyBufferManager::prepareCpuBuffers(dataPartsList, partIndexList, logFile);
+	cpuDataPartVersions = new short[bufferEntryCount];
+	for (int i = 0; i < bufferEntryCount; i++) {
+
+		// at the beginning all parts being staged in to the GPU should have 0 as the current version as the most 
+		// up-to-date version is copied to the beginning of the data buffer.
+		cpuDataPartVersions[i] = 0;
+	}
+	VersionedLpuDataPart *firstPart = (VersionedLpuDataPart *) dataPartsList->Nth(0);
+	versionCount = firstPart->getVersionCount();
+}
+
+void VersionedPropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
+	PropertyBufferManager::prepareGpuBuffers(logFile);
+	check_error(cudaMalloc((void **) &gpuDataPartVersions, bufferEntryCount * sizeof(short)), logFile);
+	check_error(cudaMemcpyAsync(gpuDataPartVersions, cpuDataPartVersions, 
+			bufferEntryCount * sizeof(short), cudaMemcpyHostToDevice, 0), logFile);
+}
+
+GpuBufferReferences *VersionedPropertyBufferManager::getGpuBufferReferences() {
+	
+	VersionedGpuBufferReferences *bufferRef = new VersionedGpuBufferReferences();
+	
+	bufferRef->dataBuffer = gpuBuffer;
+	bufferRef->partIndexBuffer = gpuPartIndexBuffer;
+	bufferRef->partRangeBuffer = gpuPartRangeBuffer;
+	bufferRef->partBeginningBuffer = gpuPartBeginningBuffer;
+	bufferRef->partRangeDepth = partRangeDepth;
+
+	bufferRef->versionCount = versionCount;
+	bufferRef->versionIndexBuffer = gpuDataPartVersions;
+
+	return bufferRef;
+}
+
+void VersionedPropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile) {
+
+	check_error(cudaMemcpyAsync(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost, 0), logFile);
+	check_error(cudaMemcpy(cpuDataPartVersions, gpuDataPartVersions, 
+			bufferEntryCount * sizeof(short), cudaMemcpyDeviceToHost), logFile);
+
+	int currentIndex = 0;
+	for (int i = 0; i < bufferEntryCount; i++) {
+		VersionedLpuDataPart *dataPart = (VersionedLpuDataPart *) dataPartsList->Nth(i);
+		short currVersion = cpuDataPartVersions[i];
+		int sizePerVersion = dataPart->getSize() / versionCount;
+		for (int j = 0; j < versionCount; j++) {
+			int versionIndex = (currVersion + j) % versionCount;
+			char *dataStart = cpuBuffer + currentIndex + versionIndex * sizePerVersion;
+			void *data = dataPart->getDataVersion(currVersion);
+			memcpy(data, dataStart, sizePerVersion);
+		}
+		currentIndex += dataPart->getSize();
+	}
+}
+
+void VersionedPropertyBufferManager::cleanupBuffers() {
+	
+	PropertyBufferManager::cleanupBuffers();
+
+	free(cpuDataPartVersions);
+        cpuDataPartVersions = NULL;       
+	cudaFree(gpuDataPartVersions); 
+	gpuDataPartVersions = NULL;
+}
+
+void VersionedPropertyBufferManager::copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer) {
+	VersionedLpuDataPart *versionedPart = (VersionedLpuDataPart *) dataPart;
+	int versionCount = versionedPart->getVersionCount();
+	int sizePerVersion = versionedPart->getSize() / versionCount;
+	for (int i = 0; i < versionCount; i++) {
+		void *data = versionedPart->getDataVersion(i);
+		char *dataStart = dataBuffer + i * sizePerVersion;
+		memcpy(dataStart, data, sizePerVersion);
+	}
+}
+
 //------------------------------------------------------------ LPU Data Buffer Manager ----------------------------------------------------------/
 
 LpuDataBufferManager::LpuDataBufferManager(List<const char*> *propertyNames) {
@@ -301,6 +410,22 @@ LpuDataBufferManager::LpuDataBufferManager(List<const char*> *propertyNames) {
 	for (int i = 0; i < propertyNames->NumElements(); i++) {
 		const char *propertyName = propertyNames->Nth(i);
 		propertyBuffers->Enter(propertyName, new PropertyBufferManager());
+	}
+}
+
+LpuDataBufferManager::LpuDataBufferManager(List<const char*> *versionlessProperties, 
+                        List<const char*> *multiversionProperties) {
+	
+	propertyBuffers = new Hashtable<PropertyBufferManager*>;
+
+	for (int i = 0; i < versionlessProperties->NumElements(); i++) {
+		const char *propertyName = versionlessProperties->Nth(i);
+		propertyBuffers->Enter(propertyName, new PropertyBufferManager());
+	}
+
+	for (int i = 0; i < multiversionProperties->NumElements(); i++) {
+		const char *propertyName = multiversionProperties->Nth(i);
+		propertyBuffers->Enter(propertyName, new VersionedPropertyBufferManager());
 	}
 }
 
@@ -313,7 +438,7 @@ void LpuDataBufferManager::copyPartsInGpu(const char *propertyName,
 	propertyManager->prepareGpuBuffers(logFile);
 }
 
-GpuBufferReferences LpuDataBufferManager::getGpuBufferReferences(const char *propertyName) {
+GpuBufferReferences *LpuDataBufferManager::getGpuBufferReferences(const char *propertyName) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
 	return propertyManager->getGpuBufferReferences();	
 }

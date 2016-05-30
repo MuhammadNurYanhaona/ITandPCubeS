@@ -39,7 +39,7 @@ class PartDimRanges {
  * that approach may add more overheads in the CPU to GPU transition and vice versa process. 
  */
 class LpuDataPart {
-  private:
+  protected:
 	int dimensionality;
 	PartDimRanges *partDimRanges;
 	void *data;
@@ -59,12 +59,32 @@ class LpuDataPart {
 			List<int*> *partId);
 	~LpuDataPart() { delete partDimRanges; }
 	PartDimRanges *getPartDimRanges() { return partDimRanges; }
-	void *getData() { return data; }
+	virtual void *getData() { return data; }
 	List<int*> *getId() { return partId; }
 	bool isMatchingId(List<int*> *candidateId);
-	int getSize();
+	virtual int getSize();
 	void flagReadOnly() { readOnly = true; }
 	bool isReadOnly() { return readOnly; }
+};
+
+/* This extension to the above LPU Data Part class is needed to stage-in/out properties that have multiple epoch versions. */
+class VersionedLpuDataPart : public LpuDataPart {
+  protected:
+	short versionCount;
+	int currVersionHead;
+	List<void*> *dataVersions;
+  public:
+	VersionedLpuDataPart(int dimensionality, 
+                        PartDimension *dimensions,
+                        List<void*> *dataVersions, 
+                        int elementSize, 
+                        List<int*> *partId);
+	~VersionedLpuDataPart() { delete dataVersions; }
+	void *getData() { return dataVersions->Nth(currVersionHead); }
+	short getVersionCount() { return versionCount; }
+	void *getDataVersion(int version);
+	void advanceEpochVersion();
+	int getSize() { return LpuDataPart::getSize() * versionCount; }
 };
 
 /* In most likely cases, the memory capacity of the GPU will be far less than the memory capacity of the host machine. Therefore, 
@@ -126,6 +146,15 @@ class GpuBufferReferences {
 	int partRangeDepth;
 };
 
+/* Data structures that have multiple versions need another buffer to be exchanged between the host and the GPU to keep track of the
+ * most recent versions of different parts
+ */
+class VersionedGpuBufferReferences : public GpuBufferReferences {
+  public:
+	short versionCount;
+	short *versionIndexBuffer;
+};
+
 /* Since data parts can be very small and numerous, there might be a significant cost in staging than in and out of GPU card memory. 
  * Rather, we combine all parts for a particular property in the LPUs into a single buffer and stage in and out the buffer to/of the 
  * GPU (note that staging out is only needed if the buffer has been updated by the offloaded kernel in the GPU). This class generates 
@@ -133,7 +162,7 @@ class GpuBufferReferences {
  * indexes for different LPUs for that property and the beginning index of a part in the data buffer.   
  */
 class PropertyBufferManager {
-  private:
+  protected:
 	int bufferSize;
 	int bufferEntryCount;
 	int bufferReferenceCount;
@@ -152,13 +181,35 @@ class PropertyBufferManager {
   public:
 	PropertyBufferManager();
 	~PropertyBufferManager();
-	void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
+	virtual void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
 			List<int> *partIndexList, 
 			std::ofstream &logFile);
+	virtual void prepareGpuBuffers(std::ofstream &logFile);
+	virtual GpuBufferReferences *getGpuBufferReferences();
+	virtual void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile);
+	virtual void cleanupBuffers();
+  protected:
+	virtual void copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer);
+};
+
+/* As we needed an additional host:gpu interaction buffer for data structures with multiple versions, we need enhancement to the 
+ * property buffer manager class to accomodate for that extra buffer's management 
+ */
+class VersionedPropertyBufferManager : public PropertyBufferManager {
+  private:
+	short *cpuDataPartVersions;
+	short *gpuDataPartVersions;
+	short versionCount;
+  public:
+	void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
+                        List<int> *partIndexList,
+                        std::ofstream &logFile);
 	void prepareGpuBuffers(std::ofstream &logFile);
-	GpuBufferReferences getGpuBufferReferences();
+	GpuBufferReferences *getGpuBufferReferences();
 	void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile);
 	void cleanupBuffers();
+  protected:
+	void copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer);  
 };
 
 /* This class manages the property buffers and access to those buffers for different LPU properties for all LPUs that are part of a 
@@ -169,11 +220,13 @@ class LpuDataBufferManager {
 	Hashtable<PropertyBufferManager*> *propertyBuffers;
   public:
 	LpuDataBufferManager(List<const char*> *propertyNames);
+	LpuDataBufferManager(List<const char*> *versionlessProperties, 
+			List<const char*> *multiversionProperties);
 	void copyPartsInGpu(const char *propertyName, 
 			List<LpuDataPart*> *dataPartsList, 
 			List<int> *partIndexList, 
 			std::ofstream &logFile);
-	GpuBufferReferences getGpuBufferReferences(const char *propertyName);
+	GpuBufferReferences *getGpuBufferReferences(const char *propertyName);
 	void retrieveUpdatesFromGpu(const char *propertyName, 
 			List<LpuDataPart*> *dataPartsList, 
 			std::ofstream &logFile);
@@ -206,7 +259,7 @@ class LpuBatchController {
 	bool isEmptyBatch() { return currentBatchSize == 0; }
 	int getBatchLpuCountThreshold() { return batchLpuCountThreshold; }
 	int getCurrentBatchSize() { return currentBatchSize; }
-	GpuBufferReferences getGpuBufferReferences(const char *propertyName) { 
+	GpuBufferReferences *getGpuBufferReferences(const char *propertyName) { 
 		return bufferManager->getGpuBufferReferences(propertyName); 
 	}
 	void updateBatchDataPartsFromGpuResults();

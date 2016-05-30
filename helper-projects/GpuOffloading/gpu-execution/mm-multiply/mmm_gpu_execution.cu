@@ -27,7 +27,7 @@ MMMLpuBatchController::MMMLpuBatchController(int lpuCountThreshold, long memLimi
 }
 
 int MMMLpuBatchController::calculateLpuMemoryRequirement(LPU *lpu) {
-	MMMLpu *mmmLpu = (MMMLpu *) lpu;
+	mmm::MMMLpu *mmmLpu = (mmm::MMMLpu *) lpu;
 	int size = 0;
 	if (!dataPartTracker->isAlreadyIncluded(mmmLpu->aPartId, "a")) {
 		size += (mmmLpu->aPartDims[0].storage.getLength() 
@@ -46,7 +46,7 @@ int MMMLpuBatchController::calculateLpuMemoryRequirement(LPU *lpu) {
 
 void MMMLpuBatchController::addLpuToTheCurrentBatch(LPU *lpu) {
 	
-	MMMLpu *mmmLpu = (MMMLpu *) lpu;
+	mmm::MMMLpu *mmmLpu = (mmm::MMMLpu *) lpu;
 
 	LpuDataPart *aPart = new LpuDataPart(2, 
 			mmmLpu->aPartDims, mmmLpu->a, sizeof(double), mmmLpu->aPartId);
@@ -711,9 +711,9 @@ MMMGpuCodeExecutor::MMMGpuCodeExecutor(LpuBatchController *lpuBatchController,
 
 void MMMGpuCodeExecutor::offloadFunction() {
 	
-	GpuBufferReferences aBuffers = lpuBatchController->getGpuBufferReferences("a");
-	GpuBufferReferences bBuffers = lpuBatchController->getGpuBufferReferences("b");
-	GpuBufferReferences cBuffers = lpuBatchController->getGpuBufferReferences("c");
+	GpuBufferReferences *aBuffers = lpuBatchController->getGpuBufferReferences("a");
+	GpuBufferReferences *bBuffers = lpuBatchController->getGpuBufferReferences("b");
+	GpuBufferReferences *cBuffers = lpuBatchController->getGpuBufferReferences("c");
 
 	MMMLpuBatchRange batchRange;
 	batchRange.lpuIdRange = currentBatchLpuRange;
@@ -725,7 +725,11 @@ void MMMGpuCodeExecutor::offloadFunction() {
 	matrixMultiplyKernelSharedMem <<< BLOCK_COUNT, threadsPerBlock, shared_memory_size >>>
 			(batchRange, partition, arrayMetadata, 
 			taskGlobalsGpu, threadLocalsGpu, 
-			aBuffers, bBuffers, cBuffers);
+			*aBuffers, *bBuffers, *cBuffers);
+
+	delete aBuffers;
+	delete bBuffers;
+	delete cBuffers;
 }
 
 void MMMGpuCodeExecutor::initialize() {
