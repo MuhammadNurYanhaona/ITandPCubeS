@@ -248,6 +248,7 @@ class LpuBatchController {
 	std::ofstream *logFile;
   public:
 	LpuBatchController();
+	void setBufferManager(LpuDataBufferManager *manager) { this->bufferManager = manager; }
 	void initialize(int lpuCountThreshold, 
 			long memoryConsumptionLimit, 
 			List<const char*> *propertyNames,

@@ -483,7 +483,6 @@ void LpuBatchController::initialize(int lpuCountThreshold,
 	gpuMemStat = new GpuMemoryConsumptionStat(memoryConsumptionLimit);
 	dataPartTracker = new LpuDataPartTracker();
 	dataPartTracker->initialize(propertyNames);
-	bufferManager = new LpuDataBufferManager(propertyNames);
 }
 
 bool LpuBatchController::canHoldLpu(LPU *lpu) {

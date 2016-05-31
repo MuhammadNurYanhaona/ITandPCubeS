@@ -23,6 +23,7 @@ MMMLpuBatchController::MMMLpuBatchController(int lpuCountThreshold, long memLimi
 	List<const char*> *toBeModifiedProperties = new List<const char*>;
 	toBeModifiedProperties->Append("c");
 
+	setBufferManager(new LpuDataBufferManager(propertyNames));
 	initialize(lpuCountThreshold, memLimit, propertyNames, toBeModifiedProperties);		
 }
 

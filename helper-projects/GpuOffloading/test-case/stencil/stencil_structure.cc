@@ -20,13 +20,35 @@ IdGenerator::IdGenerator(int lpuCount) {
 
 List<int*> *IdGenerator::getPartId(int linearLpuId) {
 	List<int*> *partIdList = new List<int*>;
-        int *partId = new int[1];
+        int *partId = new int[2];
 	partId[0] = linearLpuId;
+	partId[1] = 0;
 	partIdList->Append(partId);
 	return partIdList;
 }
 
 //----------------------------------------------------------------- Plate Part ---------------------------------------------------------------/
+
+void PlatePart::setData(double *data, int version) {
+	int index = (versionHead + version) % 2;
+	if (index == 0) {
+		this->data = data;
+	} else {
+		this->data_lag_1 = data;
+	}
+}
+
+double *PlatePart::getData(int version) {
+	int index = (versionHead + version) % 2;
+	if (index == 0) {
+		return data;
+	}
+	return data_lag_1;
+}
+
+void PlatePart::advanceEpoch() {
+	versionHead = (versionHead + 1) % 2;
+}
 
 void PlatePart::duplicate(PlatePart *copy) {
 	copy->storageDims[0] = this->storageDims[0];
@@ -76,8 +98,8 @@ PlatePart *PlatePartGenerator::generatePart(List<int*> *partId) {
         PlatePart *part = new PlatePart();
         part->storageDims[0] = dimension1;
         part->storageDims[1] = dimension2;
-        part->data = data;	
-	part->data_lag_1 = data_lag_1;
+        part->setData(data, 0);	
+	part->setData(data_lag_1, 1);
         part->partId = partId;
 
         return part;
@@ -153,7 +175,7 @@ void PlatePartMap::matchParts(PlatePartMap *otherMap, std::ofstream &logFile) {
 
 //------------------------------------------------------------- Get Next LPU Routine ---------------------------------------------------------/
 
-void getNextLpu(int linearLpuId,
+void stencil::getNextLpu(int linearLpuId,
 		stencil::StencilLpu *lpuInstance,
 		stencil::IdGenerator *idGenerator,
 		stencil::PlatePartMap *partMap) {
@@ -164,10 +186,14 @@ void getNextLpu(int linearLpuId,
         delete[] id;
         delete partId;
 
-	lpuInstance->plate = part->data;
-	lpuInstance->plate_lag_1 = part->data_lag_1;
+	lpuInstance->plate = part->getData(0);
+	lpuInstance->plate_lag_1 = part->getData(1);
         lpuInstance->platePartId = part->partId;
         lpuInstance->platePartDims[0].partition = lpuInstance->platePartDims[0].storage = part->storageDims[0];
         lpuInstance->platePartDims[1].partition = lpuInstance->platePartDims[1].storage = part->storageDims[1];
+
+	lpuInstance->partReference = part;
 }
+
+
 

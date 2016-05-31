@@ -40,15 +40,15 @@ void StencilComm::performLocalExchange(List<stencil::PlatePart*> *listOfParts) {
 		int sendIndexInPrev = prevPart->storageDims[0].getLength() 
 				* prevPart->storageDims[1].getLength() 
 				- 2 * boundaryElements;
-		double *dataDst = dataPart->data;
-		double *dataSrc = prevPart->data + sendIndexInPrev;
+		double *dataDst = dataPart->getData(0);
+		double *dataSrc = prevPart->getData(0) + sendIndexInPrev;
 		memcpy(dataDst, dataSrc, boundaryElements * sizeof(double));
 
 		// send to the previous
 		int recvIndexInPrev = prevPart->storageDims[0].getLength()
                                 * prevPart->storageDims[1].getLength() - boundaryElements;
-		dataDst = prevPart->data + recvIndexInPrev;
-		dataSrc = dataPart->data + boundaryElements;
+		dataDst = prevPart->getData(0) + recvIndexInPrev;
+		dataSrc = dataPart->getData(0) + boundaryElements;
 		memcpy(dataDst, dataSrc, boundaryElements * sizeof(double));
 	}
 }
@@ -67,7 +67,7 @@ void StencilComm::performRemoteExchange(List<stencil::PlatePart*> *listOfParts) 
 	// send-receive from the upper boundary
 	if (localParts.min != 0) {
 		stencil::PlatePart *part = listOfParts->Nth(0);
-		double *data = part->data;
+		double *data = part->getData(0);
 		int boundaryElements = part->storageDims[1].getLength() * padding;
 		double *sendPtr = data + boundaryElements;
 		int status = MPI_Isend(sendPtr, boundaryElements, MPI_DOUBLE,
@@ -91,7 +91,7 @@ void StencilComm::performRemoteExchange(List<stencil::PlatePart*> *listOfParts) 
 	// send-receve from the lower boundary
 	if (localParts.max != lpuCount - 1) {
 		stencil::PlatePart *part = listOfParts->Nth(listOfParts->NumElements() - 1);
-		double *data = part->data;
+		double *data = part->getData(0);
 		int boundaryElements = part->storageDims[1].getLength() * padding;
 		int sendIndex = part->storageDims[0].getLength() 
 				* part->storageDims[1].getLength() - 2 * boundaryElements;

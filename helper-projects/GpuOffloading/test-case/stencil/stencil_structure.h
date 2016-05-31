@@ -15,8 +15,8 @@ namespace stencil {
 
         class Partition {
           public:
-                int blockCount1;
-		int blockCount2;
+                int blockCount;
+		int blockSize;
 		int padding1;
 		int padding2;
         };
@@ -36,20 +36,6 @@ namespace stencil {
 		int currIteration;
         };
 
-	class StencilLpu : public LPU {
-	  public:
-		double *plate;
-		double *plate_lag_1;
-                List<int*> *platePartId;
-                PartDimension platePartDims[2];
-          public:
-                StencilLpu() : LPU() {
-                        plate = NULL;
-			plate_lag_1 = NULL;
-                        platePartId = NULL;
-                }
-	};
-
 	// this generator is for the scenario where the GPU can hold an entire Space A LPU	
 	class IdGenerator {
           private:
@@ -60,9 +46,11 @@ namespace stencil {
         };
 
 	class PlatePart {
-          public:
+          private:
                 double *data;
 		double *data_lag_1;
+		int versionHead;
+	  public:
                 Dimension storageDims[2];
                 List<int*> *partId;
           public:
@@ -70,10 +58,30 @@ namespace stencil {
                         data = NULL;
 			data_lag_1 = NULL;
                         partId = NULL;
+			versionHead = 0;
                 }
+		void setData(double *data, int version);
+		double *getData(int version);
+		void advanceEpoch();	
                 void duplicate(PlatePart *copy);
                 bool sameContent(PlatePart *other);
         };
+	
+	class StencilLpu : public LPU {
+	  public:
+		PlatePart *partReference;
+		double *plate;
+		double *plate_lag_1;
+                List<int*> *platePartId;
+                PartDimension platePartDims[2];
+          public:
+                StencilLpu() : LPU() {
+			partReference = NULL;
+                        plate = NULL;
+			plate_lag_1 = NULL;
+                        platePartId = NULL;
+                }
+	};
 
 	class PlatePartGenerator {
           private:
@@ -103,6 +111,7 @@ namespace stencil {
                 bool partExists(List<int*> *partId);
                 void addPart(PlatePart *part);
                 PlatePart *getPart(List<int*> *partId);
+		List<PlatePart*> *getPartList() { return partList; }
                 PlatePartMap *duplicate();
                 void matchParts(PlatePartMap *otherMap, std::ofstream &logFile);
         };
