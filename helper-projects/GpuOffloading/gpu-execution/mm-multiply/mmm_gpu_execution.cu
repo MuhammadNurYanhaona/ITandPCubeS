@@ -434,7 +434,8 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 		// allocate enough space for C part in the dynamic shared memory panel
 		__shared__ double *c_shared;
 		if (warpId == 0 && threadId == 0) {
-			c_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
+			c_shared = (double *) MEMORY_PANEL;
+			//c_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
 			int cSize = (cPRanges[0][1] - cPRanges[0][0] + 1) 
 					* (cPRanges[1][1] - cPRanges[1][0] + 1) * sizeof(double);
 			FREE_MEMORY_INDEX += (cSize / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
@@ -499,7 +500,8 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 			__shared__ double *a_shared, *b_shared;
 			if (warpId == 0 && threadId == 0) {
 				
-				a_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
+				a_shared = (double *) (MEMORY_PANEL + 32 * 32 * sizeof(double));
+				//a_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
 				int aSize = (aPSubRanges[0][1] - aPSubRanges[0][0] + 1) 
 						* (aPSubRanges[1][1] - aPSubRanges[1][0] + 1) * sizeof(double);
 				FREE_MEMORY_INDEX += (aSize / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
@@ -508,7 +510,8 @@ __global__ void matrixMultiplyKernelSharedMem(MMMLpuBatchRange batchRange,
 					FREE_MEMORY_INDEX += MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
 				}
 				
-				b_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
+				b_shared = (double *) (MEMORY_PANEL + 2 * 32 * 32 * sizeof(double));
+				//b_shared = (double *) MEMORY_PANEL[FREE_MEMORY_INDEX];
 				int bSize = (bPSubRanges[0][1] - bPSubRanges[0][0] + 1) 
 						* (bPSubRanges[1][1] - bPSubRanges[1][0] + 1) * sizeof(double);
 				FREE_MEMORY_INDEX += (bSize / MEMORY_PANNEL_ALIGNMENT_BOUNDARY) 
