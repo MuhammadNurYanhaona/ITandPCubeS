@@ -188,7 +188,7 @@ void computeCpuStencil(stencil::StencilLpu *lpu, stencil::Partition partition) {
 
 		for (int r = firstRow + 1; r < lastRow; r++) {	
 			for (int c = firstCol + 1; c < lastCol; c++) {
-				data[(r - firstRow) * colCount + (c - firstCol)] = 2.5 * (
+				data[(r - firstRow) * colCount + (c - firstCol)] = 0.25 * (
 						  data_lag_1[(r + 1 - firstRow) * colCount + (c - firstCol)]
 						+ data_lag_1[(r - 1 - firstRow) * colCount + (c - firstCol)]
 						+ data_lag_1[(r - firstRow) * colCount + (c + 1 - firstCol)]
