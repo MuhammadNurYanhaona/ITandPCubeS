@@ -47,6 +47,8 @@ class StencilGpuCodeExecutor : public GpuCodeExecutor {
                         stencil::TaskGlobals *taskGlobals,
                         stencil::ThreadLocals *threadLocals);
         void offloadFunction();
+        void offloadFunction1();
+        void offloadFunction2();
         void initialize();
         void cleanup();
 };

@@ -50,6 +50,7 @@ void StencilLpuBatchController::addLpuToTheCurrentBatch(LPU *lpu) {
 //---------------------------------------------------------- Offload Functions -----------------------------------------------------------/
 
 
+// This kernel version assumes that Space A has been mapped to the SMs and Space B to the warps
 __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
                 stencil::Partition partition,
                 stencil::ArrayMetadata arrayMetadata,
@@ -248,6 +249,7 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
 						int jEnd = iterableRanges[3];
 						int jStep = indexesAndSteps[3];
 						for (int j = jStart; j <= jEnd; j+= jStep) {
+
 							// calculate the plate cell value for the current epoch as the average
 							// of its four neighbors from the last epoch
 							spaceBPlateParts[warpId][warpEpochs[warpId]]
@@ -319,7 +321,280 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
 			}
 		}
 	}
-		
+}
+
+// this kernel version assumes that Space A has been mapped to the GPU and Space B is mapped to the SMs
+__global__ void stencilKernel2(StencilLpuBatchRange batchRange,
+                stencil::Partition partition,
+                stencil::ArrayMetadata arrayMetadata,
+                stencil::TaskGlobals *taskGlobals,
+                stencil::ThreadLocals *threadLocals,
+                VersionedGpuBufferReferences plateBuffers) {
+
+        // before we can do anything in the kernel, we need to determine the thread, warp, and sm IDs of the thread
+        // executing the kernel code
+        int smId = blockIdx.x;
+        int warpId = threadIdx.x / WARP_SIZE;
+        int threadId = threadIdx.x % WARP_SIZE;
+
+        /*----------------------------------------------------------------------------------------------------------------------------
+                                                                Space A Logic
+        ----------------------------------------------------------------------------------------------------------------------------*/
+
+        // variables holding the data part references for the current top level LPU SMs will be working on
+        __shared__ double *plate[2];
+        __shared__ int plateSRanges[2][2], platePRanges[2][2];
+
+	// we are having trouble using dynamic shared memory; for now let us assume that the maximum Space B LPU size 
+	// for any Space A LPU will not be larger than an arbitrary constant and we allocate that much shared memory 
+	// space statically within the kernel
+	__shared__ double plate_shared[2][2000];
+
+	// an index to get a reference to the most up-to-date version of the place for an Space A LPU 
+	__shared__ short plateVersionIndex;
+	
+	// all SMs go through all LPUs offloaded from the host
+	Range lpuIdRange = batchRange.lpuIdRange;
+        for (int lpuId = lpuIdRange.min; lpuId <= lpuIdRange.max; lpuId++) {
+
+                // all threads should synchronize here to prevent the LPU metadata writer threads to overwrite the old
+                // values before the other threads are done using those values
+                __syncthreads(); 
+
+		// the first thread in the SM reads LPU metadata information and initializes pointers 
+		if (warpId == 0 && threadId == 0) {
+                        __shared__ int lpuIndex, plateIndex, plateStartsAt, plateDimRangeStart, plateSize;
+                        lpuIndex = lpuId - lpuIdRange.min;
+                        plateIndex = plateBuffers.partIndexBuffer[lpuIndex];
+                        plateStartsAt = plateBuffers.partBeginningBuffer[plateIndex];
+                        plateDimRangeStart = plateIndex * 2 * 2 * 2;
+
+                        // load storage range information in the shared memory
+                        plateSRanges[0][0] = plateBuffers.partRangeBuffer[plateDimRangeStart];
+                        plateSRanges[0][1] = plateBuffers.partRangeBuffer[plateDimRangeStart + 1];
+                        plateSRanges[1][0] = plateBuffers.partRangeBuffer[plateDimRangeStart + 2];
+                        plateSRanges[1][1] = plateBuffers.partRangeBuffer[plateDimRangeStart + 3];
+
+                        // load partition range information in the shared memory
+                        platePRanges[0][0] = plateBuffers.partRangeBuffer[plateDimRangeStart + 4];
+                        platePRanges[0][1] = plateBuffers.partRangeBuffer[plateDimRangeStart + 5];
+                        platePRanges[1][0] = plateBuffers.partRangeBuffer[plateDimRangeStart + 6];
+                        platePRanges[1][1] = plateBuffers.partRangeBuffer[plateDimRangeStart + 7];
+
+                        // initialize plate data references
+                        plate[0] = (double *) (plateBuffers.dataBuffer + plateStartsAt);
+                        plateSize = (plateSRanges[0][1] - plateSRanges[0][0] + 1)
+                                        * (plateSRanges[1][1] - plateSRanges[1][0] + 1);
+                        plate[1] = (plate[0] + plateSize);
+
+                        // read the current version index into the shared memory 
+                        plateVersionIndex = plateBuffers.versionIndexBuffer[plateIndex];
+                }
+                __syncthreads();
+
+		/*--------------------------------------------------------------------------------------------------------------------
+								Space B: Middle LPS
+		--------------------------------------------------------------------------------------------------------------------*/ 
+
+		// The first thread in each SM determines the Space B LPU count; this time we do not have the encircling
+		// Space A padding1/padding2 number of iterations as those iterations will be done at the host level
+		__shared__ int spaceBLpuCount1, spaceBLpuCount2, spaceBLpuCount;
+		if (threadId == 0 && warpId == 0) {
+			spaceBLpuCount1 = block_size_part_count(platePRanges[0], partition.blockSize);
+			spaceBLpuCount2 = block_size_part_count(platePRanges[1], partition.blockSize);
+			spaceBLpuCount = spaceBLpuCount1 * spaceBLpuCount2;
+		}
+		__syncthreads();
+
+		// The Space B LPUs are distributed among different SMs/blocks. Although we are operating over multiple 
+		// Space A LPUs in each kernel call, the deterministic nature of the LPU partition will ensure that a 
+		// particular SM/block will always get the same set of Space B LPUs for offloaded parent Space A LPUs in 
+		// all kernel invocations. It may be possible to utilize this fact to optimize the kernel executions. 
+		// distribute the Space B LPUs among the warps
+		__shared__ int spaceBLpuId[2];
+		__shared__ int spaceBPRanges[2][2];
+		__shared__ int spaceBPRangesWithoutPadding[2][2];
+		__shared__ short spaceBVersionIndex;
+                for (int spaceBLpu = smId; spaceBLpu < spaceBLpuCount; spaceBLpu += BLOCK_COUNT) {
+
+			if (threadId == 0 && warpId == 0) {
+				// construct the 2 dimensional LPU ID from the linear LPU Id
+				spaceBLpuId[0] = spaceBLpu / spaceBLpuCount2;
+				spaceBLpuId[1] = spaceBLpu % spaceBLpuCount2;
+
+				// determine the region of the plate the current Space B LPU encompasses considering
+				// padding; this range is the range over which the current LPU computation should 
+				// take place   
+				block_size_part_range(spaceBPRanges[0], platePRanges[0],
+						spaceBLpuCount1, spaceBLpuId[0],
+						partition.blockSize,
+						partition.padding2, partition.padding2);
+				block_size_part_range(spaceBPRanges[1], platePRanges[1],
+						spaceBLpuCount2, spaceBLpuId[1],
+						partition.blockSize,
+						partition.padding2, partition.padding2);
+
+				// determine another region information that excludes the padding; this range will be
+				// used to resynchronize the Space B LPU update to the card memory Space A LPU region   
+				block_size_part_range(spaceBPRangesWithoutPadding[0], platePRanges[0],
+						spaceBLpuCount1, spaceBLpuId[0],
+						partition.blockSize, 0, 0);
+				block_size_part_range(spaceBPRangesWithoutPadding[1], platePRanges[1],
+						spaceBLpuCount2, spaceBLpuId[1],
+						partition.blockSize, 0, 0);
+				
+				// set the version index of the space B LPU
+				spaceBVersionIndex = plateVersionIndex;
+			}
+			__syncthreads();
+
+			// all warps collectively read the current Space B plate portion from the global card memory to
+			// the SM shared memory
+			// different warps read different rows
+			for (int i = spaceBPRanges[0][0] + warpId; i <= spaceBPRanges[0][1]; i += WARP_COUNT) {
+				// different threads read different columns
+				for (int j = spaceBPRanges[1][0] + threadId;
+						j <= spaceBPRanges[1][1]; j += WARP_SIZE) {
+					plate_shared[0][(i - spaceBPRanges[0][0])
+							* (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+							+ (j - spaceBPRanges[1][0])]
+						= plate[0][(i - plateSRanges[0][0])
+							* (plateSRanges[1][1] - plateSRanges[1][0] + 1)
+							+ (j - plateSRanges[1][0])];
+					plate_shared[1][(i - spaceBPRanges[0][0])
+							* (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+							+ (j - spaceBPRanges[1][0])]
+						= plate[1][(i - plateSRanges[0][0])
+							* (plateSRanges[1][1] - plateSRanges[1][0] + 1)
+							+ (j - plateSRanges[1][0])];
+				}
+			}
+			__syncthreads();
+
+			for (int spaceBIter = 0; spaceBIter < partition.padding2; spaceBIter++) {
+
+				// first advance the Space B epoch version
+				if (threadId == 0 && warpId == 0) {
+					spaceBVersionIndex = (spaceBVersionIndex + 1) % 2;
+				}
+				__syncthreads();
+
+				// just like in the matrix-matrix multiplication, we assume that the partition hierarchy
+				// in this scenaro has another lower level LPS that distributes regions of the Space B
+				// LPU to different warps
+				/*----------------------------------------------------------------------------------------------------
+									 Space C: Bottom LPS
+				----------------------------------------------------------------------------------------------------*/ 
+				__shared__ int spaceCLpuCount1, spaceCLpuCount2, spaceCLpuCount;
+				if (threadId == 0 && warpId == 0) {
+					spaceCLpuCount1 = block_size_part_count(spaceBPRanges[0], 1);
+					spaceCLpuCount2 = block_size_part_count(spaceBPRanges[1], partition.blockSize);
+					spaceCLpuCount = spaceCLpuCount1 * spaceCLpuCount2;
+				}
+				__syncthreads();
+
+				// distribute the Space C LPUs among the warps
+                        	__shared__ int spaceCLpuId[WARP_COUNT][2];
+                        	__shared__ int spaceCPRanges[WARP_COUNT][2][2];
+				for (int spaceCLpu = warpId; spaceCLpu < spaceCLpuCount; spaceCLpu += WARP_COUNT) {
+
+					if (threadId == 0) {
+						// construct the 2 dimensional LPU ID from the linear LPU Id
+						spaceCLpuId[warpId][0] = spaceCLpu / spaceCLpuCount2;
+						spaceCLpuId[warpId][1] = spaceCLpu % spaceCLpuCount2;
+
+						// determine the region of the plate the current Space C LPU encompasses
+						block_size_part_range(spaceCPRanges[warpId][0], spaceBPRanges[0],
+								spaceCLpuCount1, spaceCLpuId[warpId][0],
+								1, 0, 0);
+						block_size_part_range(spaceCPRanges[warpId][1], spaceBPRanges[1],
+								spaceCLpuCount2, spaceCLpuId[warpId][1],
+								partition.blockSize, 0, 0);
+					}
+					// there is no syncthread operation needed here as updates done by a thread in a warp is 
+					// visible to all other threads in that warp
+					
+					// Distribute rows and columns of the plate cells to different threads. Note that
+					// under the current scheme only rows or only columns will be distributed among the
+					// threads of the warp, every thread will cover each entry in the other dimension.
+					// Also notice that we have some arithmatic performed first before assigning indexes
+					// to the threads. This is because the IT loop of the corresponding compute stage
+					// has additional restrictions.
+					int iterableRanges[4];
+					iterableRanges[0] = spaceCPRanges[warpId][0][0] + 1;
+					iterableRanges[1] = spaceCPRanges[warpId][0][1] - 1;
+					iterableRanges[2] = spaceCPRanges[warpId][1][0] + 1;
+					iterableRanges[3] = spaceCPRanges[warpId][1][1] - 1;
+					int indexesAndSteps[4];
+					determineLoopIndexesAndSteps(2, threadId, iterableRanges, indexesAndSteps);
+									
+					// iterate over the rows
+					int iStart = indexesAndSteps[0];
+					int iEnd = iterableRanges[1];
+					int iStep = indexesAndSteps[1];
+					for (int i = iStart; i <= iEnd; i += iStep) {
+
+						// iterate over the columns
+						int jStart = indexesAndSteps[2];
+						int jEnd = iterableRanges[3];
+						int jStep = indexesAndSteps[3];
+						for (int j = jStart; j <= jEnd; j+= jStep) {
+
+							// calculate the plate cell value for the current epoch as the average
+							// of its four neighbors from the last epoch
+							plate_shared[spaceBVersionIndex]
+									[(i - spaceBPRanges[0][0])
+                                                                	* (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+                                                                	+ (j - spaceBPRanges[1][0])]  
+								= 0.25 * (plate_shared[(spaceBVersionIndex + 1) % 2]
+                                                                        	[(i + 1 - spaceBPRanges[0][0])
+                                                                        	* (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+                                                                        	+ (j - spaceBPRanges[1][0])]
+									+ plate_shared[(spaceBVersionIndex + 1) % 2]
+                                                                                [(i - 1 - spaceBPRanges[0][0])
+                                                                                * (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+                                                                                + (j - spaceBPRanges[1][0])]
+									+ plate_shared[(spaceBVersionIndex + 1) % 2]
+                                                                                [(i - spaceBPRanges[0][0])
+                                                                                * (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+                                                                                + (j + 1 - spaceBPRanges[1][0])]
+									+ plate_shared[(spaceBVersionIndex + 1) % 2]
+                                                                                [(i - spaceBPRanges[0][0])
+                                                                                * (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+                                                                                + (j - 1 - spaceBPRanges[1][0])]);
+						} // done iterating over j indices
+					} // done iterating over i indices
+				} // done iterating over Space C LPUs	
+			} // done doing padding2 number of Space B iterations
+						
+			// finally the update done by the SM is written back to the correct version of the Space A LPU
+			// in the global memory; now this cannot be done in the general case as the update will skew the
+			// view of the other SM's padding region data since they are expecting to read old cell values
+			// as opposed to the updated values. We are doing this here because we know that the new version
+			// wont be used before the next kernel launch. A lot of static analysis in the source code will
+			// be needed to determine that this kind of updates will not corrupt data. 
+			// different warps read different rows
+			for (int i = spaceBPRangesWithoutPadding[0][0] + warpId; 
+					i <= spaceBPRangesWithoutPadding[0][1]; i += WARP_COUNT) {
+				// different threads read different columns
+				for (int j = spaceBPRangesWithoutPadding[1][0] + threadId;
+						j <= spaceBPRangesWithoutPadding[1][1]; j += WARP_SIZE) {
+					plate[plateVersionIndex][(i - plateSRanges[0][0])
+							* (plateSRanges[1][1] - plateSRanges[1][0] + 1)
+							+ (j - plateSRanges[1][0])]
+						= plate_shared[spaceBVersionIndex][(i - spaceBPRanges[0][0])
+							* (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+							+ (j - spaceBPRanges[1][0])];
+					plate[(plateVersionIndex + 1) % 2][(i - plateSRanges[0][0])
+							* (plateSRanges[1][1] - plateSRanges[1][0] + 1)
+							+ (j - plateSRanges[1][0])]
+						= plate_shared[(spaceBVersionIndex + 1) % 2][(i - spaceBPRanges[0][0])
+							* (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
+							+ (j - spaceBPRanges[1][0])];
+				} // iteration over i ends
+			} // iteration over j ends
+		} // iterating over Space B LPUs ends
+	} // iterating over Space A LPUs ends
 }
 
 //------------------------------------------------------- Stencil GPU Code Executor ------------------------------------------------------/
@@ -338,20 +613,45 @@ StencilGpuCodeExecutor::StencilGpuCodeExecutor(LpuBatchController *lpuBatchContr
         this->threadLocalsGpu = NULL;
 }
 
-void StencilGpuCodeExecutor::offloadFunction() {
-	
+void StencilGpuCodeExecutor::offloadFunction1() {
+
 	GpuBufferReferences *buffers = lpuBatchController->getGpuBufferReferences("plate");
-	VersionedGpuBufferReferences *plateBuffers = (VersionedGpuBufferReferences *) buffers;
-	
-	StencilLpuBatchRange batchRange;
+        VersionedGpuBufferReferences *plateBuffers = (VersionedGpuBufferReferences *) buffers;
+
+        StencilLpuBatchRange batchRange;
         batchRange.lpuIdRange = currentBatchLpuRange;
         batchRange.lpuCount = lpuCount[0];
-	
-	int threadsPerBlock = WARP_SIZE * WARP_COUNT;
-	stencilKernel1 <<< BLOCK_COUNT, threadsPerBlock >>> 
-			(batchRange, partition, arrayMetadata, 
-			taskGlobalsGpu, threadLocalsGpu, *plateBuffers);
-	delete buffers;
+
+        int threadsPerBlock = WARP_SIZE * WARP_COUNT;
+        stencilKernel1 <<< BLOCK_COUNT, threadsPerBlock >>>
+                        (batchRange, partition, arrayMetadata,
+                        taskGlobalsGpu, threadLocalsGpu, *plateBuffers);
+        delete buffers;
+}
+
+void StencilGpuCodeExecutor::offloadFunction2() {
+
+	GpuBufferReferences *buffers = lpuBatchController->getGpuBufferReferences("plate");
+        VersionedGpuBufferReferences *plateBuffers = (VersionedGpuBufferReferences *) buffers;
+
+        StencilLpuBatchRange batchRange;
+        batchRange.lpuIdRange = currentBatchLpuRange;
+        batchRange.lpuCount = lpuCount[0];
+        int threadsPerBlock = WARP_SIZE * WARP_COUNT;
+
+	int spaceAIterations = partition.padding1 / partition.padding2;
+
+	for (int i = 0; i < spaceAIterations; i++) {
+        	stencilKernel2 <<< BLOCK_COUNT, threadsPerBlock >>>
+                        	(batchRange, partition, arrayMetadata,
+                        	taskGlobalsGpu, threadLocalsGpu, *plateBuffers);
+	}
+
+        delete buffers;
+}
+
+void StencilGpuCodeExecutor::offloadFunction() {
+	offloadFunction1();	
 }
 
 void StencilGpuCodeExecutor::initialize() {
