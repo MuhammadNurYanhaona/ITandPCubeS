@@ -56,6 +56,7 @@ void PlatePart::duplicate(PlatePart *copy) {
         copy->partId = this->partId;
         int partSize = storageDims[0].getLength() * storageDims[1].getLength();
         copy->data = new double[partSize];
+        copy->data_lag_1 = new double[partSize];
         memcpy(copy->data, this->data, partSize * sizeof(double));
         memcpy(copy->data_lag_1, this->data_lag_1, partSize * sizeof(double));
 }

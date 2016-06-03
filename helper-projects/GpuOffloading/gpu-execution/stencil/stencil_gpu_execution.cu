@@ -20,9 +20,12 @@ StencilLpuBatchController::StencilLpuBatchController(int lpuCountThreshold,
 	List<const char*> *versionlessProperties = new List<const char*>;
 	List<const char*> *multiversionProperties = new List<const char*>;
 	multiversionProperties->Append("plate");
+	List<const char*> *propertyNames = new List<const char*>;
+        propertyNames->AppendAll(versionlessProperties);
+        propertyNames->AppendAll(multiversionProperties);
 
 	setBufferManager(new LpuDataBufferManager(versionlessProperties, multiversionProperties));
-        initialize(lpuCountThreshold, memConsumptionLimit, propertyNames, toBeModifiedProperties);
+        initialize(lpuCountThreshold, memConsumptionLimit, propertyNames, multiversionProperties);
 }
 
 int StencilLpuBatchController::calculateLpuMemoryRequirement(LPU *lpu) {
@@ -137,6 +140,7 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
 			// distribute the Space B LPUs among the warps
                         __shared__ int spaceBLpuId[WARP_COUNT][2];
 			__shared__ int spaceBPRanges[WARP_COUNT][2][2];
+			__shared__ int spaceBPRangesWithoutPadding[WARP_COUNT][2][2];
 			__shared__ double *spaceBPlateParts[WARP_COUNT][2];
 			__shared__ short warpEpochs[WARP_COUNT];
                         for (int spaceBLpu = warpId; spaceBLpu < spaceBLpuCount; spaceBLpu += WARP_COUNT) { 
@@ -146,7 +150,9 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
                                         spaceBLpuId[warpId][0] = spaceBLpu / spaceBLpuCount2;
                                         spaceBLpuId[warpId][1] = spaceBLpu % spaceBLpuCount2;
 		
-					// determine the region of the plate the current Space B LPU encompasses
+					// determine the region of the plate the current Space B LPU encompasses considering
+					// padding; this range is the range over which the current LPU computation should 
+					// take place	
 					block_size_part_range(spaceBPRanges[warpId][0], platePRanges[0],
                                                         spaceBLpuCount1, spaceBLpuId[warpId][0], 
 							partition.blockSize, 
@@ -155,13 +161,22 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
                                                         spaceBLpuCount2, spaceBLpuId[warpId][1],
                                                         partition.blockSize, 
 							partition.padding2, partition.padding2);
+
+					// determine another region information that excludes the padding; this range will be
+					// used to resynchronize the Space B LPU update to the card memory Space A LPU region	
+					block_size_part_range(spaceBPRangesWithoutPadding[warpId][0], platePRanges[0],
+                                                        spaceBLpuCount1, spaceBLpuId[warpId][0], 
+							partition.blockSize, 0, 0);
+                                        block_size_part_range(spaceBPRangesWithoutPadding[warpId][1], platePRanges[1],
+                                                        spaceBLpuCount2, spaceBLpuId[warpId][1],
+							partition.blockSize, 0, 0);
 				}
 				// there is no syncthread operation needed here as updates done by a thread in a warp is 
 				// visible to all other threads in that warp
 
 				// before computation for an Space B LPU can begin, we need to allocate a separate memory
-				// units for holding its plate parts as there are overlappings among Space B LPUs too and
-				// one warp computation on the padded region may corrupt other warps data
+				// units for holding its plate parts as there are overlappings among Space B LPUs too and one 
+				// warp computation on the padded region may corrupt other warps data
 				if (threadId == 0) {
 					spaceBPlateParts[warpId][0] = (double *) malloc(sizeof(double)
 							* (spaceBPRanges[warpId][0][1] - spaceBPRanges[warpId][0][0] + 1)
@@ -233,14 +248,13 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
 						int jEnd = iterableRanges[3];
 						int jStep = indexesAndSteps[3];
 						for (int j = jStart; j <= jEnd; j+= jStep) {
-
 							// calculate the plate cell value for the current epoch as the average
 							// of its four neighbors from the last epoch
 							spaceBPlateParts[warpId][warpEpochs[warpId]]
 									[(i - spaceBPRanges[warpId][0][0])
                                                                 	* (spaceBPRanges[warpId][1][1] 
 										- spaceBPRanges[warpId][1][0] + 1)
-                                                                	+ (j - spaceBPRanges[warpId][1][0])]
+                                                                	+ (j - spaceBPRanges[warpId][1][0])]  
 								= 0.25 * (spaceBPlateParts[warpId][(warpEpochs[warpId] + 1) % 2]
                                                                         	[(i + 1 - spaceBPRanges[warpId][0][0])
                                                                         	* (spaceBPRanges[warpId][1][1]
@@ -260,17 +274,17 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
                                                                                 [(i - spaceBPRanges[warpId][0][0])
                                                                                 * (spaceBPRanges[warpId][1][1]
                                                                                         - spaceBPRanges[warpId][1][0] + 1)
-                                                                                + (j - 1 - spaceBPRanges[warpId][1][0])]); 
-						
+                                                                                + (j - 1 - spaceBPRanges[warpId][1][0])]);
 						} // done iterating over j indices
 					} // done iterating over i indices
 				} // done Space B padding number of iterations
 				
 				// at the end of the computation, copy updates from the allocated memory for the Space B LPU
 				// to the Space A LPU region 
-				for (int i = spaceBPRanges[warpId][0][0]; i <= spaceBPRanges[warpId][0][1]; i++) {
-					for (int j = spaceBPRanges[warpId][1][0] + threadId;
-							j <= spaceBPRanges[warpId][1][1]; j += WARP_SIZE) {
+				for (int i = spaceBPRangesWithoutPadding[warpId][0][0]; 
+						i <= spaceBPRangesWithoutPadding[warpId][0][1]; i++) {
+					for (int j = spaceBPRangesWithoutPadding[warpId][1][0] + threadId;
+							j <= spaceBPRangesWithoutPadding[warpId][1][1]; j += WARP_SIZE) {
 						plate[0][(i - plateSRanges[0][0]) 
 								* (plateSRanges[1][1] - plateSRanges[1][0] + 1)
 								+ (j - plateSRanges[1][0])]  
@@ -295,7 +309,14 @@ __global__ void stencilKernel1(StencilLpuBatchRange batchRange,
 					free(spaceBPlateParts[warpId][0]);
 					free(spaceBPlateParts[warpId][1]);
 				}  
-			}	
+			}
+
+			// How does a compiler decide to do the following? This is something that we probably cannot have in a
+			// generated code and we needs to find an alternative. 
+			__syncthreads();
+			if (threadId == 0 && warpId == 0) {
+				plateVersionIndex = (plateVersionIndex + 1) % 2;
+			}
 		}
 	}
 		

@@ -375,7 +375,7 @@ void VersionedPropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> 
 		for (int j = 0; j < versionCount; j++) {
 			int versionIndex = (currVersion + j) % versionCount;
 			char *dataStart = cpuBuffer + currentIndex + versionIndex * sizePerVersion;
-			void *data = dataPart->getDataVersion(currVersion);
+			void *data = dataPart->getDataVersion(versionIndex);
 			memcpy(data, dataStart, sizePerVersion);
 		}
 		currentIndex += dataPart->getSize();
