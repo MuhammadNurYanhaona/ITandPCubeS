@@ -329,7 +329,8 @@ __global__ void stencilKernel2(StencilLpuBatchRange batchRange,
                 stencil::ArrayMetadata arrayMetadata,
                 stencil::TaskGlobals *taskGlobals,
                 stencil::ThreadLocals *threadLocals,
-                VersionedGpuBufferReferences plateBuffers) {
+                VersionedGpuBufferReferences plateBuffers, 
+		int iteration) {
 
         // before we can do anything in the kernel, we need to determine the thread, warp, and sm IDs of the thread
         // executing the kernel code
@@ -388,7 +389,7 @@ __global__ void stencilKernel2(StencilLpuBatchRange batchRange,
                         plate[1] = (plate[0] + plateSize);
 
                         // read the current version index into the shared memory 
-                        plateVersionIndex = plateBuffers.versionIndexBuffer[plateIndex];
+                        plateVersionIndex = iteration % 2;
                 }
                 __syncthreads();
 
@@ -416,6 +417,10 @@ __global__ void stencilKernel2(StencilLpuBatchRange batchRange,
 		__shared__ int spaceBPRangesWithoutPadding[2][2];
 		__shared__ short spaceBVersionIndex;
                 for (int spaceBLpu = smId; spaceBLpu < spaceBLpuCount; spaceBLpu += BLOCK_COUNT) {
+		
+			// a syncthread is needed in this step to stop the first thread in the SM from changing the part
+			// dimension metadata for plate before all other threads have finished using that information	
+			__syncthreads();
 
 			if (threadId == 0 && warpId == 0) {
 				// construct the 2 dimensional LPU ID from the linear LPU Id
@@ -506,10 +511,10 @@ __global__ void stencilKernel2(StencilLpuBatchRange batchRange,
 						// determine the region of the plate the current Space C LPU encompasses
 						block_size_part_range(spaceCPRanges[warpId][0], spaceBPRanges[0],
 								spaceCLpuCount1, spaceCLpuId[warpId][0],
-								1, 0, 0);
+								1, 1, 1);
 						block_size_part_range(spaceCPRanges[warpId][1], spaceBPRanges[1],
 								spaceCLpuCount2, spaceCLpuId[warpId][1],
-								partition.blockSize, 0, 0);
+								partition.blockSize, 1, 1);
 					}
 					// there is no syncthread operation needed here as updates done by a thread in a warp is 
 					// visible to all other threads in that warp
@@ -565,7 +570,8 @@ __global__ void stencilKernel2(StencilLpuBatchRange batchRange,
 						} // done iterating over j indices
 					} // done iterating over i indices
 				} // done iterating over Space C LPUs	
-			} // done doing padding2 number of Space B iterations
+			} // done doing padding2 number of Space B iterations 
+			
 						
 			// finally the update done by the SM is written back to the correct version of the Space A LPU
 			// in the global memory; now this cannot be done in the general case as the update will skew the
@@ -579,13 +585,13 @@ __global__ void stencilKernel2(StencilLpuBatchRange batchRange,
 				// different threads read different columns
 				for (int j = spaceBPRangesWithoutPadding[1][0] + threadId;
 						j <= spaceBPRangesWithoutPadding[1][1]; j += WARP_SIZE) {
-					plate[plateVersionIndex][(i - plateSRanges[0][0])
+					plate[spaceBVersionIndex][(i - plateSRanges[0][0])
 							* (plateSRanges[1][1] - plateSRanges[1][0] + 1)
 							+ (j - plateSRanges[1][0])]
 						= plate_shared[spaceBVersionIndex][(i - spaceBPRanges[0][0])
 							* (spaceBPRanges[1][1] - spaceBPRanges[1][0] + 1)
 							+ (j - spaceBPRanges[1][0])];
-					plate[(plateVersionIndex + 1) % 2][(i - plateSRanges[0][0])
+					plate[(spaceBVersionIndex + 1) % 2][(i - plateSRanges[0][0])
 							* (plateSRanges[1][1] - plateSRanges[1][0] + 1)
 							+ (j - plateSRanges[1][0])]
 						= plate_shared[(spaceBVersionIndex + 1) % 2][(i - spaceBPRanges[0][0])
@@ -644,14 +650,15 @@ void StencilGpuCodeExecutor::offloadFunction2() {
 	for (int i = 0; i < spaceAIterations; i++) {
         	stencilKernel2 <<< BLOCK_COUNT, threadsPerBlock >>>
                         	(batchRange, partition, arrayMetadata,
-                        	taskGlobalsGpu, threadLocalsGpu, *plateBuffers);
+                        	taskGlobalsGpu, threadLocalsGpu, *plateBuffers, 
+				i);
 	}
 
         delete buffers;
 }
 
 void StencilGpuCodeExecutor::offloadFunction() {
-	offloadFunction1();	
+	offloadFunction2();	
 }
 
 void StencilGpuCodeExecutor::initialize() {
