@@ -10,6 +10,8 @@
 #include <cstdlib>
 #include <time.h>
 
+using namespace mmm;
+
 //---------------------------------------------------------------- ID Generator --------------------------------------------------------------/
 
 IdGenerator::IdGenerator(int *lpuCount) {
@@ -342,10 +344,10 @@ void MatrixPartMap::matchParts(MatrixPartMap *otherMap, std::ofstream &logFile) 
 
 //------------------------------------------------------------- Get Next LPU Routine ---------------------------------------------------------/
 
-void getNextLpu(int linearLpuId,
-		MMMLpu *lpuInstance,
-		IdGenerator *idGenerator,
-		MatrixPartMap *partMap) {
+void mmm::getNextLpu(int linearLpuId,
+		mmm::MMMLpu *lpuInstance,
+		mmm::IdGenerator *idGenerator,
+		mmm::MatrixPartMap *partMap) {
 
 	List<int*> *aPartId =  idGenerator->getAPartId(linearLpuId);
 	MatrixPart *aPart = partMap->getAPart(aPartId);
