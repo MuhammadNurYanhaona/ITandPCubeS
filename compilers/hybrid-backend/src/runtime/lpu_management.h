@@ -154,7 +154,8 @@ class ThreadState {
 	List<int*> *lpuIdChain;
   public:
 	ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, ThreadIds *threadIds);
-
+	
+	ThreadIds *getThreadIds() { return threadIds; }
 	void setPartConfigMap(Hashtable<DataPartitionConfig*> *map) { partConfigMap = map; }
 	Hashtable<DataPartitionConfig*> *getPartConfigMap() { return partConfigMap; }
 	void setTaskData(TaskData *taskData) { this->taskData = taskData; }
@@ -215,7 +216,6 @@ class ThreadState {
 
 	LPU *getCurrentLpu(int lpsId, bool allowInvalid = false);
 	void removeIterationBound(int lpsId);
-	ThreadIds *getThreadIds() { return threadIds; }
 	bool isValidPpu(int lpsId);
 	int getThreadNo() { return threadIds->threadNo; }
 	virtual ~ThreadState() {}
