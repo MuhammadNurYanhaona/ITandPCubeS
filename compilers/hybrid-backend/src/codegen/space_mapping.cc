@@ -17,6 +17,18 @@
 #include <string>
 #include <deque>
 
+//--------------------------------------------------------------- PPS Definition ------------------------------------------------------/
+
+PPS_Definition::PPS_Definition() {
+	id = -1;
+	name = NULL;
+	units = 0;
+	coreSpace = false;
+	segmented = false;
+	physicalUnit = false;
+	gpuTransition = false;
+}
+
 void PPS_Definition::print(int indentLevel) {
 	std::ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
@@ -26,11 +38,68 @@ void PPS_Definition::print(int indentLevel) {
 	if (coreSpace) std::cout << indent.str() << "Computation Core\n";
 	if (segmented) std::cout << indent.str() << "Segmented Memory\n";	
 	if (physicalUnit) std::cout << indent.str() << "Physical Unit\n";
+	if (gpuTransition) std::cout << indent.str() << "Top-most GPU Level\n";
 }
 
-List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
+//---------------------------------------------------------------- PCubeS Model -------------------------------------------------------/
 
-	List<PPS_Definition*> *list = new List<PPS_Definition*>;
+PCubeSModel::PCubeSModel(int modelType) {
+	this->modelType = modelType;
+	ppsDefinitions = new List<PPS_Definition*>();
+	modelName = NULL;
+}
+
+PCubeSModel::PCubeSModel(int modelType, List<PPS_Definition*> *ppsDefinitions) {
+	this->modelType = modelType;
+	this->ppsDefinitions = ppsDefinitions;
+	modelName = NULL;
+}
+
+void PCubeSModel::print(int indentLevel) {
+	for (int i = 0; i < indentLevel; i++) std::cout << '\t';
+	if (modelName != NULL) {
+		std::cout << "Model: " << modelName;
+	} else {
+		std::cout << "Model: Default Model";
+	}
+	std::cout << "\n";
+	for (int i = 0; i < ppsDefinitions->NumElements(); i++) {
+		ppsDefinitions->Nth(i)->print(indentLevel + 1);
+	}
+}
+
+int PCubeSModel::getGpuTransitionSpaceId() {
+	if (modelType != PCUBES_MODEL_TYPE_HYBRID) {
+		std::cout << "Cannot get SM count from a host-only PCubeS model\n";
+		std::exit(EXIT_FAILURE);
+	}
+	int gpuLevelIndex = ppsDefinitions->NumElements() - 3;
+	return ppsDefinitions->Nth(gpuLevelIndex)->id;
+}
+
+int PCubeSModel::getSMCount() {
+	if (modelType != PCUBES_MODEL_TYPE_HYBRID) {
+		std::cout << "Cannot get SM count from a host-only PCubeS model\n";
+		std::exit(EXIT_FAILURE);
+	}
+	int smLevelIndex = ppsDefinitions->NumElements() - 2;
+	return ppsDefinitions->Nth(smLevelIndex)->units;
+}
+
+int PCubeSModel::getWarpCount() {
+	if (modelType != PCUBES_MODEL_TYPE_HYBRID) {
+		std::cout << "Cannot get WARP count from a host-only PCubeS model\n";
+		std::exit(EXIT_FAILURE);
+	}
+	int warpLevelIndex = ppsDefinitions->NumElements() - 1;
+	return ppsDefinitions->Nth(warpLevelIndex)->units;
+}
+
+//---------------------------------------------------------- Utility Library Functions ------------------------------------------------/
+
+List<PCubeSModel*> *parsePCubeSDescription(const char *filePath) {
+
+	List<PCubeSModel*> *modelList = new List<PCubeSModel*>;
 	std::string line;
 	std::ifstream pcubesfile(filePath);
 	std::string separator1 = ":";
@@ -45,15 +114,37 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 	
 	std::cout << "Parsing the PCubeS description-----------------------------------" << std::endl;
 
+	List<PPS_Definition*> *ppsList = new List<PPS_Definition*>;
+	int currentModelNo = 0;
+	std::string modelName("Default");
+	bool hybridModel = false;
+
 	while (std::getline(pcubesfile, line)) {
+
 		// trim line and escape it if it is a comment	
 		string_utils::trim(line);
 		if (line.length() == 0) continue;
 		std::string comments = "//";
 		if (string_utils::startsWith(line, comments)) continue;
-
-		// separate space number from its name and PPU count
+		
+		// separate space number from its name and PPU count; alternatively the current line can be the beginning 
+		// of a new PCubeS model
 		tokenList = string_utils::tokenizeString(line, separator1);
+		std::string firstToken = tokenList->Nth(0);
+		if (strcmp(firstToken.c_str(), "Model") == 0) {
+			if (currentModelNo > 0) {
+				int modelType = hybridModel ? PCUBES_MODEL_TYPE_HYBRID : PCUBES_MODEL_TYPE_HOST_ONLY; 
+				PCubeSModel *lastModel = new PCubeSModel(modelType, ppsList);
+				lastModel->setModelName(strdup(modelName.c_str()));
+				modelList->Append(lastModel);
+			}
+			hybridModel = false;
+			modelName = tokenList->Nth(1);
+			ppsList = new List<PPS_Definition*>;
+			currentModelNo++;
+			continue;
+		}
+
 		std::string spaceNoStr = tokenList->Nth(0);
 		std::string spaceNameStr = tokenList->Nth(1);
 
@@ -67,6 +158,11 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		bool coreSpace = string_utils::contains(attrList, "core");
 		bool segmented = string_utils::contains(attrList, "segment");
 		bool physicalUnit = string_utils::contains(attrList, "unit");
+		bool gpuTransition = string_utils::contains(attrList, "gpu");
+
+		// if there is a GPU transition PPS in the current PCubeS model then this is a hybrid model and we should 
+		// record this information
+		if (gpuTransition) hybridModel = true;
 
 		// retrieve space name and PPU count
 		tokenList = string_utils::tokenizeString(spaceNameStr, separator3);
@@ -83,28 +179,35 @@ List<PPS_Definition*> *parsePCubeSDescription(const char *filePath) {
 		spaceDefinition->coreSpace = coreSpace;
 		spaceDefinition->segmented = segmented;
 		spaceDefinition->physicalUnit = physicalUnit;
+		spaceDefinition->gpuTransition = gpuTransition;
 			
 		// store the space definition in the list in top-down order
 		int i = 0;	
-		for (; i < list->NumElements(); i++) {
-			if (list->Nth(i)->id > spaceId) continue;
+		for (; i < ppsList->NumElements(); i++) {
+			if (ppsList->Nth(i)->id > spaceId) continue;
 			else break;	
 		}
-		list->InsertAt(spaceDefinition, i);
+		ppsList->InsertAt(spaceDefinition, i);
 	}
 	pcubesfile.close();
 
-	std::cout << "PCubeS Description of the hardware\n";
-	for (int i = 0; i < list->NumElements(); i++) {
-		list->Nth(i)->print(1);
+	int modelType = hybridModel ? PCUBES_MODEL_TYPE_HYBRID : PCUBES_MODEL_TYPE_HOST_ONLY; 
+	PCubeSModel *lastModel = new PCubeSModel(modelType, ppsList);
+	lastModel->setModelName(strdup(modelName.c_str()));
+	modelList->Append(lastModel);
+
+	std::cout << "PCubeS Description(s) of the hardware\n";
+	for (int i = 0; i < modelList->NumElements(); i++) {
+		PCubeSModel *model = modelList->Nth(i);
+		model->print(1);
 	}
-	return list;
+	return modelList;
 }
 
 MappingNode *parseMappingConfiguration(const char *taskName,
                 const char *filePath,
                 PartitionHierarchy *lpsHierarchy,
-                List<PPS_Definition*> *pcubesConfig) {
+                List<PCubeSModel*> *pcubesModels) {
 
 	std::string line;
 	std::ifstream mappingfile(filePath);
@@ -138,7 +241,37 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	std::string mapping = description.substr(mappingStart + 1, mappingEnd - mappingStart - 1);
 	string_utils::trim(mapping);
 	mappingfile.close();
-
+		
+	// determine what PCubeS model is selected for the LPS to PPS mapping; if no model is specified then assume
+	// that the default model has been intended
+	mappingList = string_utils::tokenizeString(mapping, newlineDelimiter);
+	int mappingCount = mappingList->NumElements();
+	int lineNo = 0;
+	std::string firstLine = mappingList->Nth(0);
+	tokenList = string_utils::tokenizeString(firstLine, mappingDelimiter);
+	List<PPS_Definition*> *pcubesConfig = NULL;
+	if (strcmp("Model", tokenList->Nth(0).c_str()) == 0) {
+		const char *modelName = tokenList->Nth(1).c_str();
+		bool modelFound = false;
+		for (int i = 0; i < pcubesModels->NumElements(); i++) {
+			PCubeSModel *model = pcubesModels->Nth(i);
+			if (strcmp(modelName, model->getModelName()) == 0) {
+				modelFound = true;
+				pcubesConfig = model->getPpsDefinitions();
+				lpsHierarchy->setPCubeSModel(model);
+			}
+		}
+		if (!modelFound) {
+			std::cout << "could not find the specified model in the PCubeS description\n";
+			std::exit(EXIT_FAILURE);	
+		}
+		lineNo++;
+	} else {
+		PCubeSModel *model = pcubesModels->Nth(0);
+		pcubesConfig = model->getPpsDefinitions();
+		lpsHierarchy->setPCubeSModel(model);
+	}
+	
 	// create the root of the mapping hierarchy
 	MapEntry *rootEntry = new MapEntry();
 	Space *rootSpace = lpsHierarchy->getRootSpace();
@@ -151,16 +284,13 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	rootNode->children = new List<MappingNode*>;
 
 	// parse individual lines and construct the mapping hierarchy
-	mappingList = string_utils::tokenizeString(mapping, newlineDelimiter);
 	Hashtable<MappingNode*> *mappingTable = new Hashtable<MappingNode*>;
-	int i = 0;
-	int mappingCount = mappingList->NumElements();
 	int totalPPSes = pcubesConfig->NumElements();
-	while (i < mappingCount) {
+	while (lineNo < mappingCount) {
 
 		// determine the LPS and PPS for the mapping
 
-		std::string mapping = mappingList->Nth(i);
+		std::string mapping = mappingList->Nth(lineNo);
 		tokenList = string_utils::tokenizeString(mapping, mappingDelimiter);
 		int ppsId = atoi(tokenList->Nth(1).c_str());
 		PPS_Definition *pps = pcubesConfig->Nth(totalPPSes - ppsId);
@@ -173,7 +303,7 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		if (rootFound != std::string::npos) {
 			rootEntry->PPS = pps;
 			rootSpace->setPpsId(ppsId);
-			i++;
+			lineNo++;
 			continue;
 		}
 
@@ -194,9 +324,9 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 		node->mappingConfig = entry;
 		node->children = new List<MappingNode*>;
 		mappingTable->Enter(lps->getName(), node, true);
-		i++;
+		lineNo++;
 	
-		// if the LPS is subpartitioned than map the subpartition into the same PPS
+		// if the LPS is subpartitioned then map the subpartition into the same PPS
 		if (lps->getSubpartition() != NULL) {
 			MapEntry *subEntry = new MapEntry();
 			subEntry->LPS = lps->getSubpartition();
@@ -271,13 +401,16 @@ void generateLPSConstants(const char *outputFile, MappingNode *mappingRoot) {
 	}
 }
 
-void generatePPSCountConstants(const char *outputFile, List<PPS_Definition*> *pcubesConfig) {
+void generatePPSCountConstants(const char *outputFile, PCubeSModel *pcubesModel) {
+	
+	List<PPS_Definition*> *pcubesConfig = pcubesModel->getPpsDefinitions();
 	std::string stmtSeparator = ";\n";
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
+
   	if (programFile.is_open()) {
-		const char *header = "constants for PPS counts";
-		decorator::writeSectionHeader(programFile, header);
+		
+		decorator::writeSectionHeader(programFile, "constants for PPS counts");
 		programFile << std::endl;
 		PPS_Definition *pps = pcubesConfig->Nth(0);
 		int prevSpaceId = pps->id;
@@ -290,6 +423,14 @@ void generatePPSCountConstants(const char *outputFile, List<PPS_Definition*> *pc
 			programFile << " = " << pps->units << stmtSeparator;
 			prevSpaceId = pps->id;
 		}
+
+		if (pcubesModel->getModelType() == PCUBES_MODEL_TYPE_HYBRID) {
+			decorator::writeSectionHeader(programFile, "constants for GPU Configuration");		
+			programFile << std::endl;
+			programFile << "const int SM_COUNT " << pcubesModel->getSMCount() << stmtSeparator;
+			programFile << "const int WARP_COUNT " << pcubesModel->getWarpCount() << stmtSeparator;
+		}
+
     		programFile.close();
   	} else {
 		std::cout << "Unable to open output program file";

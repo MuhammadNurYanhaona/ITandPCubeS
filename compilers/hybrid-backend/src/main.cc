@@ -104,7 +104,7 @@ int main(int argc, const char *argv[]) {
 
 	//***************************************************************** Back End Compiler
 	// parse PCubeS description of the multicore hardware
-	List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription(pcubesFile);
+	List<PCubeSModel*> *pcubesModels = parsePCubeSDescription(pcubesFile);
 	// iterate over list of tasks and generate code for each of them in separate files
 	List<TaskDef*> *taskList = ProgramDef::program->getTasks();
 	for (int i = 0; i < taskList->NumElements(); i++) {
@@ -114,7 +114,7 @@ int main(int argc, const char *argv[]) {
 		taskDef->getComputation()->calculateLPSUsageStatistics();
 		TaskGenerator *generator = new TaskGenerator(taskDef, 
 				outputDir, mappingFile, processorFile);
-		generator->generate(pcubesConfig);
+		generator->generate(pcubesModels);
 	}
 	// generate classes for the list of tuples present in the source in a header file
 	generateClassesForTuples(tupleHeader, ProgramDef::program->getTuples());

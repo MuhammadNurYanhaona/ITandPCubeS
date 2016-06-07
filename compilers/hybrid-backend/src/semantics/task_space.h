@@ -30,6 +30,7 @@ enum PartitionLinkType { LinkTypePartition, LinkTypeSubpartition, LinkTypeUndefi
 class PartitionArg;
 class Space;
 class Symbol;
+class PCubeSModel;
 
 /*	This class stores partition funcion arguments regarding a single dimension of a task global array 
 	within a single space configuration. 
@@ -394,9 +395,13 @@ class Space {
 */
 class PartitionHierarchy {
   protected:
+	PCubeSModel *pcubesModel;
 	Hashtable<Space*> *spaceHierarchy;
   public:
 	PartitionHierarchy();
+	void setPCubeSModel(PCubeSModel *pcubesModel);
+	PCubeSModel *getPCubeSModel();
+	bool isMappedToHybridModel();
 	Space *getSpace(char spaceId);
 	Space *getSubspace(char spaceId);
 	Space *getRootSpace();

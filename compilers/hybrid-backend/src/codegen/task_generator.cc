@@ -78,7 +78,7 @@ const char *TaskGenerator::getNamespace(TaskDef *taskDef) {
 	return string_utils::toLower(initials);
 }
 
-void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
+void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 
 	std::cout << "\n-----------------------------------------------------------------\n";
 	std::cout << "Translating task: " << taskDef->getName();
@@ -89,9 +89,13 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// interpret mapping configuration
         PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
         MappingNode *mappingConfig = parseMappingConfiguration(taskDef->getName(),
-                        mappingFile, lpsHierarchy, pcubesConfig);
+                        mappingFile, lpsHierarchy, pcubesModels);
 	this->mappingRoot = mappingConfig;
 	Space *rootLps = lpsHierarchy->getRootSpace();
+
+	// retrieve the description of the PCubeS model that has been used for the LPS mapping the current task
+	PCubeSModel *pcubesModel = lpsHierarchy->getPCubeSModel();
+	List<PPS_Definition*> *pcubesConfig = pcubesModel->getPpsDefinitions();
 
 	// determine where memory segmentation happens in the hardware
 	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
@@ -103,8 +107,8 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	}
 	if (segmentedPPS == 0) {
 		std::cout << "No segmentation observed in the PCubeS configuration\n";
-		// assign the topmost PPS the segmentation marker to make the code work for
-		// non segmented memory architectures
+		// assign the topmost PPS the segmentation marker to make the code work for non segmented memory 
+		// architectures
 		segmentedPPS = pcubesConfig->Nth(0)->id;
 	}
 
@@ -116,7 +120,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         
 	// generate constansts needed for various reasons
         generateLPSConstants(headerFile, mappingConfig);
-        generatePPSCountConstants(headerFile, pcubesConfig);
+        generatePPSCountConstants(headerFile, pcubesModel);
         generateThreadCountConstants(headerFile, mappingConfig, pcubesConfig);
         
 	// generate data structures and functions for task environment management 

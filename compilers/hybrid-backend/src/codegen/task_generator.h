@@ -49,7 +49,7 @@ class TaskGenerator {
 
 	// function to generate all data structures and methods that are relevant to this task 
 	// including a thread run function to run the task as a parallel program in multiple threads
-	void generate(List<PPS_Definition*> *pcubesConfig);
+	void generate(List<PCubeSModel*> *pcubesModels);
 
 	// a supporting function for task executor that initiates the environment links based on input
 	// from console; it returns the list of external links to aid the calculation of other helper

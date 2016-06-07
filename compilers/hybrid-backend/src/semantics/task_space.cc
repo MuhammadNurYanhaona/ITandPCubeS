@@ -7,6 +7,7 @@
 #include "partition_function.h"
 #include "../syntax/errors.h"
 #include "../static-analysis/usage_statistic.h"
+#include "../codegen/space_mapping.h"
 #include "symbol.h"
 
 #include <deque>
@@ -673,6 +674,18 @@ bool Space::allocateStructure(const char *structureName) {
 
 PartitionHierarchy::PartitionHierarchy() {
 	spaceHierarchy = new Hashtable<Space*>;
+	pcubesModel = NULL;
+}
+
+void PartitionHierarchy::setPCubeSModel(PCubeSModel *pcubesModel) {
+	this->pcubesModel = pcubesModel;
+}
+
+PCubeSModel *PartitionHierarchy::getPCubeSModel() { return pcubesModel; }
+        
+bool PartitionHierarchy::isMappedToHybridModel() {
+	if (pcubesModel == NULL) return false;
+	return (pcubesModel->getModelType() == PCUBES_MODEL_TYPE_HYBRID);
 }
 
 Space *PartitionHierarchy::getSpace(char spaceId) {
