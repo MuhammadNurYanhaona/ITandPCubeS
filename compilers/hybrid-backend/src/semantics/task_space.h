@@ -413,6 +413,21 @@ class PartitionHierarchy {
 	// can be set accordingly during LPU generations. The analysis done here is dependent on the LPS-to-PPS 
 	// mapping. Therefore, it should be done after ppsIds are set to LPSes properly. 	
 	void performAllocationAnalysis(int segmentedPPS);
+  private:
+	// We try to keep the environment inside the GPU cards to look more like the multicore memory model as 
+	// opposed to the segmented memory model. So the data parts are allocated for the the top-most LPS in the
+	// partition hierarchy that is mapped to a GPU PPS as opposed to for the LPS that hosts the computation
+	// stages. Furthermore, we ignore reordering of array indices in the LPS hierarchy after the allocation for
+	// the top-most GPU LPS. This choice has been made to avoid developing intra-GPU communicator for data part
+	// synchronization which was a major work for the segmented memory backend. We could use the same logic for
+	// communicators for the GPU as we have for the host and cluster level communicator, but our initial assump-
+	// tion is that the overhead of communicator operations will be significant. Furthermore, we wanted to 
+	// maximize the amount of time we spent on GPU computation in-between data stage in-out from the host and
+	// minimize the number of times we do the transfaer. In that regard, having larger data part allocations 
+	// for higher level LPSes often helps. 
+	// The following function, implements the deviant behavior for GPU LPSes regarding memory allocation as a
+	// supporting function to the performAllocationAnalysis() routine above.   
+	void performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gpuPpsId);
 };
 
 #endif

@@ -1,0 +1,5 @@
+"Matrix Multiply" {
+	// syntax LPS ':' PPS
+	Space Root: 	4	// node
+	Space A: 	1	// hyperthreads
+}

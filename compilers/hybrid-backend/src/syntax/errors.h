@@ -79,6 +79,7 @@ class ReportError
 	static void InvalidPadding(yyltype *loc, const char *functionName);
 	static void PartitionArgumentsNotSupported(yyltype *loc, const char *functionName);
 	static void PaddingArgumentsNotSupported(yyltype *loc, const char *functionName);
+	static void UnsupportedGpuPartitionConfiguration(const char *variableName, const char *gpuLps);
 
 	// Errors discovered during static analysis	
 	static void NotLValueinAssignment(yyltype *loc);

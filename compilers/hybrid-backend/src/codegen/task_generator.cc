@@ -114,6 +114,9 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 
 	// do back-end architecture dependent static analyses of the task
 	lpsHierarchy->performAllocationAnalysis(segmentedPPS);
+	if (ReportError::NumErrors() > 0) {
+		std::exit(EXIT_FAILURE);
+	}
 
 	// generate a constant array for processor ordering in the hardware
 	generateProcessorOrderArray(headerFile, processorFile);

@@ -332,7 +332,7 @@ void ReportError::TooFineGrainedVariablePartition(Identifier *id) {
 }
 
 void ReportError::ArgumentCountMismatchInPartitionFunction(const char *functionName) {
-	Formatted(NULL, "Internal error in partition function implementation. Argument count does not match what expected");
+	Formatted(NULL, "Internal error in partition function %s. Argument count does not match what expected", functionName);
 }
 
 void ReportError::UnknownPartitionFunction(yyltype *loc, const char *functionName) {
@@ -354,6 +354,10 @@ void ReportError::PartitionArgumentsNotSupported(yyltype *loc, const char *funct
         
 void ReportError::PaddingArgumentsNotSupported(yyltype *loc, const char *functionName) {
 	Formatted(loc, "Partition function %s does not support padding arguments", functionName);
+}
+
+void ReportError::UnsupportedGpuPartitionConfiguration(const char *variableName, const char *gpuLps) {
+	Formatted(NULL, "The current compiler cannot generate code for the partition configuration \n    where the top-most LPS mapped to a GPU PPS does not have all variables used inside the GPU.\n    Variable '%s' falls in that category. Specify a mapping for '%s' in Space %s.", variableName, variableName, gpuLps);
 }
 
 void ReportError::NotLValueinAssignment(yyltype *loc) {

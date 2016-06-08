@@ -731,7 +731,16 @@ Space *PartitionHierarchy::getCommonAncestor(Space *space1, Space *space2) {
 	return getRootSpace();
 }
 
-void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {	
+void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
+	
+	// determine if the current task's LPS hierarchy has been mapped to a hybrid PCubeS model
+	// and if yes, determine the top-most PPS ID for the GPU
+	bool hybridModel = (pcubesModel->getModelType() ==  PCUBES_MODEL_TYPE_HYBRID);
+	int gpuPpsId = -1;
+	if (hybridModel) {
+		gpuPpsId = pcubesModel->getGpuTransitionSpaceId();
+	}
+
 	Space *root = getRootSpace();
 	List<const char*> *variableList = root->getLocalDataStructureNames();
 	
@@ -764,6 +773,13 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 		if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
 
 		int ppsId = lps->getPpsId();
+
+		// if the current LPS is mapped at or below the PPS designating host to GPU 
+		// transition then we do GPU specific allocation analysis
+		if (ppsId <= gpuPpsId) {
+			performAllocAnalysisOnLpsMappedToGpu(lps, gpuPpsId);
+			continue;
+		}
 		
 		// iterate over all the arrays of current LPS and consider only those for memory
 		// allocation that have been used within any of LPS's compute stages.
@@ -847,6 +863,51 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 					source->setAllocator(lps);
 					source = source->getSource();
 				}
+			}
+		}
+	}
+}
+
+void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gpuPpsId) {
+	
+	Space *parentLps = lps->getParent();
+	Space *rootLps = getRootSpace();
+
+	bool topmostLpsMappedToGpu = false;
+	if (parentLps == rootLps || parentLps->getPpsId() > gpuPpsId) {
+		topmostLpsMappedToGpu = true;
+	}
+
+	// if the current LPS is the topmost LPS in its hierarchy that has been been mapped inside the GPU then we flag 
+	// all data structures specified in its partition configuration for allocation
+	if (topmostLpsMappedToGpu) {
+		List<const char*> *variableList = lps->getLocallyUsedArrayNames();
+		for (int i = 0; i < variableList->NumElements(); i++) {
+			DataStructure *variable = lps->getLocalStructure(variableList->Nth(i));
+			variable->setAllocator(lps);
+                        variable->getUsageStat()->flagAllocated();
+		}
+	// if the current LPS is not the topmost LPS in its hierarchy then we validate that all variables used in it have 
+	// already been allocated in its ancestor top-most GPU level LPS
+	} else {
+		Space *ancestorGpuLps = parentLps;
+		while (parentLps != rootLps && parentLps->getPpsId() <= gpuPpsId) {
+			ancestorGpuLps = parentLps;
+			parentLps = parentLps->getParent();
+		}
+		const char *ancestorLpsName = ancestorGpuLps->getName();
+		List<const char*> *variableList = lps->getLocallyUsedArrayNames();
+		for (int i = 0; i < variableList->NumElements(); i++) {
+			DataStructure *variable = lps->getLocalStructure(variableList->Nth(i));
+			const char *varName = variable->getName();
+			DataStructure *lastAllocation = variable->getClosestAllocation();
+			if (lastAllocation != NULL) {
+				Space *allocatingSpace = lastAllocation->getSpace();
+				if (allocatingSpace != ancestorGpuLps) {
+					ReportError::UnsupportedGpuPartitionConfiguration(varName, ancestorLpsName);
+				}
+			} else {
+				ReportError::UnsupportedGpuPartitionConfiguration(varName, ancestorLpsName);
 			}
 		}
 	}
