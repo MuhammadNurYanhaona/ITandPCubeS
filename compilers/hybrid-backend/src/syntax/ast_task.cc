@@ -15,6 +15,8 @@
 #include "../static-analysis/data_flow.h"
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/task_env_stat.h"
+#include "../static-analysis/gpu_execution_ctxt.h"
+#include "../codegen/space_mapping.h"
 
 #include <sstream>
 
@@ -257,6 +259,21 @@ TaskEnvStat *TaskDef::getAfterExecutionEnvStat() {
 	TaskEnvStat *taskStat = new TaskEnvStat(envAccessList, rootLps);
 	compute->getComputation()->prepareTaskEnvStat(taskStat);
 	return taskStat;
+}
+
+List<GpuExecutionContext*> *TaskDef::getGpuExecutionContexts() {
+	PartitionHierarchy *lpsHierarchy = getPartitionHierarchy();
+	PCubeSModel *pcubesModel = lpsHierarchy->getPCubeSModel();
+	int topmostGpuPps = pcubesModel->getGpuTransitionSpaceId();
+	List<GpuExecutionContext*> *gpuContextList = new List<GpuExecutionContext*>;
+	CompositeStage *computation = compute->getComputation();
+	computation->extractSubflowContextsForGpuExecution(topmostGpuPps, gpuContextList);
+	return gpuContextList;	
+}
+
+bool TaskDef::usingHybridModel() {
+	PartitionHierarchy *lpsHierarchy = getPartitionHierarchy();
+	return lpsHierarchy->isMappedToHybridModel();
 }
 
 void TaskDef::print() {

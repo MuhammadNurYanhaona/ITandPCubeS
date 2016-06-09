@@ -20,6 +20,7 @@ class FlowStage;
 class CompositeStage;
 class VariableAccess;
 class TaskEnvStat;
+class GpuExecutionContext;
 
 enum LinkageType { TypeCreate, TypeLink, TypeCreateIfNotLinked };
 
@@ -321,6 +322,13 @@ class TaskDef : public Definition {
 	// data structures and the stale/fresh status of their different LPS allocations at the end of the 
 	// task execution. 
 	TaskEnvStat *getAfterExecutionEnvStat();
+	// When the task is mapped to the hybrid PCubeS model of the target execution platform, parts of
+	// code that are intended to be execution inside the GPU should be handled differently from the
+	// remaining parts that execute in the host. This function retrieves the sub-flows and generates
+	// associated metadata for parts of the task's computation flow that are intended for GPU execution.
+	List<GpuExecutionContext*> *getGpuExecutionContexts();
+	
+	bool usingHybridModel();
 	void print();
 
 	//-----------------------------------------------------------------helper functions for back-end compilers

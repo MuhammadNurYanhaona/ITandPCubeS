@@ -36,6 +36,7 @@ FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	syncDependencies = new StageSyncDependencies(this);
 	this->parent = NULL;
 	this->epochDependentVarList = new List<const char*>;
+	this->gpuEntryPoint = false;
 }
 
 void FlowStage::mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap) {

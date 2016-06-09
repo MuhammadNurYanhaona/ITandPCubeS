@@ -19,6 +19,7 @@ class StageSyncReqs;
 class StageSyncDependencies;
 class SyncRequirement;
 class CommunicationCharacteristics;
+class GpuExecutionContext;
 
 /* An important point to remember about synchronization related enums and classes in this headers is that they corresponds 
    to situations where there is a need for definite data movements along with signaling the fact that an update has taken 
@@ -80,6 +81,9 @@ class FlowStage {
 	// this flow stage. This information is later used to advance appropriate data structures' epoch version after
 	// the execution of the flow stage.
 	List<const char*> *epochDependentVarList;
+
+	// This flag variable indicates if the current flow stage signals an entry to inside GPU code execution
+	bool gpuEntryPoint;
   public:
 	// a static reference to be used, if needed, during analysis the content of a flow stage to find out the stage
 	// confining the locus of analysis; currently this has been used for epoch dependency analysis only
@@ -101,6 +105,8 @@ class FlowStage {
 	List<const char*> *getEpochDependentVarList() { return epochDependentVarList; }
 	Hashtable<VariableAccess*> *getAccessMap() { return accessMap; }
 	void setAccessMap(Hashtable<VariableAccess*> *accessMap) { this->accessMap = accessMap; }
+	void flagAsGpuEntryPoint() { gpuEntryPoint = true; }
+	bool isGpuEntryPoint() { return gpuEntryPoint; }
 	void mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap);
 	void addAccessInfo(VariableAccess *accessLog);
 	Hashtable<VariableAccess*> *getAccessLogsForSpaceInIndexLimit(Space *space, 
@@ -334,6 +340,13 @@ class CompositeStage : public FlowStage {
 	
 	void printSyncRequirements(int indentLevel);
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
+	
+	// Subflows of the computation that are indented to be executed in the GPU, are treated differently, and
+	// their code generation process is dissimilar to that of subflows intended for CPU execution. This recur-
+	// sive function checks the stages nested in a composite flow stage to detect sub-flows for GPU. This
+	// analysis needs to know the LPS-to-PPS mapping. So it can be performed only after mapping has been done. 
+	void extractSubflowContextsForGpuExecution(int topmostGpuPps, 
+			List<GpuExecutionContext*> *gpuContextList);
 
 	// helper functions for code generation-------------------------------------------------------------------
 	

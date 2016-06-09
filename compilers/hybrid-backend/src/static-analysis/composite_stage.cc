@@ -2,6 +2,7 @@
 #include "data_access.h"
 #include "sync_stat.h"
 #include "task_env_stat.h"
+#include "gpu_execution_ctxt.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
@@ -740,6 +741,30 @@ int CompositeStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, 
 		nextIndex = stage->assignIndexAndGroupNo(nextIndex, this->index, currentRepeatCycle);
 	}
 	return nextIndex;	
+}
+
+void CompositeStage::extractSubflowContextsForGpuExecution(int topmostGpuPps, 
+		List<GpuExecutionContext*> *gpuContextList) {
+
+	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
+	for (int i = 0; i < stageGroups->NumElements(); i++) {
+		List<FlowStage*> *stageGroup = stageGroups->Nth(i);
+		FlowStage *firstStage = stageGroup->Nth(0);
+		Space *firstSpaceLps = firstStage->getSpace();
+		if (firstSpaceLps->getPpsId() <= topmostGpuPps) {
+			firstStage->flagAsGpuEntryPoint();
+			GpuExecutionContext *gpuContext = new GpuExecutionContext(firstSpaceLps, stageGroup);
+			gpuContextList->Append(gpuContext);
+		} else {
+			for (int j = 0; j < stageGroup->NumElements(); j++) {
+				FlowStage *stage = stageGroup->Nth(j);
+				CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+				if (compositeStage != NULL) {
+					compositeStage->extractSubflowContextsForGpuExecution(topmostGpuPps, gpuContextList);
+				}
+			}
+		}
+	}
 }
 
 List<FlowStage*> *CompositeStage::filterOutSyncStages(List<FlowStage*> *originalList) {
