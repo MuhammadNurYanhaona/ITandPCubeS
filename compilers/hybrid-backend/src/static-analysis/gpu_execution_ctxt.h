@@ -14,11 +14,11 @@
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 
-/* The execution logic we have chosen for GPU LPUs is that the host will generate the LPUs in batch and ship them
- * in and out of the GPUs. Sometimes the batch of LPUs shipped to the GPU may be multiplexed to arbitrary PPUs of
- * the intended PPS. Some other times, what LPUs executed by what PPU needs to be controlled precisely (for example
- * LPUs of subpartitioned LPSes have such requirement). Code generation for these two scenarios need to be done
- * differently. The following enum, specifies the type for a particular GPU execution context.
+/* The execution logic we have chosen for GPU LPUs is that the host will generate the LPUs in batch and ship them in 
+ * and out of the GPUs. Sometimes the batch of LPUs shipped to the GPU may be multiplexed to arbitrary PPUs of the 
+ * intended PPS. Some other times, what LPUs executed by what PPU needs to be controlled precisely (for example LPUs 
+ * of subpartitioned LPSes have such requirement). Code generation for these two scenarios need to be done differently. 
+ * The following enum, specifies the type for a particular GPU execution context.
  */
 enum GpuContextType { 	LOCATION_SENSITIVE_LPU_DISTR_CONTEXT, 
 		 	LOCATION_INDIPENDENT_LPU_DISTR_CONTEXT };
@@ -34,7 +34,25 @@ class GpuExecutionContext {
 	// type of LPU distribution to be used for the current context
 	GpuContextType contextType;
   public:
-	GpuExecutionContext(Space *contextLps, List<FlowStage*> *contextFlow);
+	GpuExecutionContext(int topmostGpuPps, List<FlowStage*> *contextFlow);
+
+	// the context ID, which is the index of the first flow stage within the context, is used for searching the 
+	// context during code generation
+	int getContextId();
+	
+	// a name based on the context ID is used to name the generated GPU code executor class for this context
+	const char *getContextName();
+
+	void describe(int indent);
+  private:
+	// It can happen that the computation flow dives into a lower level LPS in the GPU directly from a host
+	// level LPS without going through the nesting of the upper level GPU LPS that has been mapped to some higher
+	// GPU PPS. Even in those scenarios, we take the first LPS in the path to the entry stage's LPS that has been
+	// mapped to the GPU as the context LPS. We will rather do the lower level LPU generation within the 
+	// generated kernels as opposed to ship in smaller LPUs to the kernels. Furthermore, our data part allocation
+	// scheme for GPU LPUs also demand that host to GPU context switching should happen at the topmost LPS mapped
+	// to the GPU. 
+	Space *getContextLps(int topmostGpuPps, Space *entryStageLps);	
 };
 
 #endif

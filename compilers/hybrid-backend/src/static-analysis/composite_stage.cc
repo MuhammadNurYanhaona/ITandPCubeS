@@ -748,12 +748,19 @@ void CompositeStage::extractSubflowContextsForGpuExecution(int topmostGpuPps,
 
 	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
 	for (int i = 0; i < stageGroups->NumElements(); i++) {
+		
 		List<FlowStage*> *stageGroup = stageGroups->Nth(i);
 		FlowStage *firstStage = stageGroup->Nth(0);
+		
+		// often time the compiler adds intermediate sync stages to aid the synchronization requirement determination
+		// process; we skip such stages here
+		SyncStage *syncStage = dynamic_cast<SyncStage*>(firstStage);
+		if (syncStage != NULL) continue;
+
 		Space *firstSpaceLps = firstStage->getSpace();
 		if (firstSpaceLps->getPpsId() <= topmostGpuPps) {
 			firstStage->flagAsGpuEntryPoint();
-			GpuExecutionContext *gpuContext = new GpuExecutionContext(firstSpaceLps, stageGroup);
+			GpuExecutionContext *gpuContext = new GpuExecutionContext(topmostGpuPps, stageGroup);
 			gpuContextList->Append(gpuContext);
 		} else {
 			for (int j = 0; j < stageGroup->NumElements(); j++) {

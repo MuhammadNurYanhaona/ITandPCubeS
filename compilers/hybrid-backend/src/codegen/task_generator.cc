@@ -35,6 +35,7 @@
 #include "../syntax/ast_type.h"
 #include "../static-analysis/task_global.h"
 #include "../static-analysis/sync_stat.h"
+#include "../static-analysis/gpu_execution_ctxt.h"
 #include "../semantics/task_space.h"
 
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
@@ -125,7 +126,7 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
         generateLPSConstants(headerFile, mappingConfig);
         generatePPSCountConstants(headerFile, pcubesModel);
         generateThreadCountConstants(headerFile, mappingConfig, pcubesConfig);
-        
+
 	// generate data structures and functions for task environment management 
 	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
         List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
