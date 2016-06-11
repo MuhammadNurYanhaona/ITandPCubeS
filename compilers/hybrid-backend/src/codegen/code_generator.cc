@@ -125,7 +125,11 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 			for (int i = 0; i < pcubesConfig->NumElements(); i++) {
 				PPS_Definition *nextPps = pcubesConfig->Nth(i);
 				if (nextPps->id >= highestUnpartitionedPpsId) continue;
-				threadCount *= nextPps->units;
+				
+				// in case of passive (currently they are always PPSes inside the GPU) some
+				// ancestor PPS's thread creates work for them; so the thread count is 1 
+				threadCount *= (nextPps->passive) ? 1 : nextPps->units;
+				
 				if (pps == nextPps) break;
 			}
 		}
@@ -141,7 +145,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 		for (int i = 0; i < pcubesConfig->NumElements(); i++) {
 			PPS_Definition *pps = pcubesConfig->Nth(i);
 			if (pps->id >= highestUnpartitionedPpsId) continue;
-			totalThreads *= pps->units;
+			totalThreads *= (pps->passive) ? 1 : pps->units;
 			if (pps->id == lowestPpsId) break;
 		}
 	}
@@ -173,7 +177,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 		for (int i = segmentedPpsIndex + 1; i < pcubesConfig->NumElements(); i++) {
 			PPS_Definition *pps = pcubesConfig->Nth(i);
 			if (pps->id >= highestUnpartitionedPpsId) continue;
-			threadsPerSegment *= pps->units;
+			threadsPerSegment *= (pps->passive) ? 1 : pps->units;
 			if (pps->id == lowestPpsId) break;
 		}
 	}
@@ -203,12 +207,12 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 		}
 	}
 	int ppsCount = pcubesConfig->NumElements();
-	int threadsParCore = 1;
+	int threadsPerCore = 1;
 	for (int i = coreSpaceId - 1; i >= lowestPpsId; i--) {
 		PPS_Definition *pps = pcubesConfig->Nth(ppsCount - i);
-		threadsParCore *= pps->units;
+		threadsPerCore *= (pps->passive) ? 1 : pps->units;
 	}	
-	programFile << "const int Threads_Per_Core = " << threadsParCore << stmtSeparator;
+	programFile << "const int Threads_Per_Core = " << threadsPerCore << stmtSeparator;
 
 	// calculate where the hardware unit boundary lies in the PCubeS hierarchy so that processor numbering
 	// can be reset at proper interval
@@ -221,7 +225,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 			phyUnitFound = true;
 			continue;
 		}
-		processorsPerPhyUnit *= pps->units;
+		processorsPerPhyUnit *= (pps->passive) ? 1 : pps->units;
 	}
 	programFile << "const int Processors_Per_Phy_Unit = ";	
 	if (phyUnitFound) programFile << processorsPerPhyUnit << stmtSeparator;
@@ -249,7 +253,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 		for (int i = 0; i < pcubesConfig->NumElements(); i++) {
 			PPS_Definition *pps = pcubesConfig->Nth(i);
 			if (pps->id >= lastMappedPpsId) continue;
-			coreJump *= pps->units;
+			coreJump *= (pps->passive) ? 1 : pps->units;
 			if (pps->id == coreSpaceId) break;
 		}
 	}
@@ -337,7 +341,9 @@ void generateFnForThreadIdsAllocation(const char *headerFileName,
 		int partitionCount = 1;
 		int ppsCount = pcubesConfig->NumElements();
 		for (int i = parentPps->id - 1; i >= pps->id; i--) {
-			partitionCount *= pcubesConfig->Nth(ppsCount - i)->units;
+			PPS_Definition *pps = pcubesConfig->Nth(ppsCount - i);
+			int ppuCount = (pps->passive) ? 1 : pps->units;
+			partitionCount *= ppuCount;
 		}
 
 		// create a prefix and variable name to make future references easy

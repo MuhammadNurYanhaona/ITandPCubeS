@@ -47,6 +47,15 @@ class PPS_Definition {
 	   is needed for the top-most gpu PPS		
 	*/
 	bool gpuTransition;
+
+	/* If the current PPS is located inside the GPU then depending on how LPS mapping has been
+	   done for the task. It might receive LPUs independently from the host and have its states
+	   been managed there separately, or it can be subsumed within some higher level PPS which
+	   will generates work for it. The latter case is flagged as passive. This treatment can be
+	   done for host level PPSes too, but we do not know if this will improve generated code's 
+	   performance.
+	*/
+	bool passive;
   public:
 	PPS_Definition();
 	void print(int indentLevel);
@@ -65,12 +74,14 @@ class PCubeSModel {
 	int getModelType() { return modelType; }
 	void addNextPpsDefinition(PPS_Definition *ppsDef) { ppsDefinitions->Append(ppsDef); }
 	List<PPS_Definition*> *getPpsDefinitions() { return ppsDefinitions; }
+	void setPassivePpsThreshold(int thresholdPpsId);
 	void print(int indentLevel);	
 
 	// these three functions are applicable only for the hybrid PCubeS model	
 	int getGpuTransitionSpaceId();
 	int getSMCount();
 	int getWarpCount();
+	
 };
 
 /* object definition to identify an LPS-PPS mapping */
@@ -101,7 +112,7 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 /* function definition to generate constants corresponds to LPSes */
 void generateLPSConstants(const char *outputFile, MappingNode *mappingRoot);
 
-/* function definition to generate the thread counts for all PPSes */
+/* function definition to generate the PPU counts for all PPSes */
 void generatePPSCountConstants(const char *outputFile, PCubeSModel *pcubesModel); 
 
 /* 

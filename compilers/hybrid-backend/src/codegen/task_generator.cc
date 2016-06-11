@@ -121,6 +121,26 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 
 	// generate a constant array for processor ordering in the hardware
 	generateProcessorOrderArray(headerFile, processorFile);
+
+	// determine if the task is using the hybrid model and if YES what is the top-most LPS/PPS where host to
+	// GPU LPU offloading will be done; below that PPS, PPUs will not be treated as independent entities from
+	// the host and no state management will be done for them
+	bool hybridMapping = taskDef->usingHybridModel();
+	int passivePpsThreshold = -1;
+	List<GpuExecutionContext*> *gpuContextList = NULL;
+	if (hybridMapping) {
+		std::cout << "Identifying parts of the computation to be offloaded to GPUs\n";
+		gpuContextList = taskDef->getGpuExecutionContexts();
+		for (int i = 0; i < gpuContextList->NumElements(); i++) {
+			Space *offloadingLps = gpuContextList->Nth(i)->getContextLps();
+			if (offloadingLps->getPpsId() < passivePpsThreshold 
+					|| passivePpsThreshold == -1) {
+				passivePpsThreshold = offloadingLps->getPpsId();
+			}
+		}
+	}
+	pcubesModel->setPassivePpsThreshold(passivePpsThreshold);
+	 
         
 	// generate constansts needed for various reasons
         generateLPSConstants(headerFile, mappingConfig);

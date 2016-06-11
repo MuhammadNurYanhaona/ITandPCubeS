@@ -27,6 +27,7 @@ PPS_Definition::PPS_Definition() {
 	segmented = false;
 	physicalUnit = false;
 	gpuTransition = false;
+	passive = false;
 }
 
 void PPS_Definition::print(int indentLevel) {
@@ -53,6 +54,13 @@ PCubeSModel::PCubeSModel(int modelType, List<PPS_Definition*> *ppsDefinitions) {
 	this->modelType = modelType;
 	this->ppsDefinitions = ppsDefinitions;
 	modelName = NULL;
+}
+
+void PCubeSModel::setPassivePpsThreshold(int thresholdPpsId) {
+	for (int i = 0; i < ppsDefinitions->NumElements(); i++) {
+		PPS_Definition *pps = ppsDefinitions->Nth(i);
+		pps->passive = (pps->id < thresholdPpsId);
+	}
 }
 
 void PCubeSModel::print(int indentLevel) {
