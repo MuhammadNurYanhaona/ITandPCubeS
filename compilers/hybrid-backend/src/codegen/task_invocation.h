@@ -32,15 +32,22 @@ void generateRoutineToReadProgramArgs(TupleDef *programArg,
 		const char *headerFile, 
 		const char *programFile);
 
-// generate a function that serves as a task::main and handle initiation, execution, and after
-// processing of tasks.
+// This function generates a routine that serves as a task::main and handle initiation, execution, and 
+// after processing of tasks. It uses one of the two functions below for the execution part depending
+// on what PCubeS model of the target hybrid execution platform has been used for mapping the task.
 void generateTaskExecutor(TaskGenerator *taskGenerator);
+
+void generateHostOnlyExecutionCode(std::ofstream &programFile, 
+		TaskGenerator *taskGenerator);
+void generateHybridExecutionCode(std::ofstream &programFile, 
+		TaskGenerator *taskGenerator);
+
 
 // generate a main function based on the configuration of the coordinator program in IT source code
 void generateMain(ProgramDef *programDef, const char *programFile);	
 
-// function that invokes other functions listed here to generate data structures and method for
-// needed to make multi-task programs work
+// function that invokes other functions listed here to generate data structures and method for needed 
+// to make multi-task programs work
 void processCoordinatorProgram(ProgramDef *programDef, 
 		const char *headerFile, 
 		const char *programFile);

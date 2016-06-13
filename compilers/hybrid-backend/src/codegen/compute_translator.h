@@ -29,4 +29,11 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFile,
 		MappingNode *mappingRoot, bool involvesSynchronization, 
 		int communicatorCount);	
 
+/* function definition for generating the computation flow executor in the batch
+   execution mode (batch execution mode is used when the task has been mapped to
+   the hybrid PCubeSModel of the target platform) */
+void generateBatchComputeFunction(TaskDef *taskDef, const char *headerFile,
+		const char *programFile, const char *initials,
+		int communicatorCount);	
+
 #endif

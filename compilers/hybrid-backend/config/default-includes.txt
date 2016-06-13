@@ -19,6 +19,7 @@
 // for LPU and PPU management data structures
 #include "../../src/runtime/structure.h"
 #include "../../src/runtime/lpu_management.h"
+#include "../../src/runtime/batch_lpu_mgmt.h"
 
 // for utility routines
 #include "../../src/utils/list.h"

@@ -435,8 +435,8 @@ void generatePPSCountConstants(const char *outputFile, PCubeSModel *pcubesModel)
 		if (pcubesModel->getModelType() == PCUBES_MODEL_TYPE_HYBRID) {
 			decorator::writeSectionHeader(programFile, "constants for GPU Configuration");		
 			programFile << std::endl;
-			programFile << "const int SM_COUNT " << pcubesModel->getSMCount() << stmtSeparator;
-			programFile << "const int WARP_COUNT " << pcubesModel->getWarpCount() << stmtSeparator;
+			programFile << "const int SM_COUNT = " << pcubesModel->getSMCount() << stmtSeparator;
+			programFile << "const int WARP_COUNT = " << pcubesModel->getWarpCount() << stmtSeparator;
 		}
 
     		programFile.close();

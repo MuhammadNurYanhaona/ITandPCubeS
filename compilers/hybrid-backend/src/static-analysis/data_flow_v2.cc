@@ -25,6 +25,8 @@
 
 FlowStage *FlowStage::CurrentFlowStage = NULL;
 
+CodeGenerationMode FlowStage::codeGenerationMode = Host_Only_Code_Ceneration;
+
 FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	this->index = index;
 	this->space = space;

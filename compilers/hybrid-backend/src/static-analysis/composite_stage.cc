@@ -375,7 +375,15 @@ List<List<FlowStage*>*> *CompositeStage::getConsecutiveNonLPSCrossingStages() {
 	return stageGroups;
 }
 
+
 void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
+	if (FlowStage::codeGenerationMode == Host_Only_Code_Ceneration) {
+		genInvocationCodeForHost(stream, indentation, containerSpace);
+	} else genInvocationCodeForHybrid(stream, indentation, containerSpace);
+}
+
+void CompositeStage::genInvocationCodeForHost(std::ofstream &stream, 
+		int indentation, Space *containerSpace) {
 	
 	std::string stmtSeparator = ";\n";
 	std::string paramSeparator = ", ";
@@ -591,6 +599,215 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// at the end remove checkpoint if the container LPS is not the root LPS
 		if (!containerSpace->isRoot()) {
 			stream << indent.str() << "threadState->removeIterationBound(Space_";
+			stream << containerSpace->getName() << ')' << stmtSeparator;
+		}
+		// exit from the scope
+		stream << indent.str() << "} // scope exit for iterating LPUs of Space ";
+		stream << space->getName() << "\n";
+	}	
+}
+
+void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream, 
+		int indentation, Space *containerSpace) {
+	
+	std::string stmtSeparator = ";\n";
+	std::string paramSeparator = ", ";
+	std::ostringstream indent;
+	for (int i = 0; i < indentation; i++) indent << '\t';
+	int nextIndentation = indentation;
+	std::ostringstream nextIndent;
+	nextIndent << indent.str();
+	const char *spaceName = space->getName();
+
+	// if the index is 0 then it is the first composite stage representing the entire compution. We declare
+	// any synchronization counter that is applicable outside all repeat-cycle boundaries
+	if (this->index == 0) {
+		declareSynchronizationCounters(stream, indentation, this->repeatIndex + 1);
+	}
+
+	// if their is an LPS transition due to entering this stage then create a while loop traversing LPUs of 
+	// newly entered LPS
+	if (this->space != containerSpace) {
+		nextIndentation++;
+		nextIndent << '\t';
+		// create a new local scope for traversing LPUs of this new scope
+		stream << std::endl;
+		stream << indent.str() << "{ // scope entrance for iterating LPUs of Space ";
+		stream << spaceName << "\n";
+		// declare a new ID vector to track progress in LPU generation and initialize it
+		stream << indent.str() << "std::vector<int> lpuIdVector" << stmtSeparator;
+		stream << indent.str() << "batchPpuState->initLpuIdVectorsForLPSTraversal(Space_";
+		stream << spaceName << paramSeparator << "&lpuIdVector)" << stmtSeparator;
+		// declare another vector to hold on to current LPUs of this LPS
+		stream << indent.str() << "std::vector<LPU*> *lpuVector" << stmtSeparator;
+		// generate LPUs by repeatedly invoking the get-next-LPU routine
+		stream << indent.str() << "while((lpuVector = batchPpuState->getNextLpus(";
+		stream << "Space_" << spaceName << paramSeparator << "Space_" << containerSpace->getName();
+		stream << paramSeparator << "&lpuIdVector)) != NULL) {\n";
+		// as this part of the code executes in the host, which the PCubeS model ensure to be single 
+		// threaded, the LPU vector should have just one entry and we can retrive that LPU from the
+		// beginning of the vector
+		stream << nextIndent.str() << "LPU *lpu = lpuVector->at(0)" << stmtSeparator;
+		// cast the common LPU variable to LPS specific LPU		
+		stream << nextIndent.str() << "Space" << spaceName << "_LPU * space" << spaceName;
+		stream << "Lpu = (Space" << spaceName << "_LPU*) lpu" << stmtSeparator;
+	}
+
+	// Check if there is any activating condition attached with this container stage. If there is such a
+	// condition then the stages inside should be executed only if the activating condition evaluates to true.
+	if (executeCond != NULL) {
+		
+		// first get a hold of the LPU reference
+		std::ostringstream lpuVarName;
+		lpuVarName << "space" << space->getName() << "Lpu->";
+		
+		// then generate local variables for any array been accessed within the condition
+		List<FieldAccess*> *fields = executeCond->getTerminalFieldAccesses();
+		for (int i = 0; i < fields->NumElements(); i++) {
+			DataStructure *structure = space->getLocalStructure(fields->Nth(i)->getField()->getName());
+			if (structure == NULL) continue;
+			ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+			if (array == NULL) continue;
+			const char *arrayName = array->getName();
+        		int dimensions = array->getDimensionality();
+        		stream << nextIndent.str() << "Dimension ";
+                	stream  << arrayName << "PartDims[" << dimensions << "];\n";
+        		stream << nextIndent.str() << "Dimension ";
+                	stream  << arrayName << "StoreDims[" << dimensions << "];\n";
+                	for (int j = 0; j < dimensions; j++) {
+                		stream << indent.str();
+               			stream << arrayName << "PartDims[" << j << "] = " << lpuVarName.str();
+                        	stream << arrayName << "PartDims[" << j << "].partition;\n";
+                		stream << indent.str();
+               			stream << arrayName << "StoreDims[" << j << "] = " << lpuVarName.str();
+                        	stream << arrayName << "PartDims[" << j << "].storage;\n";
+        		}
+		}
+		
+		// now set the name transformer's LPU prefix properly so that if the activate condition involves
+		// accessing elements of the LPU, it works correctly
+		ntransform::NameTransformer::transformer->setLpuPrefix(lpuVarName.str().c_str());
+	
+		// then generate an if condition for condition checking
+		stream << nextIndent.str() << "if(!(";
+		std::ostringstream conditionStream;
+		executeCond->translate(conditionStream, nextIndentation, 0, space);
+		stream << conditionStream.str();
+		stream << ")) {\n";
+		// we skip the current LPU if the condition evaluates to false	
+		stream << nextIndent.str() << "\tcontinue" << stmtSeparator;
+		stream << nextIndent.str() << "}\n";	
+	}
+	
+	// Iterate over groups of flow stages where each group executes within a single LPS.
+	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
+	for (int i = 0; i < stageGroups->NumElements(); i++) {
+		
+		List<FlowStage*> *currentGroup = stageGroups->Nth(i);
+
+		// retrieve all data dependencies, and sort them to ensure waitings for updates happen in order
+		List<SyncRequirement*> *dataDependencies = getDataDependeciesOfGroup(currentGroup);
+		dataDependencies = SyncRequirement::sortList(dataDependencies);
+		
+		// separate dependencies into communication and synchronization dependencies and keep only the former
+		// as no synchronization is needed in the single threaded host but host-to-host communication may be
+		// needed
+		int segmentedPPS = space->getSegmentedPPS();
+		List<SyncRequirement*> *commDependencies = new List<SyncRequirement*>;
+		List<SyncRequirement*> *syncDependencies = new List<SyncRequirement*>;
+		SyncRequirement::separateCommunicationFromSynchronizations(segmentedPPS, 
+				dataDependencies, commDependencies, syncDependencies);
+		generateDataReceivesForGroup(stream, nextIndentation, commDependencies);
+		
+		// retrieve all shared data update signals that need to be activated if stages in the group execute
+		List<SyncRequirement*> *updateSignals = getUpdateSignalsOfGroup(currentGroup);
+		// mark these signals as signaled so that they are not reactivated within the nested code
+		for (int j = 0; j < updateSignals->NumElements(); j++) {
+			updateSignals->Nth(j)->signal();
+		}
+		// sort the update signals to ensure waiting for signal clearance (equivalent to get signals from the
+		// readers that all of them have finished reading the last update) happens in proper order
+		updateSignals = SyncRequirement::sortList(updateSignals);
+		// divide the signals between those issuing communications and those that do not and keep the communi-
+		// cation signals only
+		List<SyncRequirement*> *commSignals = new List<SyncRequirement*>;
+		List<SyncRequirement*> *syncSignals = new List<SyncRequirement*>;
+		SyncRequirement::separateCommunicationFromSynchronizations(segmentedPPS, 
+				updateSignals, commSignals, syncSignals);
+		
+		// Sync stages -- not synchronization dependencies -- that dictate additional data movement operations 
+		// are not needed (according to our current (date: Jan-30-2015) understanding); so we filter them out.	
+		currentGroup = filterOutSyncStages(currentGroup);
+		if (currentGroup->NumElements() == 0) {
+			// before rulling sync stages out, we need to ensure that whatever data they were supposed to 
+			// send are sent
+			generateDataSendsForGroup(stream, nextIndentation, commSignals); 
+			continue;
+		}
+		
+		// check if the current group is the entry point to a sub-flow to be executed in the GPU
+		if (currentGroup->Nth(0)->isGpuEntryPoint()) {
+			// then invoke GPU computation
+			stream << nextIndent.str() << "//GPU computation" << stmtSeparator;
+			// if there is any data communication is needed after the GPU computation then issue relevant
+			// communication then exit
+			generateDataSendsForGroup(stream, nextIndentation, commSignals); 
+			continue;
+		} 
+		
+		// there should be a special checking for repeat loops. Repeat loops will have the while loop that
+		// iterates over LPUs of the LPS under concern inside its body if it does not use LPS dependent 
+		// variables in repeat evaluation process. Otherwise, it should follow the normal code generation
+		// procedure followed for other stages
+		bool groupIsLpsIndRepeat = false; 
+		if (currentGroup->NumElements() == 1) {
+			FlowStage *stage = currentGroup->Nth(0);
+			RepeatCycle *repeatCycle = dynamic_cast<RepeatCycle*>(stage);
+			if (repeatCycle != NULL && !repeatCycle->isLpsDependent()) {
+				Space *repeatSpace = repeatCycle->getSpace();
+				// temporarily the repeat cycle is assigned to be executed in current LPS to ensure
+				// that LPU iterations for stages inside it proceed accurately
+				repeatCycle->changeSpace(this->space);
+				repeatCycle->generateInvocationCode(stream, nextIndentation, space);
+				// reset the repeat cycle's LPS to the previous one once code generation is done
+				repeatCycle->changeSpace(repeatSpace);
+				groupIsLpsIndRepeat = true;
+			}	
+		}
+
+		if (!groupIsLpsIndRepeat) {
+			Space *groupSpace = currentGroup->Nth(0)->getSpace();
+			// if the LPS of the group is not the same of this one then we need to consider LPS entry, 
+			// i.e., include a while loop for the group to traverse over the LPUs
+			if (groupSpace != space) {
+				// create a local composite stage to apply the logic of this function recursively
+				CompositeStage *tempStage = new CompositeStage(-1, groupSpace, NULL);
+				tempStage->setStageList(currentGroup);
+				tempStage->generateInvocationCode(stream, nextIndentation, space);
+				delete tempStage;
+			// otherwise the current LPU of this composite stage will suffice and we execute all the 
+			// nested stages one after one.	 
+			} else {
+				for (int j = 0; j < currentGroup->NumElements(); j++) {
+					FlowStage *stage = currentGroup->Nth(j);
+					stage->generateInvocationCode(stream, nextIndentation, space);
+				}
+			}
+		}
+
+		// communicate any update of shared data	
+		generateDataSendsForGroup(stream, nextIndentation, commSignals); 
+	}
+	
+	// close the while loop if applicable
+	if (space != containerSpace) {
+		// update the LPU ID vector
+		stream << nextIndent.str() << "batchPpuState->extractLpuIdsFromLpuVector(";
+		stream << "&lpuIdVector" << paramSeparator << "lpuVector)" << stmtSeparator;	
+		stream << indent.str() << "}\n";
+		// at the end remove checkpoint if the container LPS is not the root LPS
+		if (!containerSpace->isRoot()) {
+			stream << indent.str() << "batchPpuState->removeIterationBound(Space_";
 			stream << containerSpace->getName() << ')' << stmtSeparator;
 		}
 		// exit from the scope
@@ -845,7 +1062,13 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 
 		int commIndex = comm->getIndex();
 		Space *dependentLps = comm->getDependentLps();
-		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << dependentLps->getName();
+		stream << indentStr.str() << "if (";
+		if (FlowStage::codeGenerationMode == Host_Only_Code_Ceneration) {
+			stream << "threadState->isValidPpu";
+		} else {
+			stream << "batchPpuState->hasValidPpus";
+		}
+		stream << "(Space_" << dependentLps->getName();
 		stream << ")) {\n";
 		stream << indentStr.str() << indent << "Communicator *communicator = threadState->getCommunicator(\"";
 		stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
@@ -880,9 +1103,13 @@ void CompositeStage::generateDataReceivesForGroup(std::ofstream &stream, int ind
 
 			int commIndex = comm->getIndex();
 			Space *dependentLps = comm->getDependentLps();
-			stream << indentStr.str() << indent; 
-			stream << "if (threadState->isValidPpu(Space_" << dependentLps->getName();
-			stream << ")) {\n";
+			stream << indentStr.str() << indent << "if (";
+			if (FlowStage::codeGenerationMode == Host_Only_Code_Ceneration) {
+				stream << "threadState->isValidPpu";
+			} else {
+				stream << "batchPpuState->hasValidPpus";
+			}
+			stream << "(Space_" << dependentLps->getName() << ")) {\n";
 			stream << indentStr.str() << doubleIndent;
 			stream << "Communicator *communicator = threadState->getCommunicator(\"";
 			stream << comm->getDependencyArc()->getArcName() << "\")" << stmtSeparator;
@@ -1098,8 +1325,13 @@ void CompositeStage::generateDataSendsForGroup(std::ofstream &stream, int indent
 		
 		// check if the current PPU is a valid candidate for signaling update
 		Space *signalingLps = currentComm->getDependencyArc()->getSource()->getSpace();
-		stream << indentStr.str() << "if (threadState->isValidPpu(Space_" << signalingLps->getName();
-		stream << ")) {\n";
+		stream << indentStr.str() << "if (";
+		if (FlowStage::codeGenerationMode == Host_Only_Code_Ceneration) {
+			stream << "threadState->isValidPpu"; 
+		} else {
+			stream << "batchPpuState->hasValidPpus"; 
+		}
+		stream << "(Space_" << signalingLps->getName() << ")) {\n";
 		
 		// retrieve the communicator for this dependency
 		stream << indentStr.str() << indent;

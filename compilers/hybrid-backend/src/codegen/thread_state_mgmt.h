@@ -12,6 +12,7 @@
 */
 
 class MappingNode;
+class PCubeSModel;
 class PPS_Definition;
 class EnvironmentLink;
 class PartitionParameterConfig;
@@ -45,5 +46,13 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 void generateThreadStateImpl(const char *headerFileName, const char *programFileName, 
 		MappingNode *mappingRoot,
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig);
+
+/* When a task is mapped to the hybrid PCubeS model of the hardware, LPUs are generated in batches  
+   by a single thread for the PPUs of the entire machine, as opposed to each PPU controller thread 
+   generating its own LPU one-by-one independently. The following function generates a routine that
+   tells the batch PPU controller how many LPUs should be in the batch vectors for different LPSes. */
+void generateLpuBatchVectorSizeSetupRoutine(const char *headerFile, 
+		const char *programFile, 
+		const char *initials, MappingNode *mappingRoot);
 
 #endif

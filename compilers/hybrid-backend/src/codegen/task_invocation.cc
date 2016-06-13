@@ -332,13 +332,6 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	// copy partition parameters into an array to later make them accessible for thread-state management
 	taskGenerator->copyPartitionParameters(programFile); 
 
-	// check if synchronization needed and initialize sync primitives if the answer is YES
-	SyncManager *syncManager = taskGenerator->getSyncManager();	
-        if (syncManager->involvesSynchronization()) {
-                programFile << std::endl << indent << "// initializing sync primitives\n";
-                programFile << indent << "initializeSyncPrimitives()" << stmtSeparator;
-        }
-
 	// get the list of external environment-links then invoke the task initializer function
 	List<EnvironmentLink*> *envLinks = taskDef->getEnvironmentLinks();
 	List<const char*> *externalEnvLinks = new List<const char*>;
@@ -395,8 +388,11 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 		programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	}
 
-	// start threads and wait for them to finish execution of the task 
-        taskGenerator->startThreads(programFile);
+	// depending on what PCubeS Model has been chosen for executing this task, invokes the proper sub-routine to
+	// generate execution code
+	if (taskDef->usingHybridModel()) {
+		generateHybridExecutionCode(programFile, taskGenerator);
+	} else generateHostOnlyExecutionCode(programFile, taskGenerator);
 
 	// log time spent on task's computation
 	programFile << std::endl;
@@ -444,6 +440,47 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	
 	headerFile.close();
 	programFile.close();
+}
+
+void generateHostOnlyExecutionCode(std::ofstream &programFile, TaskGenerator *taskGenerator) {
+
+        programFile << std::endl << indent << "// ---------------- Host Only Execution Code Starts\n\n";
+	
+	// check if synchronization needed and initialize sync primitives if the answer is YES
+	SyncManager *syncManager = taskGenerator->getSyncManager();	
+        if (syncManager->involvesSynchronization()) {
+                programFile << std::endl << indent << "// initializing sync primitives\n";
+                programFile << indent << "initializeSyncPrimitives()" << stmtSeparator;
+        }
+
+	// start threads and wait for them to finish execution of the task 
+        taskGenerator->startThreads(programFile);
+
+        programFile << std::endl << std::endl << indent;
+	programFile << "// ------------------ Host Only Execution Code Ends\n";
+}
+
+void generateHybridExecutionCode(std::ofstream &programFile, TaskGenerator *taskGenerator) {
+        
+	programFile << std::endl << indent << "// ---------------- Host + GPU Execution Code Starts\n\n";
+
+	// group the thread states (PPU Controllers' stacks) of the current segment into a batch PPU state that
+	// will generate LPUs for component PPUs in batches
+	programFile << indent << "std::vector<int> *lpuVectorSizes = getLpuVectorSizesForLpses()";
+	programFile << stmtSeparator;
+	programFile << indent << "List<ThreadState*> *ppuStateList = ";
+	programFile << "mySegment->getParticipantList()" << stmtSeparator;
+	programFile << indent << "BatchPpuState *batchPpuState = new BatchPpuState(Space_Count";
+	programFile << paramSeparator << "ppuStateList" << paramSeparator << "lpuVectorSizes)";
+	programFile << stmtSeparator;  
+
+	// then call the batch computation flow executor function with appropriate arguments
+	programFile << indent << "run(metadata" << paramSeparator << "&taskGlobals" << paramSeparator;
+	programFile << "&threadLocals" << paramSeparator << "partition" << paramSeparator;
+	programFile << "batchPpuState" << paramSeparator << "logFile)" << stmtSeparator;
+
+	programFile << std::endl << std::endl << indent;
+	programFile << "// ------------------ Host + GPU Execution Code Ends\n";
 }
 
 void generateMain(ProgramDef *programDef, const char *programFile) {

@@ -64,6 +64,7 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 
 	mappingRoot = NULL;
 	segmentedPPS = 0;
+	syncManager = NULL;
 }
 
 const char *TaskGenerator::getHeaderFileName(TaskDef *taskDef) {
@@ -94,7 +95,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	this->mappingRoot = mappingConfig;
 	Space *rootLps = lpsHierarchy->getRootSpace();
 
-	// retrieve the description of the PCubeS model that has been used for the LPS mapping the current task
+	// retrieve the description of the PCubeS model that has been used for the LPS mapping of the current task
+
 	PCubeSModel *pcubesModel = lpsHierarchy->getPCubeSModel();
 	List<PPS_Definition*> *pcubesConfig = pcubesModel->getPpsDefinitions();
 
@@ -119,9 +121,6 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 		std::exit(EXIT_FAILURE);
 	}
 
-	// generate a constant array for processor ordering in the hardware
-	generateProcessorOrderArray(headerFile, processorFile);
-
 	// determine if the task is using the hybrid model and if YES what is the top-most LPS/PPS where host to
 	// GPU LPU offloading will be done; below that PPS, PPUs will not be treated as independent entities from
 	// the host and no state management will be done for them
@@ -140,12 +139,18 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 		}
 	}
 	pcubesModel->setPassivePpsThreshold(passivePpsThreshold);
-	 
-        
+
+	// for host-only execution, we need to know how the physical cores of the machines are numbered to pin a
+	// thread to a specific core
+	if (!hybridMapping) {
+		// generate a constant array for processor ordering in the hardware
+		generateProcessorOrderArray(headerFile, processorFile);
+	}
+
 	// generate constansts needed for various reasons
         generateLPSConstants(headerFile, mappingConfig);
         generatePPSCountConstants(headerFile, pcubesModel);
-        generateThreadCountConstants(headerFile, mappingConfig, pcubesConfig);
+        generateThreadCountConstants(headerFile, mappingConfig, pcubesModel);
 
 	// generate data structures and functions for task environment management 
 	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
@@ -173,19 +178,29 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 		= generateLPUCountFunctions(headerFile, programFile, initials, mappingRoot);
 	generateAllLpuConstructionFunctions(headerFile, programFile, initials, mappingRoot);
 
-	// generate thread management functions and classes
+	// generate thread management functions and classes; these are needed in both hybrid and host only models
+	// of execution as part of underlying state management infrastructure for LPU generation and traversal 
         generateFnForThreadIdsAllocation(headerFile, 
 			programFile, initials, mappingConfig, pcubesConfig);
         generateFnForThreadIdsAdjustment(headerFile, programFile, initials, mappingConfig);
         generateThreadStateImpl(headerFile, programFile, mappingConfig, partParamConfigMap);
 
-	// generate synchronization primitives and their initialization functions
-	syncManager = new SyncManager(taskDef, headerFile, programFile, initials);
-	syncManager->processSyncList();
-	syncManager->generateSyncPrimitives();
-	syncManager->generateSyncInitializerFn();
-	syncManager->generateSyncStructureForThreads();
-	syncManager->generateFnForThreadsSyncStructureInit();
+	// generate setup functions for hybrid execution management if hybrid model being used
+	if (hybridMapping) {
+		generateLpuBatchVectorSizeSetupRoutine(headerFile, 
+			programFile, initials, mappingRoot);
+	}
+
+	// generate synchronization primitives and their initialization functions; sync primitives are not needed
+	// for hybrid mapping as host in that case works as a single threaded program
+	if (!hybridMapping) {
+		syncManager = new SyncManager(taskDef, headerFile, programFile, initials);
+		syncManager->processSyncList();
+		syncManager->generateSyncPrimitives();
+		syncManager->generateSyncInitializerFn();
+		syncManager->generateSyncStructureForThreads();
+		syncManager->generateFnForThreadsSyncStructureInit();
+	}
 
 	// generate communication related data structures and functions
 	std::cout << "Generating communication related data structures and functions\n";
@@ -213,8 +228,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// generate task executor and associated functions
 	generateTaskExecutor(this);
 
-	// initialize the variable transformation map that would be used to translate the code 
-	// inside initialize and compute blocks
+	// initialize the variable transformation map that would be used to translate the code inside initialize 
+	// and compute blocks
 	ntransform::NameTransformer::setTransformer(taskDef);	
 
 	// translate the initialize block of the task into a function
@@ -224,14 +239,23 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// generate functions for all compute stages in the source code
 	generateFnsForComputation(taskDef, headerFile, programFile, initials);
 
-	// generate run function for threads
-	generateThreadRunFunction(taskDef, headerFile, 
-			programFile, initials, mappingConfig, 
-			syncManager->involvesSynchronization(), communicatorCount);
+	// generate pthreads execution and management related functions for the host only task's LPS mapping
+	if (!hybridMapping) {
+		// generate run function for threads
+		generateThreadRunFunction(taskDef, headerFile, 
+				programFile, initials, mappingConfig, 
+				syncManager->involvesSynchronization(), communicatorCount);
 
-	// generate data structure and functions for Pthreads
-	generateArgStructForPthreadRunFn(taskDef->getName(), headerFile);
-	generatePThreadRunFn(headerFile, programFile, initials);
+		// generate data structure and functions for Pthreads
+		generateArgStructForPthreadRunFn(taskDef->getName(), headerFile);
+		generatePThreadRunFn(headerFile, programFile, initials);
+	
+	// for the hybrid mapping, generate a function for simulating the task's computation flow in batches of 
+	// LPUs and the implementation classes for all GPU sub-flow context executors
+	} else {
+		generateBatchComputeFunction(taskDef, 
+			headerFile, programFile, initials, communicatorCount);
+	}
 
 	closeNameSpace(headerFile);
 }

@@ -203,7 +203,9 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
         programFile << "\n\t// create a local transformed index variable for later use\n";
         programFile << "\tint xformIndex;\n";
 
-	// invoke recursive flow stage invocation code to implement the logic of the run method
+	// set up the code generation mode for host-only execution model then invoke recursive flow stage invocation 
+	// code to implement the logic of the run method
+	FlowStage::codeGenerationMode = Host_Only_Code_Ceneration;
 	CompositeStage *computation = taskDef->getComputation();
 	computation->generateInvocationCode(programFile, 1, rootLps);
 
@@ -221,3 +223,95 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	headerFile.close();
         programFile.close();
 }
+
+void generateBatchComputeFunction(TaskDef *taskDef, const char *headerFileName,
+                const char *programFileName, const char *initials, int communicatorCount) {
+	
+	std::cout << "Generating the computation flow implmenter function for the task\n";
+	
+	const char *upperInitials = string_utils::getInitials(taskDef->getName());
+        
+	std::ofstream programFile, headerFile;
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+
+	const char *header = "function that simulates the task's computation flow";
+	decorator::writeSectionHeader(headerFile, header);
+	headerFile << "\n";
+	decorator::writeSectionHeader(programFile, header);
+	programFile << "\n";
+	
+	// create a stream for writing the arguments default to all thread run functions
+	std::ostringstream defaultArgs;
+	// add the default arrayMetadata, task-global and thread-local arguments
+	defaultArgs << "ArrayMetadata *arrayMetadata";
+	defaultArgs << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
+	defaultArgs << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
+	// then add a parameter for the partition arguments
+	defaultArgs << paramSeparator << paramIndent << upperInitials << "Partition partition";
+	// then add a parameter for the batch PPU state variable
+	defaultArgs << paramSeparator << paramIndent << "BatchPpuState *batchPpuState";
+	// then add the logging file as the last parameter	
+	defaultArgs << paramSeparator << "std::ofstream &logFile";
+
+	// write the function signature in both header and program files
+	headerFile << "void run(" << defaultArgs.str() << ");\n\n";
+	programFile << "void " << initials << "::run(" << defaultArgs.str() << ") {\n";
+	
+	// set the root LPU for the thread so the computation can start
+	PartitionHierarchy *hierarchy = taskDef->getPartitionHierarchy();
+	Space *rootLps = hierarchy->getRootSpace();
+	programFile << "\n\t// set the root LPU in all component PPU states so that they can generate LPUs\n";
+	programFile << "\tstd::vector<ThreadState*> *ppuStates = batchPpuState->getPpuStates();\n";
+	programFile << "\tfor (unsigned int i = 0; i < ppuStates->size(); i++) {\n";
+	programFile << "\t\tThreadState *ppuState = ppuStates->at(i);\n";
+	programFile << "\t\tLPU *rootLpu = ppuState->getCurrentLpu(Space_" << rootLps->getName() << ");\n";
+	programFile << "\t\tif (rootLpu == NULL) {\n";
+	programFile << "\t\t\tppuState->setRootLpu(arrayMetadata);\n";
+	programFile << "\t\t}\n";
+	programFile << "\t}\n";
+
+	// enable logging in the batch PPU state controller
+	programFile << "\n\t// setting up logging\n";
+	programFile << "\tbatchPpuState->enableLogging(&logFile);\n";
+
+	// extract the state of the first PPU Controller (that does all host level LPS computation) for accessing
+	// the communicators and implementing epoch version updates of data structures when needed
+	programFile << "\n\t// extracting the first PPU controller's state for resource access\n";
+	programFile << "\tThreadState *threadState = ppuStates->at(0);\n";
+
+	// if the task involves communications then create communicator counter variables for each data dependency
+        // requiring communication
+        if (communicatorCount > 0) {
+                programFile << "\n\t// create a counter variables for communicators\n";
+                for (int i = 0; i < communicatorCount; i++) {
+                        programFile << "\tint commCounter" << i << " = 0;\n";
+                }
+        }
+
+        // create a local part-dimension object for probable array dimension based range or assignment expressions
+        programFile << "\n\t// create a local part-dimension object for later use\n";
+        programFile << "\tPartDimension partConfig;\n";
+
+        // create a local integer for holding intermediate values of transformed index during inclusion testing
+        programFile << "\n\t// create a local transformed index variable for later use\n";
+        programFile << "\tint xformIndex;\n";
+
+	// set up the code generation mode for hybrid execution model then invoke recursive flow stage invocation 
+	// code to implement the logic of the run method
+	FlowStage::codeGenerationMode = Hybrid_Code_Generation;
+	CompositeStage *computation = taskDef->getComputation();
+	computation->generateInvocationCode(programFile, 1, rootLps);
+	
+	// finish function body in the program file
+	programFile << "}\n\n";
+
+	headerFile.close();
+        programFile.close();
+}
+
+

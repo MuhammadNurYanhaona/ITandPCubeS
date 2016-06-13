@@ -67,8 +67,8 @@ void initializeOutputFiles(const char *headerFileName,
 	headerFile.close();
 }
 
-void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig) {
-	
+void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRoot, PCubeSModel *pcubesModel) {
+
 	std::ofstream programFile;
 	programFile.open (outputFile, std::ofstream::out | std::ofstream::app);
         if (programFile.is_open()) {
@@ -81,6 +81,7 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 	
 	// find lowest PPS to which any LPS has been mapped and highest PPS that has an un-partitioned LPS 
 	// mapped to it 
+	List<PPS_Definition*> *pcubesConfig = pcubesModel->getPpsDefinitions();
 	std::deque<MappingNode*> nodeQueue;
         nodeQueue.push_back(mappingRoot);
 	int lowestPpsId = pcubesConfig->Nth(0)->id;
@@ -194,70 +195,76 @@ void generateThreadCountConstants(const char *outputFile, MappingNode *mappingRo
 		programFile << lpsThreadsInSegment << stmtSeparator;
 	} 
 
-	const char *hwConstMsg = "Hardware Constants";
-	decorator::writeSubsectionHeader(programFile, hwConstMsg);
-	
-	// determine the number of threads attached par core to understand how to do thread affinity management
-	int coreSpaceId = pcubesConfig->Nth(0)->id;
-	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
-		PPS_Definition *pps = pcubesConfig->Nth(i);
-		if (pps->coreSpace) {
-			coreSpaceId = pps->id;
-			break;
-		}
-	}
-	int ppsCount = pcubesConfig->NumElements();
-	int threadsPerCore = 1;
-	for (int i = coreSpaceId - 1; i >= lowestPpsId; i--) {
-		PPS_Definition *pps = pcubesConfig->Nth(ppsCount - i);
-		threadsPerCore *= (pps->passive) ? 1 : pps->units;
-	}	
-	programFile << "const int Threads_Per_Core = " << threadsPerCore << stmtSeparator;
+	// hardware constants that are needed to determine how to pin threads to specific cores are only needed
+	// when host-only PCubesModel is used for task mapping
+	if (pcubesModel->getModelType() == PCUBES_MODEL_TYPE_HOST_ONLY) {
 
-	// calculate where the hardware unit boundary lies in the PCubeS hierarchy so that processor numbering
-	// can be reset at proper interval
-	int processorsPerPhyUnit = 1;
-	bool phyUnitFound = false;
-	for (int i = 0; i < pcubesConfig->NumElements(); i++) {
-		PPS_Definition *pps = pcubesConfig->Nth(i);
-		if (!phyUnitFound && !pps->physicalUnit) continue;
-		if (pps->physicalUnit) {
-			phyUnitFound = true;
-			continue;
-		}
-		processorsPerPhyUnit *= (pps->passive) ? 1 : pps->units;
-	}
-	programFile << "const int Processors_Per_Phy_Unit = ";	
-	if (phyUnitFound) programFile << processorsPerPhyUnit << stmtSeparator;
-	else programFile << totalThreads << stmtSeparator;
-
-	// If the lowest LPS is mapped to a PPS above the core space then threads should be more apart than
-	// 1 core space processor. In that case we need to determine how far we should jump as we assign 
-	// threads to processors. To aid in that calculation we need to calculate another constant. We call 
-	// core jump.
-        int lastMappedPpsId = mappingRoot->mappingConfig->PPS->id;
-	nodeQueue.push_back(mappingRoot);
-        while (!nodeQueue.empty()) {
-                MappingNode *node = nodeQueue.front();
-                nodeQueue.pop_front();
-                for (int i = 0; i < node->children->NumElements(); i++) {
-                        nodeQueue.push_back(node->children->Nth(i));
-                }
-		PPS_Definition *pps = node->mappingConfig->PPS;
-		if (pps->id < lastMappedPpsId) {
-			lastMappedPpsId = pps->id;
-		}
-	}
-	int coreJump = 1;
-	if (lastMappedPpsId > coreSpaceId) {
+		const char *hwConstMsg = "Hardware Constants";
+		decorator::writeSubsectionHeader(programFile, hwConstMsg);
+		
+		// determine the number of threads attached par core to understand how to do thread affinity 
+		// management
+		int coreSpaceId = pcubesConfig->Nth(0)->id;
 		for (int i = 0; i < pcubesConfig->NumElements(); i++) {
 			PPS_Definition *pps = pcubesConfig->Nth(i);
-			if (pps->id >= lastMappedPpsId) continue;
-			coreJump *= (pps->passive) ? 1 : pps->units;
-			if (pps->id == coreSpaceId) break;
+			if (pps->coreSpace) {
+				coreSpaceId = pps->id;
+				break;
+			}
 		}
+		int ppsCount = pcubesConfig->NumElements();
+		int threadsPerCore = 1;
+		for (int i = coreSpaceId - 1; i >= lowestPpsId; i--) {
+			PPS_Definition *pps = pcubesConfig->Nth(ppsCount - i);
+			threadsPerCore *= (pps->passive) ? 1 : pps->units;
+		}	
+		programFile << "const int Threads_Per_Core = " << threadsPerCore << stmtSeparator;
+
+		// calculate where the hardware unit boundary lies in the PCubeS hierarchy so that processor 
+		// numbering can be reset at proper interval
+		int processorsPerPhyUnit = 1;
+		bool phyUnitFound = false;
+		for (int i = 0; i < pcubesConfig->NumElements(); i++) {
+			PPS_Definition *pps = pcubesConfig->Nth(i);
+			if (!phyUnitFound && !pps->physicalUnit) continue;
+			if (pps->physicalUnit) {
+				phyUnitFound = true;
+				continue;
+			}
+			processorsPerPhyUnit *= (pps->passive) ? 1 : pps->units;
+		}
+		programFile << "const int Processors_Per_Phy_Unit = ";	
+		if (phyUnitFound) programFile << processorsPerPhyUnit << stmtSeparator;
+		else programFile << totalThreads << stmtSeparator;
+
+		// If the lowest LPS is mapped to a PPS above the core space then threads should be more apart 
+		// than 1 core space processor. In that case we need to determine how far we should jump as we 
+		// assign threads to processors. To aid in that calculation we need to calculate another constant. 
+		// We call core jump.
+		int lastMappedPpsId = mappingRoot->mappingConfig->PPS->id;
+		nodeQueue.push_back(mappingRoot);
+		while (!nodeQueue.empty()) {
+			MappingNode *node = nodeQueue.front();
+			nodeQueue.pop_front();
+			for (int i = 0; i < node->children->NumElements(); i++) {
+				nodeQueue.push_back(node->children->Nth(i));
+			}
+			PPS_Definition *pps = node->mappingConfig->PPS;
+			if (pps->id < lastMappedPpsId) {
+				lastMappedPpsId = pps->id;
+			}
+		}
+		int coreJump = 1;
+		if (lastMappedPpsId > coreSpaceId) {
+			for (int i = 0; i < pcubesConfig->NumElements(); i++) {
+				PPS_Definition *pps = pcubesConfig->Nth(i);
+				if (pps->id >= lastMappedPpsId) continue;
+				coreJump *= (pps->passive) ? 1 : pps->units;
+				if (pps->id == coreSpaceId) break;
+			}
+		}
+		programFile << "const int Core_Jump = " << coreJump << stmtSeparator;
 	}
-	programFile << "const int Core_Jump = " << coreJump << stmtSeparator;
 
 	programFile.close();
 }

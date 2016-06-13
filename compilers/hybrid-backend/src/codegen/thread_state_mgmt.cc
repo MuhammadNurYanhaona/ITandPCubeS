@@ -368,3 +368,64 @@ void generateThreadStateImpl(const char *headerFileName,
  
 	programFile.close();
 }
+
+void generateLpuBatchVectorSizeSetupRoutine(const char *headerFileName,
+                const char *programFileName,
+                const char *initials, MappingNode *mappingRoot) {
+
+	std::ofstream programFile, headerFile;
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open header/program file";
+                std::exit(EXIT_FAILURE);
+        }
+
+	const char *message1 = "hybrid execution environment setup functions";
+       	decorator::writeSectionHeader(headerFile, message1);
+       	decorator::writeSectionHeader(programFile, message1);
+
+	const char *message2 = "LPU vectors' size setup";
+       	decorator::writeSubsectionHeader(headerFile, message2);
+       	decorator::writeSubsectionHeader(programFile, message2);
+
+        std::ostringstream functionHeader;
+        functionHeader << "getLpuVectorSizesForLpses()";
+        std::ostringstream functionBody;
+
+	functionBody << " {\n\n";
+
+	// first instantiate the vector that will hold the LPU vector sizes for different LPSes
+	functionBody << indent << "std::vector<int> *vectorSizes = new std::vector<int>" << stmtSeparator;
+	
+	// iterate over the LPS mappings; note that the the LPSes are already oredered in the mapping configuration; 
+	// so we can just append the vector sizes for LPSes one after another
+	std::deque<MappingNode*> nodeQueue;
+       	nodeQueue.push_back(mappingRoot);
+        while (!nodeQueue.empty()) {
+                MappingNode *node = nodeQueue.front();
+                nodeQueue.pop_front();
+                for (int i = 0; i < node->children->NumElements(); i++) {
+                        nodeQueue.push_back(node->children->Nth(i));
+                }
+		Space *lps = node->mappingConfig->LPS;
+
+		// the number of LPUs in the vector for the current LPS matches its per-segment thread count constant; 
+		// so we can use that constant directly here
+		const char *lpsName = lps->getName();
+		functionBody << indent << "vectorSizes->push_back(";
+		functionBody << "Space_" << lpsName << "_Threads_Per_Segment";	
+		functionBody << ")" << stmtSeparator; 
+	}
+
+	// at the end return the batch vector size list
+	functionBody << indent << "return vectorSizes" << stmtSeparator; 
+	functionBody << "}\n";
+
+        headerFile << "std::vector<int> *" << functionHeader.str() << ";\n\n";
+        programFile << std::endl << "std::vector<int> *" << initials << "::";
+        programFile <<functionHeader.str() << " " << functionBody.str();
+
+        headerFile.close();
+        programFile.close();
+}

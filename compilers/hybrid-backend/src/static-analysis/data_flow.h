@@ -53,6 +53,11 @@ enum SyncMode { Load, Load_And_Configure, Ghost_Region_Update, Restore };
 */
 enum RepeatCycleType { Subpartition_Repeat, Conditional_Repeat };
 
+/* 	These two constants are used to determine how the translate the contents of the flow stages depending on the 
+	task's mapping configuration
+ */
+enum CodeGenerationMode {Hybrid_Code_Generation, Host_Only_Code_Ceneration};
+
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
 	easier to reason with for later part of the compiler. 
@@ -88,6 +93,10 @@ class FlowStage {
 	// a static reference to be used, if needed, during analysis the content of a flow stage to find out the stage
 	// confining the locus of analysis; currently this has been used for epoch dependency analysis only
 	static FlowStage *CurrentFlowStage;
+	// another static reference is used to determine how to translate the content of the computation flow for the
+	// task currently under investigation as the nature of the generated code varies depending on what PCubeS model
+	// has been used for the task mapping
+	static CodeGenerationMode codeGenerationMode;
   public:
 	FlowStage(int index, Space *space, Expr *executeCond);
 	virtual ~FlowStage() {};
@@ -358,6 +367,12 @@ class CompositeStage : public FlowStage {
 	// override for the code generation method inherited from Flow-Stage class
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace);
+
+	// LPU generation process for the task's computation differs depending on the PCubeS model the task has 
+	// been mapped to. These two helpfer functions are used by the recursive generate-invocation-code routine
+	// to implement the proper process.
+	void genInvocationCodeForHost(std::ofstream &stream, int indentation, Space *containerSpace);
+	void genInvocationCodeForHybrid(std::ofstream &stream, int indentation, Space *containerSpace);
 	
 	// Until we incorporate the backend support for dynamic LPSes, there is no need to generate codes for sync 
 	// stages; therefore, we filter them out during nested stages grouping.

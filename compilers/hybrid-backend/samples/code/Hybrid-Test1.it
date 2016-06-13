@@ -17,8 +17,10 @@ Task "Hybrid Execution Test":
 	Compute:
 		"Determine Max Value In Row" (Space B) {
 			do {
-				max_entries[i] = reduce("max", matrix[i][j])
-			} for i, j in matrix
+				do {
+					max_entries[i] = reduce("max", matrix[i][j])
+				} for j in matrix
+			} for i in matrix
 		}
 		"Determine Matrix Maximum" (Space A) {
 			do {

@@ -8,6 +8,7 @@ class TupleDef;
 class TaskDef;
 class Space;
 class MappingNode;
+class PCubeSModel;
 class PPS_Definition;
 class EnvironmentLink;
 
@@ -18,7 +19,7 @@ void initializeOutputFiles(const char *headerFile,
 /* function definition for generating constants for total number of threads, threads per core,
    threads per segment, processors per hardware unit, etc.  */
 void generateThreadCountConstants(const char *outputFile, 
-		MappingNode *mappingRoot, List<PPS_Definition*> *pcubesConfig);
+		MappingNode *mappingRoot, PCubeSModel *pcubesModel);
 
 /* function definition for generating the runtime library routine that will create thread Ids */
 void generateFnForThreadIdsAllocation(const char *headerFile, 

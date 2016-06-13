@@ -77,6 +77,7 @@ class BatchPpuState {
 			List<ThreadState*> *ppuStateList, 
 			std::vector<int> *groupLeaderPpuCounts);
 	~BatchPpuState();
+	std::vector<ThreadState*> *getPpuStates() { return ppuStates; }
 	
 	// This is the function that manage get-next-LPU calls to the underlying PPU controllers and returns a vector 
 	// of LPUs for the LPS indicated by the LPS ID. The container LPS ID parameter is used to restrict the change
