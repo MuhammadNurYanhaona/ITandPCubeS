@@ -109,7 +109,10 @@ class PartDimension {
 
 	PartDimension getSubrange(int begin, int end); // This function generate a new part-dimension object that 
 					// represent a sub-range of the current object. The storage dimension is copied
-					// as it is and the new partition dimension is determined from the arguments.   
+					// as it is and the new partition dimension is determined from the arguments. 
+
+	int getDepth();                 // Tells the number of part-dimension objects that forms a path to lead to the
+                                        // current part-dimension object  
 					
 	void print(std::ofstream &stream, int indentLevel);
 };
@@ -158,5 +161,17 @@ class LPU_Group {
         int *lpuIds;
 };
 
+/* base class for LPUs of all LPSes; task specific subclasses will add other necessary fields  */
+class LPU {
+  public:
+        int id;
+        bool valid;
+
+        LPU() { id = 0; valid = false; }
+        void setId(int id) { this->id = id; }
+        void setValidBit(bool valid) { this->valid = valid; }
+        bool isValid() { return valid; }
+        virtual void print(std::ofstream &stream, int indentLevel) {}
+};
 
 #endif

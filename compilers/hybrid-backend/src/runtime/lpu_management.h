@@ -81,19 +81,6 @@ class MockLpuCounter : public LpuCounter {
 	void logCompositeLpuId(std::ofstream &log, int indent);
 };
 
-/* base class for LPUs of all LPSes; task specific subclasses will add other necessary fields  */
-class LPU {
-  public:
-	int id;
-	bool valid;
-	
-	LPU() { id = 0; valid = false; } 
-	void setId(int id) { this->id = id; }	
-	void setValidBit(bool valid) { this->valid = valid; }
-	bool isValid() { return valid; }
-	virtual void print(std::ofstream &stream, int indentLevel) {}
-};
-
 /* base class for task metadata object that holds the dimension information of all arrays been used */
 class Metadata {
   public:

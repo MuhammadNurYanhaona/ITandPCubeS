@@ -14,9 +14,9 @@ using namespace std;
 
 int *getLpuCountPr(Dimension dim1, Dimension dim2, int blockSize);
 void generatePartsPr(Range myLpuRange, 
-		IdGenerator *idGenerator, 
-		MatrixPartGenerator *partGenerator, 
-		MatrixPartMap *partMap);
+		mmm::IdGenerator *idGenerator, 
+		mmm::MatrixPartGenerator *partGenerator, 
+		mmm::MatrixPartMap *partMap);
 
 int mainMMMProfile(int argc, char *argv[]) {
 	
@@ -70,10 +70,10 @@ int mainMMMProfile(int argc, char *argv[]) {
 	if (myLpuRange.max >= linearLpuCount) myLpuRange.max = linearLpuCount - 1;
 
 	// generate and save the data parts
-	IdGenerator *idGenerator = new IdGenerator(lpuCount);
-	MatrixPartGenerator *partGenerator = new MatrixPartGenerator(lpuCount, 
+	mmm::IdGenerator *idGenerator = new mmm::IdGenerator(lpuCount);
+	mmm::MatrixPartGenerator *partGenerator = new mmm::MatrixPartGenerator(lpuCount, 
 			blockSize, &A_MD[0], &B_MD[0], &C_MD[0]);
-	MatrixPartMap *partMap = new MatrixPartMap();
+	mmm::MatrixPartMap *partMap = new mmm::MatrixPartMap();
 	generatePartsPr(myLpuRange, idGenerator, partGenerator, partMap); 
 
 	// initialize GPU code executor
@@ -88,7 +88,7 @@ int mainMMMProfile(int argc, char *argv[]) {
 	gpuExecutor->initialize();
 
 	// offload LPUs to the gpu code executor
-	MMMLpu *lpu = new MMMLpu();
+	mmm::MMMLpu *lpu = new mmm::MMMLpu();
 	for (int lpuId = myLpuRange.min; lpuId <= myLpuRange.max; lpuId++) {
 		getNextLpu(lpuId, lpu, idGenerator, partMap);
 		gpuExecutor->submitNextLpu(lpu);
@@ -113,9 +113,9 @@ int mainMMMProfile(int argc, char *argv[]) {
 }
 
 void generatePartsPr(Range myLpuRange,
-                IdGenerator *idGenerator,
-                MatrixPartGenerator *partGenerator,
-                MatrixPartMap *partMap) {
+                mmm::IdGenerator *idGenerator,
+                mmm::MatrixPartGenerator *partGenerator,
+                mmm::MatrixPartMap *partMap) {
 
 	for (int lpuId = myLpuRange.min; lpuId <= myLpuRange.max; lpuId++) {
 
