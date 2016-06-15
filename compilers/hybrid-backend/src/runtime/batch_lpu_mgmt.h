@@ -22,6 +22,7 @@
 #include "../communication/communicator.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../gpu-offloader/gpu_code_executor.h"
 
 #include <fstream>
 #include <vector>
@@ -32,7 +33,6 @@
 #define LPU_GEN_STATE_NON_CONTRIB_ACTIVE 2
 #define LPU_GEN_STATE_CONTRIB_DEPLATED 3
 #define LPU_GEN_STATE_NON_CONTRIB_DEPLATED 4
-
 
 class BatchPpuState {
   protected:
@@ -68,6 +68,10 @@ class BatchPpuState {
 	// properties to denote different LPUs, we maintain an LPU vector per LPS in the batch mode
 	List<std::vector<LPU*>*> *lpuVectorsForLPSes;
 
+	// A list of gpu-code-executors are used to offload LPU computations to the GPU at different context of a task's
+	// computation flow. A map is used to store them to identify an executor by it's context ID.
+	Hashtable<GpuCodeExecutor*> *gpuCodeExecutors;
+
 	// these two variables are for debugging activities inside the class
 	bool loggingEnabled;
 	std::ofstream *logFile;
@@ -78,6 +82,10 @@ class BatchPpuState {
 			std::vector<int> *groupLeaderPpuCounts);
 	~BatchPpuState();
 	std::vector<ThreadState*> *getPpuStates() { return ppuStates; }
+	void setGpuCodeExecutors(Hashtable<GpuCodeExecutor*> *executors) { gpuCodeExecutors = executors; }
+	GpuCodeExecutor *getGpuExecutorForContext(const char *contextId) { 
+		return gpuCodeExecutors->Lookup(contextId); 
+	}
 	
 	// This is the function that manage get-next-LPU calls to the underlying PPU controllers and returns a vector 
 	// of LPUs for the LPS indicated by the LPS ID. The container LPS ID parameter is used to restrict the change

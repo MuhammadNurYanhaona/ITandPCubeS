@@ -7,6 +7,7 @@
 #include "../communication/communicator.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../gpu-offloader/gpu_code_executor.h"
 
 #include <fstream>
 #include <vector>
@@ -26,6 +27,7 @@ BatchPpuState::BatchPpuState(int lpsCount, List<ThreadState*> *ppuStateList, std
 	this->loggingEnabled = false;
 	this->logFile = NULL;
 	initializeLpuVectors();
+	gpuCodeExecutors = NULL;
 }
 
 BatchPpuState::~BatchPpuState() {

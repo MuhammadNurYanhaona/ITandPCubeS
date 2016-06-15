@@ -137,6 +137,14 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 				passivePpsThreshold = offloadingLps->getPpsId();
 			}
 		}
+		// put the execution contexts from the list into a static map for later access during computation
+		// flow translation process
+		Hashtable<GpuExecutionContext*> *gpuContextMap = new Hashtable<GpuExecutionContext*>;
+		for (int i = 0; i < gpuContextList->NumElements(); i++) {
+			GpuExecutionContext *gpuContext = gpuContextList->Nth(i);
+			gpuContextMap->Enter(gpuContext->getContextName(), gpuContext);
+		}
+ 		GpuExecutionContext::gpuContextMap = gpuContextMap;
 	}
 	pcubesModel->setPassivePpsThreshold(passivePpsThreshold);
 

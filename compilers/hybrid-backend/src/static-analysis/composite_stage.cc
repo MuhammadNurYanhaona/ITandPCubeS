@@ -747,8 +747,15 @@ void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream,
 		
 		// check if the current group is the entry point to a sub-flow to be executed in the GPU
 		if (currentGroup->Nth(0)->isGpuEntryPoint()) {
-			// then invoke GPU computation
-			stream << nextIndent.str() << "//GPU computation" << stmtSeparator;
+			
+			// if the current group is indeed a section of the computation flow that should execute in the 
+			// GPU  then call the context specific invocation code generator
+			int gpuContextId = currentGroup->Nth(0)->getIndex();
+			const char *contextName = GpuExecutionContext::generateContextName(gpuContextId);
+			GpuExecutionContext *gpuContext 
+					= GpuExecutionContext::gpuContextMap->Lookup(contextName);
+			gpuContext->generateInvocationCode(stream, nextIndentation, space);
+	
 			// if there is any data communication is needed after the GPU computation then issue relevant
 			// communication then exit
 			generateDataSendsForGroup(stream, nextIndentation, commSignals); 
