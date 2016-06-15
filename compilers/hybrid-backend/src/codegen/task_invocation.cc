@@ -23,7 +23,7 @@ void initiateProgramHeaders(const char *headerFileName, const char *programFileN
 
 	std::cout << "Initializing header and program file\n";
        	std::string line;
-        std::ifstream commIncludeFile("config/default-includes.txt");
+        std::ifstream commIncludeFile("config/default-c-includes.txt");
         std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out);
         programFile.open (programFileName, std::ofstream::out);

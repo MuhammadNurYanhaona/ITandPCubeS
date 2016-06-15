@@ -21,6 +21,7 @@
 #include "file_io.h"
 #include "communication.h"
 #include "environment_mgmt.h"
+#include "gpu_execution.h"
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -58,6 +59,11 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 	programFileStr << outputDirectory;
 	programFileStr << taskNameLower << ".cc";
 	programFile = strdup(programFileStr.str().c_str());
+
+	std::ostringstream cudaProgramFileStr;
+	cudaProgramFileStr << outputDirectory;
+	cudaProgramFileStr << taskNameLower << "_offload.cu";
+	cudaProgramFile = strdup(cudaProgramFileStr.str().c_str());
 
 	initials = string_utils::getInitials(taskDef->getName());
 	initials = string_utils::toLower(initials);
@@ -153,6 +159,12 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	if (!hybridMapping) {
 		// generate a constant array for processor ordering in the hardware
 		generateProcessorOrderArray(headerFile, processorFile);
+
+	// for hybrid execution generate the batch configuration constants for offloading LPUs to the GPU and set
+	// up a separate program file to hold the GPU/CUDA related code
+	} else {
+		generateBatchConfigurationConstants(headerFile, pcubesModel);
+		initializeCudaProgramFile(initials, headerFile, cudaProgramFile);
 	}
 
 	// generate constansts needed for various reasons
@@ -196,7 +208,7 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// generate setup functions for hybrid execution management if hybrid model being used
 	if (hybridMapping) {
 		generateLpuBatchVectorSizeSetupRoutine(headerFile, 
-			programFile, initials, mappingRoot);
+			cudaProgramFile, initials, mappingRoot);
 	}
 
 	// generate synchronization primitives and their initialization functions; sync primitives are not needed

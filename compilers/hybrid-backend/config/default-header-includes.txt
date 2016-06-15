@@ -1,0 +1,55 @@
+// for error reporting and diagnostics
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cstdlib>
+#include <stdio.h>
+#include <time.h>
+#include <sys/time.h>
+
+// for math functions
+#include <math.h>
+#include <algorithm>
+#include <climits>
+
+// for tuple definitions found in the source code
+#include "tuple.h"
+#include <vector>
+
+// for LPU and PPU management data structures
+#include "../../src/runtime/structure.h"
+#include "../../src/runtime/lpu_management.h"
+#include "../../src/runtime/batch_lpu_mgmt.h"
+
+// for utility routines
+#include "../../src/utils/list.h"
+#include "../../src/utils/hashtable.h"
+
+// for memory management
+#include "../../src/memory-management/allocation.h"
+#include "../../src/memory-management/part_tracking.h"
+#include "../../src/memory-management/part_generation.h"
+#include "../../src/memory-management/part_management.h"
+
+// for input-output and initialization
+#include "../../src/input-output/stream.h"
+#include "../../src/input-output/data_handler.h"
+
+// for communication
+#include "../../src/communication/part_folding.h"
+#include "../../src/communication/part_config.h"
+#include "../../src/communication/part_distribution.h"
+#include "../../src/communication/confinement_mgmt.h"
+#include "../../src/communication/data_transfer.h"
+#include "../../src/communication/comm_buffer.h"
+#include "../../src/communication/comm_statistics.h"
+
+// for task and program environment management and interaction
+#include "../../src/environment/environment.h"
+#include "../../src/environment/env_instruction.h"
+#include "../../src/runtime/array_transfer.h"
+
+// for synchronization
+#include "../../src/runtime/sync.h"
+
+class Communicator;

@@ -1,5 +1,6 @@
 #include "allocation.h"
 #include "part_tracking.h"
+#include "part_generation.h"
 #include "../utils/utility.h"
 #include "../utils/list.h"
 #include "../runtime/structure.h"

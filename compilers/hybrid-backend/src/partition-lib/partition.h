@@ -117,6 +117,7 @@ public:
  * */
 class VoidInstr : public PartitionInstr {
 public:
+	using PartitionInstr::getIntervalDesc;
 	VoidInstr();
 	Dimension getDimension(bool includePadding=true) { return parentDim; }
 	Dimension getDimension(Dimension pD, int pId, int pC, bool iP) { return pD; }
@@ -133,6 +134,7 @@ protected:
 	int frontPadding;
 	int rearPadding;
 public:
+	using PartitionInstr::getIntervalDesc;
 	BlockSizeInstr(int size);
 	BlockSizeInstr(Dimension pd, int id, int size);
 	Dimension getDimension(bool includePadding=true);
@@ -152,6 +154,7 @@ protected:
 	int frontPadding;
 	int rearPadding;
 public:
+	using PartitionInstr::getIntervalDesc;
 	BlockCountInstr(int count);
 	BlockCountInstr(Dimension pd, int id, int count);
 	Dimension getDimension(bool includePadding=true);

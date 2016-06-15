@@ -27,6 +27,7 @@ class TaskGenerator {
 	const char *mappingFile;
 	const char *headerFile;
 	const char *programFile;
+	const char *cudaProgramFile;
 	const char *initials;
 	MappingNode *mappingRoot;
 	SyncManager *syncManager;

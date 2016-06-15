@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <fstream>
 
+
 // Notice that in all device function implementations we try to avoid declaring local variables as much 
 // as possible as CUDA merge device functions into the calling kernels that will result in too many local
 // variables per thread.

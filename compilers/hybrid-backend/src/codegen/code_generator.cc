@@ -23,8 +23,6 @@
 void initializeOutputFiles(const char *headerFileName, 
 		const char *programFileName, const char *initials) {
 
-	std::string line;
-        std::ifstream commIncludeFile("config/default-includes.txt");
 	std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out);
         programFile.open (programFileName, std::ofstream::out);
@@ -47,22 +45,35 @@ void initializeOutputFiles(const char *headerFileName,
 	programFile << "#include \"" << taskName  << '"' << std::endl << std::endl;
         decorator::writeSectionHeader(programFile, "header files for different purposes");        
 	
-	if (commIncludeFile.is_open()) {
-                while (std::getline(commIncludeFile, line)) {
-			headerFile << line << std::endl;
+	std::string line;
+        std::ifstream commCIncludeFile("config/default-c-includes.txt");
+	if (commCIncludeFile.is_open()) {
+                while (std::getline(commCIncludeFile, line)) {
 			programFile << line << std::endl;
 		}
-		headerFile << std::endl;
 		programFile << std::endl;
 	} else {
-		std::cout << "Unable to open common include file";
+		std::cout << "Unable to open common include file for setting up the output C++ source file";
 		std::exit(EXIT_FAILURE);
 	}
+
+        std::ifstream commHIncludeFile("config/default-header-includes.txt");
+	if (commHIncludeFile.is_open()) {
+                while (std::getline(commHIncludeFile, line)) {
+			headerFile << line << std::endl;
+		}
+		headerFile << std::endl;
+	} else {
+		std::cout << "Unable to open common include file for setting up the output header file";
+		std::exit(EXIT_FAILURE);
+	}
+
 
 	headerFile << "namespace " << string_utils::toLower(initials) << " {\n\n";
 	programFile << "using namespace " << string_utils::toLower(initials) << ";\n\n";
 
-	commIncludeFile.close();
+	commCIncludeFile.close();
+	commHIncludeFile.close();
 	programFile.close();
 	headerFile.close();
 }

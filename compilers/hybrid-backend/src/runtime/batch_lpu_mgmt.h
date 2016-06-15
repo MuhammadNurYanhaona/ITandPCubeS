@@ -19,7 +19,6 @@
 #include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"
-#include "../communication/communicator.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../gpu-offloader/gpu_code_executor.h"

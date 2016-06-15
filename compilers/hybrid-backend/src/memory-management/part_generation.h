@@ -109,6 +109,7 @@ class DimPartitionConfig {
 			int paddings[2], int ppuCount, int lpsAlignment);
 	// constructor to be overriden by functions that do not support padding
 	DimPartitionConfig(Dimension dimension, int *partitionArgs, int ppuCount, int lpsAlignment);
+	virtual ~DimPartitionConfig() {}
 
 	bool hasPadding() { return paddings[0] > 0 || paddings[1] > 0; }
 	Dimension getDataDimension() { return dataDimension; }

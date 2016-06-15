@@ -5,10 +5,11 @@
 #include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"
-#include "../communication/communicator.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include <fstream>
+
+class Communicator;
 
 /* Remember that there is a partial ordering of logical processing spaces (LPS). Thereby, the number of
    LPUs for a child LPS at a particular point of computation depends on the size of the data structure
