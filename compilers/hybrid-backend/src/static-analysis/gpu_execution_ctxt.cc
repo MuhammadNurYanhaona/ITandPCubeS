@@ -118,6 +118,9 @@ const char *GpuExecutionContext::spewOffloadingContextCode(int indentation) {
 	stream << indent.str() << "batchPpuState->initLpuIdVectorsForLPSTraversal(Space_";
 	stream << lpsName << paramSeparator << "&lpuIdVector)" << stmtSeparator;
 
+	// declare an initialize an iteration counter
+	stream << indent.str() << "int iterationNo = 0" << stmtSeparator;
+
 	// declare another vector to hold on to current LPUs of this LPS
 	stream << indent.str() << "std::vector<LPU*> *lpuVector" << stmtSeparator;
                 
@@ -125,13 +128,21 @@ const char *GpuExecutionContext::spewOffloadingContextCode(int indentation) {
 	stream << indent.str() << "while((lpuVector = batchPpuState->getNextLpus(";
 	stream << "Space_" << lpsName << paramSeparator << "Space_" << containerLpsName;
 	stream << paramSeparator << "&lpuIdVector)) != NULL) {\n";
+	
+	// in the first iteration set up the LPU count in the GPU code executor
+	stream << indent.str() << "\tif(iterationNo == 0) {\n";
+	stream << indent.str() << doubleIndent;
+	stream << "gpuCodeExecutor->setLpuCount(threadState->getLpuCounts(";
+	stream << "Space_" << lpsName << "))" << stmtSeparator;
+	stream << indent.str() << "\t}\n";
 
 	// hand over the vector of LPUs to the GPU code executor
 	stream << indent.str() << '\t' << "gpuCodeExecutor->submitNextLpus(lpuVector);\n";
 	
-	// update the LPU ID vector and close the LPS traveral loop
+	// update the LPU ID vector and iteration counter, and close the LPS traveral loop
 	stream << indent.str() << '\t' << "batchPpuState->extractLpuIdsFromLpuVector(";
         stream << "&lpuIdVector" << paramSeparator << "lpuVector)" << stmtSeparator;
+	stream << indent.str() << '\t' << "iterationNo++" << stmtSeparator;
        	stream << indent.str() << "}\n";
 	
 	// force execution of last remaining LPUs that did not fill up a complete batch
