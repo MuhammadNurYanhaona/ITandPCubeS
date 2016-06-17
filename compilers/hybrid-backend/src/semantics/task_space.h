@@ -159,6 +159,7 @@ class DataStructure {
 	Space *allocator;
 
 	// denotes the maximum number of versions to be maintained for this data structure if it is epoch dependent
+	// note that version count starts from 0 not 1
 	int versionCount;
   public:
 	DataStructure(VariableDef *definition);

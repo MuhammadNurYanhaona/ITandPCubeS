@@ -23,12 +23,10 @@ namespace string_utils {
 	// check if a string starts with any particular string
 	bool startsWith(std::string &str, std::string &endStr);
 
-	// replace more than one whitespaces in a row with a single space in
-	// any place within a string
+	// replace more than one whitespaces in a row with a single space in any place within a string
 	void shrinkWhitespaces(std::string &str);
 
-	// tokenize a string, this implementation trim and remove extra 
-	// whitespaces within the tokens.	
+	// tokenize a string, this implementation trim and remove extra whitespaces within the tokens.	
 	List<std::string> *tokenizeString(std::string &str, std::string &delims);
 
 	// replace all occurances of a character with another character
@@ -57,6 +55,12 @@ namespace string_utils {
 
 	// compute the union of two lists and assign the result to the first list
 	void combineLists(List<const char*> *list1, List<const char*> *list2);
+	
+	// compute the intersection of two lists and return the result in a new list
+	List<const char*> *intersectLists(List<const char*> *list1, List<const char*> *list2);
+	
+	// compute the subtraction of the second list from the first list and return the result in a new list
+	List<const char*> *subtractList(List<const char*> *list1, List<const char*> *list2);
 }
 
 #endif

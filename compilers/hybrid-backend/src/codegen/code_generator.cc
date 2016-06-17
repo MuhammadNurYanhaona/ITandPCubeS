@@ -576,25 +576,31 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 		programFile << "class Space" << lps->getName() << "_LPU : public LPU {\n";
 		programFile << "  public:\n";
 		for (int i = 0; i < localArrays->NumElements(); i++) {
-			ArrayDataStructure *array = (ArrayDataStructure*) lps->getLocalStructure(localArrays->Nth(i));
+			ArrayDataStructure *array 
+					= (ArrayDataStructure*) lps->getLocalStructure(localArrays->Nth(i));
 			ArrayType *arrayType = (ArrayType*) array->getType();
 			const char *elemType = arrayType->getTerminalElementType()->getName();
 			programFile << indent << elemType << " *" << array->getName();
 			programFile << stmtSeparator;
 			
-			// if there are multiple epoch version needed for the array in current LPS then create references
-			// for all previous epoch versions
-			int versionCount = array->getLocalVersionCount();
+			// If there are multiple epoch version needed for the array then create references for all 
+			// previous epoch versions. All versions may not necessarily be needed in the computation 
+			// stages that will execute in the current LPS. During LPU construction, the not needed 
+			// version references will have dangling pointers. 
+			int versionCount = array->getVersionCount();
 			for (int j = 1; j <= versionCount; j++) {
 				programFile << indent << elemType << " *" << array->getName();
 				programFile << "_lag_" << j;
 				programFile << stmtSeparator;
 			}
+
+			programFile << indent << "List<int*> *";
+			programFile << array->getName() << "PartId" << stmtSeparator;	
 			
 			int dimensions = array->getDimensionality();
 			programFile << indent << "PartDimension ";
 			programFile << array->getName() << "PartDims[" << array->getDimensionality() << "]";
-			programFile << stmtSeparator;	
+			programFile << stmtSeparator;
 		}
 		// add a specific lpu_id static array with dimensionality equals to the dimensions of the LPS
 		if (lps->getDimensionCount() > 0) {

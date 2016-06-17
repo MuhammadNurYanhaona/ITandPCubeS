@@ -333,12 +333,27 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 
 		// if there are are multiple epoch dependent versions for current data then copy older versions 
 		// in the LPU too
-		int versionCount = array->getLocalVersionCount();
+		int versionCount = array->getLocalVersionCount();	
+		// To ensure that all versions of the data structure can be made available in inside GPU computations
+		// when the hybrid PCubeS model of the target architecture has been used, we have an additional clause
+		// that we set up version references for all parts if the current LPS allocate the data part
+		if (!allocatedElsewhere) {
+			versionCount = array->getVersionCount();
+		} 
 		for (int j = 1; j <= versionCount; j++) {
 			programFile << doubleIndent << "lpu->" << varName << "_lag_" << j << " = ";
 			programFile << "(" << elemType->getCType() << "*) ";
 			programFile << varName << "Part->getData(" << j << ")" << stmtSeparator;
 		}
+
+		// Here we make another adjustment for the hybrid model by putting the part ID reference into the LPU
+		// if the current LPS is the allocator of the data part. This is needed as the GPU LPU offloader works
+		// in batches and keep tracks of unique data parts for a batch of LPU by data parts IDs.
+		if (!allocatedElsewhere) {
+			programFile << doubleIndent << "lpu->" << varName << "PartId = ";
+			programFile << varName << "Part->getMetadata()->getIdList()" << stmtSeparator;
+		}
+
 		programFile << indent << "}\n";
 	}
 	

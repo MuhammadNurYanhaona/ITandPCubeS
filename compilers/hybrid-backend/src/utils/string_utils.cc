@@ -195,3 +195,25 @@ void string_utils::combineLists(List<const char*> *list1, List<const char*> *lis
 		}
 	}
 }
+
+List<const char*> *string_utils::intersectLists(List<const char*> *list1, List<const char*> *list2) {
+	List<const char*> *intersection = new List<const char*>;
+	for (int i = 0; i < list1->NumElements(); i++) {
+		const char *str = list1->Nth(i);
+		if (string_utils::contains(list2, str)) {
+			intersection->Append(str);
+		}
+	}
+	return intersection;
+}
+
+List<const char*> *string_utils::subtractList(List<const char*> *list1, List<const char*> *list2) {
+	List<const char*> *subtraction = new List<const char*>;
+	for (int i = 0; i < list1->NumElements(); i++) {
+		const char *str = list1->Nth(i);
+		if (!string_utils::contains(list2, str)) {
+			subtraction->Append(str);
+		}
+	}
+	return subtraction;
+}

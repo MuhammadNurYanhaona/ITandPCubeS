@@ -49,6 +49,10 @@
 #include "../../src/environment/env_instruction.h"
 #include "../../src/runtime/array_transfer.h"
 
+// for offloading computation to GPU
+#include "../../src/gpu-offloader/lpu_parts_tracking.h"
+#include "../../src/gpu-offloader/gpu_code_executor.h"
+
 // for synchronization
 #include "../../src/runtime/sync.h"
 

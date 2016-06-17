@@ -1,13 +1,16 @@
 #include "gpu_execution_ctxt.h"
 #include "data_flow.h"
+#include "../syntax/ast_stmt.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 #include "../utils/code_constant.h"
+#include "../utils/string_utils.h"
 
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
 #include <string.h>
+#include <deque>
 
 //--------------------------------------------------------- GPU Execution Context ----------------------------------------------------------/
 
@@ -20,6 +23,7 @@ GpuExecutionContext::GpuExecutionContext(int topmostGpuPps, List<FlowStage*> *co
 	if (contextLps->getSubpartition() != NULL) {
 		contextType = LOCATION_SENSITIVE_LPU_DISTR_CONTEXT;
 	} else contextType = LOCATION_INDIPENDENT_LPU_DISTR_CONTEXT;
+	performVariableAccessAnalysis();
 }
 
 int GpuExecutionContext::getContextId() {
@@ -37,6 +41,38 @@ const char *GpuExecutionContext::generateContextName(int contextId) {
 	std::ostringstream stream;
         stream << "GpuExecutionContextNo" << contextId;
         return strdup(stream.str().c_str());
+}
+
+List<const char*> *GpuExecutionContext::getVariableAccessList() {
+	
+	List<const char*> *varList = new List<const char*>;
+	Iterator<VariableAccess*> iterator = varAccessLog->GetIterator();
+	VariableAccess *varAccess = NULL;
+	while ((varAccess = iterator.GetNextValue()) != NULL) {
+		varList->Append(varAccess->getName());
+	}
+	return varList;
+}
+        
+List<const char*> *GpuExecutionContext::getModifiedVariableList() {
+	
+	List<const char*> *varList = new List<const char*>;
+	Iterator<VariableAccess*> iterator = varAccessLog->GetIterator();
+	VariableAccess *varAccess = NULL;
+	while ((varAccess = iterator.GetNextValue()) != NULL) {
+		if (varAccess->isContentAccessed()) {	
+			AccessFlags *accessFlags = varAccess->getContentAccessFlags();
+			if (accessFlags->isWritten() || accessFlags->isRedirected()) {
+				varList->Append(varAccess->getName());
+			}
+		}
+	}
+	return varList;
+}
+        
+List<const char*> *GpuExecutionContext::getEpochIndependentVariableList() {
+	List<const char*> *allVarAccesses = getVariableAccessList();
+	return string_utils::subtractList(allVarAccesses, epochDependentVarAccesses);
 }
 
 void GpuExecutionContext::generateInvocationCode(std::ofstream &stream, int indentation, Space *callingCtxtLps) {
@@ -96,6 +132,37 @@ Space *GpuExecutionContext::getContextLps(int topmostGpuPps, Space *entryStageLp
 		currentLps = currentLps->getParent();
 	}
 	return candidateContextLps;
+}
+
+void GpuExecutionContext::performVariableAccessAnalysis() {
+
+	varAccessLog = new Hashtable<VariableAccess*>;
+	epochDependentVarAccesses = new List<const char*>;
+
+	std::deque<FlowStage*> stageQueue;
+	for (int i = 0; i < contextFlow->NumElements(); i++) {
+		stageQueue.push_back(contextFlow->Nth(i));
+	}
+
+	while (!stageQueue.empty()) {
+		FlowStage *stage = stageQueue.front();
+		stageQueue.pop_front();
+		CompositeStage *metaStage = dynamic_cast<CompositeStage*>(stage);
+		if (metaStage != NULL) {
+			List<FlowStage*> *stageList = metaStage->getStageList();
+			for (int i = 0; i < stageList->NumElements(); i++) {
+				stageQueue.push_back(stageList->Nth(i));
+			}
+		}
+		Hashtable<VariableAccess*> *stageAccesses = stage->getAccessMap();
+		if (stageAccesses != NULL) {
+			Stmt::mergeAccessedVariables(varAccessLog, stage->getAccessMap());
+		}
+		List<const char*> *stageEpochVars = stage->getEpochDependentVarList();
+		if (stageEpochVars != NULL) {
+			string_utils::combineLists(epochDependentVarAccesses, stageEpochVars);
+		}
+	}	
 }
 
 const char *GpuExecutionContext::spewOffloadingContextCode(int indentation) {

@@ -11,6 +11,7 @@
  */
 
 #include "data_flow.h"
+#include "data_access.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
@@ -34,6 +35,9 @@ class GpuExecutionContext {
 	List<FlowStage*> *contextFlow;
 	// type of LPU distribution to be used for the current context
 	GpuContextType contextType;
+	// two properties for maintaining detail information about data accesses happenned inside the current context
+	Hashtable<VariableAccess*> *varAccessLog;
+	List<const char*> *epochDependentVarAccesses;
   public:
 	// A static access point to all GPU execution contexts of a task is maintained here so that they can be 
 	// accessed during code generation process. This is needed as LPU traversal process for execution contexts  
@@ -52,6 +56,12 @@ class GpuExecutionContext {
 	const char *getContextName();
 	static const char *generateContextName(int contextId);
 
+	// data access information retrieval functions
+	List<const char*> *getVariableAccessList();
+	List<const char*> *getModifiedVariableList();
+	List<const char*> *getEpochDependentVariableList() { return epochDependentVarAccesses; }
+	List<const char*> *getEpochIndependentVariableList();
+
 	// this routine is used to generate LPU generation and traversal code inside the generated task::run function
 	// based on the GPU context type 
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *callingCtxtLps);
@@ -66,6 +76,10 @@ class GpuExecutionContext {
 	// scheme for GPU LPUs also demand that host to GPU context switching should happen at the topmost LPS mapped
 	// to the GPU. 
 	Space *getContextLps(int topmostGpuPps, Space *entryStageLps);
+
+	// We need to know what variables have been accessed and how inside the sub-flow to decide data state in/out
+	// requirement for the current context. This function does the analysis  
+	void performVariableAccessAnalysis();
 
 	// These are two auxiliary functions used by the generateInvocationCode routine. Remember that the get-next-
 	// Lpu LPU generation routine is a recursive process that goes up and down in the LPS hierarchy in search for

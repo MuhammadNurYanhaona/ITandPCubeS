@@ -8,6 +8,7 @@
 #include "../utils/string_utils.h"
 
 #include <fstream>
+#include <sstream>
 #include <cstdlib>
 #include <iostream>
 
@@ -84,23 +85,45 @@ void generateBatchConfigurationConstants(const char *headerFileName, PCubeSModel
 	headerFile.close();
 }
 
-void generateLpuBatchControllerForLps(Space *gpuContextLps, const char *initials,
+void generateLpuBatchControllerForLps(GpuExecutionContext *gpuContext, 
+		PCubeSModel *pcubesModel, 
+		const char *initials,
                 std::ofstream &headerFile, std::ofstream &programFile) {
 
-	const char *lpsName = gpuContextLps->getName();	
-        decorator::writeSubsectionHeader(headerFile, lpsName);
-        decorator::writeSubsectionHeader(programFile, lpsName);
+	const char *contextName = gpuContext->getContextName();	
+        decorator::writeSubsectionHeader(headerFile, contextName);
+        decorator::writeSubsectionHeader(programFile, contextName);
+
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "LpuBatchController";
+	std::string className = classNameStr.str();
+	
+	// declare the class in the header file
+	headerFile << "class " << className << " : public LpuBatchController {\n";
+	headerFile << "  public:\n";
+	headerFile << indent << className << "()" << stmtSeparator;
+	headerFile << indent << "int calculateLpuMemoryRequirement(LPU *lpu)" << stmtSeparator;
+	headerFile << indent << "void addLpuToTheCurrentBatch(LPU *lpu)" << stmtSeparator;
+	headerFile << "}" << stmtSeparator;
+
+	// then add implementation for the constructor and the two virtual functions inherited from the base 
+	// class in the program file
+	generateLpuBatchControllerConstructor(gpuContext, pcubesModel, initials, programFile);
+	generateLpuBatchControllerLpuAdder(gpuContext, initials, programFile);
+	generateLpuBatchControllerMemchecker(gpuContext, initials, programFile);
+	
 }
 
 void generateLpuBatchControllers(List<GpuExecutionContext*> *gpuExecutionContextList,
-                const char *initials,
+                PCubeSModel *pcubesModel,
+		const char *initials,
                 const char *headerFileName, const char *programFileName) {
 	
 	std::cout << "Generating GPU LPU stage-in stage-out controllers\n";
 
 	std::ofstream programFile, headerFile;
-        headerFile.open (headerFileName, std::ofstream::out);
-        programFile.open (programFileName, std::ofstream::out);
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
         if (!programFile.is_open()) {
                 std::cout << "Unable to open output program file";
                 std::exit(EXIT_FAILURE);
@@ -110,23 +133,249 @@ void generateLpuBatchControllers(List<GpuExecutionContext*> *gpuExecutionContext
                 std::exit(EXIT_FAILURE);
         }
 
-	const char *header = "LPU stage-in/stage-out controllers";
+	const char *header = "GPU LPU stage-in/stage-out controllers";
         decorator::writeSectionHeader(headerFile, header);
         decorator::writeSectionHeader(programFile, header);
 
-	// different sub-flow execution contexts can share the same LPU batch controller if they enters the GPU
-	// in the same LPS; thus the LPU batch controllers are LPS specific -- not context specific 
-	List<const char*> *alreadyCoveredLpses = new List<const char*>;
 	for (int i = 0; i < gpuExecutionContextList->NumElements(); i++) {
 		GpuExecutionContext *context = gpuExecutionContextList->Nth(i);
-		Space *contextLps = context->getContextLps();
-		const char *lpsName = contextLps->getName();
-		if (!string_utils::contains(alreadyCoveredLpses, lpsName)) {
-			alreadyCoveredLpses->Append(lpsName);
-			generateLpuBatchControllerForLps(contextLps, initials, headerFile, programFile);		
-		}
+		generateLpuBatchControllerForLps(context, 
+				pcubesModel, initials, headerFile, programFile);		
 	}
 
 	headerFile.close();
 	programFile.close();
+}
+
+void generateLpuBatchControllerConstructor(GpuExecutionContext *gpuContext, PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile) {
+	
+	// determine the batch size for executing LPUs in bunch in the GPU
+	Space *gpuContextLps = gpuContext->getContextLps();
+	int ppsId = gpuContextLps->getPpsId();
+	int gpuPpsId = pcubesModel->getGpuTransitionSpaceId();
+	std::string batchSize;	
+	if (ppsId == gpuPpsId) {
+		batchSize = std::string("GPU_BATCH_SIZE_THRESHOLD");
+	} else if (ppsId == gpuPpsId - 1) {
+		batchSize = std::string("SM_BATCH_SIZE_THRESHOLD");
+	} else {
+		batchSize = std::string("WARP_BATCH_SIZE_THRESHOLD");
+	}
+
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "LpuBatchController";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << initials << "::" << className << "::" << className;
+	programFile << "() : LpuBatchController() {\n";
+
+	// Determine the list of arrays and how they are accessed within the current subflow. Note that scalar and
+	// non-array collections are staged in and out separately. So here we are only concerned about arrays. 
+	List<const char*> *arrayNames = gpuContextLps->getLocallyUsedArrayNames();
+	List<const char*> *accessedArrays = string_utils::intersectLists(
+			gpuContext->getVariableAccessList(), arrayNames);
+	List<const char*> *modifiedArrays = string_utils::intersectLists(
+			gpuContext->getModifiedVariableList(), arrayNames);
+	List<const char*> *epochDependArrays = string_utils::intersectLists(
+			gpuContext->getEpochDependentVariableList(), arrayNames);
+	List<const char*> *epochIndArrays = string_utils::subtractList(accessedArrays, epochDependArrays);
+
+	// create property lists inside the constructor for the arrays of the above
+	programFile << std::endl;
+	programFile << indent << "List<const char*> *propertyNames = new List<const char*>" << stmtSeparator;
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *array = accessedArrays->Nth(i);
+		programFile << indent << "propertyNames->Append(\"" << array << "\")" << stmtSeparator;
+	}	
+	programFile << indent << "List<const char*> *modifiedPropertyNames = new List<const char*>";
+	programFile << stmtSeparator;
+	for (int i = 0; i < modifiedArrays->NumElements(); i++) {
+		const char *array = modifiedArrays->Nth(i);
+		programFile << indent << "modifiedPropertyNames->Append(\"" << array << "\")" << stmtSeparator;
+	}
+	programFile << indent << "List<const char*> *multiversionProperties = new List<const char*>";
+	programFile << stmtSeparator;
+	for (int i = 0; i < epochDependArrays->NumElements(); i++) {
+		const char *array = epochDependArrays->Nth(i);
+		programFile << indent << "multiversionProperties->Append(\"" << array << "\")" << stmtSeparator;
+	}	
+	programFile << indent << "List<const char*> *versionlessProperties = new List<const char*>";
+	programFile << stmtSeparator;
+	for (int i = 0; i < epochIndArrays->NumElements(); i++) {
+		const char *array = epochIndArrays->Nth(i);
+		programFile << indent << "versionlessProperties->Append(\"" << array << "\")" << stmtSeparator;
+	}
+
+	// initialize the LPU Batch controller's internal buffer and data parts management structures
+	programFile << std::endl;
+	programFile << indent << "setBufferManager(new LpuDataBufferManager(";
+	programFile << "versionlessProperties" << paramSeparator << "multiversionProperties))" << stmtSeparator;
+	programFile << indent << "initialize(" << batchSize << paramSeparator << paramIndent;
+	programFile << "GPU_MAX_MEM_CONSUMPTION" << paramSeparator << paramIndent;
+	programFile << "propertyNames" << paramSeparator << "modifiedPropertyNames)" << stmtSeparator;	
+		
+	programFile << "}\n";
+}
+
+void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext, 
+		const char *initials, std::ofstream &programFile) {
+	
+	Space *gpuContextLps = gpuContext->getContextLps();
+
+	// determine what multiversion and version-less arrays are accessed within the sub-flow
+	List<const char*> *arrayNames = gpuContextLps->getLocallyUsedArrayNames();
+	List<const char*> *epochDependArrays = string_utils::intersectLists(
+			gpuContext->getEpochDependentVariableList(), arrayNames);
+	List<const char*> *epochIndArrays = string_utils::intersectLists(
+			gpuContext->getEpochIndependentVariableList(), arrayNames);
+
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "LpuBatchController";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << "void " << initials << "::" << className << "::addLpuToTheCurrentBatch(LPU *lpu) {\n\n";
+
+	// get the LPS specific LPU reference
+	const char *lpsName = gpuContextLps->getName();
+	programFile << indent << "Space" << lpsName;
+	programFile << "_LPU *typedLpu = (Space" << lpsName << "_LPU*) lpu" << stmtSeparator;
+
+	// iterate over the versionless properties and create a normal LPU data part for each and add that to the
+	// batch controller only when the data part has not already been included during the processing of some
+	// earlier LPU
+	programFile << indent << "bool redundantPart = false" << stmtSeparator;
+	for (int i = 0; i < epochIndArrays->NumElements(); i++) {
+		
+		const char *varName = epochIndArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure*) gpuContextLps->getStructure(varName);
+		int dimensionality = array->getDimensionality();
+		ArrayType *arrayType = (ArrayType*) array->getType();		
+		Type *elementType = arrayType->getTerminalElementType();
+	
+		programFile << std::endl;
+		programFile << indent << "LpuDataPart *" << varName << "Part = new LpuDataPart(";
+		programFile << dimensionality << paramSeparator << paramIndent;
+		programFile << "typedLpu->" << varName << "PartDims" << paramSeparator;
+		programFile << "typedLpu->" << varName << paramSeparator << paramIndent;
+		programFile << "sizeof(" << elementType->getCType() << ")" << paramSeparator;
+		programFile << "typedLpu->" << varName << "PartId)" << stmtSeparator; 
+
+		programFile << indent << "redundantPart = dataPartTracker->addDataPart(";
+		programFile << varName << "Part" << paramSeparator;
+		programFile << "\"" << varName << "\")" << stmtSeparator;
+		programFile << indent << "if (redundantPart) delete " << varName << "Part" << stmtSeparator;
+	}
+
+	// for multiversion properties apply the same logic of the above but create versioned LPU data parts
+	for (int i = 0; i < epochDependArrays->NumElements(); i++) {
+
+		const char *varName = epochDependArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure*) gpuContextLps->getStructure(varName);
+		int dimensionality = array->getDimensionality();
+		ArrayType *arrayType = (ArrayType*) array->getType();		
+		Type *elementType = arrayType->getTerminalElementType();
+		int versionCount = array->getVersionCount();
+		
+		programFile << std::endl;
+		programFile << indent << "List<void*> *" << varName << "VersionList = ";
+		programFile << "new List<void*>" << stmtSeparator;
+		for (int j = 0; j <= versionCount; j++) {
+			programFile << indent << varName << "VersionList->Append(";
+			programFile << "typedLpu->" << varName;
+			if (j > 0) programFile << "_lag_" << j;
+			programFile << ")" << stmtSeparator;
+		}
+
+		programFile << std::endl;
+		programFile << indent << "VersionedLpuDataPart *" << varName;
+		programFile << "Part = new VersionedLpuDataPart(" << dimensionality << paramSeparator;
+		programFile << paramIndent << "typedLpu->" << varName << "PartDims" << paramSeparator;
+		programFile << varName << "VersionList" << paramSeparator << paramIndent;
+		programFile << "sizeof(" << elementType->getCType() << ")" << paramSeparator;
+		programFile << "typedLpu->" << varName << "PartId)" << stmtSeparator; 
+
+		programFile << indent << "redundantPart = dataPartTracker->addDataPart(";
+		programFile << varName << "Part" << paramSeparator;
+		programFile << "\"" << varName << "\")" << stmtSeparator;
+		programFile << indent << "if (redundantPart) delete " << varName << "Part" << stmtSeparator;
+	}
+
+	programFile << indent << "LpuBatchController::addLpuToTheCurrentBatch(lpu)" << stmtSeparator;
+	programFile << "}\n";
+}
+
+void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext,
+                const char *initials, std::ofstream &programFile) {
+	
+	Space *gpuContextLps = gpuContext->getContextLps();
+
+	// determine what multiversion and version-less arrays are accessed within the sub-flow
+	List<const char*> *arrayNames = gpuContextLps->getLocallyUsedArrayNames();
+	List<const char*> *accessedArrays = string_utils::intersectLists(
+			gpuContext->getVariableAccessList(), arrayNames);
+	List<const char*> *epochDependArrays = string_utils::intersectLists(
+			gpuContext->getEpochDependentVariableList(), arrayNames);
+
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "LpuBatchController";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << "int " << initials << "::" << className;
+	programFile << "::calculateLpuMemoryRequirement(LPU *lpu) {\n\n";
+
+	// get the LPS specific LPU reference
+	const char *lpsName = gpuContextLps->getName();
+	programFile << indent << "Space" << lpsName;
+	programFile << "_LPU *typedLpu = (Space" << lpsName << "_LPU*) lpu" << stmtSeparator;
+
+	// initialize the size tracker variable
+	programFile << indent << "int size = 0" << stmtSeparator;
+
+	// iterate over the arrays to be used in the GPU computation
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		
+		const char *varName = accessedArrays->Nth(i);
+		
+		// if the current array has been already included in the batch as part of some other LPU, it does 
+		// not add to the size calculation as we stage-in just one copy of replicated data parts
+		programFile << indent << "if (!dataPartTracker->isAlreadyIncluded(";
+		programFile << "typedLpu->" << varName << "PartId" << paramSeparator;
+		programFile << "\"" << varName << "\""	<< ")) {\n";
+
+		// determine the element type and dimensionality of the array
+		ArrayDataStructure *array = (ArrayDataStructure*) gpuContextLps->getStructure(varName);
+		int dimensionality = array->getDimensionality();
+		ArrayType *arrayType = (ArrayType*) array->getType();		
+		Type *elementType = arrayType->getTerminalElementType();
+
+		// calculate the amount of additional GPU memory this part will consume
+		programFile << doubleIndent << "int partSize = ";
+		for (int j = 0; j < dimensionality; j++) {
+			if (j > 0) {
+				programFile << paramIndent << doubleIndent << "* ";
+			}
+			programFile << "typedLpu->" << varName << "PartDims[" << j << "].storage.getLength()";
+		}
+		programFile << paramIndent << doubleIndent << "* sizeof(" << elementType->getCType() << ")";
+		if (string_utils::contains(epochDependArrays, varName)) {
+			// version count storage starts from 0 so we need to add 1 here before applying it as a 
+			// multiplication factor
+			int versionCount = array->getVersionCount() + 1;
+			programFile << " * " << versionCount;
+		}
+		programFile << stmtSeparator;
+
+		// add the part size to the size tracker
+		programFile << doubleIndent << "size += partSize" << stmtSeparator;
+			
+		programFile << indent << "}\n";
+	}
+	
+	//return the size and close the program file
+	programFile << indent << "return size" << stmtSeparator;
+	programFile << "}\n";
 }

@@ -886,6 +886,12 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 			DataStructure *variable = lps->getLocalStructure(variableList->Nth(i));
 			variable->setAllocator(lps);
                         variable->getUsageStat()->flagAllocated();
+			
+			// flag the variable as been accessed in this LPS to ensure that the LPU generation routine does
+			// not ignore putting in proper data part reference into the LPU if it has not been accessed here.
+			if (!variable->getUsageStat()->isAccessed()) {
+				variable->getUsageStat()->addAccess();
+			} 
 		}
 	// if the current LPS is not the topmost LPS in its hierarchy then we validate that all variables used in it have 
 	// already been allocated in its ancestor top-most GPU level LPS

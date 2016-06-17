@@ -10,6 +10,7 @@ Task "Hybrid Execution Test":
 		matrix: 2D Array of Real double-precision
 		max_entries: 1D Array of Real double-precision
 		normalizer: Real double-precision
+		t: Epoch
 	Environment:
 		matrix: link
 	Initialize:
@@ -29,7 +30,7 @@ Task "Hybrid Execution Test":
 		}
 		"Normalize Matrix" (Space D) { 
 			do { 
-				matrix[i][j] = matrix[i][j] / normalizer
+				matrix[i][j] at (t) = matrix[i][j] at (t - 1) / normalizer
 			} for i, j in matrix
 		}
 	Partition (p, q, r):
