@@ -50,4 +50,34 @@ void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext,
 			  Functions related to generating GPU Code Executors
 ---------------------------------------------------------------------------------------------------------*/
 
+// GPU code executors serve as the broker between host and the GPU computation for a particular offloading
+// context. A GPU code executor has a reference to a context specific LpuBatchController for staging in and
+// out data and it embodies an offloading funcion that invokes the CUDA kernel(s) to simulate the logic of
+// the sub-flow represented by the underlying GPU execution context. This function generates the definition
+// of a GPU code executor
+void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
+		PCubeSModel *pcubesModel,
+                const char *initials,
+                std::ofstream &headerFile, std::ofstream &programFile);
+
+// This uses the function above to generate GPU code executors for all GPU execution contexts of the current
+// task
+void generateGpuCodeExecutors(List<GpuExecutionContext*> *gpuExecutionContextList, 
+		PCubeSModel *pcubesModel,
+		const char *initials, 
+		const char *headerFile, const char *programFile);
+
+// these are four auxiliary functions to be used by the Gpu-Code-Executor generator function of the above to
+// provide implementations for the constructor and some inherited functions
+void generateGpuCodeExecutorConstructor(GpuExecutionContext *gpuContext, 
+		const char *initials, std::ofstream &programFile);
+void generateGpuCodeExecutorInitializer(GpuExecutionContext *gpuContext, 
+		const char *initials, std::ofstream &programFile);
+void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
+		PCubeSModel *pcubesModel, 
+		const char *initials, std::ofstream &programFile);
+void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext, 
+		const char *initials, std::ofstream &programFile);
+
+
 #endif

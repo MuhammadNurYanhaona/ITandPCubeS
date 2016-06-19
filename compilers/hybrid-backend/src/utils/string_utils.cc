@@ -98,6 +98,17 @@ const char *string_utils::toLower(const char *origString) {
 	return strdup(str.c_str());
 }
 
+const char *string_utils::toUpper(const char *origString) {
+	std::string str(origString);
+	for (int i = 0; i < str.length(); i++) {
+		char ch = str[i];
+		char upperCh = toupper(ch);
+		str[i] = upperCh;	
+	}
+	return strdup(str.c_str());
+}
+
+
 const char *string_utils::getInitials(const char *str) {
 	std::ostringstream initials;
 	int length = strlen(str);

@@ -275,6 +275,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	} else {
 		generateLpuBatchControllers(gpuContextList, 
 			pcubesModel, initials, headerFile, cudaProgramFile);
+		generateGpuCodeExecutors(gpuContextList, 
+			pcubesModel, initials, headerFile, cudaProgramFile);
 		generateBatchComputeFunction(taskDef, 
 			headerFile, programFile, initials, communicatorCount);
 	}

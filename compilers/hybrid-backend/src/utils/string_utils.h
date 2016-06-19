@@ -34,6 +34,9 @@ namespace string_utils {
 
 	// convert a character string to lower case and return a new string
 	const char *toLower(const char *origString);
+	
+	// convert a character string to upper case and return a new string
+	const char *toUpper(const char *origString);
 
 	// get the capitalized characters of string as its initials
 	const char *getInitials(const char *str);

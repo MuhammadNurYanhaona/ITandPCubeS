@@ -379,3 +379,186 @@ void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext,
 	programFile << indent << "return size" << stmtSeparator;
 	programFile << "}\n";
 }
+
+void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel,
+                const char *initials,
+                std::ofstream &headerFile, std::ofstream &programFile) {
+
+	const char *contextName = gpuContext->getContextName();	
+        decorator::writeSubsectionHeader(headerFile, contextName);
+        decorator::writeSubsectionHeader(programFile, contextName);
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "CodeExecutor";
+	std::string className = classNameStr.str();
+
+	// declare the class in the header file
+	headerFile << "class " << className << " : public GpuCodeExecutor {\n";
+	
+	// all code executors should have the root level array metadata, partition information, and scalar variables
+	// as their private properties
+	headerFile << "  private:\n";
+	headerFile << indent << initials << "::ArrayMetadata arrayMetadata" << stmtSeparator;
+	const char *upperInitials = string_utils::toUpper(initials);
+	headerFile << indent << upperInitials << "Partition partition" << stmtSeparator;
+
+	// unlike the previous two, task-global and thread-local scalar variables are not read-only; so we maintain
+	// pointer reference to them and have two versions: one for the host and the other for the GPU
+	headerFile << indent << initials << "::TaskGlobals " << "*taskGlobalsHost";
+	headerFile << paramSeparator << "*taskGlobalsGpu" << stmtSeparator;
+	headerFile << indent << initials << "::ThreadLocals " << "*threadLocalsHost";
+	headerFile << paramSeparator << "*threadLocalsGpu" << stmtSeparator;
+
+	// define the constructor and three functions a context specific code executor should give implementation for
+	headerFile << "  public:\n";
+	headerFile << indent << className << "(LpuBatchController *lpuBatchController";
+	headerFile << paramSeparator << paramIndent << initials << "::ArrayMetadata arrayMetadata";
+	headerFile << paramSeparator << paramIndent << upperInitials << "Partition partition";
+	headerFile << paramSeparator << paramIndent << initials << "::TaskGlobals *taskGlobals";
+	headerFile << paramSeparator << paramIndent << initials << "::ThreadLocals *threadLocals)";
+	headerFile << stmtSeparator;
+	headerFile << indent << "void offloadFunction()" << stmtSeparator;
+	headerFile << indent << "void initialize()" << stmtSeparator;
+	headerFile << indent << "void cleanup()" << stmtSeparator;
+	headerFile << "}" << stmtSeparator;
+
+	// invoke auxiliary functions to generate implementations for the defined functions 
+	generateGpuCodeExecutorConstructor(gpuContext, initials, programFile);
+	generateGpuCodeExecutorInitializer(gpuContext, initials, programFile);
+	generateGpuCodeExecutorOffloadFn(gpuContext,  pcubesModel, initials, programFile);
+	generateGpuCodeExecutorCleanupFn(gpuContext, initials, programFile);
+}
+
+void generateGpuCodeExecutors(List<GpuExecutionContext*> *gpuExecutionContextList,
+                PCubeSModel *pcubesModel,
+                const char *initials,
+                const char *headerFileName, const char *programFileName) {
+	
+	std::cout << "Generating GPU code executors\n";
+
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open()) {
+                std::cout << "Unable to open output program file";
+                std::exit(EXIT_FAILURE);
+        }
+        if (!headerFile.is_open()) {
+                std::cout << "Unable to open output header file";
+                std::exit(EXIT_FAILURE);
+        }
+
+	const char *header = "GPU code executors";
+        decorator::writeSectionHeader(headerFile, header);
+        decorator::writeSectionHeader(programFile, header);
+
+	for (int i = 0; i < gpuExecutionContextList->NumElements(); i++) {
+		GpuExecutionContext *context = gpuExecutionContextList->Nth(i);
+		generateGpuCodeExecutorForContext(context, 
+				pcubesModel, initials, headerFile, programFile);		
+	}
+
+	headerFile.close();
+	programFile.close();
+}
+
+void generateGpuCodeExecutorConstructor(GpuExecutionContext *gpuContext,
+                const char *initials, std::ofstream &programFile) {
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "CodeExecutor";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << initials << "::" << className << "::" << className;
+	programFile << "(LpuBatchController *lpuBatchController";
+	programFile << paramSeparator << paramIndent << initials << "::ArrayMetadata arrayMetadata";
+	const char *upperInitials = string_utils::toUpper(initials);
+	programFile << paramSeparator << paramIndent << upperInitials << "Partition partition";
+	programFile << paramSeparator << paramIndent << initials << "::TaskGlobals *taskGlobals";
+	programFile << paramSeparator << paramIndent << initials << "::ThreadLocals *threadLocals)";
+	programFile << " : GpuCodeExecutor(lpuBatchController) {\n\n";
+
+	programFile << indent << "this->arrayMetadata = arrayMetadata" << stmtSeparator;
+	programFile << indent << "this->partition = partition" << stmtSeparator;
+	programFile << indent << "this->taskGlobalsHost = taskGlobals" << stmtSeparator;
+	programFile << indent << "this->taskGlobalsGpu = NULL" << stmtSeparator;
+	programFile << indent << "this->threadLocalsHost = threadLocals" << stmtSeparator;
+	programFile << indent << "this->threadLocalsGpu = NULL" << stmtSeparator;
+
+	programFile << "}\n";
+}
+
+void generateGpuCodeExecutorInitializer(GpuExecutionContext *gpuContext,
+                const char *initials, std::ofstream &programFile) {
+
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "CodeExecutor";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << "void " << initials << "::" << className << "::initialize() {\n\n";
+	
+	// invoke the super class's initialize function
+	programFile << indent << "GpuCodeExecutor::initialize()" << stmtSeparator << '\n';
+
+	// stage in the task global and thread local scalars into the GPU card memory
+	programFile << indent << "int taskGlobalsSize = sizeof(*taskGlobalsHost)" << stmtSeparator;
+	programFile << indent << "cudaMemcpy(taskGlobalsGpu" << paramSeparator;
+	programFile << "taskGlobalsHost" << paramSeparator;
+	programFile << "taskGlobalsSize" << paramSeparator;
+	programFile << "cudaMemcpyHostToDevice)" << stmtSeparator;
+	programFile << indent << "int threadLocalsSize = sizeof(*threadLocalsHost)" << stmtSeparator;
+	programFile << indent << "cudaMemcpy(threadLocalsGpu" << paramSeparator;
+	programFile << "threadLocalsHost" << paramSeparator;
+	programFile << "threadLocalsSize" << paramSeparator;
+	programFile << "cudaMemcpyHostToDevice)" << stmtSeparator;
+	
+	programFile << "}\n";
+}
+
+void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,  
+                PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile) {
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "CodeExecutor";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << "void " << initials << "::" << className << "::offloadFunction() {\n\n";
+	
+	programFile << indent << "// This is where the computation sub-flow should be implemented as a series\n";
+	programFile << indent << "// of kernel calls. We do not have the GPU kernels yet. Need to discuss this.\n";	
+
+	programFile << "}\n";
+}
+
+void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext,  
+                const char *initials, std::ofstream &programFile) {
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "CodeExecutor";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << "void " << initials << "::" << className << "::cleanup() {\n\n";
+
+	// retrieve whatever updates to scalar variables done in the GPU computation
+	programFile << indent << "int taskGlobalsSize = sizeof(*taskGlobalsHost)" << stmtSeparator;
+	programFile << indent << "cudaMemcpy(taskGlobalsHost" << paramSeparator;
+	programFile << "taskGlobalsGpu" << paramSeparator;
+	programFile << "taskGlobalsSize" << paramSeparator;
+	programFile << "cudaMemcpyDeviceToHost)" << stmtSeparator;
+	programFile << indent << "int threadLocalsSize = sizeof(*threadLocalsHost)" << stmtSeparator;
+	programFile << indent << "cudaMemcpy(threadLocalsHost" << paramSeparator;
+	programFile << "threadLocalsGpu" << paramSeparator;
+	programFile << "threadLocalsSize" << paramSeparator;
+	programFile << "cudaMemcpyDeviceToHost)" << stmtSeparator;
+
+	// then invoke the superclass's cleanup function to tear down the GPU device context
+	programFile << '\n' << indent << "GpuCodeExecutor::cleanup()" << stmtSeparator;
+
+	programFile << "}\n"; 
+}
