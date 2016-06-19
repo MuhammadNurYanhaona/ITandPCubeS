@@ -208,7 +208,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// generate setup functions for hybrid execution management if hybrid model being used
 	if (hybridMapping) {
 		generateLpuBatchVectorSizeSetupRoutine(headerFile, 
-			cudaProgramFile, initials, mappingRoot);
+				cudaProgramFile, initials, mappingRoot);
+		generateGpuExecutorMapFn(gpuContextList, initials, headerFile, cudaProgramFile);
 	}
 
 	// generate synchronization primitives and their initialization functions; sync primitives are not needed

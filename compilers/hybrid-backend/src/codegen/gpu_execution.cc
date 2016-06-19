@@ -562,3 +562,73 @@ void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext,
 
 	programFile << "}\n"; 
 }
+
+void generateGpuExecutorMapFn(List<GpuExecutionContext*> *gpuExecutionContextList,
+                const char *initials,
+                const char *headerFileName, const char *programFileName) {
+	
+	std::cout << "Generating GPU code executor map for the batch PPU controller\n";
+
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open()) {
+                std::cout << "Unable to open output program file";
+                std::exit(EXIT_FAILURE);
+        }
+        if (!headerFile.is_open()) {
+                std::cout << "Unable to open output header file";
+                std::exit(EXIT_FAILURE);
+        }
+
+	const char *header = "GPU code executors setup";
+        decorator::writeSubsectionHeader(headerFile, header);
+        decorator::writeSubsectionHeader(programFile, header);
+
+	// generate the function header
+	std::ostringstream fnHeader;
+	fnHeader << "getGpuCodeExecutorMap(";
+	fnHeader << initials << "::ArrayMetadata arrayMetadata";
+	const char *upperInitials = string_utils::toUpper(initials);
+	fnHeader << paramSeparator << paramIndent << upperInitials << "Partition partition";
+	fnHeader << paramSeparator << paramIndent << initials << "::TaskGlobals *taskGlobals";
+	fnHeader << paramSeparator << paramIndent << initials << "::ThreadLocals *threadLocals";
+	fnHeader << paramSeparator << paramIndent << "std::ofstream &logFile)";
+
+	// write the function header in the header and program files
+	headerFile << "Hashtable<GpuCodeExecutor*> *" << fnHeader.str() << stmtSeparator;
+	programFile << std::endl;
+	programFile << "Hashtable<GpuCodeExecutor*> *" << initials << "::" << fnHeader.str();
+
+	// starts function body by instantiating the GPU code executor map
+	programFile << " {\n\n" << indent;
+	programFile << "Hashtable<GpuCodeExecutor*> *executorMap = new Hashtable<GpuCodeExecutor*>";
+	programFile << stmtSeparator;
+
+	// iterate over the GPU execution contexts in the list and crate a LPU Batch controller and GPU code
+	// executor for each context and put them in the map 
+	for (int i = 0; i < gpuExecutionContextList->NumElements(); i++) {
+		GpuExecutionContext *context = gpuExecutionContextList->Nth(i);
+		int contextId = context->getContextId();
+		programFile << std::endl;
+		programFile << indent << "LpuBatchController *lpuBatchController" << contextId << " = ";
+		programFile << "new Context" << contextId << "LpuBatchController()";
+		programFile << stmtSeparator;
+		programFile << indent << "GpuCodeExecutor *gpuCodeExecutor" << contextId << " = ";
+		programFile << "new Context" << contextId << "CodeExecutor(";
+		programFile << "lpuBatchController" << contextId << paramSeparator << paramIndent;
+		programFile << "arrayMetadata" << paramSeparator << "partition" << paramSeparator;
+		programFile << "taskGlobals" << paramSeparator << "threadLocals)" << stmtSeparator;
+		programFile << indent << "gpuCodeExecutor" << contextId << "->setLogFile(&logFile)";
+		programFile << stmtSeparator;
+		programFile << indent << "executorMap->Enter(\"" << context->getContextName() << "\"";
+		programFile << paramSeparator << "gpuCodeExecutor" << contextId << ")" << stmtSeparator;
+	}
+
+	// return the map and close the function
+	programFile << indent << "return executorMap" << stmtSeparator;
+	programFile << "}\n"; 
+
+	headerFile.close();
+	programFile.close();
+}

@@ -79,5 +79,15 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
 
+/*--------------------------------------------------------------------------------------------------------- 
+			    Host and GPU brokerage functions generators
+---------------------------------------------------------------------------------------------------------*/
+
+// The batch-mode PPU controller needs references of all the GPU code executor classes to be able to offload 
+// a GPU computation to specific executor when the need may arise. This routine generates a function that
+// instantiates all GPU code executors of a class and puts them in a map searchable by the context ID. 
+void generateGpuExecutorMapFn(List<GpuExecutionContext*> *gpuExecutionContextList,
+                const char *initials,
+                const char *headerFile, const char *programFile);
 
 #endif
