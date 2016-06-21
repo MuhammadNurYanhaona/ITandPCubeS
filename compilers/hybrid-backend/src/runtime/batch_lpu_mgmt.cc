@@ -28,6 +28,7 @@ BatchPpuState::BatchPpuState(int lpsCount, List<ThreadState*> *ppuStateList, std
 	this->logFile = NULL;
 	initializeLpuVectors();
 	gpuCodeExecutors = NULL;
+	ppuLpuGenerationStatus = new std::vector<int>;
 }
 
 BatchPpuState::~BatchPpuState() {
@@ -38,6 +39,7 @@ BatchPpuState::~BatchPpuState() {
 		delete lpuVector;
 	}
 	delete lpuVectorsForLPSes;
+	delete ppuLpuGenerationStatus;
 }
 
 vector<LPU*> *BatchPpuState::getNextLpus(int lpsId, int containerLpsId, std::vector<int> *currentLpuIds) {

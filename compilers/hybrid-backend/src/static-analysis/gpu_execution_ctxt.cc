@@ -154,6 +154,9 @@ void GpuExecutionContext::performVariableAccessAnalysis() {
 				stageQueue.push_back(stageList->Nth(i));
 			}
 		}
+		SyncStage *syncStage = dynamic_cast<SyncStage*>(stage);
+		if (syncStage != NULL) continue;
+
 		Hashtable<VariableAccess*> *stageAccesses = stage->getAccessMap();
 		if (stageAccesses != NULL) {
 			Stmt::mergeAccessedVariables(varAccessLog, stage->getAccessMap());
