@@ -80,6 +80,24 @@ vector<LPU*> *BatchPpuState::getNextLpus(int lpsId, int containerLpsId, std::vec
 	return lpuVector;			
 }
 
+std::vector<int*> *BatchPpuState::genLpuCountsVector(int lpsId, bool singleEntry) {
+	std::vector<int*> *countVector = new std::vector<int*>;
+	if (singleEntry) {
+		countVector->push_back(ppuStates->at(0)->getLpuCounts(lpsId));
+		return countVector;
+	}
+	for (unsigned int i = 0; i < ppuStates->size(); i++) {
+		ThreadState *ppuState = ppuStates->at(i);
+		int lpuGenerationStatus = ppuLpuGenerationStatus->at(i);
+		if (lpuGenerationStatus == LPU_GEN_STATE_CONTRIB_ACTIVE) {
+			countVector->push_back(ppuState->getLpuCounts(lpsId));	
+		} else if (lpuGenerationStatus == LPU_GEN_STATE_CONTRIB_DEPLATED) {
+			countVector->push_back(NULL);
+		}
+	}
+	return countVector;	
+}
+
 void BatchPpuState::initLpuIdVectorsForLPSTraversal(int lpsId, std::vector<int> *lpuIdVector) {
 	
 	lpuIdVector->clear();
@@ -94,6 +112,29 @@ void BatchPpuState::initLpuIdVectorsForLPSTraversal(int lpsId, std::vector<int> 
 			ppuLpuGenerationStatus->push_back(LPU_GEN_STATE_CONTRIB_ACTIVE);	
 		} else {
 			ppuLpuGenerationStatus->push_back(LPU_GEN_STATE_NON_CONTRIB_ACTIVE);
+		}
+	}
+}
+
+void BatchPpuState::adjustLpuIdVector(int lpsId, 
+		std::vector<int> *lpuIdVector,
+                int ancestorLpsId, 
+		std::vector<LPU*> *ancestorLpuVector) {
+
+	int activePpusInCurrentLps = groupLeaderPpuCounts->at(lpsId);
+	int activePpusInAncestorLps = groupLeaderPpuCounts->at(ancestorLpsId);
+	int ppusPerGroup = activePpusInCurrentLps / activePpusInAncestorLps;
+
+	for (unsigned int i = 0; i < ppuStates->size(); i++) {
+		int lpuGenerationStatus = ppuLpuGenerationStatus->at(i);
+		int groupId = i / ppusPerGroup;
+		if (ancestorLpuVector->at(groupId) == NULL) {
+			if (lpuGenerationStatus == LPU_GEN_STATE_CONTRIB_ACTIVE) {
+				ppuLpuGenerationStatus->at(i) = LPU_GEN_STATE_CONTRIB_DEPLATED; 
+			} else {
+				ppuLpuGenerationStatus->at(i) = LPU_GEN_STATE_NON_CONTRIB_DEPLATED;
+			}
+			
 		}
 	}
 }

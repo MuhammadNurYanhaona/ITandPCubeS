@@ -103,7 +103,8 @@ void generateLpuBatchControllerForLps(GpuExecutionContext *gpuContext,
 	headerFile << "  public:\n";
 	headerFile << indent << className << "()" << stmtSeparator;
 	headerFile << indent << "int calculateLpuMemoryRequirement(LPU *lpu)" << stmtSeparator;
-	headerFile << indent << "void addLpuToTheCurrentBatch(LPU *lpu)" << stmtSeparator;
+	headerFile << indent << "void addLpuToTheCurrentBatch(LPU *lpu" << paramSeparator;
+	headerFile << "int ppuIndex)" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
 
 	// then add implementation for the constructor and the two virtual functions inherited from the base 
@@ -214,6 +215,12 @@ void generateLpuBatchControllerConstructor(GpuExecutionContext *gpuContext, PCub
 	programFile << "versionlessProperties" << paramSeparator << "multiversionProperties))" << stmtSeparator;
 	programFile << indent << "initialize(" << batchSize << paramSeparator << paramIndent;
 	programFile << "GPU_MAX_MEM_CONSUMPTION" << paramSeparator << paramIndent;
+	if (gpuContext->getContextType() == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
+		programFile << "Space_" << gpuContextLps->getName();
+		programFile << "_Threads_Per_Segment" << paramSeparator << paramIndent; 
+	} else {
+		programFile << '1' << paramSeparator;
+	}
 	programFile << "propertyNames" << paramSeparator << "modifiedPropertyNames)" << stmtSeparator;	
 		
 	programFile << "}\n";
@@ -236,7 +243,8 @@ void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext,
 	std::string className = classNameStr.str();
 
 	programFile << std::endl;
-	programFile << "void " << initials << "::" << className << "::addLpuToTheCurrentBatch(LPU *lpu) {\n\n";
+	programFile << "void " << initials << "::" << className << "::addLpuToTheCurrentBatch(LPU *lpu";
+	programFile << paramSeparator << "int ppuIndex) {\n\n";
 
 	// get the LPS specific LPU reference
 	const char *lpsName = gpuContextLps->getName();
@@ -265,7 +273,8 @@ void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext,
 
 		programFile << indent << "redundantPart = dataPartTracker->addDataPart(";
 		programFile << varName << "Part" << paramSeparator;
-		programFile << "\"" << varName << "\")" << stmtSeparator;
+		programFile << "\"" << varName << "\"" << paramSeparator;
+		programFile << "ppuIndex)" << stmtSeparator;
 		programFile << indent << "if (redundantPart) delete " << varName << "Part" << stmtSeparator;
 	}
 
@@ -299,11 +308,13 @@ void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext,
 
 		programFile << indent << "redundantPart = dataPartTracker->addDataPart(";
 		programFile << varName << "Part" << paramSeparator;
-		programFile << "\"" << varName << "\")" << stmtSeparator;
+		programFile << "\"" << varName << "\"" << paramSeparator;
+		programFile << "ppuIndex)" << stmtSeparator;
 		programFile << indent << "if (redundantPart) delete " << varName << "Part" << stmtSeparator;
 	}
 
-	programFile << indent << "LpuBatchController::addLpuToTheCurrentBatch(lpu)" << stmtSeparator;
+	programFile << indent << "LpuBatchController::addLpuToTheCurrentBatch(lpu" << paramSeparator;
+	programFile << "ppuIndex)" << stmtSeparator;
 	programFile << "}\n";
 }
 
@@ -478,7 +489,14 @@ void generateGpuCodeExecutorConstructor(GpuExecutionContext *gpuContext,
 	programFile << paramSeparator << paramIndent << upperInitials << "Partition partition";
 	programFile << paramSeparator << paramIndent << initials << "::TaskGlobals *taskGlobals";
 	programFile << paramSeparator << paramIndent << initials << "::ThreadLocals *threadLocals)";
-	programFile << " : GpuCodeExecutor(lpuBatchController) {\n\n";
+	programFile << paramIndent << ": GpuCodeExecutor(lpuBatchController" << paramSeparator;
+	if (gpuContext->getContextType() == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
+		programFile << "Space_" << gpuContext->getContextLps()->getName();
+		programFile << "_Threads_Per_Segment";
+	} else {
+		programFile << "1";
+	}
+	programFile << ") {\n\n";
 
 	programFile << indent << "this->arrayMetadata = arrayMetadata" << stmtSeparator;
 	programFile << indent << "this->partition = partition" << stmtSeparator;

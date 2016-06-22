@@ -94,11 +94,25 @@ class BatchPpuState {
 	// there is at least one NON-NULL LPU in the vector. Otherwise, it returns a NULL vector. 
 	std::vector<LPU*> *getNextLpus(int lpsId, int containerLpsId, std::vector<int> *currentLpuIds);
 
+	// This function returns the current LPU counts for the LPS under concern of all PPU controllers. These counts
+	// are needed to construct multidimensional LPU IDs from linear IDs in intra-GPU computation. The second 
+	// parameter is used when the calling context ensures that the LPU counts of all participating PPU controllers
+	// are the same. So the count value can be retrieved from just one of them. 
+	std::vector<int*> *genLpuCountsVector(int lpsId, bool singleEntry);
+
 	// As we need the IDs of most recently generated batch of LPUs to generate the next batch, the beginning of the
 	// batch LPU generation for the LPS the caller has just entered into requires a specialized treatment. This
 	// function is used by the caller during the entrance to initialize the LPU vector with invalid IDs so that the
 	// getNextLpus routine of the above can be kick started properly
 	void initLpuIdVectorsForLPSTraversal(int lpsId, std::vector<int> *lpuIdVector);
+
+	// Sometimes we may want that the get-next-LPU recursion mechanism to work in a batch-synchronous way for the
+	// participating PPUs. To elaborate, we may want to keep the ancestor LPS's LPUs fixed and iterate over all the
+	// LPUs of the current LPS for all PPU controllers before any PPU controller can move up and change its ancestor
+	// LPU. So this helper function is provided to enable/disable PPU controllers based on their LPU generation 
+	// status in the ancestor LPS 
+	void adjustLpuIdVector(int lpsId, std::vector<int> *lpuIdVector, 
+                int ancestorLpsId, std::vector<LPU*> *ancestorLpuVector);
 
 	// returns true if any of the PPU controller participating in the group is supposed to execute compute stages in
 	// the LPS indicated by the argument

@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <cstdlib>
 #include <fstream>
+#include <vector>
 
 //--------------------------------------------------------------- Part Dim Ranges ---------------------------------------------------------------/
 
@@ -119,23 +120,31 @@ float GpuMemoryConsumptionStat::getConsumptionLevel() {
 
 //------------------------------------------------------------ LPU Data Part Tracker ------------------------------------------------------------/
 
-LpuDataPartTracker::LpuDataPartTracker() {
-	partIndexMap = new Hashtable<List<int>*>;
+LpuDataPartTracker::LpuDataPartTracker(int distinctPpuCount) {
+	this->distinctPpuCount = distinctPpuCount;
+	partIndexMap = new Hashtable<std::vector<List<int>*>*>;
 	dataPartMap = new Hashtable<List<LpuDataPart*>*>;
 }
 
 void LpuDataPartTracker::initialize(List<const char*> *varNames) {
 	for (int i = 0; i < varNames->NumElements(); i++) {
 		const char *varName = varNames->Nth(i);
-		partIndexMap->Enter(varName, new List<int>);
+		std::vector<List<int>*> *partIndexVector = new std::vector<List<int>*>;
+		partIndexVector->reserve(distinctPpuCount);
+		for (int j = 0; j < distinctPpuCount; j++) {
+			partIndexVector->push_back(new List<int>);	
+		}
+		partIndexMap->Enter(varName, partIndexVector);
 		dataPartMap->Enter(varName, new List<LpuDataPart*>);
 	}
 }
 
-bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName) {
+bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName, int ppuIndex) {
 	
-	List<int> *partIndexList = partIndexMap->Lookup(varName);
+	std::vector<List<int>*> *partIndexListVector = partIndexMap->Lookup(varName);
+	List<int> *partIndexList = partIndexListVector->at(ppuIndex);
 	List<LpuDataPart*> *dataPartList = dataPartMap->Lookup(varName);
+
 	int matchingIndex = -1;
 	List<int*> *dataPartId = dataPart->getId();
 	for (int i = 0; i < dataPartList->NumElements(); i++) {
@@ -166,10 +175,14 @@ bool LpuDataPartTracker::isAlreadyIncluded(List<int*> *dataPartId, const char *v
 
 void LpuDataPartTracker::clear() {
 	
-	List<int> *indexList = NULL;
-	Iterator<List<int>*> indexListIterator = partIndexMap->GetIterator();
-	while ((indexList = indexListIterator.GetNextValue()) != NULL) {
-		indexList->clear();
+	std::vector<List<int>*> *indexListVector = NULL;
+	Iterator<std::vector<List<int>*>*> indexListIterator = partIndexMap->GetIterator();
+	
+	while ((indexListVector = indexListIterator.GetNextValue()) != NULL) {
+		for (int i = 0; i < distinctPpuCount; i++) {
+			List<int> *indexList = indexListVector->at(i);
+			indexList->clear();
+		}
 	}
 
 	List<LpuDataPart*> *partList = NULL;
@@ -205,11 +218,10 @@ PropertyBufferManager::~PropertyBufferManager() {
 }
 
 void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
-		List<int> *partIndexList, 
+		std::vector<List<int>*> *partIndexListVector, 
 		std::ofstream &logFile) {
 
 	bufferEntryCount = dataPartsList->NumElements();
-	bufferReferenceCount = partIndexList->NumElements();
 	bufferSize = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
 		bufferSize += dataPartsList->Nth(i)->getSize();
@@ -239,10 +251,20 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 		currentIndex += size;
 	}
 
+	bufferReferenceCount = 0;
+	for (unsigned int i = 0; i < partIndexListVector->size(); i++) {
+		List<int> *partIndexList = partIndexListVector->at(i);
+		bufferReferenceCount += partIndexList->NumElements();
+	}
 	cpuPartIndexBuffer = (int *) malloc(bufferReferenceCount * sizeof(int));
-	for (int i = 0; i < partIndexList->NumElements(); i++) {
-		int index = partIndexList->Nth(i);
-		cpuPartIndexBuffer[i] = index;
+	currentIndex = 0;
+	for (unsigned int l = 0; l < partIndexListVector->size(); l++) {
+		List<int> *partIndexList = partIndexListVector->at(l);
+		for (int i = 0; i < partIndexList->NumElements(); i++) {
+			int index = partIndexList->Nth(i);
+			cpuPartIndexBuffer[currentIndex] = index;
+			currentIndex++;
+		}
 	}
 }
 
@@ -324,9 +346,9 @@ void PropertyBufferManager::copyDataIntoBuffer(LpuDataPart *dataPart, char *data
 //------------------------------------------------------- Versioned Property Buffer Manager -----------------------------------------------------/
 
 void VersionedPropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
-                        List<int> *partIndexList, std::ofstream &logFile) {
+                        std::vector<List<int>*> *partIndexListVector, std::ofstream &logFile) {
 	
-	PropertyBufferManager::prepareCpuBuffers(dataPartsList, partIndexList, logFile);
+	PropertyBufferManager::prepareCpuBuffers(dataPartsList, partIndexListVector, logFile);
 	cpuDataPartVersions = new short[bufferEntryCount];
 	for (int i = 0; i < bufferEntryCount; i++) {
 
@@ -431,10 +453,10 @@ LpuDataBufferManager::LpuDataBufferManager(List<const char*> *versionlessPropert
 
 void LpuDataBufferManager::copyPartsInGpu(const char *propertyName, 
 		List<LpuDataPart*> *dataPartsList, 
-		List<int> *partIndexList,
+		std::vector<List<int>*> *partIndexListVector,
 		std::ofstream &logFile) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
-	propertyManager->prepareCpuBuffers(dataPartsList, partIndexList, logFile);
+	propertyManager->prepareCpuBuffers(dataPartsList, partIndexListVector, logFile);
 	propertyManager->prepareGpuBuffers(logFile);
 }
 
@@ -473,6 +495,7 @@ LpuBatchController::LpuBatchController() {
 
 void LpuBatchController::initialize(int lpuCountThreshold, 
 		long memoryConsumptionLimit, 
+		int distinctPpuCount,
 		List<const char*> *propertyNames,
 		List<const char*> *toBeModifiedProperties) {
 
@@ -480,8 +503,9 @@ void LpuBatchController::initialize(int lpuCountThreshold,
 	this->toBeModifiedProperties = toBeModifiedProperties;
 	batchLpuCountThreshold = lpuCountThreshold;
 	currentBatchSize = 0;
+	this->distinctPpuCount = distinctPpuCount;
 	gpuMemStat = new GpuMemoryConsumptionStat(memoryConsumptionLimit);
-	dataPartTracker = new LpuDataPartTracker();
+	dataPartTracker = new LpuDataPartTracker(distinctPpuCount);
 	dataPartTracker->initialize(propertyNames);
 }
 
@@ -494,9 +518,10 @@ void LpuBatchController::submitCurrentBatchToGpu() {
 	if (currentBatchSize > 0) {
 		for (int i = 0; i < propertyNames->NumElements(); i++) {
 			const char *varName = propertyNames->Nth(i);
-			List<int> *partIndexes = dataPartTracker->getPartIndexList(varName);
+			std::vector<List<int>*> *partIndexVector 
+					= dataPartTracker->getPartIndexListVector(varName);
 			List<LpuDataPart*> *parts = dataPartTracker->getDataPartList(varName);
-			bufferManager->copyPartsInGpu(varName, parts, partIndexes, *logFile);
+			bufferManager->copyPartsInGpu(varName, parts, partIndexVector, *logFile);
 		}		
 	}
 }

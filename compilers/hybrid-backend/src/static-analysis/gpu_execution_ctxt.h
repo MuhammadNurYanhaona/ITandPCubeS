@@ -47,6 +47,7 @@ class GpuExecutionContext {
   public:
 	GpuExecutionContext(int topmostGpuPps, List<FlowStage*> *contextFlow);
 	Space *getContextLps() { return contextLps; }
+	GpuContextType getContextType() { return contextType; }
 
 	// the context ID, which is the index of the first flow stage within the context, is used for searching the 
 	// context during code generation

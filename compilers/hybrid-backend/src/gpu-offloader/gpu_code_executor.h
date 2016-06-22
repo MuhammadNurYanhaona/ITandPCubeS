@@ -41,21 +41,32 @@ class OffloadStats {
 // Interface class for GPU LPU execution
 class GpuCodeExecutor {
   protected:
-	// these two parameters are needed to construct multidimensional LPU IDs inside the offloaded GPU kernels as opposed
+	// Sometimes the GPU code executor works in a mode where the LPUs handed over to it be the host controller can be
+	// multiplexed to GPU PPUs arbitrarily. Some other times, there must be strict controlling of what PPU executes what
+	// LPUs. The submitNextLpus(vector<LPU*>) function below kepts LPUs for different GPU PPUs separate by having LPUs
+	// LPUs for different PPUs at different indices of the vector, but whether the differential treatment should be
+	// respected during the GPU execution is a decision made by the GPU-code-executor. The arbitrary LPU multiplexing 
+	// approach provides better load balancing so it is the preferred default. Controlled location-sensitive LPU 
+	// disbursement is the special case. The distinction between the two cases are made by this parameter. In the former
+	// case the count is 1 so LPUs from the vector are all dumped into the same GPU LPU-Batch-Controller buffer. In the
+	// latter case, the LPU buffers are kept distinct.  
+	int distinctPpuCount;
+
+	// These two parameters are needed to construct multidimensional LPU IDs inside the offloaded GPU kernels as opposed
 	// to passing the IDs as a separate array
-	int *lpuCount;
-	Range currentBatchLpuRange;
+	std::vector<int*> *lpuCountVector;
+	std::vector<Range> *lpuBatchRangeVector;
 
 	LpuBatchController *lpuBatchController;
 	std::ofstream *logFile;
 	OffloadStats *offloadStats;
   public:
-	GpuCodeExecutor(LpuBatchController *lpuBatchController);
-	void setLpuCount(int *lpuCount) { this->lpuCount = lpuCount; }
+	GpuCodeExecutor(LpuBatchController *lpuBatchController, int distinctPpuCount);
+	void setLpuCountVector(std::vector<int*> *lpuCountVector) { this->lpuCountVector = lpuCountVector; }
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	
 	// function to add a new LPU for batch execution in the GPU
-	void submitNextLpu(LPU *lpu);
+	void submitNextLpu(LPU *lpu, int ppuGroupIndex);
 	// function to force execution of partially filled batch of LPUs
 	void forceExecution();
 
@@ -69,8 +80,8 @@ class GpuCodeExecutor {
 	// example, if scalar variables are accessed and modified within the compute stages that will execute inside the off-
 	// loaded kernels then those variables should be copied in the GPU memory before the first batch of LPUs run and  
 	// brought back to the host at the end of last batch execution. The default implementation of initialize only creates
-	// a offload statistics accumulator, and the default implementation of cleanup tears down the CUDA context and prints
-	// the collected statistics. 
+	// a offload statistics accumulator and setup the batch LPU Range Vector, and the default implementation of cleanup 
+	// tears down the CUDA context and prints the collected statistics. 
 	virtual void initialize();
 	virtual void cleanup();
   protected:
@@ -80,6 +91,8 @@ class GpuCodeExecutor {
   private:
 	// this function implements the batch execution logic
 	void execute();
+	// after the execution of a batch, batch LPU ranges should be reset to prepare the executor for the next batch of LPUs
+	void resetCurrentBatchLpuRanges();
 };
 
 #endif

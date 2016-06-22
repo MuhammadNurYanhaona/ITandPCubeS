@@ -27,27 +27,28 @@ void OffloadStats::describe(std::ofstream &logFile) {
 
 //--------------------------------------------------------- GPU Code Executor -------------------------------------------------------------/
 
-GpuCodeExecutor::GpuCodeExecutor(LpuBatchController *lpuBatchController) {
+GpuCodeExecutor::GpuCodeExecutor(LpuBatchController *lpuBatchController, int distinctPpuCount) {
 	this->lpuBatchController = lpuBatchController;
+	this->distinctPpuCount = distinctPpuCount;
 }
 
-void GpuCodeExecutor::submitNextLpu(LPU *lpu) {
+void GpuCodeExecutor::submitNextLpu(LPU *lpu, int ppuGroupIndex) {
 
 	if (lpuBatchController->canAddNewLpu() && lpuBatchController->canHoldLpu(lpu)) {
 		if (lpuBatchController->isEmptyBatch()) {
-			currentBatchLpuRange = Range(lpu->id);
+			lpuBatchRangeVector->at(ppuGroupIndex) = Range(lpu->id);
 		} else {
-			currentBatchLpuRange.max++;
+			lpuBatchRangeVector->at(ppuGroupIndex).max++;
 		}
-		lpuBatchController->addLpuToTheCurrentBatch(lpu);
+		lpuBatchController->addLpuToTheCurrentBatch(lpu, ppuGroupIndex);
 		return;	
 	}
 	if (!lpuBatchController->isEmptyBatch()) {
 		execute();
 	}
 
-	lpuBatchController->addLpuToTheCurrentBatch(lpu);
-	currentBatchLpuRange = Range(lpu->id);
+	lpuBatchController->addLpuToTheCurrentBatch(lpu, ppuGroupIndex);
+	lpuBatchRangeVector->at(ppuGroupIndex) = Range(lpu->id);
 }
 
 void GpuCodeExecutor::forceExecution() {
@@ -60,7 +61,8 @@ void GpuCodeExecutor::submitNextLpus(std::vector<LPU*> *lpuVector) {
 	for (unsigned int i = 0; i < lpuVector->size(); i++) {
 		LPU *lpu = lpuVector->at(i);
 		if (lpu != NULL) {
-			submitNextLpu(lpu);
+			int ppuGroupIndex = i % distinctPpuCount;
+			submitNextLpu(lpu, ppuGroupIndex);
 		}
 	}
 }
@@ -98,13 +100,27 @@ void GpuCodeExecutor::execute() {
         endTime = tv.tv_sec * 1000000 + tv.tv_usec;
 	timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
 	offloadStats->addStagingOutTime(timeTaken);
+
+	resetCurrentBatchLpuRanges();
 }
 
 void GpuCodeExecutor::initialize() {
 	this->offloadStats = new OffloadStats();
+	lpuBatchRangeVector = new std::vector<Range>;
+	lpuBatchRangeVector->reserve(distinctPpuCount);
+	resetCurrentBatchLpuRanges();
 }
 
 void GpuCodeExecutor::cleanup() { 
 	cudaDeviceReset(); 
 	offloadStats->describe(*logFile);
+	delete lpuCountVector;
+	delete lpuBatchRangeVector;
+}
+
+void GpuCodeExecutor::resetCurrentBatchLpuRanges() {
+	lpuBatchRangeVector->clear();
+	for (int i = 0; i < distinctPpuCount; i++) {
+		lpuBatchRangeVector->push_back(Range(INVALID_ID));
+	} 
 }

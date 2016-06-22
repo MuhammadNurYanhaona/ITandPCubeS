@@ -20,7 +20,7 @@ GpuExecutionContext::GpuExecutionContext(int topmostGpuPps, List<FlowStage*> *co
 	this->contextFlow = contextFlow;
 	Space *entryLps = contextFlow->Nth(0)->getSpace();
 	this->contextLps = getContextLps(topmostGpuPps, entryLps);
-	if (contextLps->getSubpartition() != NULL) {
+	if (contextLps->isSubpartitionSpace()) {
 		contextType = LOCATION_SENSITIVE_LPU_DISTR_CONTEXT;
 	} else contextType = LOCATION_INDIPENDENT_LPU_DISTR_CONTEXT;
 	performVariableAccessAnalysis();
@@ -131,6 +131,9 @@ Space *GpuExecutionContext::getContextLps(int topmostGpuPps, Space *entryStageLp
 		candidateContextLps = currentLps;
 		currentLps = currentLps->getParent();
 	}
+	if (candidateContextLps->getSubpartition() != NULL) {
+		return candidateContextLps->getSubpartition();
+	}
 	return candidateContextLps;
 }
 
@@ -184,34 +187,53 @@ const char *GpuExecutionContext::spewOffloadingContextCode(int indentation) {
 	stream << indent.str() << "{ // scope entrance for gathering LPUs for offload\n";
 
 	// declare a new ID vector to track progress in LPU generation and initialize it
-	stream << indent.str() << "std::vector<int> lpuIdVector" << stmtSeparator;
+	stream << indent.str() << "std::vector<int> contextLpuIdVector" << stmtSeparator;
 	stream << indent.str() << "batchPpuState->initLpuIdVectorsForLPSTraversal(Space_";
-	stream << lpsName << paramSeparator << "&lpuIdVector)" << stmtSeparator;
+	stream << lpsName << paramSeparator << "&contextLpuIdVector)" << stmtSeparator;
+
+	// if the current GPU context requires PPU location sensitive LPU distribution then
+	// further adjust the LPU ID vector based on the presence of a non-NULL LPU in the
+	// ancestor for individual PPU controllers
+	if (contextType == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
+		stream << indent.str() << "batchPpuState->adjustLpuIdVector(Space_";
+		stream << lpsName << paramSeparator << paramIndent << indent.str(); 
+		stream << "&contextLpuIdVector" << paramSeparator;
+		stream << "Space_" << containerLpsName << paramSeparator;
+		stream << "lpuVector)" << stmtSeparator;
+	}
 
 	// declare an initialize an iteration counter
 	stream << indent.str() << "int iterationNo = 0" << stmtSeparator;
 
 	// declare another vector to hold on to current LPUs of this LPS
-	stream << indent.str() << "std::vector<LPU*> *lpuVector" << stmtSeparator;
+	stream << indent.str() << "std::vector<LPU*> *contextLpuVector" << stmtSeparator;
                 
 	// generate LPUs by repeatedly invoking the get-next-LPU routine
-	stream << indent.str() << "while((lpuVector = batchPpuState->getNextLpus(";
+	stream << indent.str() << "while((contextLpuVector = batchPpuState->getNextLpus(";
 	stream << "Space_" << lpsName << paramSeparator << "Space_" << containerLpsName;
-	stream << paramSeparator << "&lpuIdVector)) != NULL) {\n";
+	stream << paramSeparator << "&contextLpuIdVector)) != NULL) {\n";
 	
 	// in the first iteration set up the LPU count in the GPU code executor
 	stream << indent.str() << "\tif(iterationNo == 0) {\n";
 	stream << indent.str() << doubleIndent;
-	stream << "gpuCodeExecutor->setLpuCount(threadState->getLpuCounts(";
-	stream << "Space_" << lpsName << "))" << stmtSeparator;
+	stream << "gpuCodeExecutor->setLpuCountVector(batchPpuState->genLpuCountsVector(";
+	stream << "Space_" << lpsName << paramSeparator; 
+	if (contextType == LOCATION_INDIPENDENT_LPU_DISTR_CONTEXT) {
+		stream << "true";
+	} else { 
+		stream << "false";
+	}
+	stream << "))" << stmtSeparator;
 	stream << indent.str() << "\t}\n";
 
 	// hand over the vector of LPUs to the GPU code executor
-	stream << indent.str() << '\t' << "gpuCodeExecutor->submitNextLpus(lpuVector);\n";
+	stream << indent.str() << '\t';
+	stream << "gpuCodeExecutor->submitNextLpus(contextLpuVector);\n";
 	
 	// update the LPU ID vector and iteration counter, and close the LPS traveral loop
 	stream << indent.str() << '\t' << "batchPpuState->extractLpuIdsFromLpuVector(";
-        stream << "&lpuIdVector" << paramSeparator << "lpuVector)" << stmtSeparator;
+        stream << "&contextLpuIdVector" << paramSeparator;
+	stream << "contextLpuVector)" << stmtSeparator;
 	stream << indent.str() << '\t' << "iterationNo++" << stmtSeparator;
        	stream << indent.str() << "}\n";
 	

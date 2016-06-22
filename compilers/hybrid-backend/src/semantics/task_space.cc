@@ -1,6 +1,7 @@
 #include "task_space.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../utils/string_utils.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_def.h"
 #include "../syntax/location.h"
@@ -881,9 +882,20 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 	// if the current LPS is the topmost LPS in its hierarchy that has been been mapped inside the GPU then we flag 
 	// all data structures specified in its partition configuration for allocation
 	if (topmostLpsMappedToGpu) {
+		
+		// an special case for allocation occurs when the topmost GPU LPS is sub-partitioned; then we allocate the
+		// non sub-partitioned variables in the parent LPS and the rest in the sub-partition LPS. This is needed 
+		// to restrict the data parts from being too large so much so that a part may not even fit in the GPU card.   
 		List<const char*> *variableList = lps->getLocallyUsedArrayNames();
-		for (int i = 0; i < variableList->NumElements(); i++) {
-			DataStructure *variable = lps->getLocalStructure(variableList->Nth(i));
+		List<const char*> *subpartitionedVarList = new List<const char*>;
+		Space *subpartition = lps->getSubpartition();
+		if (subpartition != NULL) {
+			subpartitionedVarList = subpartition->getLocalDataStructureNames();
+		}
+
+		List<const char*> *topmostLpsVars = string_utils::subtractList(variableList, subpartitionedVarList);
+		for (int i = 0; i < topmostLpsVars->NumElements(); i++) {
+			DataStructure *variable = lps->getLocalStructure(topmostLpsVars->Nth(i));
 			variable->setAllocator(lps);
                         variable->getUsageStat()->flagAllocated();
 			
@@ -893,6 +905,16 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 				variable->getUsageStat()->addAccess();
 			} 
 		}
+
+		for (int i = 0; i < subpartitionedVarList->NumElements(); i++) {
+			DataStructure *variable = subpartition->getLocalStructure(subpartitionedVarList->Nth(i));
+			variable->setAllocator(subpartition);
+                        variable->getUsageStat()->flagAllocated();
+			if (!variable->getUsageStat()->isAccessed()) {
+				variable->getUsageStat()->addAccess();
+			} 
+		}	
+
 	// if the current LPS is not the topmost LPS in its hierarchy then we validate that all variables used in it have 
 	// already been allocated in its ancestor top-most GPU level LPS
 	} else {
@@ -901,7 +923,9 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 			ancestorGpuLps = parentLps;
 			parentLps = parentLps->getParent();
 		}
+		Space *ancestorSubpartition = ancestorGpuLps->getSubpartition();		
 		const char *ancestorLpsName = ancestorGpuLps->getName();
+
 		List<const char*> *variableList = lps->getLocallyUsedArrayNames();
 		for (int i = 0; i < variableList->NumElements(); i++) {
 			DataStructure *variable = lps->getLocalStructure(variableList->Nth(i));
@@ -909,7 +933,8 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 			DataStructure *lastAllocation = variable->getClosestAllocation();
 			if (lastAllocation != NULL) {
 				Space *allocatingSpace = lastAllocation->getSpace();
-				if (allocatingSpace != ancestorGpuLps) {
+				if (allocatingSpace != ancestorGpuLps 
+						&& allocatingSpace != ancestorSubpartition) {
 					ReportError::UnsupportedGpuPartitionConfiguration(varName, ancestorLpsName);
 				}
 			} else {

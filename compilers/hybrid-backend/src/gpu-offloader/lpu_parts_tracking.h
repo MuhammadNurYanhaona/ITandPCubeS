@@ -12,6 +12,7 @@
 #include "../runtime/structure.h"
 
 #include <fstream>
+#include <vector>
 
 /* For computation over valid transformed indexes we need to copy in the storage and partition dimension information of each data 
  * part in the GPU. A part-dimension object (a part of an LPU) is not suitable for directly being copied into the GPU memory due to
@@ -112,12 +113,20 @@ class GpuMemoryConsumptionStat {
  */
 class LpuDataPartTracker {
   private:
-	Hashtable<List<int>*> *partIndexMap;
+	// When the GPU PPUs are distinguished from the host, specific LPUs are allocated for execution to specific PPUs. Then data
+	// part tracking for those LPUs need to be done separately for those PPUs too. Therefore, a count of the number of PPUs in
+	// the GPU and a vector having an index list entry per PPU is needed.		
+	int distinctPpuCount;
+	Hashtable<std::vector<List<int>*>*> *partIndexMap;
+	// The actual data parts are, however, not distinguished by LPUs as multiple LPUs intended for different PPUs may share a
+	// single data part
   	Hashtable<List<LpuDataPart*>*> *dataPartMap;
   public:
-	LpuDataPartTracker();
+	LpuDataPartTracker(int distinctPpuCount);
 	void initialize(List<const char*> *varNames);
-	List<int> *getPartIndexList(const char *varName) { return partIndexMap->Lookup(varName); }
+	std::vector<List<int>*> *getPartIndexListVector(const char *varName) { 
+		return partIndexMap->Lookup(varName); 
+	}
 	List<LpuDataPart*> *getDataPartList(const char *varName) { return dataPartMap->Lookup(varName); } 
 	
         // An addition of a new LPU data part for a particular property may fail as that part may have been already included as part
@@ -125,7 +134,7 @@ class LpuDataPartTracker {
         // delete the data part if not needed.
 	// Note that even already included data parts must be attempted to be added through this function as the partIndexMap needs
 	// to be updated even for redundant data parts.
-	bool addDataPart(LpuDataPart *dataPart, const char *varName);
+	bool addDataPart(LpuDataPart *dataPart, const char *varName, int ppuIndex);
 
 	// this tells if a candidate data part has already been included in the part tracker
 	bool isAlreadyIncluded(List<int*> *dataPartId, const char *varName);
@@ -182,7 +191,7 @@ class PropertyBufferManager {
 	PropertyBufferManager();
 	~PropertyBufferManager();
 	virtual void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
-			List<int> *partIndexList, 
+			std::vector<List<int>*> *partIndexListVector, 
 			std::ofstream &logFile);
 	virtual void prepareGpuBuffers(std::ofstream &logFile);
 	virtual GpuBufferReferences *getGpuBufferReferences();
@@ -202,7 +211,7 @@ class VersionedPropertyBufferManager : public PropertyBufferManager {
 	short versionCount;
   public:
 	void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
-                        List<int> *partIndexList,
+                        std::vector<List<int>*> *partIndexListVector,
                         std::ofstream &logFile);
 	void prepareGpuBuffers(std::ofstream &logFile);
 	GpuBufferReferences *getGpuBufferReferences();
@@ -224,7 +233,7 @@ class LpuDataBufferManager {
 			List<const char*> *multiversionProperties);
 	void copyPartsInGpu(const char *propertyName, 
 			List<LpuDataPart*> *dataPartsList, 
-			List<int> *partIndexList, 
+			std::vector<List<int>*> *partIndexListVector, 
 			std::ofstream &logFile);
 	GpuBufferReferences *getGpuBufferReferences(const char *propertyName);
 	void retrieveUpdatesFromGpu(const char *propertyName, 
@@ -240,6 +249,7 @@ class LpuBatchController {
   protected:
 	int batchLpuCountThreshold;
 	int currentBatchSize;
+	int distinctPpuCount;
 	List<const char*> *propertyNames;
 	List<const char*> *toBeModifiedProperties;
 	LpuDataPartTracker *dataPartTracker;
@@ -251,6 +261,7 @@ class LpuBatchController {
 	void setBufferManager(LpuDataBufferManager *manager) { this->bufferManager = manager; }
 	void initialize(int lpuCountThreshold, 
 			long memoryConsumptionLimit, 
+			int distinctPpuCount,
 			List<const char*> *propertyNames,
 			List<const char*> *toBeModifiedProperties);
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
@@ -268,7 +279,7 @@ class LpuBatchController {
 
 	// Task:LPS specific sub-classes of the batch controller should provide implementation for the following two functions
 	virtual int calculateLpuMemoryRequirement(LPU *lpu) = 0;
-	virtual void addLpuToTheCurrentBatch(LPU *lpu) { currentBatchSize++; }
+	virtual void addLpuToTheCurrentBatch(LPU *lpu, int ppuIndex) { currentBatchSize++; }
 };
 
 #endif
