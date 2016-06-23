@@ -19,6 +19,39 @@ void initializeCudaProgramFile(const char *initials, const char *headerFile, con
 void generateBatchConfigurationConstants(const char *headerFile, PCubeSModel *pcubesModel);
 
 /*--------------------------------------------------------------------------------------------------------- 
+		    Functions related to communicating Metadata from Host to GPU
+---------------------------------------------------------------------------------------------------------*/
+
+// To construct LPUs from their IDs and regenarate dimensionality and other information inside the GPU, we 
+// need to make available a minimum set of LPU related metadata to the GPU kernels. This function generate 
+// a structure that holds that minimum set. The structure is LPS specific as our so far understanding is 
+// the metadata for LPU reconstruction is the same regardless of the offloading context as long as the LPS
+// is the same. 
+void generateOffloadingMetadataStruct(Space *gpuContextLps, std::ofstream &headerFile);
+
+// When distinction made between the SMs/Warps of the GPU from the host in a particular offloading context,
+// then the LPUs offloaded to them also have diverging partition hierarchy that result in variation in 
+// their metadata. So an aggregator structure is needed that will have one instance of the structure gene-
+// rated by the previous function for each SM/Warp. Since the PPU count is a static value once the mapping
+// configuration is known, it is possible to generate an aggregator structure with static array of metadata.
+void generateMetadataAggregatorStruct(Space *gpuContextLps, 
+		PCubeSModel *pcubesModel,
+                std::ofstream &headerFile);
+
+// This function generates a routine that creates and initializes an LPU reconstruction aggregate metadata
+// structure from the properties of an GPU-Code-Executor
+void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
+                PCubeSModel *pcubesModel,
+                const char *initials,
+                std::ofstream &headerFile, std::ofstream &programFile);
+
+// This function calls the above functions to generate metadata structures for all GPU contexts of a task
+void generateAllLpuMetadataStructs(List<GpuExecutionContext*> *gpuExecutionContextList,
+		PCubeSModel *pcubesModel,
+                const char *initials,
+                const char *headerFile, const char *programFile);
+
+/*--------------------------------------------------------------------------------------------------------- 
 			Functions related to generating LPU Batch Controllers
 ---------------------------------------------------------------------------------------------------------*/
 

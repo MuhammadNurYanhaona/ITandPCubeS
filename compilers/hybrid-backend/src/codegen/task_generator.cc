@@ -274,12 +274,14 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// for the hybrid mapping, generate a function for simulating the task's computation flow in batches of 
 	// LPUs and the implementation classes for all GPU sub-flow context executors
 	} else {
+		generateAllLpuMetadataStructs(gpuContextList,
+                		pcubesModel, initials, headerFile, cudaProgramFile);
 		generateLpuBatchControllers(gpuContextList, 
-			pcubesModel, initials, headerFile, cudaProgramFile);
+				pcubesModel, initials, headerFile, cudaProgramFile);
 		generateGpuCodeExecutors(gpuContextList, 
-			pcubesModel, initials, headerFile, cudaProgramFile);
+				pcubesModel, initials, headerFile, cudaProgramFile);
 		generateBatchComputeFunction(taskDef, 
-			headerFile, programFile, initials, communicatorCount);
+				headerFile, programFile, initials, communicatorCount);
 	}
 
 	closeNameSpace(headerFile);

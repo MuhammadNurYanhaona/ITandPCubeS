@@ -85,6 +85,154 @@ void generateBatchConfigurationConstants(const char *headerFileName, PCubeSModel
 	headerFile.close();
 }
 
+void generateOffloadingMetadataStruct(Space *gpuContextLps, std::ofstream &headerFile) {
+	
+	// initially we are keeping properties for the LPU count and batch range only in the metadata struct
+	headerFile << std::endl;
+	const char *lpsName = gpuContextLps->getName();
+	int lpsDimensionality = gpuContextLps->getDimensionCount();
+	headerFile << "class Space" << lpsName << "GpuMetadata {\n";
+	headerFile << "  public:\n";
+	for (int i = 0; i < lpsDimensionality; i++) {
+		headerFile << indent << "int lpuCount" << i + 1 << stmtSeparator;
+	}
+	headerFile << indent << "int batchRangeMin" << stmtSeparator;
+	headerFile << indent << "int batchRangeMax" << stmtSeparator;
+	headerFile << "}" << stmtSeparator;
+}
+
+void generateMetadataAggregatorStruct(Space *gpuContextLps, 
+		PCubeSModel *pcubesModel,  
+		std::ofstream &headerFile) {
+	
+	// Determine the number of metadata entries the aggregator should have. The default is 1 for normal off-
+	// loading context. If the LPS is subpartitioned then the context is a PPU location sensitive. In other
+	// word, specific LPUs are assigned to specific PPUs and PPU-count number of metadata entries are needed. 
+	int metadataEntryCount = 1;
+	if (gpuContextLps->isSubpartitionSpace()) {
+		int ppsId = gpuContextLps->getPpsId();
+		int gpuPpsId = pcubesModel->getGpuTransitionSpaceId();
+		std::string batchSize;	
+		if (ppsId == gpuPpsId) {
+			metadataEntryCount = 1;
+		} else if (ppsId == gpuPpsId - 1) {
+			metadataEntryCount = pcubesModel->getSMCount();
+		} else {
+			metadataEntryCount = pcubesModel->getSMCount() * pcubesModel->getWarpCount();
+		}
+	}
+	
+	const char *lpsName = gpuContextLps->getName();
+	headerFile << std::endl;
+	headerFile << "class Space" << lpsName << "GpuAggregateMetadata {\n";
+	headerFile << "  public:\n";
+	headerFile << indent << "Space" << lpsName << "GpuMetadata entries[" << metadataEntryCount << "]";
+	headerFile << stmtSeparator;
+	headerFile << "}" << stmtSeparator;	
+}
+
+
+void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
+                PCubeSModel *pcubesModel,
+                const char *initials,
+                std::ofstream &headerFile, std::ofstream &programFile) {
+
+	const char *lpsName = gpuContextLps->getName();
+
+	std::ostringstream fnHeader;
+	fnHeader << "getLaunchMetadata(std::vector<int*> *lpuCounts" << paramSeparator << paramIndent;
+	fnHeader << "std::vector<Range> *lpuBatchRanges)";
+
+	// write function signature in the header and the program files
+	headerFile << std::endl << "Space" << lpsName << "GpuAggregateMetadata ";
+	headerFile << fnHeader.str() << stmtSeparator;
+	programFile << std::endl << "Space" << lpsName << "GpuAggregateMetadata ";
+	programFile << initials << "::" << fnHeader.str() << " {\n\n";
+
+	// instantiate an aggregator variable
+	programFile << indent << "Space" << lpsName;
+	programFile << "GpuAggregateMetadata metadata" << stmtSeparator;
+
+	// iterate over the entries of the vector
+	programFile << indent << "for (unsigned int i = 0; i < lpuCounts->size(); i++) {\n";
+	programFile << doubleIndent << "int *lpuCount = lpuCounts->at(i)" << stmtSeparator;
+	
+	// if the count is NULL then there is no LPUs for the receiver PPU and all fields should be invalid in
+	// the metadata structure entry for it
+	int lpsDimensionality = gpuContextLps->getDimensionCount();
+	programFile << doubleIndent << "if (lpuCount == NULL) {\n";
+	for (int i = 0; i < lpsDimensionality; i++) {
+		programFile << tripleIndent << "metadata.entries[i].lpuCount" << i + 1;
+		programFile << " = INVALID_ID" << stmtSeparator;
+	}
+	programFile << tripleIndent << "metadata.entries[i].batchRangeMin = INVALID_ID" << stmtSeparator;	
+	programFile << tripleIndent << "metadata.entries[i].batchRangeMax = INVALID_ID" << stmtSeparator;	
+	programFile << doubleIndent << "} ";
+
+	// if the LPU count is not NULL then we copy the count and batch ranges from the vector to the metadata
+	// structure entry intended for the receiver PPU 
+	programFile << "else {\n";
+	for (int i = 0; i < lpsDimensionality; i++) {
+		programFile << tripleIndent << "metadata.entries[i].lpuCount" << i + 1;
+		programFile << " = lpuCount[" << i << "]" << stmtSeparator;
+	}
+	programFile << tripleIndent << "Range lpuRange = lpuBatchRanges->at(i)" << stmtSeparator;
+	programFile << tripleIndent << "metadata.entries[i].batchRangeMin = lpuRange.min" << stmtSeparator;	
+	programFile << tripleIndent << "metadata.entries[i].batchRangeMax = lpuRange.max" << stmtSeparator;	
+	programFile << doubleIndent << "}\n";
+ 	
+	programFile << indent << "}\n"; 
+
+	// return result and close the function
+	programFile << indent << "return metadata" << stmtSeparator;
+	programFile << "}\n";
+}
+
+void generateAllLpuMetadataStructs(List<GpuExecutionContext*> *gpuExecutionContextList,
+		PCubeSModel *pcubesModel, 
+                const char *initials,
+                const char *headerFileName, const char *programFileName) {
+
+	std::cout << "Generating GPU LPU metadata reconstruction data structures\n";
+
+	std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open()) {
+                std::cout << "Unable to open output program file";
+                std::exit(EXIT_FAILURE);
+        }
+        if (!headerFile.is_open()) {
+                std::cout << "Unable to open output header file";
+                std::exit(EXIT_FAILURE);
+        }
+
+	const char *header = "GPU LPU metadata reconstruction structures";
+        decorator::writeSectionHeader(headerFile, header);
+        decorator::writeSectionHeader(programFile, header);
+
+	List<const char*> *coveredLpses = new List<const char*>;
+	for (int i = 0; i < gpuExecutionContextList->NumElements(); i++) {
+		GpuExecutionContext *context = gpuExecutionContextList->Nth(i);
+		Space *contextLps = context->getContextLps();
+		const char *contextLpsName = contextLps->getName();
+		if (string_utils::contains(coveredLpses, contextLpsName)) continue;
+		coveredLpses->Append(contextLpsName);
+
+		std::ostringstream header;
+		header << "Space " << contextLpsName << " Offloading Contexts";
+		decorator::writeSubsectionHeader(headerFile, header.str().c_str());
+		decorator::writeSubsectionHeader(programFile, header.str().c_str());
+		generateOffloadingMetadataStruct(contextLps, headerFile);
+		generateMetadataAggregatorStruct(contextLps, pcubesModel, headerFile);
+		generateKernelLaunchMatadataStructFn(contextLps, 
+				pcubesModel, initials, headerFile, programFile);
+	}
+
+	headerFile.close();
+	programFile.close();
+}
+
 void generateLpuBatchControllerForLps(GpuExecutionContext *gpuContext, 
 		PCubeSModel *pcubesModel, 
 		const char *initials,
@@ -111,8 +259,7 @@ void generateLpuBatchControllerForLps(GpuExecutionContext *gpuContext,
 	// class in the program file
 	generateLpuBatchControllerConstructor(gpuContext, pcubesModel, initials, programFile);
 	generateLpuBatchControllerLpuAdder(gpuContext, initials, programFile);
-	generateLpuBatchControllerMemchecker(gpuContext, initials, programFile);
-	
+	generateLpuBatchControllerMemchecker(gpuContext, initials, programFile);	
 }
 
 void generateLpuBatchControllers(List<GpuExecutionContext*> *gpuExecutionContextList,
