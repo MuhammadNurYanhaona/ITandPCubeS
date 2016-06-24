@@ -29,6 +29,7 @@ class PartDimRanges {
 	int getSize() { return size; }	
 	int getDepth() { return depth; }
 	void copyIntoBuffer(int *buffer);
+	void describe(std::ofstream &stream, int indentLevel);
 };
 
 /* This class is used to extract any particular array and its associated information that is part of an LPU. We cannot retain the
@@ -66,6 +67,7 @@ class LpuDataPart {
 	virtual int getSize();
 	void flagReadOnly() { readOnly = true; }
 	bool isReadOnly() { return readOnly; }
+	virtual void describe(std::ofstream &stream, int indentLevel);
 };
 
 /* This extension to the above LPU Data Part class is needed to stage-in/out properties that have multiple epoch versions. */
@@ -86,6 +88,7 @@ class VersionedLpuDataPart : public LpuDataPart {
 	void *getDataVersion(int version);
 	void advanceEpochVersion();
 	int getSize() { return LpuDataPart::getSize() * versionCount; }
+	void describe(std::ofstream &stream, int indentLevel);
 };
 
 /* In most likely cases, the memory capacity of the GPU will be far less than the memory capacity of the host machine. Therefore, 
@@ -121,8 +124,11 @@ class LpuDataPartTracker {
 	// The actual data parts are, however, not distinguished by LPUs as multiple LPUs intended for different PPUs may share a
 	// single data part
   	Hashtable<List<LpuDataPart*>*> *dataPartMap;
+
+	std::ofstream *logFile;
   public:
 	LpuDataPartTracker(int distinctPpuCount);
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	void initialize(List<const char*> *varNames);
 	std::vector<List<int>*> *getPartIndexListVector(const char *varName) { 
 		return partIndexMap->Lookup(varName); 
@@ -187,9 +193,12 @@ class PropertyBufferManager {
 	int *gpuPartIndexBuffer;
 	int *gpuPartBeginningBuffer;
 	int *gpuPartRangeBuffer;
+
+	std::ofstream *logFile;
   public:
 	PropertyBufferManager();
 	~PropertyBufferManager();
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	virtual void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
 			std::vector<List<int>*> *partIndexListVector, 
 			std::ofstream &logFile);
@@ -227,10 +236,12 @@ class VersionedPropertyBufferManager : public PropertyBufferManager {
 class LpuDataBufferManager {
   private:
 	Hashtable<PropertyBufferManager*> *propertyBuffers;
+	std::ofstream *logFile;
   public:
 	LpuDataBufferManager(List<const char*> *propertyNames);
 	LpuDataBufferManager(List<const char*> *versionlessProperties, 
 			List<const char*> *multiversionProperties);
+	void setLogFile(std::ofstream *logFile);
 	void copyPartsInGpu(const char *propertyName, 
 			List<LpuDataPart*> *dataPartsList, 
 			std::vector<List<int>*> *partIndexListVector, 
@@ -264,7 +275,7 @@ class LpuBatchController {
 			int distinctPpuCount,
 			List<const char*> *propertyNames,
 			List<const char*> *toBeModifiedProperties);
-	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
+	void setLogFile(std::ofstream *logFile);
 	bool canAddNewLpu() { return currentBatchSize < batchLpuCountThreshold; }
 	bool canHoldLpu(LPU *lpu);
 	void submitCurrentBatchToGpu();

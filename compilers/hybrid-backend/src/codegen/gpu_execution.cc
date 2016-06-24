@@ -779,6 +779,8 @@ void generateGpuExecutorMapFn(List<GpuExecutionContext*> *gpuExecutionContextLis
 		programFile << indent << "LpuBatchController *lpuBatchController" << contextId << " = ";
 		programFile << "new Context" << contextId << "LpuBatchController()";
 		programFile << stmtSeparator;
+		programFile << indent << "lpuBatchController" << contextId << "->setLogFile(&logFile)";
+		programFile << stmtSeparator;
 		programFile << indent << "GpuCodeExecutor *gpuCodeExecutor" << contextId << " = ";
 		programFile << "new Context" << contextId << "CodeExecutor(";
 		programFile << "lpuBatchController" << contextId << paramSeparator << paramIndent;

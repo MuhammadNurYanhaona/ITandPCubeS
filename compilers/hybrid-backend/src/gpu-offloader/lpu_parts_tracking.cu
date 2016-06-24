@@ -8,6 +8,7 @@
 #include <cuda_runtime.h>
 #include <cstdlib>
 #include <fstream>
+#include <sstream>
 #include <vector>
 
 //--------------------------------------------------------------- Part Dim Ranges ---------------------------------------------------------------/
@@ -42,6 +43,16 @@ PartDimRanges::~PartDimRanges() {
 
 void PartDimRanges::copyIntoBuffer(int *buffer) {
 	memcpy(buffer, ranges, size * sizeof(int));
+}
+
+void PartDimRanges::describe(std::ofstream &stream, int indentLevel) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	stream << indent.str() << "Part Dimension Range: [";
+	for (int i = 0; i < size; i++) {
+		stream << "(" << ranges[i].min << ", " << ranges[i].max << ")";
+	}
+	stream << "]\n";	
 }
 
 //---------------------------------------------------------------- LPU Data Part ----------------------------------------------------------------/
@@ -80,6 +91,18 @@ int LpuDataPart::getSize() {
 	return elementCount * elementSize;
 }
 
+void LpuDataPart::describe(std::ofstream &stream, int indentLevel) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	stream << indent.str() << "Data Part Reference: " << this << "\n";
+	indent << '\t';
+	stream << indent.str() << "Dimensionality: " << dimensionality << "\n";
+	stream << indent.str() << "Element Count: " << elementCount << "\n";
+	stream << indent.str() << "Element Size: " << elementSize << "\n";
+	stream << indent.str() << "Total Size: " << getSize() << "\n"; 	
+	partDimRanges->describe(stream, indentLevel + 1);
+}
+
 //----------------------------------------------------------- Versioned LPU Data Part -----------------------------------------------------------/
 
 VersionedLpuDataPart::VersionedLpuDataPart(int dimensionality,
@@ -100,6 +123,13 @@ void *VersionedLpuDataPart::getDataVersion(int version) {
         
 void VersionedLpuDataPart::advanceEpochVersion() {
 	currVersionHead = (currVersionHead + 1) % versionCount;
+}
+
+void VersionedLpuDataPart::describe(std::ofstream &stream, int indentLevel) {
+	LpuDataPart::describe(stream, indentLevel);
+	std::ostringstream indent;
+        for (int i = 0; i <= indentLevel; i++) indent << '\t';
+	stream << indent.str() << "Version Count: " << versionCount << "\n";
 }
 
 //--------------------------------------------------------- GPU Memory Consumption Stat ---------------------------------------------------------/
@@ -124,6 +154,7 @@ LpuDataPartTracker::LpuDataPartTracker(int distinctPpuCount) {
 	this->distinctPpuCount = distinctPpuCount;
 	partIndexMap = new Hashtable<std::vector<List<int>*>*>;
 	dataPartMap = new Hashtable<List<LpuDataPart*>*>;
+	this->logFile = NULL;
 }
 
 void LpuDataPartTracker::initialize(List<const char*> *varNames) {
@@ -211,6 +242,7 @@ PropertyBufferManager::PropertyBufferManager() {
         gpuPartIndexBuffer = NULL;
 	gpuPartRangeBuffer = NULL;
         gpuPartBeginningBuffer = NULL;
+	logFile = NULL;
 }
 
 PropertyBufferManager::~PropertyBufferManager() {
@@ -433,6 +465,7 @@ LpuDataBufferManager::LpuDataBufferManager(List<const char*> *propertyNames) {
 		const char *propertyName = propertyNames->Nth(i);
 		propertyBuffers->Enter(propertyName, new PropertyBufferManager());
 	}
+	logFile = NULL;
 }
 
 LpuDataBufferManager::LpuDataBufferManager(List<const char*> *versionlessProperties, 
@@ -449,6 +482,15 @@ LpuDataBufferManager::LpuDataBufferManager(List<const char*> *versionlessPropert
 		const char *propertyName = multiversionProperties->Nth(i);
 		propertyBuffers->Enter(propertyName, new VersionedPropertyBufferManager());
 	}
+}
+
+void LpuDataBufferManager::setLogFile(std::ofstream *logFile) { 
+	this->logFile = logFile;
+	PropertyBufferManager *propertyManager = NULL;
+        Iterator<PropertyBufferManager*> iterator = propertyBuffers->GetIterator();
+        while ((propertyManager = iterator.GetNextValue()) != NULL) {
+                propertyManager->setLogFile(logFile);
+        } 
 }
 
 void LpuDataBufferManager::copyPartsInGpu(const char *propertyName, 
@@ -508,6 +550,12 @@ void LpuBatchController::initialize(int lpuCountThreshold,
 	dataPartTracker = new LpuDataPartTracker(distinctPpuCount);
 	dataPartTracker->initialize(propertyNames);
 }
+
+void LpuBatchController::setLogFile(std::ofstream *logFile) { 
+	this->logFile = logFile;
+	dataPartTracker->setLogFile(logFile);
+	bufferManager->setLogFile(logFile); 
+} 
 
 bool LpuBatchController::canHoldLpu(LPU *lpu) {
 	int moreMemoryNeeded = calculateLpuMemoryRequirement(lpu);
