@@ -77,7 +77,7 @@ LpuDataPart::LpuDataPart(int dimensionality,
 }
 
 bool LpuDataPart::isMatchingId(List<int*> *candidateId) {
-	for (int i = 0; i < candidateId->NumElements(); i ++) {
+	for (int i = 0; i < candidateId->NumElements(); i++) {
 		int *myId = partId->Nth(i);
 		int *otherId = candidateId->Nth(i);
 		for (int j = 0; j < dimensionality; j++) {

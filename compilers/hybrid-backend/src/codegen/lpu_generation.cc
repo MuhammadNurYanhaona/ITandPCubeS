@@ -226,6 +226,8 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 				programFile << "] = space" << parentLpsName;
 				programFile << "Lpu->" << varName << "PartDims[" << d << "]" << stmtSeparator;
 			}
+			programFile << indent << "lpu->" << varName << "PartId = space" << parentLpsName;
+			programFile << "Lpu->" << varName << "PartId" << stmtSeparator;
 			continue;
 		}
 		
