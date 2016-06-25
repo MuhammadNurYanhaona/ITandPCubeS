@@ -208,8 +208,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// generate setup functions for hybrid execution management if hybrid model being used
 	if (hybridMapping) {
 		generateLpuBatchVectorSizeSetupRoutine(headerFile, 
-				cudaProgramFile, initials, mappingRoot);
-		generateGpuExecutorMapFn(gpuContextList, initials, headerFile, cudaProgramFile);
+				programFile, initials, mappingRoot);
+		generateGpuExecutorMapFn(gpuContextList, initials, headerFile, programFile);
 	}
 
 	// generate synchronization primitives and their initialization functions; sync primitives are not needed
@@ -275,11 +275,14 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// LPUs and the implementation classes for all GPU sub-flow context executors
 	} else {
 		generateAllLpuMetadataStructs(gpuContextList,
-                		pcubesModel, initials, headerFile, cudaProgramFile);
+                		pcubesModel, initials, headerFile, programFile);
 		generateLpuBatchControllers(gpuContextList, 
-				pcubesModel, initials, headerFile, cudaProgramFile);
+				pcubesModel, initials, headerFile, programFile);
+		
+		// this part is using the cuda program file as it generates CUDA code 
 		generateGpuCodeExecutors(gpuContextList, 
 				pcubesModel, initials, headerFile, cudaProgramFile);
+
 		generateBatchComputeFunction(taskDef, 
 				headerFile, programFile, initials, communicatorCount);
 	}

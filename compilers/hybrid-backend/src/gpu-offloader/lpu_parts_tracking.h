@@ -59,7 +59,7 @@ class LpuDataPart {
 			void *data, 
 			int elementSize, 
 			List<int*> *partId);
-	~LpuDataPart() { delete partDimRanges; }
+	virtual ~LpuDataPart() { delete partDimRanges; }
 	PartDimRanges *getPartDimRanges() { return partDimRanges; }
 	virtual void *getData() { return data; }
 	List<int*> *getId() { return partId; }

@@ -26,6 +26,9 @@ COMMUNICATION_LIBS = $(shell find src -name "*.cc" -path "src/communication/*")
 IO_LIBS = $(shell find src -name "*.cc" -path "src/input-output/*")
 ENV_MANAGEMENT_LIBS = $(shell find src -name "*.cc" -path "src/environment/*")
 
+# Set up the list of sources that are the broker code between C++ and CUDA
+OFFLOAD_MGMT_LIBS = $(shell find src -name "*.cc" -path "src/gpu-offloader/*")
+
 # Set up the list of sources generated for the IT program
 BUILD_SRCS = $(shell find build/$(BUILD_SUBDIR) -name "*.cc")
 CUDA_SRCS = $(shell find . -name "*.cu")
@@ -38,7 +41,8 @@ C_OBJS = $(patsubst %.cc, %.o, $(filter %.cc, $(BUILD_SRCS))) 		\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(MM_MANAGEMENT_LIBS)))	\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(COMMUNICATION_LIBS)))	\
 	$(patsubst %.cc, %.o, $(filter %.cc, $(ENV_MANAGEMENT_LIBS)))	\
-	$(patsubst %.cc, %.o, $(filter %.cc, $(IO_LIBS)))
+	$(patsubst %.cc, %.o, $(filter %.cc, $(IO_LIBS)))		\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(OFFLOAD_MGMT_LIBS)))
 
 # cuda object files
 CUDA_OBJS = $(patsubst %.cu, %.o, $(filter %.cu, $(CUDA_SRCS)))			    	
