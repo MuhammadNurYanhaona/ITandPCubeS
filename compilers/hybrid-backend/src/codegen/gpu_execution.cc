@@ -401,7 +401,7 @@ void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext,
 	// iterate over the versionless properties and create a normal LPU data part for each and add that to the
 	// batch controller only when the data part has not already been included during the processing of some
 	// earlier LPU
-	programFile << indent << "bool redundantPart = false" << stmtSeparator;
+	programFile << indent << "bool notRedundantPart = true" << stmtSeparator;
 	for (int i = 0; i < epochIndArrays->NumElements(); i++) {
 		
 		const char *varName = epochIndArrays->Nth(i);
@@ -418,11 +418,12 @@ void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext,
 		programFile << "sizeof(" << elementType->getCType() << ")" << paramSeparator;
 		programFile << "typedLpu->" << varName << "PartId)" << stmtSeparator; 
 
-		programFile << indent << "redundantPart = dataPartTracker->addDataPart(";
+		programFile << indent << "notRedundantPart = dataPartTracker->addDataPart(";
 		programFile << varName << "Part" << paramSeparator;
 		programFile << "\"" << varName << "\"" << paramSeparator;
 		programFile << "ppuIndex)" << stmtSeparator;
-		programFile << indent << "if (redundantPart) delete " << varName << "Part" << stmtSeparator;
+		programFile << indent << "if (notRedundantPart == false) delete ";
+		programFile << varName << "Part" << stmtSeparator;
 	}
 
 	// for multiversion properties apply the same logic of the above but create versioned LPU data parts
@@ -453,11 +454,12 @@ void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext,
 		programFile << "sizeof(" << elementType->getCType() << ")" << paramSeparator;
 		programFile << "typedLpu->" << varName << "PartId)" << stmtSeparator; 
 
-		programFile << indent << "redundantPart = dataPartTracker->addDataPart(";
+		programFile << indent << "notRedundantPart = dataPartTracker->addDataPart(";
 		programFile << varName << "Part" << paramSeparator;
 		programFile << "\"" << varName << "\"" << paramSeparator;
 		programFile << "ppuIndex)" << stmtSeparator;
-		programFile << indent << "if (redundantPart) delete " << varName << "Part" << stmtSeparator;
+		programFile << indent << "if (notRedundantPart == false) delete ";
+		programFile << varName << "Part" << stmtSeparator;
 	}
 
 	programFile << indent << "LpuBatchController::addLpuToTheCurrentBatch(lpu" << paramSeparator;
