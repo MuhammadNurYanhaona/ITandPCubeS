@@ -2,7 +2,6 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../runtime/structure.h"
-#include "../gpu-utils/gpu_utils.h"
 
 #include <cstdlib>
 #include <fstream>
