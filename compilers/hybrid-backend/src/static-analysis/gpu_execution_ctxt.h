@@ -12,9 +12,14 @@
 
 #include "data_flow.h"
 #include "data_access.h"
+#include "sync_stat.h"
+#include "../syntax/ast_expr.h"
 #include "../semantics/task_space.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../codegen/space_mapping.h"
+
+#include <deque>
 
 /* The execution logic we have chosen for GPU LPUs is that the host will generate the LPUs in batch and ship them in 
  * and out of the GPUs. Sometimes the batch of LPUs shipped to the GPU may be multiplexed to arbitrary PPUs of the 
@@ -24,6 +29,46 @@
  */
 enum GpuContextType { 	LOCATION_SENSITIVE_LPU_DISTR_CONTEXT, 
 		 	LOCATION_INDIPENDENT_LPU_DISTR_CONTEXT };
+
+/* Data synchronization is a cardinal concern in translating a task's sub-flow that is intended for GPU execution.
+ * There is simply no primitive to synchronize update made in different SMs within the confinement of a single kernel.
+ * As a result, the sub-flow may need be translated as a series of kernel in the presence of data dependencies among
+ * constituent compute stages. The situation can get further complicated when the dependencies are repeated. This 
+ * class embodies the portion of a GPU context sub-flow that are grouped inside a single repeat block where the repeat
+ * iterations will be done at the host level and within each iteration a group of kernels will be launced in the GPU.   
+ */
+class KernelGroupConfig {
+  protected:
+	// an identifier to be used during code generation
+	int groupId;
+	// tells if the kernel group does repeat or not
+	bool repeatingKernels;
+	// the condition to repeat on for a repetitive kernel group
+	Expr *repeatCondition;
+	// original list of flow stages from the source code that are included in the kernel group
+	List<FlowStage*> *contextSubflow;
+	// As we mentioned earlier, the stages from the source code cannot be executed just as they are due to the
+	// synchronization limitation in the GPGPU platform. Therefore, we need to translate the contextSubflow into
+	// something that we can execute in the GPU as a series of kernel calls. This represents the translation
+	// of the context-sub-flow of the above. 
+	List<CompositeStage*> *kernelConfigs;
+  public:
+	KernelGroupConfig(int groupId, List<FlowStage*> *contextSubflow);
+	KernelGroupConfig(int groupId, RepeatCycle *repeatCycle);
+	void describe(int indentLevel);
+
+	// function that generates kernel configurations from the context subflow 
+	void generateKernelConfig(PCubeSModel *pcubesModel, Space *contextLps);
+  private:
+	// a recursive DFS based kernel configurations construction process used by the public function of the same
+	// name from above 
+	void generateKernelConfig(std::deque<FlowStage*> *stageQueue,
+			int gpuTransitionLevel, 
+			Space *contextLps, 
+			List<CompositeStage*> *currentConfigList, 
+			CompositeStage *configUnderConstruct,
+			List<SyncRequirement*> *configSyncSignals);	
+};
 
 /* This class represents a particular sub-flow in a task's computation flow that should be executed in the GPU */
 class GpuExecutionContext {
@@ -38,6 +83,8 @@ class GpuExecutionContext {
 	// two properties for maintaining detail information about data accesses happenned inside the current context
 	Hashtable<VariableAccess*> *varAccessLog;
 	List<const char*> *epochDependentVarAccesses;
+	// generated configurations of groups of kernel that will execute the logic of the context flow in the GPU
+	List<KernelGroupConfig*> *kernelConfigList;
   public:
 	// A static access point to all GPU execution contexts of a task is maintained here so that they can be 
 	// accessed during code generation process. This is needed as LPU traversal process for execution contexts  
@@ -62,6 +109,10 @@ class GpuExecutionContext {
 	List<const char*> *getModifiedVariableList();
 	List<const char*> *getEpochDependentVariableList() { return epochDependentVarAccesses; }
 	List<const char*> *getEpochIndependentVariableList();
+
+	// this routine generates CUDA kernels and surrounding offloading functions for task sub-flow of the execution 
+	// context
+	void generateKernelConfigs(PCubeSModel *pcubesModel);
 
 	// this routine is used to generate LPU generation and traversal code inside the generated task::run function
 	// based on the GPU context type 

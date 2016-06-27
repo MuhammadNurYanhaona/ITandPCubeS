@@ -454,6 +454,8 @@ class RepeatCycle : public CompositeStage {
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 	void setLpsExecutionFlags();
+	bool isSubpartitionRepeat() { return type == Subpartition_Repeat; }
+	Expr *getRepeatCondition() { return repeatCond; }
 	
 	// This function indicates if the repeat loop condition evaluation includes any LPS dependent varialbe. If
 	// it does not then the repeat loop can be lifted up and can be executed above the LPS indicated by its 

@@ -12,27 +12,27 @@
 
 //----------------------------------------------------------- Property Buffer Manager -----------------------------------------------------------/
 
-void PropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
+void PropertyBufferManager::prepareGpuBuffers() {
 	
-	check_error(cudaMalloc((void **) &gpuBuffer, bufferSize), logFile);
-	check_error(cudaMemcpyAsync(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice, 0), logFile);
+	check_error(cudaMalloc((void **) &gpuBuffer, bufferSize), *logFile);
+	check_error(cudaMemcpyAsync(gpuBuffer, cpuBuffer, bufferSize, cudaMemcpyHostToDevice, 0), *logFile);
 	
-	check_error(cudaMalloc((void **) &gpuPartIndexBuffer, bufferReferenceCount * sizeof(int)), logFile);
+	check_error(cudaMalloc((void **) &gpuPartIndexBuffer, bufferReferenceCount * sizeof(int)), *logFile);
 	check_error(cudaMemcpyAsync(gpuPartIndexBuffer, cpuPartIndexBuffer, 
-			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice, 0), logFile);
+			bufferReferenceCount * sizeof(int), cudaMemcpyHostToDevice, 0), *logFile);
 	
-	check_error(cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize * sizeof(int)), logFile);
+	check_error(cudaMalloc((void **) &gpuPartRangeBuffer, partRangeBufferSize * sizeof(int)), *logFile);
 	check_error(cudaMemcpyAsync(gpuPartRangeBuffer, cpuPartRangeBuffer, 
-			partRangeBufferSize * sizeof(int), cudaMemcpyHostToDevice, 0), logFile);
+			partRangeBufferSize * sizeof(int), cudaMemcpyHostToDevice, 0), *logFile);
 	
-	check_error(cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int)), logFile);
+	check_error(cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int)), *logFile);
 	check_error(cudaMemcpyAsync(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 
-			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice, 0), logFile);
+			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice, 0), *logFile);
 }
 
-void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile) {
+void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList) {
 	
-	check_error(cudaMemcpy(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost), logFile);
+	check_error(cudaMemcpy(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost), *logFile);
 
 	int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
@@ -73,18 +73,18 @@ void PropertyBufferManager::cleanupBuffers() {
 
 //------------------------------------------------------- Versioned Property Buffer Manager -----------------------------------------------------/
 
-void VersionedPropertyBufferManager::prepareGpuBuffers(std::ofstream &logFile) {
-	PropertyBufferManager::prepareGpuBuffers(logFile);
-	check_error(cudaMalloc((void **) &gpuDataPartVersions, bufferEntryCount * sizeof(short)), logFile);
+void VersionedPropertyBufferManager::prepareGpuBuffers() {
+	PropertyBufferManager::prepareGpuBuffers();
+	check_error(cudaMalloc((void **) &gpuDataPartVersions, bufferEntryCount * sizeof(short)), *logFile);
 	check_error(cudaMemcpyAsync(gpuDataPartVersions, cpuDataPartVersions, 
-			bufferEntryCount * sizeof(short), cudaMemcpyHostToDevice, 0), logFile);
+			bufferEntryCount * sizeof(short), cudaMemcpyHostToDevice, 0), *logFile);
 }
 
-void VersionedPropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile) {
+void VersionedPropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList) {
 
-	check_error(cudaMemcpyAsync(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost, 0), logFile);
+	check_error(cudaMemcpyAsync(cpuBuffer, gpuBuffer, bufferSize, cudaMemcpyDeviceToHost, 0), *logFile);
 	check_error(cudaMemcpy(cpuDataPartVersions, gpuDataPartVersions, 
-			bufferEntryCount * sizeof(short), cudaMemcpyDeviceToHost), logFile);
+			bufferEntryCount * sizeof(short), cudaMemcpyDeviceToHost), *logFile);
 
 	int currentIndex = 0;
 	for (int i = 0; i < bufferEntryCount; i++) {

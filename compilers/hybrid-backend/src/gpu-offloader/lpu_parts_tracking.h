@@ -200,11 +200,10 @@ class PropertyBufferManager {
 	~PropertyBufferManager();
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	virtual void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
-			std::vector<List<int>*> *partIndexListVector, 
-			std::ofstream &logFile);
-	virtual void prepareGpuBuffers(std::ofstream &logFile);
+			std::vector<List<int>*> *partIndexListVector);
+	virtual void prepareGpuBuffers();
 	virtual GpuBufferReferences *getGpuBufferReferences();
-	virtual void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile);
+	virtual void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList);
 	virtual void cleanupBuffers();
   protected:
 	virtual void copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer);
@@ -220,11 +219,10 @@ class VersionedPropertyBufferManager : public PropertyBufferManager {
 	short versionCount;
   public:
 	void prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
-                        std::vector<List<int>*> *partIndexListVector,
-                        std::ofstream &logFile);
-	void prepareGpuBuffers(std::ofstream &logFile);
+                        std::vector<List<int>*> *partIndexListVector);
+	void prepareGpuBuffers();
 	GpuBufferReferences *getGpuBufferReferences();
-	void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList, std::ofstream &logFile);
+	void syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList);
 	void cleanupBuffers();
   protected:
 	void copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer);  
@@ -244,12 +242,10 @@ class LpuDataBufferManager {
 	void setLogFile(std::ofstream *logFile);
 	void copyPartsInGpu(const char *propertyName, 
 			List<LpuDataPart*> *dataPartsList, 
-			std::vector<List<int>*> *partIndexListVector, 
-			std::ofstream &logFile);
+			std::vector<List<int>*> *partIndexListVector);
 	GpuBufferReferences *getGpuBufferReferences(const char *propertyName);
 	void retrieveUpdatesFromGpu(const char *propertyName, 
-			List<LpuDataPart*> *dataPartsList, 
-			std::ofstream &logFile);
+			List<LpuDataPart*> *dataPartsList);
 	void reset();
 };
 

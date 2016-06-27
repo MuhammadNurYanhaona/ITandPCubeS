@@ -247,8 +247,7 @@ PropertyBufferManager::~PropertyBufferManager() {
 }
 
 void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList, 
-		std::vector<List<int>*> *partIndexListVector, 
-		std::ofstream &logFile) {
+		std::vector<List<int>*> *partIndexListVector) {
 
 	bufferEntryCount = dataPartsList->NumElements();
 	bufferSize = 0;
@@ -316,9 +315,9 @@ void PropertyBufferManager::copyDataIntoBuffer(LpuDataPart *dataPart, char *data
 //------------------------------------------------------- Versioned Property Buffer Manager -----------------------------------------------------/
 
 void VersionedPropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
-                        std::vector<List<int>*> *partIndexListVector, std::ofstream &logFile) {
+                        std::vector<List<int>*> *partIndexListVector) {
 	
-	PropertyBufferManager::prepareCpuBuffers(dataPartsList, partIndexListVector, logFile);
+	PropertyBufferManager::prepareCpuBuffers(dataPartsList, partIndexListVector);
 	cpuDataPartVersions = new short[bufferEntryCount];
 	for (int i = 0; i < bufferEntryCount; i++) {
 
@@ -395,8 +394,7 @@ void LpuDataBufferManager::setLogFile(std::ofstream *logFile) {
 
 void LpuDataBufferManager::copyPartsInGpu(const char *propertyName, 
 		List<LpuDataPart*> *dataPartsList, 
-		std::vector<List<int>*> *partIndexListVector,
-		std::ofstream &logFile) {
+		std::vector<List<int>*> *partIndexListVector) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
 	propertyManager->prepareCpuBuffers(dataPartsList, partIndexListVector, logFile);
 	propertyManager->prepareGpuBuffers(logFile);
@@ -408,8 +406,7 @@ GpuBufferReferences *LpuDataBufferManager::getGpuBufferReferences(const char *pr
 }
 
 void LpuDataBufferManager::retrieveUpdatesFromGpu(const char *propertyName, 
-		List<LpuDataPart*> *dataPartsList, 
-		std::ofstream &logFile) {
+		List<LpuDataPart*> *dataPartsList) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
 	propertyManager->syncDataPartsFromBuffer(dataPartsList, logFile);
 }
