@@ -325,6 +325,12 @@ class CompositeStage : public FlowStage {
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
 	
+	// This tells if a composite stage has any actual computation as opposed being composed of just sync stages.
+	// An empty composite stage is unlikely to be present in the source code but may arise generated due to 
+	// compiler's manipulation of the intermediate representation. 
+	bool isEmpty();
+
+	
 	// this recursively goes down within the composite stage and returns the highest index of any stage nested
 	// in it
 	int getHighestNestedStageIndex();
@@ -395,6 +401,13 @@ class CompositeStage : public FlowStage {
 	virtual List<DependencyArc*> *getAllTaskDependencies();
 	List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
 	List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
+
+	// This recursive function modifies the internal organization of flow stages inside a composite stage by 
+	// making all LPS transitions from container stages to the contained stages explicit. To give an example, if
+	// LPS hierarchy is like Space C divides B divides A and a composite stage at Space A has a nested stage at
+	// Space C, this adjustment will surround the nested stage within another Space B composite stage. Explicit
+	// LPS transitions like this are important for generating CUDA kernels for GPU execution.
+	void makeAllLpsTransitionExplicit();
 
 	// this function is used by only the first composite stage (that represents the entire computation) and
 	// repeat cycles to initiate the counters that are used to track if an updater of need-to-be synchronized

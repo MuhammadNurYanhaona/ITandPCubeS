@@ -74,7 +74,18 @@ void KernelGroupConfig::generateKernelConfig(PCubeSModel *pcubesModel, Space *co
 
 	generateKernelConfig(&stageQueue, gpuTransitionLevel, 
 			contextLps, configList, configUnderConstruct, configSyncSignals);
-	kernelConfigs = configList;
+	
+	kernelConfigs = new List<CompositeStage*>;
+	for (int i = 0; i < configList->NumElements(); i++) {
+		CompositeStage *prospectiveKernel = configList->Nth(i);
+		if (prospectiveKernel->isEmpty()) continue;
+		
+		// we make all LPS transitions inside the kernel to be non-LPS jumping (means the transition skips
+		// no intermediate LPS) to be able to do intra-kernel LPS expansition easily
+		prospectiveKernel->makeAllLpsTransitionExplicit();
+
+		kernelConfigs->Append(prospectiveKernel);
+	}
 }
 
 void KernelGroupConfig::generateKernelConfig(std::deque<FlowStage*> *stageQueue,

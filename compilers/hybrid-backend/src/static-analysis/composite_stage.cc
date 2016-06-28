@@ -855,6 +855,19 @@ void CompositeStage::analyzeSynchronizationNeeds() {
 	}
 }
 
+bool CompositeStage::isEmpty() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		ExecutionStage *executeStage = dynamic_cast<ExecutionStage*>(stage);
+		if (executeStage != NULL) return false;
+		CompositeStage *nextContainerStage = dynamic_cast<CompositeStage*>(stage);
+		if (nextContainerStage != NULL) {
+			if (!nextContainerStage->isEmpty()) return false;
+		}
+	}
+	return true;
+}
+
 int CompositeStage::getHighestNestedStageIndex() {
 	int stageCount = stageList->NumElements();
 	FlowStage *lastStage = stageList->Nth(stageCount - 1);
@@ -1281,6 +1294,33 @@ List<CommunicationCharacteristics*> *CompositeStage::getCommCharacteristicsForSy
 		delete stageCommList;
 	}
 	return commCharList;
+}
+
+void CompositeStage::makeAllLpsTransitionExplicit() {
+
+	Space *myLps = getSpace();
+
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		
+		FlowStage *stage = stageList->Nth(i);
+		Space *stageLps = stage->getSpace();
+
+		if (stageLps != myLps && stageLps->getParent() != myLps) {
+
+			Space *nextLevelLps = NULL;
+			Space *currentLps = stageLps->getParent();
+			while (currentLps != myLps) {
+				nextLevelLps = currentLps;
+				currentLps = currentLps->getParent();
+			}
+
+			CompositeStage *nextContainerStage = new CompositeStage(0, nextLevelLps, NULL);
+			nextContainerStage->addStageAtEnd(stage);
+			stageList->RemoveAt(i);
+			stageList->InsertAt(nextContainerStage, i);
+			nextContainerStage->makeAllLpsTransitionExplicit();
+		}
+	}
 }
 
 void CompositeStage::declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingIndex) {
