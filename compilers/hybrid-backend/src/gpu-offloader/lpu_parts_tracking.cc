@@ -396,8 +396,8 @@ void LpuDataBufferManager::copyPartsInGpu(const char *propertyName,
 		List<LpuDataPart*> *dataPartsList, 
 		std::vector<List<int>*> *partIndexListVector) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
-	propertyManager->prepareCpuBuffers(dataPartsList, partIndexListVector, logFile);
-	propertyManager->prepareGpuBuffers(logFile);
+	propertyManager->prepareCpuBuffers(dataPartsList, partIndexListVector);
+	propertyManager->prepareGpuBuffers();
 }
 
 GpuBufferReferences *LpuDataBufferManager::getGpuBufferReferences(const char *propertyName) {
@@ -408,7 +408,7 @@ GpuBufferReferences *LpuDataBufferManager::getGpuBufferReferences(const char *pr
 void LpuDataBufferManager::retrieveUpdatesFromGpu(const char *propertyName, 
 		List<LpuDataPart*> *dataPartsList) {
 	PropertyBufferManager *propertyManager = propertyBuffers->Lookup(propertyName);
-	propertyManager->syncDataPartsFromBuffer(dataPartsList, logFile);
+	propertyManager->syncDataPartsFromBuffer(dataPartsList);
 }
 
 void LpuDataBufferManager::reset() {
@@ -466,7 +466,7 @@ void LpuBatchController::submitCurrentBatchToGpu() {
 			std::vector<List<int>*> *partIndexVector 
 					= dataPartTracker->getPartIndexListVector(varName);
 			List<LpuDataPart*> *parts = dataPartTracker->getDataPartList(varName);
-			bufferManager->copyPartsInGpu(varName, parts, partIndexVector, *logFile);
+			bufferManager->copyPartsInGpu(varName, parts, partIndexVector);
 		}		
 	}
 }
@@ -476,7 +476,7 @@ void LpuBatchController::updateBatchDataPartsFromGpuResults() {
 		for (int i = 0; i < toBeModifiedProperties->NumElements(); i++) {
 			const char *property = toBeModifiedProperties->Nth(i);
 			List<LpuDataPart*> *parts = dataPartTracker->getDataPartList(property);
-			bufferManager->retrieveUpdatesFromGpu(property, parts, *logFile);
+			bufferManager->retrieveUpdatesFromGpu(property, parts);
 		}
 	}
 }

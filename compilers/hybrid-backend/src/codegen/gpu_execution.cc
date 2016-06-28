@@ -583,6 +583,11 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	headerFile << indent << "void cleanup()" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
 
+	// Invoke an auxiliary function to generate all kernels releted to this execution context that will be needed
+	// during the execution of the offload function. Note that, we need to generate the CUDA kernel definitions
+	// before the offload function as they are not declared in the header file.
+	generateGpuCodeExecutorKernelList(gpuContext, pcubesModel, initials, programFile);
+
 	// invoke auxiliary functions to generate implementations for the defined functions 
 	generateGpuCodeExecutorConstructor(gpuContext, initials, programFile);
 	generateGpuCodeExecutorInitializer(gpuContext, initials, programFile);
@@ -695,10 +700,35 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::offloadFunction() {\n\n";
-	
-	programFile << indent << "// This is where the computation sub-flow should be implemented as a series\n";
-	programFile << indent << "// of kernel calls. We do not have the GPU kernels yet. Need to discuss this.\n";	
 
+	// retrieve references for the arguments of the kernel function
+	Space *contextLps = gpuContext->getContextLps();
+	const char *lpsName = contextLps->getName();
+	// generate a batch metadata configuration object
+	programFile << indent << "// generating arguments for kernel function parameters\n";
+	programFile << indent << initials << "::Space" << lpsName << "GpuAggregateMetadata "; 
+	programFile << "launchMetadata" << paramIndent;
+	programFile << indent << " = getLaunchMetadata(lpuCountVector" << paramSeparator;
+	programFile << "lpuBatchRangeVector)" << stmtSeparator;
+	// generate buffer references for all properties
+	List<const char*> *arrayNames = contextLps->getLocallyUsedArrayNames();
+	List<const char*> *accessedArrays = string_utils::intersectLists(
+			gpuContext->getVariableAccessList(), arrayNames);
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *arrayName = accessedArrays->Nth(i);
+		programFile << indent << "GpuBufferReferences *" << arrayName << "Buffers = ";
+		programFile << "lpuBatchController->getGpuBufferReferences(\"";
+		programFile << arrayName << "\")" << stmtSeparator;
+	}
+	programFile << std::endl;
+
+	// at the end cleanup the buffer reference pointers
+	programFile << indent << "// cleaning up buffer reference pointers\n";	
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *arrayName = accessedArrays->Nth(i);
+		programFile << indent << "delete " << arrayName << "Buffers" << stmtSeparator;
+	}
+	
 	programFile << "}\n";
 }
 
@@ -728,6 +758,71 @@ void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext,
 	programFile << '\n' << indent << "GpuCodeExecutor::cleanup()" << stmtSeparator;
 
 	programFile << "}\n"; 
+}
+
+void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
+                GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile) {
+
+	const char *kernelName = kernelDef->getName();
+
+	// define the kernel function signature
+	programFile << std::endl << "__global__ void " << kernelName << "(";
+	// first there are four default scalar parameters
+	programFile << initials << "::ArrayMetadata arrayMetadata" << paramSeparator << paramIndent;
+	programFile << string_utils::toUpper(initials) << "Partition partition" << paramSeparator;
+	programFile << paramIndent << initials << "::TaskGlobals *taskGlobals" << paramSeparator;
+	programFile << paramIndent << initials << "::ThreadLocals *threadLocals" << paramSeparator;
+	// then add another parameter for the launch configuration metadata 
+	Space *contextLps = gpuContext->getContextLps();
+	const char *lpsName = contextLps->getName();
+	programFile << paramIndent << initials << "::Space" << lpsName << "GpuAggregateMetadata "; 
+	programFile << "launchMetadata";
+	// then add buffer reference parameters for the arrays being used in the GPU offloading execution context
+	List<const char*> *arrayNames = contextLps->getLocallyUsedArrayNames();
+	List<const char*> *accessedArrays = string_utils::intersectLists(
+			gpuContext->getVariableAccessList(), arrayNames);
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *arrayName = accessedArrays->Nth(i);
+		programFile << paramSeparator << paramIndent;
+		programFile << "GpuBufferReferences *" << arrayName << "Buffers";
+	}
+
+	// begin kernel function body
+	programFile << ") {\n\n";
+
+	
+	// close kernel function body
+	programFile << "}\n";
+}
+
+void generateGpuCodeExecutorKernelList(GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile) {
+
+	List<KernelGroupConfig*> *kernelGroupConfigList = gpuContext->getKernelConfigList();
+	const char *contextName = gpuContext->getContextName();
+	for (int i = 0; i < kernelGroupConfigList->NumElements(); i++) {
+		
+		KernelGroupConfig *groupConfig = kernelGroupConfigList->Nth(i);
+		int groupId = groupConfig->getGroupId();
+		List<CompositeStage*> *kernelDefList = groupConfig->getKernelDefinitions();
+
+		for (int j = 0; j < kernelDefList->NumElements(); j++) {
+
+			CompositeStage *kernelDef = kernelDefList->Nth(j);
+			
+			// generate a system-wide unique name for the CUDA kernel
+			std::ostringstream kernelName;
+			kernelName << initials << "_" << contextName;
+			kernelName << "_Group" << groupId << "_Kernel" << j;
+			kernelDef->setName(strdup(kernelName.str().c_str()));
+
+			generateGpuCodeExecutorKernel(kernelDef, 
+					gpuContext, pcubesModel, initials, programFile);
+		}
+	}
 }
 
 void generateGpuExecutorMapFn(List<GpuExecutionContext*> *gpuExecutionContextList,

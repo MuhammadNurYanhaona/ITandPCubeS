@@ -55,6 +55,8 @@ class KernelGroupConfig {
   public:
 	KernelGroupConfig(int groupId, List<FlowStage*> *contextSubflow);
 	KernelGroupConfig(int groupId, RepeatCycle *repeatCycle);
+	int getGroupId() { return groupId; }
+	List<CompositeStage*> *getKernelDefinitions() { return kernelConfigs; }
 	void describe(int indentLevel);
 
 	// function that generates kernel configurations from the context subflow 
@@ -95,6 +97,7 @@ class GpuExecutionContext {
 	GpuExecutionContext(int topmostGpuPps, List<FlowStage*> *contextFlow);
 	Space *getContextLps() { return contextLps; }
 	GpuContextType getContextType() { return contextType; }
+	List<KernelGroupConfig*> *getKernelConfigList() { return kernelConfigList; }
 
 	// the context ID, which is the index of the first flow stage within the context, is used for searching the 
 	// context during code generation

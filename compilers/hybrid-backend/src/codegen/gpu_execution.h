@@ -18,9 +18,9 @@ void initializeCudaProgramFile(const char *initials, const char *headerFile, con
 
 void generateBatchConfigurationConstants(const char *headerFile, PCubeSModel *pcubesModel);
 
-/*--------------------------------------------------------------------------------------------------------- 
+/*---------------------------------------------------------------------------------------------------------- 
 		    Functions related to communicating Metadata from Host to GPU
----------------------------------------------------------------------------------------------------------*/
+----------------------------------------------------------------------------------------------------------*/
 
 // To construct LPUs from their IDs and regenarate dimensionality and other information inside the GPU, we 
 // need to make available a minimum set of LPU related metadata to the GPU kernels. This function generate 
@@ -51,9 +51,9 @@ void generateAllLpuMetadataStructs(List<GpuExecutionContext*> *gpuExecutionConte
                 const char *initials,
                 const char *headerFile, const char *programFile);
 
-/*--------------------------------------------------------------------------------------------------------- 
+/*---------------------------------------------------------------------------------------------------------- 
 			Functions related to generating LPU Batch Controllers
----------------------------------------------------------------------------------------------------------*/
+----------------------------------------------------------------------------------------------------------*/
 
 // LPU batch controllers do the memory allocations and data stage-in and out in both end of the computation
 // offloading. This function generates a context specific LPU batch controller 
@@ -79,9 +79,9 @@ void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext,
 void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
 
-/*--------------------------------------------------------------------------------------------------------- 
+/*---------------------------------------------------------------------------------------------------------- 
 			  Functions related to generating GPU Code Executors
----------------------------------------------------------------------------------------------------------*/
+----------------------------------------------------------------------------------------------------------*/
 
 // GPU code executors serve as the broker between host and the GPU computation for a particular offloading
 // context. A GPU code executor has a reference to a context specific LpuBatchController for staging in and
@@ -112,9 +112,19 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
 
-/*--------------------------------------------------------------------------------------------------------- 
+// these two functions are used to generate kernels related to the offloading context a GPU-Code-Executor is
+// responsible for
+void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
+		GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile);
+void generateGpuCodeExecutorKernelList(GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile);
+
+/*---------------------------------------------------------------------------------------------------------- 
 			    Host and GPU brokerage functions generators
----------------------------------------------------------------------------------------------------------*/
+----------------------------------------------------------------------------------------------------------*/
 
 // The batch-mode PPU controller needs references of all the GPU code executor classes to be able to offload 
 // a GPU computation to specific executor when the need may arise. This routine generates a function that
