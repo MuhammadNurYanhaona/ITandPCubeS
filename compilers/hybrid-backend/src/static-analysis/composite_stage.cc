@@ -1314,11 +1314,25 @@ void CompositeStage::makeAllLpsTransitionExplicit() {
 				currentLps = currentLps->getParent();
 			}
 
+			// Notice that we are not trying to fit in as many stage as possible in the newly created
+			// composite stage. The current strategy will result in two consecutive stages operating on 
+			// the same LPS to have separate nesting hierarchy as opposed to sharing the same. Sharing
+			// is the better strategy as that reduce amount of overhead code. Before we apply sharing,
+			// however, we need to make sure that putting states together will not violate any synchro-
+			// nization dependencies. Probably, we can extend the code for retrieving consecutive non
+			// LPS crossing stages (a function used for host code generation) for this. Chek that method
+			// before implementing any new logic here. 
 			CompositeStage *nextContainerStage = new CompositeStage(0, nextLevelLps, NULL);
 			nextContainerStage->addStageAtEnd(stage);
 			stageList->RemoveAt(i);
 			stageList->InsertAt(nextContainerStage, i);
 			nextContainerStage->makeAllLpsTransitionExplicit();
+
+		} else {
+                        CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+                        if (compositeStage != NULL) {
+                                compositeStage->makeAllLpsTransitionExplicit();
+                        }
 		}
 	}
 }
