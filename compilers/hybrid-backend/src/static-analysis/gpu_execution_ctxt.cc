@@ -287,6 +287,8 @@ void GpuExecutionContext::generateKernelConfigs(PCubeSModel *pcubesModel) {
 				repeatConfig->generateKernelConfig(pcubesModel, contextLps);
 				kernelConfigList->Append(repeatConfig);	
 				groupIndex++;
+			} else {
+				currentSubflow->Append(stage);
 			}
 		}
 		if (currentSubflow->NumElements() > 0) {
