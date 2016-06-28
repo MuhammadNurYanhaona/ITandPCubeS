@@ -75,6 +75,7 @@ void KernelGroupConfig::generateKernelConfig(PCubeSModel *pcubesModel, Space *co
 	generateKernelConfig(&stageQueue, gpuTransitionLevel, 
 			contextLps, configList, configUnderConstruct, configSyncSignals);
 	
+	int topmostGpuPpsForContext = contextLps->getPpsId();
 	kernelConfigs = new List<CompositeStage*>;
 	for (int i = 0; i < configList->NumElements(); i++) {
 		CompositeStage *prospectiveKernel = configList->Nth(i);
@@ -84,6 +85,7 @@ void KernelGroupConfig::generateKernelConfig(PCubeSModel *pcubesModel, Space *co
 		// no intermediate LPS) to be able to do intra-kernel LPS expansition easily
 		prospectiveKernel->makeAllLpsTransitionExplicit();
 
+		prospectiveKernel->setupGpuLpuDistrFlags(topmostGpuPpsForContext);
 		kernelConfigs->Append(prospectiveKernel);
 	}
 }

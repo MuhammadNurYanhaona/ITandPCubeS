@@ -25,7 +25,8 @@
 //------------------------------------------------ Composite Stage -------------------------------------------------------/
 
 CompositeStage::CompositeStage(int index, Space *space, Expr *executeCond) : FlowStage(index, space, executeCond) {
-	stageList = new List<FlowStage*>;	
+	stageList = new List<FlowStage*>;
+	gpuLpuDistrFlag = Not_Gpu_Stage;	
 }
 
 void CompositeStage::addStageAtBeginning(FlowStage *stage) {
@@ -213,6 +214,9 @@ void CompositeStage::print(int indent) {
 	for (int i = 0; i < indent; i++) printf("\t");
 	printf("Flow Stage: %s (Space: %s)", name, space->getName());
 	if (executeCond != NULL) printf(" Conditionally Executed");
+	if (gpuLpuDistrFlag == Gpu_Lpu_Distr_Stage) {
+		printf(" Gpu LPU Distribution Point");
+	}
 	printf("\n");
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		stageList->Nth(i)->print(indent + 1);
@@ -1329,11 +1333,42 @@ void CompositeStage::makeAllLpsTransitionExplicit() {
 			nextContainerStage->makeAllLpsTransitionExplicit();
 
 		} else {
+			ExecutionStage *executionStage = dynamic_cast<ExecutionStage*>(stage);
                         CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
-                        if (compositeStage != NULL) {
+			
+			// for execution stages, one more layer of composite stage has been added even if they are
+			// operating on an immediate descendant LPS of the current LPS to ensure that LPU generation
+			// logic is handled at composite stages only  
+			if (executionStage != NULL && stageLps != myLps) {
+				CompositeStage *nextContainerStage = new CompositeStage(0, stageLps, NULL);
+				nextContainerStage->addStageAtEnd(executionStage);
+				stageList->RemoveAt(i);
+				stageList->InsertAt(nextContainerStage, i);
+
+			} else if (compositeStage != NULL) {
                                 compositeStage->makeAllLpsTransitionExplicit();
                         }
 		}
+	}
+}
+
+void CompositeStage::setupGpuLpuDistrFlags(int currentGpuPpsMarker) {
+	
+	int nextGpuPpsMarker;
+	int myPpsId = space->getPpsId();
+	if (myPpsId == currentGpuPpsMarker) {
+		gpuLpuDistrFlag = Gpu_Lpu_Distr_Stage;
+		nextGpuPpsMarker = currentGpuPpsMarker - 1;
+	} else {
+		gpuLpuDistrFlag = Gpu_Lpu_Nondistr_Stage;
+		nextGpuPpsMarker = currentGpuPpsMarker;
+	}
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+		if (compositeStage != NULL) {
+			compositeStage->setupGpuLpuDistrFlags(nextGpuPpsMarker);
+		} 
 	}
 }
 
