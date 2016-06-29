@@ -98,6 +98,11 @@ void generateOffloadingMetadataStruct(Space *gpuContextLps, std::ofstream &heade
 	}
 	headerFile << indent << "int batchRangeMin" << stmtSeparator;
 	headerFile << indent << "int batchRangeMax" << stmtSeparator;
+	
+	// The GPU PPUs need to be able to identify where to start looking for data and metadata related to the
+	// LPUs they will be processing. 
+	headerFile << indent << "int batchStartIndex" << stmtSeparator;
+	
 	headerFile << "}" << stmtSeparator;
 }
 
@@ -152,6 +157,9 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
 	// instantiate an aggregator variable
 	programFile << indent << "Space" << lpsName;
 	programFile << "GpuAggregateMetadata metadata" << stmtSeparator;
+	
+	// instantiate a batch start index counter
+	programFile << indent << "int currentBatchStartIndex = 0" << stmtSeparator;
 
 	// iterate over the entries of the vector
 	programFile << indent << "for (unsigned int i = 0; i < lpuCounts->size(); i++) {\n";
@@ -167,6 +175,8 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
 	}
 	programFile << tripleIndent << "metadata.entries[i].batchRangeMin = INVALID_ID" << stmtSeparator;	
 	programFile << tripleIndent << "metadata.entries[i].batchRangeMax = INVALID_ID" << stmtSeparator;	
+	programFile << tripleIndent << "metadata.entries[i].batchStartIndex = INVALID_ID" << stmtSeparator;
+	
 	programFile << doubleIndent << "} ";
 
 	// if the LPU count is not NULL then we copy the count and batch ranges from the vector to the metadata
@@ -178,7 +188,16 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
 	}
 	programFile << tripleIndent << "Range lpuRange = lpuBatchRanges->at(i)" << stmtSeparator;
 	programFile << tripleIndent << "metadata.entries[i].batchRangeMin = lpuRange.min" << stmtSeparator;	
-	programFile << tripleIndent << "metadata.entries[i].batchRangeMax = lpuRange.max" << stmtSeparator;	
+	programFile << tripleIndent << "metadata.entries[i].batchRangeMax = lpuRange.max" << stmtSeparator;
+	programFile << tripleIndent << "metadata.entries[i].batchStartIndex = currentBatchStartIndex";
+	programFile << stmtSeparator;
+	
+	// if the currnet batch range is a valid range then advance the batch starting index
+	programFile << tripleIndent << "if (lpuRange.min != INVALID_ID) {\n";
+	programFile << quadIndent << "currentBatchStartIndex += lpuRange.max - lpuRange.min + 1";
+	programFile << stmtSeparator;
+	programFile << tripleIndent << "}\n";	
+	
 	programFile << doubleIndent << "}\n";
  	
 	programFile << indent << "}\n"; 

@@ -33,7 +33,7 @@ void generateOffloadingMetadataStruct(Space *gpuContextLps, std::ofstream &heade
 // then the LPUs offloaded to them also have diverging partition hierarchy that result in variation in 
 // their metadata. So an aggregator structure is needed that will have one instance of the structure gene-
 // rated by the previous function for each SM/Warp. Since the PPU count is a static value once the mapping
-// configuration is known, it is possible to generate an aggregator structure with static array of metadata.
+// configuration is known, it is possible to have an aggregator structure with a static array of metadata.
 void generateMetadataAggregatorStruct(Space *gpuContextLps, 
 		PCubeSModel *pcubesModel,
                 std::ofstream &headerFile);
