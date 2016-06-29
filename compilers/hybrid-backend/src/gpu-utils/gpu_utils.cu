@@ -41,3 +41,9 @@ void check_error(cudaError e, std::ofstream &logFile) {
                 std::exit(EXIT_FAILURE);
         }
 }
+
+int getAlignedPartSize(int originalSize) {
+	int alignmentDivides = originalSize / MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+	int remainder = originalSize % MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+	return (alignmentDivides + remainder) * MEMORY_PANNEL_ALIGNMENT_BOUNDARY;
+}

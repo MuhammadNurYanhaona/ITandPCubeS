@@ -151,19 +151,28 @@ LpuDataPartTracker::LpuDataPartTracker(int distinctPpuCount) {
 	this->distinctPpuCount = distinctPpuCount;
 	partIndexMap = new Hashtable<std::vector<List<int>*>*>;
 	dataPartMap = new Hashtable<List<LpuDataPart*>*>;
+	maxDataPartSizes = new Hashtable<int*>;
 	this->logFile = NULL;
 }
 
 void LpuDataPartTracker::initialize(List<const char*> *varNames) {
+	
 	for (int i = 0; i < varNames->NumElements(); i++) {
+		
 		const char *varName = varNames->Nth(i);
+		
 		std::vector<List<int>*> *partIndexVector = new std::vector<List<int>*>;
 		partIndexVector->reserve(distinctPpuCount);
 		for (int j = 0; j < distinctPpuCount; j++) {
 			partIndexVector->push_back(new List<int>);	
 		}
 		partIndexMap->Enter(varName, partIndexVector);
+		
 		dataPartMap->Enter(varName, new List<LpuDataPart*>);
+		
+		int *maxPartSize = new int[1];
+		*maxPartSize = 0;
+		maxDataPartSizes->Enter(varName, maxPartSize);
 	}
 }
 
@@ -182,9 +191,16 @@ bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName,
 			break;
 		}
 	}
-	if (matchingIndex == -1) {
+	if (matchingIndex == -1) {		
+		
 		partIndexList->Append(dataPartList->NumElements());	
 		dataPartList->Append(dataPart);
+
+		int *maxPartSize = maxDataPartSizes->Lookup(varName);
+		if (*maxPartSize < dataPart->getSize()) {
+			*maxPartSize = dataPart->getSize();
+		}
+
 		return true;
 	} else {
 		partIndexList->Append(matchingIndex);
@@ -221,6 +237,12 @@ void LpuDataPartTracker::clear() {
 			partList->RemoveAt(0);
 			delete dataPart;
 		}
+	}
+
+	int *maxPartSize = NULL;
+	Iterator<int*> partSizeIterator = maxDataPartSizes->GetIterator();
+	while ((maxPartSize = partSizeIterator.GetNextValue()) != NULL) {
+		*maxPartSize = 0;
 	}
 }
 

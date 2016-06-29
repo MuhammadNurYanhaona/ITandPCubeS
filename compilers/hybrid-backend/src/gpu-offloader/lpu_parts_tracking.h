@@ -124,6 +124,10 @@ class LpuDataPartTracker {
 	// The actual data parts are, however, not distinguished by LPUs as multiple LPUs intended for different PPUs may share a
 	// single data part
   	Hashtable<List<LpuDataPart*>*> *dataPartMap;
+	// To be able to allocate and assign parts of dynamic SM memory properly, we need to know the maximum memory requirement for
+	// a data part of individual variables used inside the GPU kernels. This property is used to keep track of the maximum memory 
+	// consumption per data part per variable 
+	Hashtable<int*> *maxDataPartSizes;	
 
 	std::ofstream *logFile;
   public:
@@ -134,6 +138,7 @@ class LpuDataPartTracker {
 		return partIndexMap->Lookup(varName); 
 	}
 	List<LpuDataPart*> *getDataPartList(const char *varName) { return dataPartMap->Lookup(varName); } 
+	int getMaxPartSize(const char *varName) { return *(maxDataPartSizes->Lookup(varName)); }
 	
         // An addition of a new LPU data part for a particular property may fail as that part may have been already included as part
         // of a previous LPU. The return value of this function indicates if the add operation was successful so that the caller can 
@@ -278,6 +283,7 @@ class LpuBatchController {
 	bool isEmptyBatch() { return currentBatchSize == 0; }
 	int getBatchLpuCountThreshold() { return batchLpuCountThreshold; }
 	int getCurrentBatchSize() { return currentBatchSize; }
+	int getMaxPartSizeForProperty( const char *varName) { return dataPartTracker->getMaxPartSize(varName); }
 	GpuBufferReferences *getGpuBufferReferences(const char *propertyName) { 
 		return bufferManager->getGpuBufferReferences(propertyName); 
 	}

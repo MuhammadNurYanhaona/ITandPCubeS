@@ -5,6 +5,8 @@
 #include <cuda_runtime.h>
 #include <fstream>
 
+#include "gpu_constant.h"
+
 // Given a set of index ranges to be iterated by an warp that wants to distribute the work among its thread, 
 // this routines provides the loop iteration start indexes and step sizes for the threads. Distribution of
 // iterations to threads of a warp has a great impact on the performance of a CUDA kernel as a poor choice 
@@ -22,7 +24,7 @@ __device__ void determineLoopIndexesAndSteps(int nestingLevels,
 void check_error(cudaError e, std::ofstream &logFile);
 
 // Allocation of pointers from the dynamic shared memory pannel should always happen at some multiple of the
-// following constant to avoid any alignment problem.  
-#define MEMORY_PANNEL_ALIGNMENT_BOUNDARY 8
+// alignment boundary. This function returns the aligned, adjusted size given the argument size  
+int getAlignedPartSize(int originalSize);
 
 #endif

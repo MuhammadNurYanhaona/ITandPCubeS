@@ -207,6 +207,27 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
 	programFile << "}\n";
 }
 
+void generateMaxPartSizeMetadataStruct(GpuExecutionContext *gpuContext, std::ofstream &headerFile) {
+	
+	decorator::writeSubsectionHeader(headerFile, gpuContext->getContextName());
+	
+	headerFile << std::endl;
+	headerFile << "class " << gpuContext->getContextName() << "MaxPartSizes {\n";
+
+	headerFile << "  public: \n";
+
+	Space *gpuContextLps = gpuContext->getContextLps();	
+	List<const char*> *arrayNames = gpuContextLps->getLocallyUsedArrayNames();
+	List<const char*> *accessedArrays = string_utils::intersectLists(
+			gpuContext->getVariableAccessList(), arrayNames);
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *varName = accessedArrays->Nth(i);
+		headerFile << indent << "int " << varName << "MaxPartSize" << stmtSeparator;
+	}
+
+	headerFile << "}" << stmtSeparator;
+}
+
 void generateAllLpuMetadataStructs(List<GpuExecutionContext*> *gpuExecutionContextList,
 		PCubeSModel *pcubesModel, 
                 const char *initials,
@@ -232,12 +253,18 @@ void generateAllLpuMetadataStructs(List<GpuExecutionContext*> *gpuExecutionConte
 
 	List<const char*> *coveredLpses = new List<const char*>;
 	for (int i = 0; i < gpuExecutionContextList->NumElements(); i++) {
+
+		// generate context specific maximum part sizes tracking metadata
 		GpuExecutionContext *context = gpuExecutionContextList->Nth(i);
+		generateMaxPartSizeMetadataStruct(context, headerFile);
+		
+		// determine if LPS specific LPU count and batch range metadata has already being generated
 		Space *contextLps = context->getContextLps();
 		const char *contextLpsName = contextLps->getName();
 		if (string_utils::contains(coveredLpses, contextLpsName)) continue;
 		coveredLpses->Append(contextLpsName);
 
+		// generate LPU count and batch range metadata structures and function
 		std::ostringstream header;
 		header << "Space " << contextLpsName << " Offloading Contexts";
 		decorator::writeSubsectionHeader(headerFile, header.str().c_str());
@@ -741,6 +768,24 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 	}
 	programFile << std::endl;
 
+	// determine dynamic memory requirement for the kernels of this GPU execution context and initialize
+	// a max part size metadata that will be used as an arguments for the CUDA kernels
+	programFile << indent << "// determining dynamic shared memory requirements\n";	
+	const char *contextName = gpuContext->getContextName();
+	programFile << indent << "int dynamicSharedMemorySize = 0" << stmtSeparator;
+	programFile << indent << contextName << "MaxPartSizes maxPartSizes" << stmtSeparator;
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *arrayName = accessedArrays->Nth(i);
+		programFile << indent << "int " << arrayName << "MaxSize = lpuBatchController->";
+		programFile << "getMaxPartSizeForProperty(\"" << arrayName << "\")";
+		programFile << stmtSeparator;
+		programFile << indent << "dynamicSharedMemorySize += getAlignedPartSize(";
+		programFile << arrayName << "MaxSize)" << stmtSeparator;
+		programFile << indent << "maxPartSizes." << arrayName << "MaxPartSize = ";
+		programFile << "getAlignedPartSize(" << arrayName << "MaxSize)" << stmtSeparator;
+	}
+	programFile << std::endl;
+
 	// at the end cleanup the buffer reference pointers
 	programFile << indent << "// cleaning up buffer reference pointers\n";	
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {
@@ -798,6 +843,9 @@ void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
 	const char *lpsName = contextLps->getName();
 	programFile << paramIndent << initials << "::Space" << lpsName << "GpuAggregateMetadata "; 
 	programFile << "launchMetadata";
+	// then add another parameter for the maximum sizes of data parts for different variables used in the kernels
+	programFile << paramSeparator << paramIndent << initials << "::";
+	programFile << gpuContext->getContextName() << "MaxPartSizes maxPartSizes";
 	// then add buffer reference parameters for the arrays being used in the GPU offloading execution context
 	List<const char*> *arrayNames = contextLps->getLocallyUsedArrayNames();
 	List<const char*> *accessedArrays = string_utils::intersectLists(

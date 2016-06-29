@@ -45,6 +45,15 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
                 const char *initials,
                 std::ofstream &headerFile, std::ofstream &programFile);
 
+// Unlike in conventional CUDA programming model, we cannot assume any fixed size for the SM local shared
+// memory version of data parts. This is because the programmer choose runtime arguments for the partition
+// functions that determine what are the data part sizes. Therefore, we have to use dynamic shared memory
+// and do memory allocation from that dynamic memory for different data parts explicitly. This function
+// generate a metadata structure that holds information regarding the largest part sizes for different data
+// structures that will be used as part of a batch LPU execution so that dynamic shared memory requirements
+// can be determined properly. 
+void generateMaxPartSizeMetadataStruct(GpuExecutionContext *gpuContext, std::ofstream &headerFile);	
+
 // This function calls the above functions to generate metadata structures for all GPU contexts of a task
 void generateAllLpuMetadataStructs(List<GpuExecutionContext*> *gpuExecutionContextList,
 		PCubeSModel *pcubesModel,
