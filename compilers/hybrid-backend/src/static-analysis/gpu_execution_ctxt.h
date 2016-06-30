@@ -20,6 +20,7 @@
 #include "../codegen/space_mapping.h"
 
 #include <deque>
+#include <fstream>
 
 /* The execution logic we have chosen for GPU LPUs is that the host will generate the LPUs in batch and ship them in 
  * and out of the GPUs. Sometimes the batch of LPUs shipped to the GPU may be multiplexed to arbitrary PPUs of the 
@@ -61,6 +62,7 @@ class KernelGroupConfig {
 
 	// function that generates kernel configurations from the context subflow 
 	void generateKernelConfig(PCubeSModel *pcubesModel, Space *contextLps);
+
   private:
 	// a recursive DFS based kernel configurations construction process used by the public function of the same
 	// name from above 
@@ -121,6 +123,10 @@ class GpuExecutionContext {
 	// based on the GPU context type 
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *callingCtxtLps);
 
+	// function that generates the offloading CUDA kernel from a kernel configuration
+	void generateGpuKernel(CompositeStage *kernelDef, 
+			std::ofstream &programFile, PCubeSModel *pcubesModel);
+
 	void describe(int indent);
   private:
 	// It can happen that the computation flow dives into a lower level LPS in the GPU directly from a host
@@ -154,6 +160,22 @@ class GpuExecutionContext {
 	void wrapOffloadingCodeInLargerContext(std::ofstream &stream, int indentation, 
 			List<Space*> *transitLpsList, 
 			int index, const char *offloadingCode);	
+
+	// This is a helper routine that is used during GPU kernel generation, to copy GPU card memory data in and out
+	// of the shared memory of the SMs. The primary concern here is to distribute threads and warps in a way that
+	// reduces non-coalesced global memory accesses. In the future we should incorporate concerns such as shared
+	// memory bank conflicts avoidance and improving parallelism in the data copying logic.
+	// The function returns an indent string to be appended before any statement placed inside the generated loops.  
+	const char *generateDataCopyingLoopHeaders(std::ofstream &stream, 
+			ArrayDataStructure *array, 
+			int indentLevel, bool warpLevel);
+	// this function is used to generate a single element transfer instruction between the GPU card memory and the
+	// shared memory of an SM for an array. The transfer-direction parameter indicates what memory should be read
+	// and what should be written (1 = read from card and write to SM; otherwise, do vice versa).
+	void generateElementTransferStmt(std::ofstream &stream, 
+			ArrayDataStructure *array, 
+			const char *indentPrefix, 
+			bool warpLevel, int transferDirection);
 };
 
 #endif

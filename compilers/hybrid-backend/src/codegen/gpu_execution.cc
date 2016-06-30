@@ -1,6 +1,7 @@
 #include "gpu_execution.h"
 #include "space_mapping.h"
 #include "../utils/list.h"
+#include "../syntax/ast_type.h"
 #include "../semantics/task_space.h"
 #include "../static-analysis/gpu_execution_ctxt.h"
 #include "../utils/decorator_utils.h"
@@ -784,7 +785,17 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 		programFile << indent << "maxPartSizes." << arrayName << "MaxPartSize = ";
 		programFile << "getAlignedPartSize(" << arrayName << "MaxSize)" << stmtSeparator;
 	}
+	bool warpMapping = (pcubesModel->getGpuTransitionSpaceId() - contextLps->getPpsId() == 2);
+	if (warpMapping) {
+		programFile << indent << "dynamicSharedMemorySize *= WARP_COUNT" << stmtSeparator;
+	}
 	programFile << std::endl;
+
+	// determine common kernel launch grid and block configuration
+	programFile << indent << "// common kernel launch configuration\n";
+	programFile << indent << "int gridConfig = SM_COUNT" << stmtSeparator;
+	programFile << indent << "int blockConfig = WARP_SIZE * WARP_COUNT" << stmtSeparator;
+	programFile << std::endl; 
 
 	// at the end cleanup the buffer reference pointers
 	programFile << indent << "// cleaning up buffer reference pointers\n";	
@@ -853,12 +864,28 @@ void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {
 		const char *arrayName = accessedArrays->Nth(i);
 		programFile << paramSeparator << paramIndent;
-		programFile << "GpuBufferReferences *" << arrayName << "Buffers";
+		programFile << "GpuBufferReferences " << arrayName << "Buffers";
 	}
 
 	// begin kernel function body
 	programFile << ") {\n\n";
 
+	// setup PPU identification
+	programFile << indent << "// PPU and thread identification\n";
+	programFile << indent << "int smId = blockIdx.x" << stmtSeparator;
+	programFile << indent << "int warpId = threadIdx.x / WARP_SIZE" << stmtSeparator;
+	programFile << indent << "int globalWarpId = smId * WARP_COUNT + warpId" << stmtSeparator;
+	programFile << indent << "int threadId = threadIdx.x % WARP_SIZE" << stmtSeparator;
+	programFile << std::endl;
+
+	// declare the dynamic memory panel
+	programFile << indent << "// Dynamic memory panel declaration\n";
+	programFile << indent << "extern __shared__ char memoryPanel[]" << stmtSeparator;
+	programFile << indent << "__shared__ int panelIndex" << stmtSeparator;
+	programFile << std::endl;
+
+	// then invoke the kernel generation logic of the GPU context class to fill in the rest of the GPU kernel
+	gpuContext->generateGpuKernel(kernelDef, programFile, pcubesModel);
 	
 	// close kernel function body
 	programFile << "}\n";
