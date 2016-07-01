@@ -797,6 +797,10 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 	programFile << indent << "int blockConfig = WARP_SIZE * WARP_COUNT" << stmtSeparator;
 	programFile << std::endl; 
 
+	// invoke GPU context executor configuration to generate the logic of the subflow as sequences of kernel
+	// invocations
+	gpuContext->generateContextFlowImplementerCode(programFile, 1);
+
 	// at the end cleanup the buffer reference pointers
 	programFile << indent << "// cleaning up buffer reference pointers\n";	
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {

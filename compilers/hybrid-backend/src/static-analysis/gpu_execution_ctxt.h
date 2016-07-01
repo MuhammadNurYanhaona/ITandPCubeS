@@ -63,6 +63,9 @@ class KernelGroupConfig {
 	// function that generates kernel configurations from the context subflow 
 	void generateKernelConfig(PCubeSModel *pcubesModel, Space *contextLps);
 
+	// function that implements the execution of the kernel group config as a series of CUDA kernel invocations
+	void generateKernelGroupExecutionCode(std::ofstream &programFile, 
+			List<const char*> *accessedArrays, int indentLevel);
   private:
 	// a recursive DFS based kernel configurations construction process used by the public function of the same
 	// name from above 
@@ -126,6 +129,10 @@ class GpuExecutionContext {
 	// function that generates the offloading CUDA kernel from a kernel configuration
 	void generateGpuKernel(CompositeStage *kernelDef, 
 			std::ofstream &programFile, PCubeSModel *pcubesModel);
+
+	// function that generates the sub-flow of the current context as a series of CUDA kernel invocations (possibly 
+	// with intermediate host level code)
+	void generateContextFlowImplementerCode(std::ofstream &programFile, int indentLevel);
 
 	void describe(int indent);
   private:

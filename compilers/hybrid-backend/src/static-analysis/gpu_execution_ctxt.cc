@@ -90,6 +90,48 @@ void KernelGroupConfig::generateKernelConfig(PCubeSModel *pcubesModel, Space *co
 	}
 }
 
+void KernelGroupConfig::generateKernelGroupExecutionCode(std::ofstream &programFile, 
+			List<const char*> *accessedArrays, int indentLevel) {
+	
+	if (repeatingKernels) {
+		std::cout << "We still haven't implement the logic for repititive kernels. Please wait. :P\n";
+		std::exit(EXIT_FAILURE);
+	}
+
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentLevel; i++) indentStr << indent;
+
+	for (int i = 0; i < kernelConfigs->NumElements(); i++) {
+		
+		CompositeStage *kernelDef = kernelConfigs->Nth(i);
+		const char *kernelName = kernelDef->getName();
+		
+		//---------------------------------------------------------------------------kernel invocation
+		
+		programFile << indentStr.str() << kernelName;
+		
+		// kernel launch config
+		programFile << paramIndent << indentStr.str();
+		programFile << " <<< gridConfig" << paramSeparator;
+		programFile << "blockConfig" << paramSeparator << "dynamicSharedMemorySize >>> ";
+		
+		// scalar parameters and metadata arguments 
+		programFile << paramIndent << indentStr.str() << "(";
+		programFile << "arrayMetadata" << paramSeparator;
+		programFile << "partition" << paramSeparator << paramIndent << indentStr.str();
+		programFile << "taskGlobalsGpu" << paramSeparator << "threadLocalsGpu";
+		programFile << paramSeparator << paramIndent << indentStr.str();
+		programFile << "launchMetadata" << paramSeparator << "maxPartSizes";
+
+		// buffer referrence arguments for array variables
+		for (int j = 0; j < accessedArrays->NumElements(); j++) {
+			programFile << paramSeparator << paramIndent << indentStr.str();
+			programFile << "*" << accessedArrays->Nth(i) << "Buffers";
+		}
+		programFile << ")" << stmtSeparator << std::endl;
+	}
+}
+
 void KernelGroupConfig::generateKernelConfig(std::deque<FlowStage*> *stageQueue,
 		int gpuTransitionLevel,
 		Space *contextLps,
@@ -671,6 +713,18 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	// end of outer most LPU iteration loop	
 	programFile << indent << "}\n\n";
 	programFile << indent << "} // scope ends for distribution of staged-in LPUs\n";
+}
+
+void GpuExecutionContext::generateContextFlowImplementerCode(std::ofstream &programFile, int indentLevel) {
+	
+	List<const char*> *arrayNames = contextLps->getLocallyUsedArrayNames();
+        List<const char*> *accessedArrays 
+			= string_utils::intersectLists(getVariableAccessList(), arrayNames);
+
+	for (int i = 0; i < kernelConfigList->NumElements(); i++) {
+		KernelGroupConfig *kernelGroup = kernelConfigList->Nth(i);
+		kernelGroup->generateKernelGroupExecutionCode(programFile, accessedArrays, indentLevel);
+	}
 }
 
 Space *GpuExecutionContext::getContextLps(int topmostGpuPps, Space *entryStageLps) {
