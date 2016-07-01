@@ -161,10 +161,19 @@ class FlowStage {
 	void setExecuteCondition(Expr *condition) { executeCond = condition; }
 	Expr *getExecuteCondition() { return executeCond; }
 
-	// This virtual method is used to recursively generate the run method for the task for the multi-core back
-	// end compiler.
+	// This virtual method is used to recursively generate the run method for the task for the multi-core and 
+	// segmented-memory backend compilers. For hybrid backend compiler, host level code is still generated using
+	// this function.
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace) {}
+	
+	// This virtual function is used to recursively generate a GPU kernel for the sub-flows of a task that are
+	// mapped to the GPU
+	virtual void generateGpuKernelCode(std::ofstream &stream, 
+			int indentation, 
+			Space *containerSpace, 	
+			List<const char*> *accessedArrays,
+			int topmostGpuPps) {}
 
 	// For code generation for the back-end multi-core compiler we need to know if a flow stage should be enter-
 	// ed by multiple PPUs that are under a single higher level PPU but not necessarily responsible for
@@ -383,10 +392,17 @@ class CompositeStage : public FlowStage {
 			int indentation, Space *containerSpace);
 
 	// LPU generation process for the task's computation differs depending on the PCubeS model the task has 
-	// been mapped to. These two helpfer functions are used by the recursive generate-invocation-code routine
+	// been mapped to. These two helper functions are used by the recursive generate-invocation-code routine
 	// to implement the proper process.
 	void genInvocationCodeForHost(std::ofstream &stream, int indentation, Space *containerSpace);
 	void genInvocationCodeForHybrid(std::ofstream &stream, int indentation, Space *containerSpace);
+	
+	// override the GPU kernel generation method inherited from the Flow-Stage class
+	virtual void generateGpuKernelCode(std::ofstream &stream, 
+			int indentation, 
+			Space *containerSpace, 
+			List<const char*> *accessedArrays, 
+			int topmostGpuPps);
 	
 	// Until we incorporate the backend support for dynamic LPSes, there is no need to generate codes for sync 
 	// stages; therefore, we filter them out during nested stages grouping.

@@ -9,6 +9,8 @@
 #include "../syntax/ast_type.h"
 #include "../static-analysis/usage_statistic.h"
 
+#include <fstream>
+
 /*	Partition Order specifies in what order individual partitions (or subpartitions) of a space will be
 	generated and processed by the runtime. This parameter is mostly relevant for subpartitioned spaces
 	as in normal cases partitions of a space are independent. 
@@ -252,6 +254,8 @@ class ArrayDataStructure : public DataStructure {
 	// LPS under concern. This function is purely for diagnostic purpose and has not been perfected.
 	void print();
 
+	//---------------------------------------------------------------------- Host code generation helper routines
+	
 	// These are four functions used during code generation correspond to array dimensions that have been
 	// reordered by underlying partition functions. The transformation codes for reordered data been copied 
 	// into a new memory location for current LPS and for only LPU definition generating reordered indexes 
@@ -383,11 +387,32 @@ class Space {
 	void flagToExecuteCode() { executesCode = true; }
 	bool doesExecuteCode() { return executesCode; }
 
+	//---------------------------------------------------------------------- Host code generation helper routines
+	
 	// a helper routine for code generation that determines if any of the structures listed in the partition
 	// configuration of the LPS referred by this instance needs to be allocated a memory
 	bool allocateStructures();
 	// does the checking above for a specific data structure
 	bool allocateStructure(const char *structureName);
+
+	//----------------------------------------------------------------------- GPU code generation helper routines
+
+	// This helper routine is used to calculate the LPU counts along different dimension when an LPS entry
+	// happens inside a GPU kernel. The second argument tells what array variables can be used to calculate
+	// the LPU counts. This is important as not all kernel uses all arrays of an LPS. 
+	void genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream, 
+			const char *indentStr,
+			List<const char*> *accessibleArrays, 
+			int topmostGpuPps,
+			bool perWarpCountInfo);
+
+	// This helper routine is used to construct updated partition dimension information for relevant arrays 
+	// when the GPU kernel code enters into a new LPS as part of its compution 
+	void genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
+			const char *indentStr,
+			List<const char*> *arraysNames,
+			int topmostGpuPps,
+			bool perWarpDimensionInfo);
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy is 

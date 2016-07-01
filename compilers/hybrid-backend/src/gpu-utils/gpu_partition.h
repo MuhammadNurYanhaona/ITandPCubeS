@@ -18,7 +18,7 @@
 
 //--------------------------------------------------------------------------------------- Block Size Partition Function
 
-__device__ int block_size_part_count(int *dimRange, int size);
+__device__ int block_size_part_count(int *dimRange, int ppuCount, int size);
 
 __device__ void block_size_part_range(int *resultDimRange, int *sourceDimRange, 
 		int lpuCount, int lpuId, 

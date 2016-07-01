@@ -5,7 +5,7 @@
 
 //--------------------------------------------------------- Block Size -----------------------------------------------------------/
 
-__device__ int block_size_part_count(int *dimRange, int size) {
+__device__ int block_size_part_count(int *dimRange, int ppuCount, int size) {
 	int length = dimRange[1] - dimRange[0] + 1;
 	int count = length / size;
 	return (count < 1) ? 1 : count; 

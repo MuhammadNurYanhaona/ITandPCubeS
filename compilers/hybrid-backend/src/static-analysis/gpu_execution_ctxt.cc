@@ -413,6 +413,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	
 	int gpuPpsLevel = pcubesModel->getGpuTransitionSpaceId();
 	int contextPps = contextLps->getPpsId();
+	const char *contextLpsName = contextLps->getName();
 	List<const char*> *arrayNames = contextLps->getLocallyUsedArrayNames();
         List<const char*> *accessedArrays 
 			= string_utils::intersectLists(getVariableAccessList(), arrayNames);
@@ -492,7 +493,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		int dimensions = array->getDimensionality();
 		programFile << indent << "__shared__ int " << arrayName << "SRanges";
 		programFile << storageSuffix << "[" << dimensions << "][2]" << paramSeparator;
-		programFile << arrayName << "PRanges";
+		programFile << arrayName << "Space" << contextLpsName << "PRanges";
 		programFile << storageSuffix << "[" << dimensions << "][2]" << stmtSeparator;
 	}
 	programFile << std::endl;
@@ -502,7 +503,6 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	***************************************************************************************************************/
 	
 	programFile << indent << "{ // scope starts for distribution of staged-in LPUs\n\n";
-	const char *contextLpsName = contextLps->getName();
 	int lpsDimension = contextLps->getDimensionCount();
 	
 	// for location sensitive contexts, each PPU has its own independent sub-batch of LPUs to operate on
@@ -526,17 +526,21 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << indent << "__syncthreads()" << stmtSeparator << std::endl; 
 
 		// make the PPU iterate over their respective batch ranges
-		programFile << indent << "for (int linearId = launchMetadata.entries[" << distrIndex << "]";
+		programFile << indent << "for (int space" << contextLpsName;
+		programFile << "LinearId = launchMetadata.entries[" << distrIndex << "]";
 		programFile << ".batchRangeMin; " << paramIndent << indent;
-		programFile << "linearId <= launchMetadata.entries[" << distrIndex << "].batchRangeMax; ";
-		programFile << "linearId++) {\n\n";
+		programFile << "space" << contextLpsName;
+		programFile << "LinearId <= launchMetadata.entries[" << distrIndex << "].batchRangeMax; ";
+		programFile << "space" << contextLpsName;
+		programFile << "LinearId++) {\n\n";
 		
 		// if the batch range for the current PPU starts with an invalid identifier then the PPU does not
 		// participate in any computation
 		// TODO need to determine how to avoid possible deadlocks for this
 		programFile << doubleIndent  << "// exiting if the batch range is invalid;";
 		programFile << " can we have a deadlock here?\n";
-		programFile << doubleIndent << "if (linearId == INVALID_ID) break" << stmtSeparator;
+		programFile << doubleIndent << "if (space";
+		programFile << contextLpsName << "LinearId == INVALID_ID) break" << stmtSeparator;
 	
 	// for location agnostic contexts, a single batch of LPUs gets distributed among all PPUs
  	} else {
@@ -554,11 +558,12 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << indent << "__syncthreads()" << stmtSeparator << std::endl; 
 
 		// distribute the LPU by letting the PPUs stride over the batch range
-		programFile << indent << "for (int linearId = launchMetadata.entries[0]";
+		programFile << indent << "for (int space" << contextLpsName; 
+		programFile << "LinearId = launchMetadata.entries[0]";
 		programFile << ".batchRangeMin + " << distrIndex << "; ";
-		programFile << paramIndent << indent;
-		programFile << "linearId <= launchMetadata.entries[0].batchRangeMax; ";
-		programFile << "linearId += " << jumpExpr << " {\n";
+		programFile << paramIndent << indent << "space" << contextLpsName;
+		programFile << "LinearId <= launchMetadata.entries[0].batchRangeMax; ";
+		programFile << "space" << contextLpsName << "LinearId += " << jumpExpr << " {\n";
 	}
 		
 	// SM level LPU iterations will always be preceeded by a syncthreads to ensure that all warps have
@@ -594,12 +599,12 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	programFile << " = launchMetadata.entries[";
 	if (contextType == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
 		programFile << distrIndex << "].batchStartIndex " << paramIndent;
-		programFile << tripleIndent << " + linearId "; 
+		programFile << tripleIndent << " + space" << contextLpsName << "LinearId "; 
 		programFile << "- launchMetadata.entries[" << distrIndex << "].batchRangeMin";
 		programFile << stmtSeparator;
 	} else {
 		programFile << "0].batchStartIndex" << paramIndent;
-		programFile << tripleIndent << " + linearId "; 
+		programFile << tripleIndent << " + space" << contextLpsName << " LinearId "; 
 		programFile << "- launchMetadata.entries[0].batchRangeMin" << stmtSeparator;
 	}
 
@@ -633,13 +638,15 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		for (int j = 0; j < dimensions; j++) {
 			programFile << tripleIndent << varName << "SRanges" << storageIndex;
 			programFile << "[" << j << "][0] = ";
-			programFile << varName << "PRanges" << storageIndex << "[" << j << "][0]";
+			programFile << varName << "Space" << contextLpsName;
+			programFile << "PRanges" << storageIndex << "[" << j << "][0]";
 			programFile << " = " << varName << "Buffers.partRangeBuffer[";
 			programFile << "partDimRangeStart" << storageIndex << " + ";
 			programFile << 2 * j << "]" << storageIndex << stmtSeparator;
 			programFile << tripleIndent << varName << "SRanges" << storageIndex;
 			programFile << "[" << j << "][1] = ";
-			programFile << varName << "PRanges" << storageIndex << "[" << j << "][1]";
+			programFile << varName << "Space" << contextLpsName;
+			programFile << "PRanges" << storageIndex << "[" << j << "][1]";
 			programFile << " = " << varName << "Buffers.partRangeBuffer[";
 			programFile << "partDimRangeStart" << storageIndex << " + ";
 			programFile << 2 * j + 1 << "]" << storageIndex << stmtSeparator;
@@ -681,6 +688,16 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << doubleIndent << "__syncthreads()" << stmtSeparator;
 	}
 	programFile << std::endl;
+	
+	/**************************************************************************************************************
+					    Generate CUDA Code for the Sub-Flow
+	***************************************************************************************************************/
+
+	List<FlowStage*> *kernelStages = kernelDef->getStageList();
+	for (int i = 0; i < kernelStages->NumElements(); i++) {
+		FlowStage *stage = kernelStages->Nth(i);
+		stage->generateGpuKernelCode(programFile, 2, contextLps, accessedArrays, gpuPpsLevel);
+	}
 
 	/**************************************************************************************************************
 					synchronizing GPU card memory with SM's updates

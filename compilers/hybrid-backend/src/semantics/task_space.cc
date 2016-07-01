@@ -2,6 +2,8 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
+#include "../utils/code_constant.h"
+#include "../utils/string_utils.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_def.h"
 #include "../syntax/location.h"
@@ -14,6 +16,7 @@
 #include <deque>
 #include <algorithm>
 #include <sstream>
+#include <fstream>
 #include <cstdlib>
 
 //------------------------------------------------- DataDimensionConfig -----------------------------------------------/
@@ -669,6 +672,111 @@ bool Space::allocateStructure(const char *structureName) {
 	DataStructure *structure = dataStructureList->Lookup(structureName);
 	if (structure == NULL) return false;
 	return structure->getUsageStat()->isAllocated();
+}
+
+void Space::genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream, 
+		const char *indentStr,
+		List<const char*> *accessibleArrays,
+		int topmostGpuPps, 
+		bool perWarpCountInfo) {
+
+	// for warp level mapping, there must be one count variable per warp; so this set up the variable suffix
+	std::string countIndex = std::string("");
+	std::string countSuffix = std::string("");
+	if (perWarpCountInfo) {
+		countIndex = std::string("[warpId]");
+		countSuffix = std::string("[WARP_COUNT]");
+	}
+
+	// declare the lpu counter(s)	
+	stream << indentStr << "__shared__ int " << "space" << id << "LpuCount" << countSuffix;
+	stream << "[" << dimensions << "]" << stmtSeparator;
+
+	// determine the current LPSes arrays that can be used to calculate the LPU count
+	List<const char*> *localArrays = getLocallyUsedArrayNames();
+	List<const char*> *usefulArrays = string_utils::intersectLists(accessibleArrays, localArrays);
+
+	// let only one thread to do the count determination
+	if (perWarpCountInfo) {
+		stream << indentStr << "if (threadId == 0) {\n";
+	} else {
+		stream << indentStr << "if (warpId == 0 && threadId == 0) {\n";
+	}
+
+	// iterate over the LPS dimensions and calculate LPU count along individual dimensions separately
+	for (int i = 0; i < dimensions; i++) {
+
+		// get the LPS coordinate configuration for the current dimension (dimension numbering starts from 
+		// one -- not for zero)
+		Coordinate *coordinate = coordSys->getCoordinate(i + 1);
+		
+		// identify an array that has been partitioned along the current dimension in the current LPS
+		ArrayDataStructure *partitioningArray = NULL;
+		int alignmentDimension = i;
+		for (int j = 0; j < usefulArrays->NumElements(); j++) {
+			const char *arrayName = usefulArrays->Nth(j);
+			Token *token = coordinate->getTokenForDataStructure(arrayName);
+			if (token != NULL && !token->isWildcard()) {
+				partitioningArray = (ArrayDataStructure *) token->getData();
+				alignmentDimension = token->getDimensionId();
+				break;
+			}
+		}
+
+		// retrieve the partition function configuration for the array
+		PartitionFunctionConfig *partitionFnConf 
+			= partitioningArray->getPartitionSpecForDimension(alignmentDimension);
+
+		// generate library routine call expression for the partition function
+		const char *arrayName = partitioningArray->getName();
+		const char *parentLpsName = partitioningArray->getSource()->getSpace()->getName();
+		stream << indentStr << indent << "space" << id << "LpuCount";
+		stream << countIndex << "[" << i << "] = ";
+		
+		// the first default argument is the array dimension range to be partitioned
+		stream << partitionFnConf->getName() << "_part_count(" << arrayName << "Space";
+		stream << parentLpsName << "PRanges[" << alignmentDimension - 1 << "]" << paramSeparator;
+
+		
+		// the second default argument is the PPU count for the current space
+		stream << paramIndent << indentStr << indent;
+		if (topmostGpuPps == ppsId) stream << "1";
+		else if (topmostGpuPps - ppsId == 1) stream << "SM_COUNT";
+		else stream << "WARP_COUNT";
+
+		// the remaining parameters depend on the configuration of the partition function itself; but if
+		// exist the parameters follow a particular ordering
+		DataDimensionConfig *partDimArgs = partitionFnConf->getArgsForDimension(alignmentDimension);
+		Node *dividingArg = partDimArgs->getDividingArg();
+		if (dividingArg != NULL)  {
+			stream << paramSeparator;
+			stream << DataDimensionConfig::getArgumentString(dividingArg, "partition.");			
+		}
+		Node *frontPaddingArg = partDimArgs->getFrontPaddingArg();
+		if (frontPaddingArg != NULL) {
+			stream << paramSeparator;
+			stream << DataDimensionConfig::getArgumentString(frontPaddingArg, "partition.");			
+		}
+		Node *backPaddingArg = partDimArgs->getBackPaddingArg();
+		if (backPaddingArg != NULL) {
+			stream << paramSeparator;
+			stream << DataDimensionConfig::getArgumentString(backPaddingArg, "partition.");			
+		}
+
+		stream << ")" << stmtSeparator;
+	}
+	
+	stream << indentStr << "}\n";
+	if (!perWarpCountInfo) {
+		stream << indentStr << "__syncthreads()" << stmtSeparator;
+	}
+}
+
+void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream, 
+		const char *indentStr,
+		List<const char*> *arraysNames,
+		int topmostGpuPps,
+		bool perWarpDimensionInfo) {
 }
 
 //-------------------------------------------- Partition Hierarchy -------------------------------------------------/

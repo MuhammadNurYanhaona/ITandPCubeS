@@ -827,6 +827,39 @@ void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream,
 	}	
 }
 
+void CompositeStage::generateGpuKernelCode(std::ofstream &stream, 
+		int indentLevel, 
+		Space *containerSpace, 
+		List<const char*> *accessedArrays, 
+		int topmostGpuPps) {
+	
+	std::ostringstream indentStr, nextIndent;
+	for (int i = 0; i < indentLevel; i++) indentStr << indent;
+	nextIndent << indentStr.str();
+
+
+	const char *lpsName = space->getName();
+	if (containerSpace != space) {
+		stream << indentStr.str() << "//---------------------------------- entering Space ";
+		stream << lpsName << "\n\n";
+		const char *bodyIndent = nextIndent.str().c_str();
+		bool warpLevelCount = (topmostGpuPps - containerSpace->getPpsId()) == 2;
+		space->genLpuCountInfoForGpuKernelExpansion(stream,
+				bodyIndent, accessedArrays, topmostGpuPps, warpLevelCount);
+		nextIndent << '\t';
+
+		// if this composite stage is an LPU distribution point then distribute the LPUs among the
+		// participating PPUs, otherwise let each PPU go over the entire list of LPUs
+	}
+	
+
+	if (containerSpace != space) {
+		stream << "\n";
+		stream << indentStr.str() << "//----------------------------------- exiting Space ";
+		stream << lpsName << "\n\n";
+	}
+}
+
 // A composite stage is a group entry if it has flow stages of multiple LPSes inside or any stage inside it
 // is a group entry.
 bool CompositeStage::isGroupEntry() {
