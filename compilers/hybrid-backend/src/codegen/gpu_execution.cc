@@ -724,11 +724,15 @@ void generateGpuCodeExecutorInitializer(GpuExecutionContext *gpuContext,
 
 	// stage in the task global and thread local scalars into the GPU card memory
 	programFile << indent << "int taskGlobalsSize = sizeof(*taskGlobalsHost)" << stmtSeparator;
+	programFile << indent << "cudaMalloc((void **) &taskGlobalsGpu" << paramSeparator;
+	programFile << "taskGlobalsSize)" << stmtSeparator;
 	programFile << indent << "cudaMemcpy(taskGlobalsGpu" << paramSeparator;
 	programFile << "taskGlobalsHost" << paramSeparator;
 	programFile << "taskGlobalsSize" << paramSeparator;
 	programFile << "cudaMemcpyHostToDevice)" << stmtSeparator;
 	programFile << indent << "int threadLocalsSize = sizeof(*threadLocalsHost)" << stmtSeparator;
+	programFile << indent << "cudaMalloc((void **) &threadLocalsGpu" << paramSeparator;
+	programFile << "threadLocalsSize)" << stmtSeparator;
 	programFile << indent << "cudaMemcpy(threadLocalsGpu" << paramSeparator;
 	programFile << "threadLocalsHost" << paramSeparator;
 	programFile << "threadLocalsSize" << paramSeparator;
