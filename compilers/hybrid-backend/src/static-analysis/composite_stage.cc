@@ -848,12 +848,86 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 				bodyIndent, accessedArrays, topmostGpuPps, warpLevelCount);
 		nextIndent << '\t';
 
+		std::string distrIndex;
+		std::string distrIncr;
+		std::string idSuffix = std::string("");
+		std::string idIndex = std::string("");
+		bool smLevel = (topmostGpuPps - space->getPpsId() == 1);
+		if (smLevel) {
+			distrIndex = std::string("smId");
+			distrIncr = std::string("SM_COUNT");
+		} else {
+			distrIndex = std::string("warpId");
+			distrIncr = std::string("WARP_COUNT");
+			idSuffix = std::string("[WARP_COUNT]");
+			idIndex = std::string("[warpId]");
+		}
+		std::string countIndex = std::string("");
+		if (warpLevelCount) {
+			countIndex = std::string("[warpId]");
+		}
+
+		std::ostringstream rangeLimitExpr;
+		int dimensionCount = space->getDimensionCount();
+		for (int i = 0; i < dimensionCount; i++) {
+			if (i > 0) rangeLimitExpr << " * ";
+			rangeLimitExpr << "space" << lpsName << "LpuCount[" << i << "]";
+		}
+		
+		std::ostringstream indexVar;
+		indexVar << "space" << lpsName << "LinearId";
+
 		// if this composite stage is an LPU distribution point then distribute the LPUs among the
-		// participating PPUs, otherwise let each PPU go over the entire list of LPUs
+		// participating PPUs
+		stream << "\n" << indentStr.str();
+		if (gpuLpuDistrFlag == Gpu_Lpu_Distr_Stage) {
+			stream << "// distributing LPUs of Space " << lpsName << "\n";
+			stream << indentStr.str() << "for (int " << indexVar.str()  << " = ";
+			stream << distrIndex << ";" << paramIndent << indentStr.str();
+			stream << indexVar.str() << " < " << rangeLimitExpr.str() << ";";
+			stream << paramIndent << indentStr.str();
+			stream << indexVar.str() << " += " << distrIncr << ") {\n\n"; 	
+		//otherwise let each PPU go over the entire list of LPUs
+		} else {
+			stream << "// iterating over LPUs of Space " << lpsName << "\n";
+			stream << indentStr.str() << "for (int " << indexVar.str()  << " = 0;";
+			stream << paramIndent << indentStr.str();
+			stream << indexVar.str() << " < " << rangeLimitExpr.str() << ";";
+			stream << paramIndent << indentStr.str();
+			stream << indexVar.str() << "++" << ") {\n\n"; 	
+		}
+		
+		// create the, possibly, multidimensional ID from the linear ID for the current LPU
+		stream << nextIndent.str() << "// generating LPU ID from linear ID\n";
+		stream << nextIndent.str() << "__shared__ int space";
+		stream << lpsName << "LpuId" << idSuffix << "[" << dimensionCount << "]" << stmtSeparator;
+		stream << nextIndent.str() << "__shared__ int space";
+		stream << lpsName << "LpuIdRemainder" << idSuffix << stmtSeparator;
+		stream << nextIndent.str() << "space" << lpsName << "LpuIdRemainder" << idIndex << " = ";
+		stream << indexVar.str() << stmtSeparator;
+		for (int i = dimensionCount - 1; i >= 0; i--) {
+			stream << nextIndent.str() << "space" << lpsName << "LpuId" << idIndex;
+			stream << "[" << i << "] = space" << lpsName << "LpuIdRemainder" << idIndex; 
+			stream << " \% space" << lpsName << "LpuCount" << countIndex;
+			stream << "[" << i << "]" << stmtSeparator;
+			stream << nextIndent.str() << "space" << lpsName << "LpuIdRemainder";
+			stream << idIndex << " /= " << "space" << lpsName << "LpuCount" << countIndex;
+			stream << "[" << i << "]" << stmtSeparator;
+		}
+
+		// if this is an SM or GPU level composite stage then do a syncthreads to ensure all warps 
+		// are on the same iteration of the for loop
+		if (smLevel) {
+			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
+		}
 	}
 	
 
 	if (containerSpace != space) {
+		
+		// close the LPU iteration for loop
+		stream << indentStr.str() << "}\n";
+
 		stream << "\n";
 		stream << indentStr.str() << "//----------------------------------- exiting Space ";
 		stream << lpsName << "\n\n";

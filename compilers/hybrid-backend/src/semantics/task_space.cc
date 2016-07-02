@@ -688,7 +688,8 @@ void Space::genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream,
 		countSuffix = std::string("[WARP_COUNT]");
 	}
 
-	// declare the lpu counter(s)	
+	// declare the lpu counter(s)
+	stream << indentStr << "// determining LPU counts for Space " << id << "\n";	
 	stream << indentStr << "__shared__ int " << "space" << id << "LpuCount" << countSuffix;
 	stream << "[" << dimensions << "]" << stmtSeparator;
 
