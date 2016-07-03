@@ -12,6 +12,7 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/code_constant.h"
+#include "../utils/decorator_utils.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
@@ -837,11 +838,14 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 	for (int i = 0; i < indentLevel; i++) indentStr << indent;
 	nextIndent << indentStr.str();
 
-
 	const char *lpsName = space->getName();
 	if (containerSpace != space) {
-		stream << indentStr.str() << "//---------------------------------- entering Space ";
-		stream << lpsName << "\n\n";
+
+		std::ostringstream entryHeader;
+		entryHeader << "entering Space " << lpsName;
+		decorator::writeCommentHeader(indentLevel, &stream, entryHeader.str().c_str());
+		stream << std::endl;
+
 		const char *bodyIndent = nextIndent.str().c_str();
 		bool warpLevelCount = (topmostGpuPps - containerSpace->getPpsId()) == 2;
 		space->genLpuCountInfoForGpuKernelExpansion(stream,
@@ -897,8 +901,21 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 			stream << indexVar.str() << "++" << ") {\n\n"; 	
 		}
 		
-		// create the, possibly, multidimensional ID from the linear ID for the current LPU
+		// if this is an SM or GPU level composite stage then do a syncthreads to ensure all warps 
+		// are on the same iteration of the for loop
+		if (smLevel) {
+			stream << indentStr.str() << indent << "__syncthreads()" << stmtSeparator;
+		}
+		
+		// create a, possibly, multidimensional ID from the linear ID for the current LPU
 		stream << nextIndent.str() << "// generating LPU ID from linear ID\n";
+		if (smLevel) {
+			stream << nextIndent.str() << "if (warpId == 0 && threadId == 0) {\n";
+			nextIndent << '\t';
+		} else {
+			stream << nextIndent.str() << "if (threadId == 0) {\n";
+			nextIndent << '\t';
+		}
 		stream << nextIndent.str() << "__shared__ int space";
 		stream << lpsName << "LpuId" << idSuffix << "[" << dimensionCount << "]" << stmtSeparator;
 		stream << nextIndent.str() << "__shared__ int space";
@@ -915,22 +932,32 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 			stream << "[" << i << "]" << stmtSeparator;
 		}
 
+		// determine new partition dimension ranges for the arrays in the newly entered LPS 
+		space->genArrayDimInfoForGpuKernelExpansion(stream, 
+				nextIndent.str().c_str(), 
+				accessedArrays, topmostGpuPps, 
+				warpLevelCount, !smLevel);
+
+		// close the LPU ID and arrays' partition dimension calculating if block
+		stream << indentStr.str() << indent << "}\n";
+		
 		// if this is an SM or GPU level composite stage then do a syncthreads to ensure all warps 
-		// are on the same iteration of the for loop
+		// received the updated LPU IDs and array partition dimension information
 		if (smLevel) {
-			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
+			stream << indentStr.str() << indent << "__syncthreads()" << stmtSeparator;
 		}
 	}
 	
-
 	if (containerSpace != space) {
 		
 		// close the LPU iteration for loop
 		stream << indentStr.str() << "}\n";
 
-		stream << "\n";
-		stream << indentStr.str() << "//----------------------------------- exiting Space ";
-		stream << lpsName << "\n\n";
+		stream << std::endl;
+		std::ostringstream exitHeader;
+		exitHeader << "exiting Space " << lpsName;
+		decorator::writeCommentHeader(indentLevel, &stream, exitHeader.str().c_str());
+		stream << std::endl;
 	}
 }
 

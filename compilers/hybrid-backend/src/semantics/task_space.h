@@ -410,8 +410,9 @@ class Space {
 	// when the GPU kernel code enters into a new LPS as part of its compution 
 	void genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 			const char *indentStr,
-			List<const char*> *arraysNames,
+			List<const char*> *arrayNames,
 			int topmostGpuPps,
+			bool perWarpCountInfo,
 			bool perWarpDimensionInfo);
 };
 

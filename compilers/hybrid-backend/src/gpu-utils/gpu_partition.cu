@@ -34,6 +34,12 @@ __device__ void block_size_part_range(int *resultDimRange, int *sourceDimRange,
 	resultDimRange[1] = max; 
 }
 
+__device__ void block_size_part_range(int *resultDimRange, int *sourceDimRange,
+                int lpuCount, int lpuId, int size) {
+	block_size_part_range(resultDimRange, 
+			sourceDimRange, lpuCount, lpuId, size, 0, 0);
+}
+
 //-------------------------------------------------------- Block Count -----------------------------------------------------------/
 
 

@@ -3,6 +3,7 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/code_constant.h"
+#include "../utils/decorator_utils.h"
 #include "../utils/string_utils.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_def.h"
@@ -775,9 +776,138 @@ void Space::genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream,
 
 void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream, 
 		const char *indentStr,
-		List<const char*> *arraysNames,
+		List<const char*> *arrayNames,
 		int topmostGpuPps,
-		bool perWarpDimensionInfo) {
+		bool perWarpCountInfo, bool perWarpDimensionInfo) {
+
+	// for warp level mapping, there must be one array metadata variable per warp; so this set up the variable suffix
+	std::string metadataIndex = std::string("");
+	std::string metadataSuffix = std::string("");
+	if (perWarpDimensionInfo) {
+		metadataIndex = std::string("[warpId]");
+		metadataSuffix = std::string("[WARP_COUNT]");
+	}
+
+	// determine the arrays among the accessed arrays that are part of the current LPS
+	List<const char*> *localArrayNames = getLocallyUsedArrayNames();
+	List<const char*> *localArrays = string_utils::intersectLists(arrayNames, localArrayNames);
+	
+	if (localArrays->NumElements() == 0) return;
+
+	decorator::writeCommentHeader(&stream, "array part dimension calculation start", indentStr);
+
+	// iterate over the local arrays and construct new part dimension information for each
+	const char *lpsName = id;
+	for (int i = 0; i < localArrays->NumElements(); i++) {
+		
+		const char *arrayName = localArrays->Nth(i);
+		stream << "\n" << indentStr << "// array '" << arrayName << "\"\n";	
+		
+		ArrayDataStructure *array = (ArrayDataStructure *) getLocalStructure(arrayName);
+		int arrayDimensions = array->getDimensionality();
+
+		// determine the parent array dimension that this LPU will be dividing; notice the catch with the sub-
+		// partitioned LPSes
+		Space *parentLps = array->getSource()->getSpace();
+		Space *parentSubpartition = parentLps->getSubpartition();
+		if (parentSubpartition != NULL && parentSubpartition != this) {
+			parentLps = parentSubpartition;
+		}
+		const char *parentArrayLpsName = parentLps->getName();
+
+		std::string parentMetadataIndex = std::string("");
+		if (topmostGpuPps - parentLps->getPpsId() == 2) {
+			parentMetadataIndex = std::string("[WARP_ID]");
+		}
+
+		std::ostringstream dimRangeVar, parentDimRangeVar;
+		dimRangeVar << arrayName << "Space" << lpsName << "PRanges" << metadataIndex;
+		parentDimRangeVar << arrayName << "Space" << parentArrayLpsName;
+		parentDimRangeVar << "PRanges" << parentMetadataIndex;
+		
+		// first declare one or more shared partition dimension metadata variables
+		stream << indentStr << "__shared__ int " << arrayName;
+		stream << "Space" << lpsName << "PRanges";
+		stream << metadataSuffix << "[" << arrayDimensions << "][2]" << stmtSeparator;  
+
+		// iterate over the array dimensions and process partition instruction for them one-by-one
+		for (int j = 0; j < arrayDimensions; j++) {
+		
+			// if the array is not partitioned along a particular dimension then its part dimension ranges 
+			// can be directly copied down from its source
+			// again note that dimension numbering starts from 1 not from 0
+			if (!array->isPartitionedAlongDimension(j + 1)) {
+				stream << indentStr << dimRangeVar.str();
+				stream << "[" << j << "][0] = " << parentDimRangeVar.str();
+				stream << "[" << j << "][0]" << stmtSeparator;
+				stream << indentStr << dimRangeVar.str();
+				stream << "[" << j << "][1] = " << parentDimRangeVar.str();
+				stream << "[" << j << "][1]" << stmtSeparator;
+				continue;
+			}
+			
+			// retrieve partition function configuration for the array dimension
+			PartitionFunctionConfig *partFnConf = array->getPartitionSpecForDimension(j + 1);
+			DataDimensionConfig *partDimArgs = partFnConf->getArgsForDimension(j + 1);
+
+			// determine what dimension of the LPS the array dimension has been aligned to; this is needed
+			// to identify the proper LPU/part ID and count to calculate the dimension ranges
+			int alignedDimension = j;
+			for (int k = 0; k < dimensions; k++) {
+				Coordinate *coordinate = coordSys->getCoordinate(k + 1);
+				Token *token = coordinate->getTokenForDataStructure(arrayName);
+				if (token != NULL && token->getDimensionId() == j + 1) {
+					alignedDimension = k;
+					break;
+				}
+			}
+
+			// invoke the dimension range determining library function for the partition function with
+			// appropriate parameters
+			
+			// first two arguments are the current part and parent part dimension references
+			stream << indentStr << partFnConf->getName() << "_part_range(";
+			stream <<  dimRangeVar.str() << "[" << j << "]" << paramSeparator;
+			stream << paramIndent << indentStr;
+			stream << parentDimRangeVar.str() << "[" << j << "]" << paramSeparator;
+			stream << paramIndent << indentStr;
+			
+			// the next two argument are the LPU count and ID along the aligned dimension
+			stream << "space" << lpsName << "LpuCount";
+			if (perWarpCountInfo) stream << metadataIndex;
+			stream << "[" << alignedDimension << "]" << paramSeparator;
+			stream << "space" << lpsName << "LpuId" << metadataIndex; 
+			stream << "[" << alignedDimension << "]";
+			stream << paramIndent << indentStr;
+
+			// the remaining parameters are partition function specific but are applied in an specific order
+			Node *dividingArg = partDimArgs->getDividingArg();
+			if (dividingArg != NULL)  {
+				stream << paramSeparator;
+				stream << DataDimensionConfig::getArgumentString(dividingArg, "partition.");			
+			}
+			Node *frontPaddingArg = partDimArgs->getFrontPaddingArg();
+			if (frontPaddingArg != NULL) {
+				stream << paramSeparator;
+				stream << DataDimensionConfig::getArgumentString(frontPaddingArg, "partition.");			
+			}
+			Node *backPaddingArg = partDimArgs->getBackPaddingArg();
+			if (backPaddingArg != NULL) {
+				stream << paramSeparator;
+				stream << DataDimensionConfig::getArgumentString(backPaddingArg, "partition.");			
+			}
+			
+			// close the function call
+			stream << ")" << stmtSeparator;
+			
+		}	
+	}
+	
+	if (!perWarpDimensionInfo) {
+		stream << indentStr << "__syncthreads()" << stmtSeparator;
+	}
+
+	decorator::writeCommentHeader(&stream, "array part dimension calculation end", indentStr);
 }
 
 //-------------------------------------------- Partition Hierarchy -------------------------------------------------/

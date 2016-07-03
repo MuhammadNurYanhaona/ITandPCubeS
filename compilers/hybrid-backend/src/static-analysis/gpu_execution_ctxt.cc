@@ -7,6 +7,7 @@
 #include "../utils/list.h"
 #include "../utils/code_constant.h"
 #include "../utils/string_utils.h"
+#include "../utils/decorator_utils.h"
 #include "../codegen/space_mapping.h"
 
 #include <iostream>
@@ -575,6 +576,12 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << std::endl;
 	}
 
+	/**************************************************************************************************************
+			  data part reference and metadata initialization from GPU card memory
+	***************************************************************************************************************/
+	
+	decorator::writeCommentHeader(2, &programFile, "kernel argument buffers processing start");
+	
 	// before processing can start on any LPU, we need to read dimension information of all component data 
 	// parts and index into the appropriate positions of the card memory LPU data buffer so that data copying
 	// can be done from the global card memory to the SM shared memory
@@ -618,7 +625,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
                 Type *elemType = arrayType->getTerminalElementType();
 
 		programFile << std::endl << tripleIndent;
-		programFile << "// --------------- retrieving variable '" << varName << "' information\n";
+		programFile << "// retrieving variable '" << varName << "' information\n";
 		programFile << tripleIndent << "partIndex" << storageIndex << " = " << varName;
 		programFile << "Buffers.partIndexBuffer[lpuIndex" << storageIndex << "]" << stmtSeparator;
 		programFile << tripleIndent << "partStartPos" << storageIndex << " = " << varName;
@@ -659,17 +666,21 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << doubleIndent << "__syncthreads()" << stmtSeparator;
 	} 
 	
+	decorator::writeCommentHeader(2, &programFile, "kernel argument buffers processing end");
+	
 	/**************************************************************************************************************
 					copy data parts from GPU card memory to SM memory
 	***************************************************************************************************************/
 	
+	decorator::writeCommentHeader(2, &programFile, "card to shared memory data reading start");
+
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {
 		
 		const char *varName = accessedArrays->Nth(i);
                 ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(varName);
 		int dimensions = array->getDimensionality();
 		programFile << std::endl << doubleIndent;
-		programFile << "// copying '" << varName << "' from global to shared memory\n";
+		programFile << "// copying variable '" << varName << "' part(s)\n";
 		
 		// generate the for loops surrounding the data transfer instruction
 		const char *indentStr = generateDataCopyingLoopHeaders(programFile, array, 2, !smLevel);
@@ -687,6 +698,8 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	if (smLevel) {
 		programFile << doubleIndent << "__syncthreads()" << stmtSeparator;
 	}
+	
+	decorator::writeCommentHeader(2, &programFile, "data reading done");
 	programFile << std::endl;
 	
 	/**************************************************************************************************************
@@ -703,6 +716,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 					synchronizing GPU card memory with SM's updates
 	***************************************************************************************************************/
         
+	decorator::writeCommentHeader(2, &programFile, "shared memory to card memory data sync start");
 	List<const char*> *modifiedArrays 
 			= string_utils::intersectLists(getModifiedVariableList(), arrayNames);
 	for (int i = 0; i < modifiedArrays->NumElements(); i++) {
@@ -711,7 +725,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
                 ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(varName);
 		int dimensions = array->getDimensionality();
 		programFile << std::endl << doubleIndent;
-		programFile << "// synchronizing '" << varName << "' part in the global memory\n";
+		programFile << "// synchronizing variable '" << varName << "' part(s)\n";
 		
 		// generate the for loops surrounding the data transfer instruction
 		const char *indentStr = generateDataCopyingLoopHeaders(programFile, array, 2, !smLevel);
@@ -726,6 +740,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 			programFile << "}\n";
 		}
 	}
+	decorator::writeCommentHeader(2, &programFile, "data synchronization done");
 
 	// end of outer most LPU iteration loop	
 	programFile << indent << "}\n\n";

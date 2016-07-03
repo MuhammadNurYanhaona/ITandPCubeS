@@ -25,6 +25,9 @@ __device__ void block_size_part_range(int *resultDimRange, int *sourceDimRange,
 		int size,
                 int frontPadding, int backPadding);
 
+__device__ void block_size_part_range(int *resultDimRange, int *sourceDimRange, 
+		int lpuCount, int lpuId, int size);
+
 //-------------------------------------------------------------------------------------- Block Count Partition Function
 
 #endif
