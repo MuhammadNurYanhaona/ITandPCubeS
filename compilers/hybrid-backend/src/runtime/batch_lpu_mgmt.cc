@@ -28,7 +28,10 @@ BatchPpuState::BatchPpuState(int lpsCount, List<ThreadState*> *ppuStateList, std
 	this->logFile = NULL;
 	initializeLpuVectors();
 	gpuCodeExecutors = NULL;
-	ppuLpuGenerationStatus = new std::vector<int>;
+	ppuLpuGenerationStatusForLPSes = new List<vector<int>*>;
+	for (int i = 0; i < lpsCount; i++) {
+		ppuLpuGenerationStatusForLPSes->Append(new vector<int>);
+	}
 }
 
 BatchPpuState::~BatchPpuState() {
@@ -39,12 +42,18 @@ BatchPpuState::~BatchPpuState() {
 		delete lpuVector;
 	}
 	delete lpuVectorsForLPSes;
-	delete ppuLpuGenerationStatus;
+	while (ppuLpuGenerationStatusForLPSes->NumElements() > 0) {
+		vector<int> *status = ppuLpuGenerationStatusForLPSes->Nth(0);
+		ppuLpuGenerationStatusForLPSes->RemoveAt(0);
+		delete status;
+	}
+	delete ppuLpuGenerationStatusForLPSes;
 }
 
 vector<LPU*> *BatchPpuState::getNextLpus(int lpsId, int containerLpsId, std::vector<int> *currentLpuIds) {
 	
 	vector<LPU*> *lpuVector = lpuVectorsForLPSes->Nth(lpsId);
+	vector<int> *ppuLpuGenerationStatus = ppuLpuGenerationStatusForLPSes->Nth(lpsId);	
 	int activePpuCounts = groupLeaderPpuCounts->at(lpsId);
 	int activePpuGap = ppuStates->size() / activePpuCounts;
 	
@@ -81,11 +90,14 @@ vector<LPU*> *BatchPpuState::getNextLpus(int lpsId, int containerLpsId, std::vec
 }
 
 std::vector<int*> *BatchPpuState::genLpuCountsVector(int lpsId, bool singleEntry) {
+	
 	std::vector<int*> *countVector = new std::vector<int*>;
 	if (singleEntry) {
 		countVector->push_back(ppuStates->at(0)->getLpuCounts(lpsId));
 		return countVector;
 	}
+
+	vector<int> *ppuLpuGenerationStatus = ppuLpuGenerationStatusForLPSes->Nth(lpsId);	
 	for (unsigned int i = 0; i < ppuStates->size(); i++) {
 		ThreadState *ppuState = ppuStates->at(i);
 		int lpuGenerationStatus = ppuLpuGenerationStatus->at(i);
@@ -101,6 +113,7 @@ std::vector<int*> *BatchPpuState::genLpuCountsVector(int lpsId, bool singleEntry
 void BatchPpuState::initLpuIdVectorsForLPSTraversal(int lpsId, std::vector<int> *lpuIdVector) {
 	
 	lpuIdVector->clear();
+	vector<int> *ppuLpuGenerationStatus = ppuLpuGenerationStatusForLPSes->Nth(lpsId);	
 	ppuLpuGenerationStatus->clear();
 
 	int activePpuCounts = groupLeaderPpuCounts->at(lpsId);
@@ -125,6 +138,7 @@ void BatchPpuState::adjustLpuIdVector(int lpsId,
 	int activePpusInAncestorLps = groupLeaderPpuCounts->at(ancestorLpsId);
 	int ppusPerGroup = activePpusInCurrentLps / activePpusInAncestorLps;
 
+	vector<int> *ppuLpuGenerationStatus = ppuLpuGenerationStatusForLPSes->Nth(lpsId);	
 	for (unsigned int i = 0; i < ppuStates->size(); i++) {
 		int lpuGenerationStatus = ppuLpuGenerationStatus->at(i);
 		int groupId = i / ppusPerGroup;

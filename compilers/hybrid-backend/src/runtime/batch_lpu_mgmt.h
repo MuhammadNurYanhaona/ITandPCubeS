@@ -60,8 +60,8 @@ class BatchPpuState {
 	// Rather, we want all PPU controllers should finish producing the LPUs for non-repeated case before any starts
 	// repeating its LPUs, if needed of-course. To achieve that effect, we let the PPU controllers that have depleted
 	// their LPUs to just wait and invoke the get-next-LPU routines on the others that still have more LPUs left.
-	// The following property is used to keep track of the current states of the PPU controllers.       
-	std::vector<int> *ppuLpuGenerationStatus;
+	// The following property is used to keep track of the current states of the PPU controllers at different LPSes.       
+	List<std::vector<int>*> *ppuLpuGenerationStatusForLPSes;
 
 	// Just like in the case of an isolated PPU controller, where we maintain a single LPU instance and update its
 	// properties to denote different LPUs, we maintain an LPU vector per LPS in the batch mode
