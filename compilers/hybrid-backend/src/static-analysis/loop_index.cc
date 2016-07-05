@@ -5,6 +5,7 @@
 #include "../syntax/ast_type.h"
 #include "../syntax/ast.h"
 #include "../semantics/task_space.h"
+#include "../codegen/name_transformer.h"
 
 #include <iostream>
 #include <sstream>
@@ -66,15 +67,11 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
 	if (structure->isDimensionReordered(dimensionNo + 1, space->getRoot())) {
 		xform << "Xformed";
 	}
-	xform << " - " << array << "StoreDims[" << dimensionNo << "].range.min" << ")";
-	bool firstEntry = true;
-	for (int i = dimensionCount - 1; i > dimensionNo; i--) {
-		if (!firstEntry) {
-			xform << '\n' << indent.str() << "\t\t";
-		}
-		xform << " * " << array << "StoreDims[" << i << "].length";
-		firstEntry = false;
-	}
+
+	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+	const char *indexSuffix = transformer->getArrayIndexStorageSuffix(array,
+                                dimensionNo, dimensionCount, indentLevel);
+	xform << indexSuffix;
 	stream << indent.str();
 	stream << "int " << index << array << dimensionNo;
 	stream << " = " << xform.str() << ";\n";

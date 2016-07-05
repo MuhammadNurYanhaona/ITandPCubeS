@@ -838,7 +838,9 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 	for (int i = 0; i < indentLevel; i++) indentStr << indent;
 	nextIndent << indentStr.str();
 
+	bool smLevel = (topmostGpuPps - space->getPpsId() == 1);
 	const char *lpsName = space->getName();
+
 	if (containerSpace != space) {
 
 		std::ostringstream entryHeader;
@@ -846,7 +848,7 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		decorator::writeCommentHeader(indentLevel, &stream, entryHeader.str().c_str());
 		stream << std::endl;
 
-		const char *bodyIndent = nextIndent.str().c_str();
+		const char *bodyIndent = strdup(nextIndent.str().c_str());
 		bool warpLevelCount = (topmostGpuPps - containerSpace->getPpsId()) == 2;
 		space->genLpuCountInfoForGpuKernelExpansion(stream,
 				bodyIndent, accessedArrays, topmostGpuPps, warpLevelCount);
@@ -856,7 +858,6 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		std::string distrIncr;
 		std::string idSuffix = std::string("");
 		std::string idIndex = std::string("");
-		bool smLevel = (topmostGpuPps - space->getPpsId() == 1);
 		if (smLevel) {
 			distrIndex = std::string("smId");
 			distrIncr = std::string("SM_COUNT");
@@ -904,48 +905,73 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		// if this is an SM or GPU level composite stage then do a syncthreads to ensure all warps 
 		// are on the same iteration of the for loop
 		if (smLevel) {
-			stream << indentStr.str() << indent << "__syncthreads()" << stmtSeparator;
+			stream << nextIndent.str();
+			stream << "// sync to ensure all warps are in the same stage\n"; 
+			stream << stmtSeparator;
+			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
 		}
 		
 		// create a, possibly, multidimensional ID from the linear ID for the current LPU
 		stream << nextIndent.str() << "// generating LPU ID from linear ID\n";
-		if (smLevel) {
-			stream << nextIndent.str() << "if (warpId == 0 && threadId == 0) {\n";
-			nextIndent << '\t';
-		} else {
-			stream << nextIndent.str() << "if (threadId == 0) {\n";
-			nextIndent << '\t';
-		}
 		stream << nextIndent.str() << "__shared__ int space";
 		stream << lpsName << "LpuId" << idSuffix << "[" << dimensionCount << "]" << stmtSeparator;
-		stream << nextIndent.str() << "__shared__ int space";
+		if (smLevel) {
+			stream << nextIndent.str() << "if (warpId == 0 && threadId == 0) {\n";
+		} else {
+			stream << nextIndent.str() << "if (threadId == 0) {\n";
+		}
+		stream << nextIndent.str() << indent << "__shared__ int space";
 		stream << lpsName << "LpuIdRemainder" << idSuffix << stmtSeparator;
-		stream << nextIndent.str() << "space" << lpsName << "LpuIdRemainder" << idIndex << " = ";
+		stream << nextIndent.str() << indent;
+		stream << "space" << lpsName << "LpuIdRemainder" << idIndex << " = ";
 		stream << indexVar.str() << stmtSeparator;
 		for (int i = dimensionCount - 1; i >= 0; i--) {
-			stream << nextIndent.str() << "space" << lpsName << "LpuId" << idIndex;
+			stream << nextIndent.str() << indent << "space" << lpsName << "LpuId" << idIndex;
 			stream << "[" << i << "] = space" << lpsName << "LpuIdRemainder" << idIndex; 
 			stream << " \% space" << lpsName << "LpuCount" << countIndex;
 			stream << "[" << i << "]" << stmtSeparator;
-			stream << nextIndent.str() << "space" << lpsName << "LpuIdRemainder";
+			stream << nextIndent.str() << indent << "space" << lpsName << "LpuIdRemainder";
 			stream << idIndex << " /= " << "space" << lpsName << "LpuCount" << countIndex;
 			stream << "[" << i << "]" << stmtSeparator;
 		}
+		stream << indentStr.str() << indent << "}\n";
 
 		// determine new partition dimension ranges for the arrays in the newly entered LPS 
 		space->genArrayDimInfoForGpuKernelExpansion(stream, 
-				nextIndent.str().c_str(), 
+				strdup(nextIndent.str().c_str()), 
 				accessedArrays, topmostGpuPps, 
 				warpLevelCount, !smLevel);
 
-		// close the LPU ID and arrays' partition dimension calculating if block
-		stream << indentStr.str() << indent << "}\n";
 		
 		// if this is an SM or GPU level composite stage then do a syncthreads to ensure all warps 
 		// received the updated LPU IDs and array partition dimension information
 		if (smLevel) {
-			stream << indentStr.str() << indent << "__syncthreads()" << stmtSeparator;
+			stream << nextIndent.str() << "// synchronizing metadata updates\n";
+			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
 		}
+	}
+
+	// recursively generate code for the stages inside the current stage
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		
+		// for SM level operation, blindly do a syncthreads after execution of each nested stage lest 
+		// there might be some data dependencies among stages that we might miss
+		if (i > 0 && smLevel) {
+			stream << nextIndent.str();
+			stream << "// synchronize between nested stages execution\n" << stmtSeparator;
+			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
+		}
+		
+		FlowStage *stage = stageList->Nth(i);
+		
+		// if the stage is a sync stage, we can ignore it for now (later on we need to decide how to
+		// handle padding-sync stages)
+		SyncStage *syncStage = dynamic_cast<SyncStage*>(stage);
+		if (syncStage != NULL) continue;
+
+		int nextIndentLevel = (containerSpace != space) ? indentLevel + 1 : indentLevel;
+		stage->generateGpuKernelCode(stream, 
+				nextIndentLevel, space, accessedArrays, topmostGpuPps); 
 	}
 	
 	if (containerSpace != space) {

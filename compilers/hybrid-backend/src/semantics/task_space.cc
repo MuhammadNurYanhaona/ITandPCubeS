@@ -736,7 +736,7 @@ void Space::genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream,
 		stream << countIndex << "[" << i << "] = ";
 		
 		// the first default argument is the array dimension range to be partitioned
-		stream << partitionFnConf->getName() << "_part_count(" << arrayName << "Space";
+		stream << partitionFnConf->getName() << "_part_count(&" << arrayName << "Space";
 		stream << parentLpsName << "PRanges[" << alignmentDimension - 1 << "]" << paramSeparator;
 
 		
@@ -826,9 +826,16 @@ void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 		parentDimRangeVar << "PRanges" << parentMetadataIndex;
 		
 		// first declare one or more shared partition dimension metadata variables
-		stream << indentStr << "__shared__ int " << arrayName;
+		stream << indentStr << "__shared__ GpuDimension " << arrayName;
 		stream << "Space" << lpsName << "PRanges";
-		stream << metadataSuffix << "[" << arrayDimensions << "][2]" << stmtSeparator;  
+		stream << metadataSuffix << "[" << arrayDimensions << "]" << stmtSeparator; 
+
+		// let some specific thread(s) do the dimension range calculation
+		if (perWarpDimensionInfo) {
+			stream << indentStr << "if (threadId == 0) {\n";		
+		} else {
+			stream << indentStr << "if (warpId == 0 && threadId == 0) {\n";
+		}
 
 		// iterate over the array dimensions and process partition instruction for them one-by-one
 		for (int j = 0; j < arrayDimensions; j++) {
@@ -837,12 +844,9 @@ void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 			// can be directly copied down from its source
 			// again note that dimension numbering starts from 1 not from 0
 			if (!array->isPartitionedAlongDimension(j + 1)) {
-				stream << indentStr << dimRangeVar.str();
-				stream << "[" << j << "][0] = " << parentDimRangeVar.str();
-				stream << "[" << j << "][0]" << stmtSeparator;
-				stream << indentStr << dimRangeVar.str();
-				stream << "[" << j << "][1] = " << parentDimRangeVar.str();
-				stream << "[" << j << "][1]" << stmtSeparator;
+				stream << indentStr << indent << dimRangeVar.str();
+				stream << "[" << j << "] = " << parentDimRangeVar.str();
+				stream << "[" << j << "]" << stmtSeparator;
 				continue;
 			}
 			
@@ -866,11 +870,11 @@ void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 			// appropriate parameters
 			
 			// first two arguments are the current part and parent part dimension references
-			stream << indentStr << partFnConf->getName() << "_part_range(";
-			stream <<  dimRangeVar.str() << "[" << j << "]" << paramSeparator;
-			stream << paramIndent << indentStr;
-			stream << parentDimRangeVar.str() << "[" << j << "]" << paramSeparator;
-			stream << paramIndent << indentStr;
+			stream << indentStr << indent << partFnConf->getName() << "_part_range(";
+			stream << "&" << dimRangeVar.str() << "[" << j << "]" << paramSeparator;
+			stream << paramIndent << indentStr << indent;
+			stream << "&" << parentDimRangeVar.str() << "[" << j << "]" << paramSeparator;
+			stream << paramIndent << indentStr << indent;
 			
 			// the next two argument are the LPU count and ID along the aligned dimension
 			stream << "space" << lpsName << "LpuCount";
@@ -878,7 +882,7 @@ void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 			stream << "[" << alignedDimension << "]" << paramSeparator;
 			stream << "space" << lpsName << "LpuId" << metadataIndex; 
 			stream << "[" << alignedDimension << "]";
-			stream << paramIndent << indentStr;
+			stream << paramIndent << indentStr << indent;
 
 			// the remaining parameters are partition function specific but are applied in an specific order
 			Node *dividingArg = partDimArgs->getDividingArg();
@@ -898,9 +902,11 @@ void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 			}
 			
 			// close the function call
-			stream << ")" << stmtSeparator;
-			
-		}	
+			stream << ")" << stmtSeparator;		
+		}
+
+		// close the if block that encompasses the dimension calculation
+		stream << indentStr << "}\n";
 	}
 	
 	if (!perWarpDimensionInfo) {

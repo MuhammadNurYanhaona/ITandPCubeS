@@ -297,6 +297,11 @@ class ExecutionStage : public FlowStage {
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	bool isGroupEntry();
 	void setLpsExecutionFlags();
+	void generateGpuKernelCode(std::ofstream &stream, 
+			int indentation, 
+			Space *containerSpace, 	
+			List<const char*> *accessedArrays,
+			int topmostGpuPps);
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 

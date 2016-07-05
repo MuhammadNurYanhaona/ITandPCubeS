@@ -23,6 +23,7 @@
 // for GPU side utility routines
 #include "../../src/gpu-utils/gpu_utils.h"
 #include "../../src/gpu-utils/gpu_constant.h"
+#include "../../src/gpu-utils/gpu_structure.h"
 #include "../../src/gpu-utils/gpu_partition.h"
 
 // for interpreting LPU data parts

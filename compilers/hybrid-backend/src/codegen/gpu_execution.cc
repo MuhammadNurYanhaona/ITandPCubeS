@@ -1,5 +1,6 @@
 #include "gpu_execution.h"
 #include "space_mapping.h"
+#include "name_transformer.h"
 #include "../utils/list.h"
 #include "../syntax/ast_type.h"
 #include "../semantics/task_space.h"
@@ -903,6 +904,12 @@ void generateGpuCodeExecutorKernelList(GpuExecutionContext *gpuContext,
                 PCubeSModel *pcubesModel,
                 const char *initials, std::ofstream &programFile) {
 
+	// the name transformer needs to be set to GPU mode so that the variable names used inside GPU kernels get
+	// prefix and suffixes that are appropriate for the GPU environment
+	ntransform::HybridNameTransformer *transformer = (ntransform::HybridNameTransformer*) 
+			ntransform::NameTransformer::transformer;
+	transformer->setToGpuMode();	
+
 	List<KernelGroupConfig*> *kernelGroupConfigList = gpuContext->getKernelConfigList();
 	const char *contextName = gpuContext->getContextName();
 	for (int i = 0; i < kernelGroupConfigList->NumElements(); i++) {
@@ -925,6 +932,9 @@ void generateGpuCodeExecutorKernelList(GpuExecutionContext *gpuContext,
 					gpuContext, pcubesModel, initials, programFile);
 		}
 	}
+	
+	// reset the name transformer to host mode
+	transformer->setToHostMode();
 }
 
 void generateGpuExecutorMapFn(List<GpuExecutionContext*> *gpuExecutionContextList,

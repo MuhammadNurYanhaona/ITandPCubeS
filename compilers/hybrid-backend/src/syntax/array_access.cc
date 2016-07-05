@@ -210,6 +210,8 @@ void ArrayAccess::translate(std::ostringstream &stream, int indentLevel, int cur
 
 void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, int indentLevel, 
 		const char *array, ArrayType *type, Space *space) {
+
+	ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
 	
 	int dimension = getIndexPosition();
 	// If this is not the beginning index access in the expression then pass the computation forward first to get 
@@ -239,12 +241,9 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, int indentLe
 		} else { 
 			stream << indexStream.str();
 		}
-                stream << " - " << array << "StoreDims[" << dimension << "].range.min";
-		stream << ')';
-		std::ostringstream xform;
-                for (int i = dimensionCount - 1; i > dimension; i--) {
-                        stream << " * " << array << "StoreDims[" << i << "].length";
-                }
+		const char *indexSuffix = transformer->getArrayIndexStorageSuffix(array, 
+				dimension, dimensionCount, indentLevel);
+		stream << indexSuffix;
 	}
 }
 

@@ -11,6 +11,7 @@
 #include "../utils/hashtable.h"
 #include "../utils/string_utils.h"
 #include "../utils/code_constant.h"
+#include "../utils/decorator_utils.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
@@ -579,8 +580,8 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 	// reset the name transformer to user common "lpu." prefix for array access in case it is been modified
 	ntransform::NameTransformer::transformer->setLpuPrefix("lpu->");
 
-	// create local variables for all array dimensions so that later on name-transformer that add 
-	// prefix/suffix to accessed global variables can work properly
+	// create local variables for all array dimensions so that later on the name-transformer, that adds
+	// prefix/suffix to accessed global variables, can work properly
 	stream <<  localMdHd;
 	stream << "\t// create local copies of partition and storage dimension configs of all arrays\n";
 	std::string stmtIndent = "\t";
@@ -796,4 +797,50 @@ bool ExecutionStage::isGroupEntry() {
 
 void ExecutionStage::setLpsExecutionFlags() {
 	space->flagToExecuteCode();
+}
+
+void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,        
+		int indentation,
+		Space *containerSpace,
+		List<const char*> *accessedArrays,
+		int topmostGpuPps) {
+
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentation; i++) indentStr << indent;
+	int innerIndent = indentation;
+
+	decorator::writeCommentHeader(indentation, &stream, "translation of an execution stage start");
+	stream << std::endl;
+
+	// A compute stage may be executing in an LPS that has been mapped to either the GPU, SM, or WARP PPS level.
+	// For the former two mapping, we need to restrict what PPU can execute the current stage.
+	int myPps = space->getPpsId();
+	bool warpLevel = (topmostGpuPps - myPps == 2);
+	if (topmostGpuPps == myPps) {
+		stream << indentStr.str() << "if (smId == 0 && warpId == 0) {\n";
+		innerIndent++;
+	} else if (topmostGpuPps - myPps == 1) {
+		stream << indentStr.str() << "if (warpId == 0) {\n";
+		innerIndent++;
+	}
+	
+	// set up appropriate mode for the name transformer that adds prefix and suffixes to the variables used in
+	// statements inside the execution stage
+	ntransform::HybridNameTransformer *transformer = (ntransform::HybridNameTransformer*)
+        		ntransform::NameTransformer::transformer;
+	transformer->setWarpSuffixStat(warpLevel);
+	transformer->setCurrentLpsName(space->getName());
+
+	// do code-block translation
+	std::ostringstream codeStream;
+	code->generateCode(codeStream, innerIndent, space);
+	stream << codeStream.str();
+
+	// close the PPU filtering if block when applicable
+	if (!warpLevel) {
+		stream << indentStr.str() << "}\n";
+	}
+	
+	stream << std::endl;
+	decorator::writeCommentHeader(indentation, &stream, "translation done");
 }

@@ -16,16 +16,20 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+#include "gpu_structure.h"
+
 //--------------------------------------------------------------------------------------- Block Size Partition Function
 
-__device__ int block_size_part_count(int *dimRange, int ppuCount, int size);
+__device__ int block_size_part_count(GpuDimension *dimension, int ppuCount, int size);
 
-__device__ void block_size_part_range(int *resultDimRange, int *sourceDimRange, 
+__device__ void block_size_part_range(GpuDimension *resultDimension, 
+		GpuDimension *sourceDimension, 
 		int lpuCount, int lpuId, 
 		int size,
                 int frontPadding, int backPadding);
 
-__device__ void block_size_part_range(int *resultDimRange, int *sourceDimRange, 
+__device__ void block_size_part_range(GpuDimension *resultDimension, 
+		GpuDimension *sourceDimension, 
 		int lpuCount, int lpuId, int size);
 
 //-------------------------------------------------------------------------------------- Block Count Partition Function

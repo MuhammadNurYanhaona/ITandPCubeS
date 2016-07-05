@@ -492,10 +492,10 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		const char *arrayName = accessedArrays->Nth(i);
                 ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(arrayName);
 		int dimensions = array->getDimensionality();
-		programFile << indent << "__shared__ int " << arrayName << "SRanges";
-		programFile << storageSuffix << "[" << dimensions << "][2]" << paramSeparator;
+		programFile << indent << "__shared__ GpuDimension " << arrayName << "SRanges";
+		programFile << storageSuffix << "[" << dimensions << "]" << paramSeparator;
 		programFile << arrayName << "Space" << contextLpsName << "PRanges";
-		programFile << storageSuffix << "[" << dimensions << "][2]" << stmtSeparator;
+		programFile << storageSuffix << "[" << dimensions << "]" << stmtSeparator;
 	}
 	programFile << std::endl;
 
@@ -644,16 +644,18 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << std::endl;
 		for (int j = 0; j < dimensions; j++) {
 			programFile << tripleIndent << varName << "SRanges" << storageIndex;
-			programFile << "[" << j << "][0] = ";
+			programFile << "[" << j << "].range.min = ";
 			programFile << varName << "Space" << contextLpsName;
-			programFile << "PRanges" << storageIndex << "[" << j << "][0]";
+			programFile << "PRanges" << storageIndex << "[" << j << "].range.min";
+			programFile << "\n" << tripleIndent << doubleIndent;
 			programFile << " = " << varName << "Buffers.partRangeBuffer[";
 			programFile << "partDimRangeStart" << storageIndex << " + ";
 			programFile << 2 * j << "]" << storageIndex << stmtSeparator;
 			programFile << tripleIndent << varName << "SRanges" << storageIndex;
-			programFile << "[" << j << "][1] = ";
+			programFile << "[" << j << "].range.max = ";
 			programFile << varName << "Space" << contextLpsName;
-			programFile << "PRanges" << storageIndex << "[" << j << "][1]";
+			programFile << "PRanges" << storageIndex << "[" << j << "].range.max";
+			programFile << "\n" << tripleIndent << doubleIndent;
 			programFile << " = " << varName << "Buffers.partRangeBuffer[";
 			programFile << "partDimRangeStart" << storageIndex << " + ";
 			programFile << 2 * j + 1 << "]" << storageIndex << stmtSeparator;
@@ -949,17 +951,18 @@ const char *GpuExecutionContext::generateDataCopyingLoopHeaders(std::ofstream &s
 		int i = 0; 
 		for (; i < dimensions - 1; i++) {
 			stream << indentStr.str() << "for (int d" << "_" << i << " = ";
-			stream << varName << "SRanges[warpId][" << i << "][0]; ";
+			stream << varName << "SRanges[warpId][" << i << "].range.min; ";
 			stream << paramIndent << indentStr.str();
-			stream << "d_" << i << " <= " << varName << "SRanges[warpId][" << i << "][1];";
+			stream << "d_" << i << " <= " << varName;
+			stream << "SRanges[warpId][" << i << "].range.max;";
 			stream << " d_" << i << "++) {\n";
 			indentStr << indent;	
 		}
 		// the lowermost dimension's index range is distributed among the threads
 		stream << indentStr.str() << "for (int d" << "_" << i << " = ";
-		stream << varName << "SRanges[warpId][" << i << "][0] + threadId; ";
+		stream << varName << "SRanges[warpId][" << i << "].range.min + threadId; ";
 		stream << paramIndent << indentStr.str();
-		stream << "d_" << i << " <= SRanges[warpId][" << i << "][1]; d_";
+		stream << "d_" << i << " <= SRanges[warpId][" << i << "].range.max; d_";
 		stream << i << " += WAPR_SIZE) {\n";
 		indentStr << indent;	
 
@@ -972,9 +975,9 @@ const char *GpuExecutionContext::generateDataCopyingLoopHeaders(std::ofstream &s
 	// for single dimensional arrays, the single dimension gets distributed to all threads of the SM
 	if (dimensions == 1) {
 		stream << indentStr.str() << "for (int d_0 = ";
-		stream << varName << "SRanges[0][0] + threadIdx.x; ";
+		stream << varName << "SRanges[0].range.min + threadIdx.x; ";
 		stream << paramIndent << indentStr.str();
-		stream << "d_0 <= " << varName << "SRanges[0][1];";
+		stream << "d_0 <= " << varName << "SRanges[0].range.max;";
 		stream << " d_0 += WARP_SIZE * WARP_COUNT) {\n";
 		indentStr << indent;	
 		return strdup(indentStr.str().c_str());
@@ -985,9 +988,9 @@ const char *GpuExecutionContext::generateDataCopyingLoopHeaders(std::ofstream &s
 	int i = 0; 
 	for (; i < dimensions - 2; i++) {
 		stream << indentStr.str() << "for (int d" << "_" << i << " = ";
-		stream << varName << "SRanges[" << i << "][0]; ";
+		stream << varName << "SRanges[" << i << "].range.min; ";
 		stream << paramIndent << indentStr.str();
-		stream << "d_" << i << " <= " << varName << "SRanges[" << i << "][1];";
+		stream << "d_" << i << " <= " << varName << "SRanges[" << i << "].range.max;";
 		stream << " d_" << i << "++) {\n";
 		indentStr << indent;	
 	}
@@ -995,16 +998,16 @@ const char *GpuExecutionContext::generateDataCopyingLoopHeaders(std::ofstream &s
 	// distribute indexes in the next to last dimension to the warps and indexes in the last dimension
 	// to the threads of a warp
 	stream << indentStr.str() << "for (int d" << "_" << i << " = ";
-	stream << varName << "SRanges[" << i << "][0] + warpId; ";
+	stream << varName << "SRanges[" << i << "].range.min + warpId; ";
 	stream << paramIndent << indentStr.str();
-	stream << "d_" << i << " <= " << varName << "SRanges[" << i << "][1];";
+	stream << "d_" << i << " <= " << varName << "SRanges[" << i << "].range.max;";
 	stream << " d_" << i << " += WARP_COUNT) {\n";
 	indentStr << indent;
 	i++;	
 	stream << indentStr.str() << "for (int d" << "_" << i << " = ";
-	stream << varName << "SRanges[" << i << "][0] + threadId; ";
+	stream << varName << "SRanges[" << i << "].range.min + threadId; ";
 	stream << paramIndent << indentStr.str();
-	stream << "d_" << i << " <= " << varName << "SRanges[" << i << "][1];";
+	stream << "d_" << i << " <= " << varName << "SRanges[" << i << "].range.max;";
 	stream << " d_" << i << " += WARP_SIZE) {\n";
 	indentStr << indent;
 	return strdup(indentStr.str().c_str());
@@ -1036,12 +1039,12 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 		if (i > 0) {
 			stream << paramIndent << indentPrefix << " + ";
 		}
-		stream << "(d_" << i << " - " << varName << "SRanges[" << i << "][0])";
+		stream << "(d_" << i << " - " << varName << "SRanges[" << i << "].range.min)";
 		if (i < dimensions - 1) {
 			for (int j = i + 1; j < dimensions; j++) {
 				stream << paramIndent << indentPrefix << " * ";
-				stream << "(" << varName << "SRanges[" << j << "][1] - ";
-				stream << varName << "SRanges[" << j << "][0] + 1)";
+				stream << "(" << varName << "SRanges[" << j << "].range.max - ";
+				stream << varName << "SRanges[" << j << "].range.min + 1)";
 			}
 		}	
 	}
@@ -1051,12 +1054,12 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 		if (i > 0) {
 			stream << paramIndent << indentPrefix << " + ";	
 		}
-		stream << "(d_" << i << " - " << varName << "SRanges[" << i << "][0])";
+		stream << "(d_" << i << " - " << varName << "SRanges[" << i << "].range.min)";
 		if (i < dimensions - 1) {
 			for (int j = i + 1; j < dimensions; j++) {
 				stream << paramIndent << indentPrefix << " * ";
-				stream << "(" << varName << "SRanges[" << j << "][1] - ";
-				stream << varName << "SRanges[" << j << "][0] + 1)";
+				stream << "(" << varName << "SRanges[" << j << "].range.max - ";
+				stream << varName << "SRanges[" << j << "].range.min + 1)";
 			}
 		}	
 	}
