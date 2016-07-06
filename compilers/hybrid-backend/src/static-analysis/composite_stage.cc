@@ -240,6 +240,13 @@ void CompositeStage::performEpochUsageAnalysis() {
 	}
 }
 
+void CompositeStage::flagVectorizableLoops() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+		stage->flagVectorizableLoops();
+	}
+}
+
 void CompositeStage::reorganizeDynamicStages() {
 	
 	int currentStageIndex = 0;

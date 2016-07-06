@@ -140,6 +140,11 @@ class FlowStage {
 	// epoch dependent calculatations happening within the flow stages.
 	virtual void performEpochUsageAnalysis() {}
 
+	// This recursive process probe through the contexts of execution-stages and set flags to  loop statements
+	// found inside that can be vectorized. Although the analysis is applicable only for execution-stages, we
+	// declare the function here and override it in composite-stage class too to simplify the analysis process.  
+	virtual void flagVectorizableLoops() {}
+
 	DataDependencies *getDataDependencies() { return dataDependencies; }
 	bool isDataModifierRelevant(FlowStage *modifier);
 
@@ -290,6 +295,7 @@ class ExecutionStage : public FlowStage {
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
 	void performEpochUsageAnalysis();
+	void flagVectorizableLoops() { code->flagInnermostParallelForLoops(); }
 	void print(int indent);
 
 	// helper method for generating back-end code
@@ -341,6 +347,7 @@ class CompositeStage : public FlowStage {
 	virtual void print(int indent);
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	virtual void performEpochUsageAnalysis();
+	void flagVectorizableLoops();
 	void reorganizeDynamicStages();
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
 	virtual void prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);

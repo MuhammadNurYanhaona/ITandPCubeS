@@ -106,6 +106,7 @@ namespace ntransform {
 		HybridNameTransformer();
 		void setToGpuMode() { gpuMode = true; }
 		void setToHostMode() { gpuMode = false; }
+		bool isGpuMode() { return gpuMode; }
 		void setWarpSuffixStat(bool stat) { applyWarpSuffix = stat; }
 		void setCurrentLpsName(const char *lpsName) { this->currentLpsName = lpsName; }
 		const char *getTransformedName(const char *varName,

@@ -224,6 +224,8 @@ void TaskDef::analyseCode() {
 	}
 	
 	//------------------------------------------------------------------ Data Dependency Analysis
+	// identify the loops inside the task's computation block that can be vectorized
+	computation->flagVectorizableLoops();
 	// assign stages stage, group, and nesting indexes to aid latter analysis
 	computation->assignIndexAndGroupNo(0, 0, 0);
 	computation->setRepeatIndex(-1);

@@ -9,6 +9,7 @@
 #include "../utils/hashtable.h"
 #include "errors.h"
 #include "../static-analysis/loop_index.h"
+#include "../codegen/vectorization.h"
 #include "../codegen/name_transformer.h"
 
 #include <iostream>
@@ -76,6 +77,13 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 	
 	IndexScope::currentScope->enterScope(indexScope);
 
+	// check if an attempt can be made to vectorize the index loop
+	bool vectorizable = false;
+	PLoopStmt *parallelLoop = dynamic_cast<PLoopStmt*>(this);
+	if (parallelLoop != NULL) {
+		vectorizable = parallelLoop->isInnermostLoop();
+	}
+
 	// check if the loop is a reduction loop; if it is then do initialization for reduction
 	if (reductionLoop) initializeReductionLoop(stream, indentLevel, space); 
 
@@ -89,9 +97,11 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 	// create an array for indexes that are single entry in the execution space so that we do not have to
 	// create loops for them
 	List<const char*> *forbiddenIndexes = new List<const char*>;
+
 	
 	List<IndexArrayAssociation*> *associateList = indexScope->getAllPreferredAssociations();
 	int indentIncrease = 0;
+	std::ostringstream loopHeaders;
 	for (int i = 0; i < associateList->NumElements(); i++) {
 		
 		IndexArrayAssociation *association = associateList->Nth(i);
@@ -103,8 +113,8 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 		std::ostringstream indent;
 		for (int j = 0; j < newIndent; j++) indent << '\t';
 		// create a scope for the for loop corresponding to this association
-		stream << indent.str();
-		stream << "{// scope entrance for parallel loop on index " << index << "\n";
+		loopHeaders << indent.str();
+		loopHeaders << "{// scope entrance for parallel loop on index " << index << "\n";
 		// check if the index is a single entry
 		bool forbidden = false;
 		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
@@ -113,14 +123,14 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 			forbiddenIndexes->Append(index);
 			forbidden = true;
 			// declare the initialized index variable
-			stream << indent.str() << "int " << association->getIndex() << " = ";
+			loopHeaders << indent.str() << "int " << association->getIndex() << " = ";
 			ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
-			stream << transformer->getTransformedName(arrayName, true, true);
-			stream << '[' << dimensionNo << "].range.min;\n"; 
+			loopHeaders << transformer->getTransformedName(arrayName, true, true);
+			loopHeaders << '[' << dimensionNo << "].range.min;\n"; 
 		}
 		
 		// check any additional restrictions been provided that can be used as restricting conditions to 
-		// further limit iteration range from original partition dimension's minimum to maximum value
+		// further limit the iteration range from original partition dimension's minimum to maximum value
 		List<LogicalExpr*> *applicableRestrictions = NULL;
 		if (allRestrictions != NULL && allRestrictions->NumElements() > 0) {
 			remainingRestrictions = new List<LogicalExpr*>;
@@ -137,7 +147,7 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 
 		if (!forbidden) {
 			// declare the uninitialized index variable
-			stream << indent.str() << "int " << index << ";\n"; 
+			loopHeaders << indent.str() << "int " << index << ";\n"; 
 			// convert the index access to a range loop iteration and generate code for that
 			DataStructure *structure = space->getLocalStructure(association->getArray());
 			RangeExpr *rangeExpr = association->convertToRangeExpr(structure->getType());
@@ -153,7 +163,8 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 						arrayName, dimensionNo + 1);
 			}
 
-			rangeExpr->generateLoopForRangeExpr(stream, newIndent, space, restrictStream.str().c_str());
+			rangeExpr->generateLoopForRangeExpr(loopHeaders, newIndent, 
+					space, strdup(restrictStream.str().c_str()));
 			indentIncrease++;
 			newIndent++;	
 		}
@@ -169,10 +180,10 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 		// restrictions should work for both mode of loop traversal.
 		if (!forbidden && applicableRestrictions != NULL && applicableRestrictions->NumElements() > 0) {
 			for (int k = 0; k < applicableRestrictions->NumElements(); k++) {	
-				for (int in = 0; in < newIndent; in++) stream << '\t';
-				stream << "if (!(";
-				applicableRestrictions->Nth(k)->translate(stream, newIndent, 0, space);
-				stream << ")) continue;\n";
+				for (int in = 0; in < newIndent; in++) loopHeaders << '\t';
+				loopHeaders << "if (!(";
+				applicableRestrictions->Nth(k)->translate(loopHeaders, newIndent, 0, space);
+				loopHeaders << ")) continue;\n";
 			}
 		}
 
@@ -182,9 +193,19 @@ void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 		list = IndexArrayAssociation::filterList(list);
 		for (int j = 0; j < list->NumElements(); j++) {
 			IndexArrayAssociation *otherAssoc = list->Nth(j);
-			otherAssoc->generateTransform(stream, newIndent, space);
+			otherAssoc->generateTransform(loopHeaders, newIndent, space);
 		}
+	}
 
+	// If the loops are flagged as vectorizable then try to vectorize them by converting the headers to equivalent
+	// loop headers but with embedded vectorization instructions. Otherwise, just write the loop headers into the
+	// output stream.
+	if (vectorizable) {
+		const char *oldHeaders = strdup(loopHeaders.str().c_str());
+		const char *newHeaders = vectorizeLoops(oldHeaders, indentLevel);
+		stream << newHeaders;
+	} else {
+		stream << loopHeaders.str();
 	}
 
 	// translate the body of the for loop if it is not a reduction loop; otherwise do reduce iteration
@@ -314,6 +335,15 @@ void StmtBlock::analyseEpochDependencies(Space *space) {
 		stmt->analyseEpochDependencies(space);
 	}	
 }
+
+bool StmtBlock::flagInnermostParallelForLoops() {
+	bool innerLoopFound = false;
+	for (int i = 0; i < stmts->NumElements(); i++) {
+		Stmt *stmt = stmts->Nth(i);
+		innerLoopFound = innerLoopFound || stmt->flagInnermostParallelForLoops();
+	}
+	return innerLoopFound;
+}
 	
 //-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
@@ -433,6 +463,15 @@ void IfStmt::analyseEpochDependencies(Space *space) {
 		ConditionalStmt *stmt = ifBlocks->Nth(i);
 		stmt->analyseEpochDependencies(space);
 	}
+}
+
+bool IfStmt::flagInnermostParallelForLoops() {
+	bool innerLoopFound = false;
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+		ConditionalStmt *stmt = ifBlocks->Nth(i);
+		innerLoopFound = innerLoopFound || stmt->flagInnermostParallelForLoops();
+	}
+	return innerLoopFound;
 }
 
 //------------------------------------------------------------ Parallel Loop -----------------------------------------------------------/
@@ -585,6 +624,7 @@ PLoopStmt::PLoopStmt(List<IndexRangeCondition*> *rc, Stmt *b, yyltype loc) : Loo
 	}
 	body = b;
 	body->SetParent(this);
+	innermostLoop = false;
 }
 
 void PLoopStmt::PrintChildren(int indentLevel) {
@@ -670,6 +710,12 @@ void PLoopStmt::analyseEpochDependencies(Space *space) {
 		IndexRangeCondition *cond = rangeConditions->Nth(i);
 		cond->analyseEpochDependencies(space);
 	}
+}
+
+bool PLoopStmt::flagInnermostParallelForLoops() {
+	bool innerLoopFound = LoopStmt::flagInnermostParallelForLoops();
+	innermostLoop = !(innerLoopFound);
+	return true;
 }
 
 void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {

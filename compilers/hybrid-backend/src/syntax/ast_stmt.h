@@ -51,6 +51,11 @@ class Stmt : public Node {
 	// are parts of this statement 
 	virtual void analyseEpochDependencies(Space *space) {}
 
+	// This is a recursive function that set flags in the parallel for loops within a 
+	// compute stage as inner-most for loops (containing no other parallel loops inside
+	// them) or not. This is a rudimentary analysis that helps to vectorize loops.
+	virtual bool flagInnermostParallelForLoops() { return false; }
+
 	//-------------------------------------------------------------------------Code Generation Routines
 	// back end code generation routine; subclasses should provide appropriate 
 	// implementations
@@ -76,6 +81,7 @@ class StmtBlock : public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	virtual bool flagInnermostParallelForLoops();
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -99,6 +105,7 @@ class ConditionalStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	bool flagInnermostParallelForLoops() { return stmt->flagInnermostParallelForLoops(); }
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space);
@@ -122,6 +129,7 @@ class IfStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	bool flagInnermostParallelForLoops();
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -194,6 +202,7 @@ class LoopStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines
 	virtual List<const char*> *getIndexNames() = 0;
 	virtual void analyseEpochDependencies(Space *space) { body->analyseEpochDependencies(space); }
+	virtual bool flagInnermostParallelForLoops() { return body->flagInnermostParallelForLoops(); }
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	// a helper routine for code generation that declares variables in the scope
@@ -224,9 +233,13 @@ class LoopStmt: public Stmt {
 
 class PLoopStmt: public LoopStmt {
   protected:
+	// conditions that restrict the iteration ranges of the parallel loop
 	List<IndexRangeCondition*> *rangeConditions;
+	// tells if the current for loop is the innermost loop in the context it is situated in
+	bool innermostLoop;
   public:
-	PLoopStmt(List<IndexRangeCondition*> *rangeConditions, Stmt *body, yyltype loc);	
+	PLoopStmt(List<IndexRangeCondition*> *rangeConditions, Stmt *body, yyltype loc);
+	bool isInnermostLoop() { return innermostLoop; }	
     
 	//--------------------------------------------------------------------------Syntax Analysis Routines	
     	const char *GetPrintNameForNode() { return "ParallelForLoop"; }
@@ -240,6 +253,7 @@ class PLoopStmt: public LoopStmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	List<const char*> *getIndexNames();
 	void analyseEpochDependencies(Space *space);
+	bool flagInnermostParallelForLoops();
 	
 	//--------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -311,6 +325,7 @@ class WhileStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	bool flagInnermostParallelForLoops() { return body->flagInnermostParallelForLoops(); }
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
