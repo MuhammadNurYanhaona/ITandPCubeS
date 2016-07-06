@@ -46,7 +46,7 @@ void PartDimRanges::describe(std::ofstream &stream, int indentLevel) {
 	std::ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
 	stream << indent.str() << "Part Dimension Range: [";
-	for (int i = 0; i < size; i++) {
+	for (int i = 0; i < (size / 2); i++) {
 		stream << "(" << ranges[i].min << ", " << ranges[i].max << ")";
 	}
 	stream << "]\n";	

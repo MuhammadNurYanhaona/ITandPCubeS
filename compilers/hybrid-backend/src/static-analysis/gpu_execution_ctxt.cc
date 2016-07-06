@@ -127,7 +127,7 @@ void KernelGroupConfig::generateKernelGroupExecutionCode(std::ofstream &programF
 		// buffer referrence arguments for array variables
 		for (int j = 0; j < accessedArrays->NumElements(); j++) {
 			programFile << paramSeparator << paramIndent << indentStr.str();
-			programFile << "*" << accessedArrays->Nth(i) << "Buffers";
+			programFile << "*" << accessedArrays->Nth(j) << "Buffers";
 		}
 		programFile << ")" << stmtSeparator << std::endl;
 	}
