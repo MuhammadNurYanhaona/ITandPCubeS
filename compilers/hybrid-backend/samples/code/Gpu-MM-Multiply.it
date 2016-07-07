@@ -17,8 +17,11 @@ Task "Matrix Multiply":
 		c.dimension2 = b.dimension2
 	Compute:
 		"Block multiply matrices" (Space B) { 
-			do { c[i][j] = c[i][j] + a[i][k] * b[k][j]
-			} for i, j in c; k in a
+			do { 
+				do in sequence {
+					c[i][j] = c[i][j] + a[i][k] * b[k][j]
+				} for k in a.dimension2.range
+			} for i, j in c
 		}
 		Repeat: from "Block multiply matrices" foreach Space A sub-partition
 	Partition (k, l, q, m, n):
