@@ -32,11 +32,12 @@ GpuCodeExecutor::GpuCodeExecutor(LpuBatchController *lpuBatchController, int dis
 void GpuCodeExecutor::submitNextLpu(LPU *lpu, int ppuGroupIndex) {
 
 	if (lpuBatchController->canAddNewLpu() && lpuBatchController->canHoldLpu(lpu)) {
-		if (lpuBatchController->isEmptyBatch()) {
-			lpuBatchRangeVector->at(ppuGroupIndex) = Range(lpu->id);
-		} else {
-			lpuBatchRangeVector->at(ppuGroupIndex).max++;
-		}
+                Range lpuIdRange = lpuBatchRangeVector->at(ppuGroupIndex);
+                if (lpuIdRange.min == INVALID_ID) {
+                        lpuBatchRangeVector->at(ppuGroupIndex) = Range(lpu->id);
+                } else {
+                        lpuBatchRangeVector->at(ppuGroupIndex).max++;
+                }
 		lpuBatchController->addLpuToTheCurrentBatch(lpu, ppuGroupIndex);
 		return;	
 	}
