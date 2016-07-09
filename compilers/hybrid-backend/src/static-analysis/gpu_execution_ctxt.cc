@@ -122,7 +122,8 @@ void KernelGroupConfig::generateKernelGroupExecutionCode(std::ofstream &programF
 		programFile << "partition" << paramSeparator << paramIndent << indentStr.str();
 		programFile << "taskGlobalsGpu" << paramSeparator << "threadLocalsGpu";
 		programFile << paramSeparator << paramIndent << indentStr.str();
-		programFile << "launchMetadata" << paramSeparator << "maxPartSizes";
+		programFile << "launchMetadata" << paramSeparator;
+		programFile << "hostLpuConfigs" << paramSeparator << "maxPartSizes";
 
 		// buffer referrence arguments for array variables
 		for (int j = 0; j < accessedArrays->NumElements(); j++) {
@@ -466,7 +467,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
                 Type *elemType = arrayType->getTerminalElementType();
 		std::string indentLevel = std::string(doubleIndent);
                 if (!smLevel) {
-			programFile << tripleIndent << "for (int i = 0; i < WARP_COUNT; i++) {\n";
+			programFile << doubleIndent << "for (int i = 0; i < WARP_COUNT; i++) {\n";
 			indentLevel = std::string(tripleIndent);
 		}		
 		programFile << indentLevel << arrayName;
@@ -475,7 +476,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << "(memoryPanel + panelIndex)" << stmtSeparator;
 		programFile << indentLevel << "panelIndex += " << "maxPartSizes." << arrayName;
 		programFile << "MaxPartSize" << stmtSeparator;		
-		if (!smLevel) programFile << tripleIndent << "}\n";
+		if (!smLevel) programFile << doubleIndent << "}\n";
         }
         programFile << indent << "}\n";
         programFile << indent << "__syncthreads()" << stmtSeparator;
@@ -564,7 +565,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << ".batchRangeMin + " << distrIndex << "; ";
 		programFile << paramIndent << indent << "space" << contextLpsName;
 		programFile << "LinearId <= launchMetadata.entries[0].batchRangeMax; ";
-		programFile << "space" << contextLpsName << "LinearId += " << jumpExpr << " {\n";
+		programFile << "space" << contextLpsName << "LinearId += " << jumpExpr << ") {\n";
 	}
 		
 	// SM level LPU iterations will always be preceeded by a syncthreads to ensure that all warps have

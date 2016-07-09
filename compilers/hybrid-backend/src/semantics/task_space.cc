@@ -731,7 +731,13 @@ void Space::genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream,
 
 		// generate library routine call expression for the partition function
 		const char *arrayName = partitioningArray->getName();
-		const char *parentLpsName = partitioningArray->getSource()->getSpace()->getName();
+		Space *parentLps = partitioningArray->getSource()->getSpace();
+		Space *parentSubpartition = parentLps->getSubpartition();
+		if (parentSubpartition != NULL && parentSubpartition != this) {
+			parentLps = parentSubpartition;
+		}
+		const char *parentLpsName = parentLps->getName();
+
 		stream << indentStr << indent << "space" << id << "LpuCount";
 		stream << countIndex << "[" << i << "] = ";
 		

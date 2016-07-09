@@ -226,6 +226,9 @@ void FlowStage::calculateLPSUsageStatistics() {
 }
 
 void FlowStage::analyzeSynchronizationNeeds() {
+
+	std::cout << "Doing Analysis on stage: " << getName() << "\n";
+	std::cout.flush();
 	
 	List<DependencyArc*> *outgoingArcList = dataDependencies->getOutgoingArcs();
 	synchronizationReqs = new StageSyncReqs(this);
@@ -831,11 +834,12 @@ void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
 	transformer->setWarpSuffixStat(warpLevel);
 	transformer->setCurrentLpsName(space->getName());
 
+/*	
 	// do code-block translation
 	std::ostringstream codeStream;
 	code->generateCode(codeStream, innerIndent, space);
 	stream << codeStream.str();
-
+*/
 	// close the PPU filtering if block when applicable
 	if (!warpLevel) {
 		stream << indentStr.str() << "}\n";

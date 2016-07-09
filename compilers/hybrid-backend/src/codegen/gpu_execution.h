@@ -45,6 +45,26 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
                 const char *initials,
                 std::ofstream &headerFile, std::ofstream &programFile);
 
+// To do proper transformation/re-transformation of an array's indices within GPU kernels when the partition 
+// functions being used for the array reorder its indices, we need to know IDs, counts, and dimension ranges 
+// of the host level LPUs that lead to the GPU LPU the array is a part of. So another metadata structure is
+// generated that can hold these information. This metdata structure is kept separate from the one of the 
+// above as generating instances of it will require parsing host level LPUs by the GPU code executor while
+// instances of the earlier metadata structure can be initialized from LPU count information along.    
+void generateSuperLpuConfigStruct(Space *gpuContextLps, std::ofstream &headerFile);
+
+// This routine generates a function to extract properties from an LPU to initialize an LPU configuration
+// metadata 
+void generateSuperLpuConfigStructFn(Space *gpuContextLps, 
+		const char *initials, std::ofstream &programFile);
+
+// Just like in the case of launch-configuration metadata, we may need multiple copies of super LPU config
+// metadata incase we have sub-partitions in the task's LPS hierarchy which may necessitate different GPU
+// PPU operate on branches of LPU hierarchy that have diverged already in the host level. 
+void generateSuperLpuConfigAggregatorStruct(Space *gpuContextLps,
+                PCubeSModel *pcubesModel,
+                std::ofstream &headerFile);	
+
 // Unlike in conventional CUDA programming model, we cannot assume any fixed size for the SM local shared
 // memory version of data parts. This is because the programmer choose runtime arguments for the partition
 // functions that determine what are the data part sizes. Therefore, we have to use dynamic shared memory
@@ -109,7 +129,7 @@ void generateGpuCodeExecutors(List<GpuExecutionContext*> *gpuExecutionContextLis
 		const char *initials, 
 		const char *headerFile, const char *programFile);
 
-// these are four auxiliary functions to be used by the Gpu-Code-Executor generator function of the above to
+// these are five auxiliary functions to be used by the Gpu-Code-Executor generator function of the above to
 // provide implementations for the constructor and some inherited functions
 void generateGpuCodeExecutorConstructor(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
@@ -119,6 +139,8 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 		PCubeSModel *pcubesModel, 
 		const char *initials, std::ofstream &programFile);
 void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext, 
+		const char *initials, std::ofstream &programFile);
+void generateGpuCodeExecutorAncestorLpuExtractFn(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
 
 // these two functions are used to generate kernels related to the offloading context a GPU-Code-Executor is

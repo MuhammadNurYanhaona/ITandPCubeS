@@ -34,6 +34,7 @@ void GpuCodeExecutor::submitNextLpu(LPU *lpu, int ppuGroupIndex) {
 	if (lpuBatchController->canAddNewLpu() && lpuBatchController->canHoldLpu(lpu)) {
                 Range lpuIdRange = lpuBatchRangeVector->at(ppuGroupIndex);
                 if (lpuIdRange.min == INVALID_ID) {
+			extractAncestorLpuConfigs(lpu, ppuGroupIndex);
                         lpuBatchRangeVector->at(ppuGroupIndex) = Range(lpu->id);
                 } else {
                         lpuBatchRangeVector->at(ppuGroupIndex).max++;
@@ -46,6 +47,7 @@ void GpuCodeExecutor::submitNextLpu(LPU *lpu, int ppuGroupIndex) {
 	}
 
 	lpuBatchController->addLpuToTheCurrentBatch(lpu, ppuGroupIndex);
+	extractAncestorLpuConfigs(lpu, ppuGroupIndex);
 	lpuBatchRangeVector->at(ppuGroupIndex) = Range(lpu->id);
 }
 

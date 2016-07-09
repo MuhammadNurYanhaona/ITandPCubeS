@@ -63,20 +63,23 @@ void generateAllDataExchangeFns(const char *headerFile,
 void generateScalarCommmunicatorFn(std::ofstream &headerFile,
                 std::ofstream &programFile,
                 const char *initials,
-                Space *rootLps, CommunicationCharacteristics *commCharacter);	
+                Space *rootLps, CommunicationCharacteristics *commCharacter, 
+		bool batchExecutionMode);	
 
 // This function generates a functions to instantiating a communicator for synchronizing an array update dependency
 void generateArrayCommmunicatorFn(std::ofstream &headerFile,
                 std::ofstream &programFile,
                 const char *initials,
-                Space *rootLps, CommunicationCharacteristics *commCharacter);	
+                Space *rootLps, CommunicationCharacteristics *commCharacter, 
+		bool batchExecutionMode);	
 
 // This calls the two functions above to generate communicators for all data dependencies within a task that involve
 // communications 
 void generateAllCommunicators(const char *headerFile,
                 const char *programFile,
                 TaskDef *taskDef,
-                List<CommunicationCharacteristics*> *commCharacterList);
+                List<CommunicationCharacteristics*> *commCharacterList, 
+		bool batchExecutionMode);
 
 // This function generates a function for constructing a map of communicators for a segment that will be shared by
 // its PPU controllers. Later when a situation for dependency resolution occurs the PPU controllers retrieve the

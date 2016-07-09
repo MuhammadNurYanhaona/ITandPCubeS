@@ -209,6 +209,138 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
 	programFile << "}\n";
 }
 
+void generateSuperLpuConfigStruct(Space *gpuContextLps, std::ofstream &headerFile) {
+
+	List<const char*> *accessedArrays = gpuContextLps->getLocallyUsedArrayNames();
+	
+	const char *lpsName = gpuContextLps->getName();
+	headerFile << "\n" << "class Space" << lpsName << "AncestorLpuConfigs" << " {\n";
+	headerFile << "  public:\n";
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *arrayName = accessedArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure *) gpuContextLps->getLocalStructure(arrayName);
+		int dimensions = array->getDimensionality();
+	
+		// determine how many host level super parts are there for this array
+		int superPartCount = 0;
+		DataStructure *parent = array->getSource();	
+		while (!parent->getSpace()->isRoot()) {
+			superPartCount++;
+			parent = parent->getSource();
+		}
+		
+		if (i > 0) {
+			headerFile << std::endl;
+		}
+
+		// there should be a count, an ID, and a dimension range property for each parent link
+		headerFile << indent << "// variable '" << arrayName << "' info\n";
+		headerFile << indent << "int " << arrayName;
+		headerFile << "PartsCount[" << superPartCount << "]";
+		headerFile << "[" << dimensions << "]" << stmtSeparator; 
+		headerFile << indent << "int " << arrayName << "PartIds[" << superPartCount << "]";
+		headerFile << "[" << dimensions << "]" << stmtSeparator; 
+		headerFile << indent << "int " << arrayName << "PartDims[" << superPartCount << "]";
+		headerFile << "[" << dimensions << "][2]" << stmtSeparator; 
+	}
+	headerFile << " public:\n";
+	headerFile << indent << "void initialize(LPU *lpu)" << stmtSeparator;
+	headerFile << "}" << stmtSeparator; 
+}
+
+void generateSuperLpuConfigStructFn(Space *gpuContextLps, const char *initials, std::ofstream &programFile) {
+	
+	// generate the function signature
+	const char *lpsName = gpuContextLps->getName();
+	programFile << std::endl << "void " << initials << "::Space" << lpsName << "AncestorLpuConfigs";
+	programFile << "::" << "initialize(LPU *lpu) ";
+
+	// generate function body
+	programFile << "{\n\n";
+
+	// first cast the generic LPU to appropriate type
+	programFile << indent << "Space" << lpsName << "_LPU *typedLpu = (Space" << lpsName << "_LPU*)";
+	programFile << " lpu" << stmtSeparator;
+	
+	// process the individual arrays in sequence
+	List<const char*> *accessedArrays = gpuContextLps->getLocallyUsedArrayNames();
+	for (int i = 0; i < accessedArrays->NumElements(); i++) {
+		const char *arrayName = accessedArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure *) gpuContextLps->getLocalStructure(arrayName);
+		int dimensions = array->getDimensionality();
+
+		programFile << std::endl << indent << "// processing variable '" << arrayName << "'\n"; 
+		
+		int currentIndex = 0;
+		DataStructure *parent = array->getSource();	
+		while (!parent->getSpace()->isRoot()) {
+				
+			// iterate over the dimensions
+			for (int j = 0; j < dimensions; j++) {
+				
+				// determine the reference point name for the proper metadata instance
+				std::ostringstream metadata;
+				metadata << "typedLpu->" << arrayName << "PartDims[" << j << "]";
+				for (int k = 0; k <= currentIndex; k++) {
+					if (k == 0) metadata << ".parent";
+					else metadata << "->parent";
+				}
+				
+				// assign properties from the part dimension object to proper fields of the of the 
+				// current object
+				programFile << indent << arrayName << "PartsCount[" << currentIndex << "]";
+				programFile <<  "[" << j << "] = ";
+				programFile << metadata.str() << "->count" << stmtSeparator;
+				programFile << indent << arrayName << "PartIds[" << currentIndex << "]";
+				programFile <<  "[" << j << "] = ";
+				programFile << metadata.str() << "->index" << stmtSeparator;
+				programFile << indent << arrayName << "PartDims[" << currentIndex << "]";
+				programFile <<  "[" << j << "][0] = ";
+				programFile << metadata.str() << "->partition.range.min" << stmtSeparator;
+				programFile << indent << arrayName << "PartDims[" << currentIndex << "]";
+				programFile <<  "[" << j << "][1] = ";
+				programFile << metadata.str() << "->partition.range.max" << stmtSeparator;
+			}
+
+			parent = parent->getSource();
+			currentIndex++;
+		}
+	}
+
+	// close function body
+	programFile << "}\n";
+}
+
+void generateSuperLpuConfigAggregatorStruct(Space *gpuContextLps,
+                PCubeSModel *pcubesModel,
+                std::ofstream &headerFile) {
+
+	// Determine the number of metadata entries the aggregator should have. The default is 1 for normal off-
+        // loading context. If the LPS is subpartitioned then the context is a PPU location sensitive. In other
+        // word, specific LPUs are assigned to specific PPUs and PPU-count number of metadata entries are needed. 
+        int metadataEntryCount = 1;
+        if (gpuContextLps->isSubpartitionSpace()) {
+                int ppsId = gpuContextLps->getPpsId();
+                int gpuPpsId = pcubesModel->getGpuTransitionSpaceId();
+                std::string batchSize;
+                if (ppsId == gpuPpsId) {
+                        metadataEntryCount = 1;
+                } else if (ppsId == gpuPpsId - 1) {
+                        metadataEntryCount = pcubesModel->getSMCount();
+                } else {
+                        metadataEntryCount = pcubesModel->getSMCount() * pcubesModel->getWarpCount();
+                }
+        }
+
+        const char *lpsName = gpuContextLps->getName();
+        headerFile << std::endl;
+        headerFile << "class Space" << lpsName << "AncestorLpuConfigsAggregate {\n";
+        headerFile << "  public:\n";
+        headerFile << indent << "Space" << lpsName << "AncestorLpuConfigs entries[";
+	headerFile << metadataEntryCount << "]" << stmtSeparator;
+        headerFile << "}" << stmtSeparator;
+}
+
 void generateMaxPartSizeMetadataStruct(GpuExecutionContext *gpuContext, std::ofstream &headerFile) {
 	
 	decorator::writeSubsectionHeader(headerFile, gpuContext->getContextName());
@@ -275,6 +407,11 @@ void generateAllLpuMetadataStructs(List<GpuExecutionContext*> *gpuExecutionConte
 		generateMetadataAggregatorStruct(contextLps, pcubesModel, headerFile);
 		generateKernelLaunchMatadataStructFn(contextLps, 
 				pcubesModel, initials, headerFile, programFile);
+
+		// generate host level ancestor LPUs' metadata holder structures and function
+		generateSuperLpuConfigStruct(contextLps, headerFile);
+		generateSuperLpuConfigStructFn(contextLps, initials, programFile);	
+		generateSuperLpuConfigAggregatorStruct(contextLps, pcubesModel, headerFile);
 	}
 
 	headerFile.close();
@@ -618,7 +755,14 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	headerFile << indent << initials << "::ThreadLocals " << "*threadLocalsHost";
 	headerFile << paramSeparator << "*threadLocalsGpu" << stmtSeparator;
 
-	// define the constructor and three functions a context specific code executor should give implementation for
+	// finally, a GPU code executor should maintain a context specific metadata structure instance to propagate
+	// host level LPU configuration information during kernel invocations; ancestor LPU metadata is needed for 
+	// proper array index transformations
+	const char *contextLpsName = gpuContext->getContextLps()->getName();
+	headerFile << indent << initials << "::Space" << contextLpsName << "AncestorLpuConfigsAggregate ";
+	headerFile << "hostLpuConfigs" << stmtSeparator; 
+
+	// define the constructor and four functions a context specific code executor should give implementation for
 	headerFile << "  public:\n";
 	headerFile << indent << className << "(LpuBatchController *lpuBatchController";
 	headerFile << paramSeparator << paramIndent << initials << "::ArrayMetadata arrayMetadata";
@@ -629,6 +773,8 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	headerFile << indent << "void offloadFunction()" << stmtSeparator;
 	headerFile << indent << "void initialize()" << stmtSeparator;
 	headerFile << indent << "void cleanup()" << stmtSeparator;
+	headerFile << indent << "void extractAncestorLpuConfigs(LPU *lpu" << paramSeparator;
+	headerFile << "int ppuGroupIndex)" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
 
 	// Invoke an auxiliary function to generate all kernels releted to this execution context that will be needed
@@ -641,6 +787,7 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	generateGpuCodeExecutorInitializer(gpuContext, initials, programFile);
 	generateGpuCodeExecutorOffloadFn(gpuContext,  pcubesModel, initials, programFile);
 	generateGpuCodeExecutorCleanupFn(gpuContext, initials, programFile);
+	generateGpuCodeExecutorAncestorLpuExtractFn(gpuContext, initials, programFile);
 }
 
 void generateGpuCodeExecutors(List<GpuExecutionContext*> *gpuExecutionContextList,
@@ -844,6 +991,25 @@ void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext,
 	programFile << "}\n"; 
 }
 
+void generateGpuCodeExecutorAncestorLpuExtractFn(GpuExecutionContext *gpuContext,
+                const char *initials, std::ofstream &programFile) {
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "CodeExecutor";
+	std::string className = classNameStr.str();
+
+	Space *contextLps = gpuContext->getContextLps();
+	const char *lpsName = contextLps->getName();
+	
+	programFile << std::endl;
+	programFile << "void " << initials << "::" << className; 
+	programFile << "::extractAncestorLpuConfigs(LPU *lpu" << paramSeparator;
+	programFile << "int ppuGroupIndex) {\n";
+	programFile << indent << "hostLpuConfigs.entries[ppuGroupIndex].initialize(lpu)";
+	programFile << stmtSeparator;
+	programFile << "}\n";
+}
+
 void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
                 GpuExecutionContext *gpuContext,
                 PCubeSModel *pcubesModel,
@@ -863,6 +1029,9 @@ void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
 	const char *lpsName = contextLps->getName();
 	programFile << paramIndent << initials << "::Space" << lpsName << "GpuAggregateMetadata "; 
 	programFile << "launchMetadata";
+	// then add another parameter for host level LPUs metadata
+	programFile << paramSeparator << paramIndent << initials << "::";
+	programFile << "Space" << lpsName << "AncestorLpuConfigsAggregate hostLpuConfigs";
 	// then add another parameter for the maximum sizes of data parts for different variables used in the kernels
 	programFile << paramSeparator << paramIndent << initials << "::";
 	programFile << gpuContext->getContextName() << "MaxPartSizes maxPartSizes";

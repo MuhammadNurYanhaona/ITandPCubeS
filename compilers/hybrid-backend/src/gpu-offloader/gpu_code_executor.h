@@ -88,6 +88,15 @@ class GpuCodeExecutor {
 	// subclasses should provide implementation for this function should that invokes the proper sequence of GPU kernels 
 	// to perform the compute stages relevant to the current context 
 	virtual void offloadFunction() = 0;
+
+	// To support transformation and re-transformation of an array's indices if index reordering partition functions have 
+	// been used to create the data parts, metadata information about the entire part hierarchy is needed. In other words
+	// host level LPU metadata is needed to process their descendant GPU LPUs. (Fortunately, the host level LPU is fixed
+	// for all LPUs intended for a PPU Group in a particular batch because of the way we traverse the LPU hierarchy.) This
+	// interface has been provided so that sub-classes can extract metadata from LPUs and pass that metadata to the GPU as
+	// an additional kernel launch argument. Note that no corresponding LPU configuration metadata property is provided in
+	// the class as the type of the metadata depends on the specific GPU-code-executor subclass.  
+	virtual void extractAncestorLpuConfigs(LPU *lpu, int ppuGroupIndex) = 0;
   private:
 	// this function implements the batch execution logic
 	void execute();

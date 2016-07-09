@@ -150,6 +150,7 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 			GpuExecutionContext *gpuContext = gpuContextList->Nth(i);
 			// generate the GPU kernel configurations for each execution context at the same time
 			gpuContext->generateKernelConfigs(pcubesModel);
+			gpuContext->describe(1);
 			gpuContextMap->Enter(gpuContext->getContextName(), gpuContext);
 		}
  		GpuExecutionContext::gpuContextMap = gpuContextMap;
@@ -235,7 +236,7 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	generateAllDataExchangeFns(headerFile, programFile, taskDef, commCharacterList);
 	if (communicatorCount > 0) {
 		generateAllCommunicators(headerFile, 
-				programFile, taskDef, commCharacterList);
+				programFile, taskDef, commCharacterList, hybridMapping);
 		generateCommunicatorMapFn(headerFile, 
 				programFile, taskDef, commCharacterList);
 		generateCommunicationExcludeFn(headerFile, 

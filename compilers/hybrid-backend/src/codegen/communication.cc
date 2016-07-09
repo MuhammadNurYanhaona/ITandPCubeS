@@ -475,7 +475,8 @@ void generateAllDataExchangeFns(const char *headerFileName,
 void generateScalarCommmunicatorFn(std::ofstream &headerFile,
                 std::ofstream &programFile,
                 const char *initials,
-                Space *rootLps, CommunicationCharacteristics *commCharacter) {
+                Space *rootLps, CommunicationCharacteristics *commCharacter, 
+		bool batchExecutionMode) {
 	
 	const char *dependencyName = commCharacter->getSyncRequirement()->getDependencyArc()->getArcName();
 	
@@ -535,7 +536,17 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 	}
 	fnBody << paramSeparator << '\n' << indent << doubleIndent;
 	fnBody << '"' << dependencyName <<  '"' << paramSeparator;
-	fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
+	
+	// Currently in the batch execution mode, which is applicable for hybrid CPU + GPU mapping of the task, the host code is
+	// single-threaded further the dispatcher that offloads LPUs to GPU is also single threaded. Thus the number of threads 
+	// that	will need to report to the communicator before a communication can begin is either 1 or 0.
+	if (batchExecutionMode) {
+		fnBody << '\n' << tripleIndent << "(localSenderPpus > 0) ? 1 : 0" << paramSeparator;
+		fnBody << '\n' << tripleIndent << "(localReceiverPpus > 0) ? 1 : 0" << paramSeparator;
+	} else {
+		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
+	}
+
 	fnBody << "dataSize)" << stmtSeparator;
 
 	// check if the allocation was successful and set up the data buffer reference in the communicator for the scalar
@@ -554,7 +565,8 @@ void generateScalarCommmunicatorFn(std::ofstream &headerFile,
 void generateArrayCommmunicatorFn(std::ofstream &headerFile,
                 std::ofstream &programFile,
                 const char *initials,
-                Space *rootLps, CommunicationCharacteristics *commCharacter) {
+                Space *rootLps, CommunicationCharacteristics *commCharacter, 
+		bool batchExecutionMode) {
 	
 	const char *dependencyName = commCharacter->getSyncRequirement()->getDependencyArc()->getArcName();
 	const char *varName = commCharacter->getVarName();
@@ -712,7 +724,17 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	}
 	fnBody << paramSeparator << '\n' << indent << doubleIndent;
 	fnBody << '"' << dependencyName << '"' << paramSeparator;
-	fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
+
+	// Currently in the batch execution mode, which is applicable for hybrid CPU + GPU mapping of the task, the host code is
+	// single-threaded further the dispatcher that offloads LPUs to GPU is also single threaded. Thus the number of threads 
+	// that	will need to report to the communicator before a communication can begin is either 1 or 0.
+	if (batchExecutionMode) {
+		fnBody << '\n' << tripleIndent << "(localSenderPpus > 0) ? 1 : 0" << paramSeparator;
+		fnBody << '\n' << tripleIndent << "(localReceiverPpus > 0) ? 1 : 0" << paramSeparator;
+	} else {
+		fnBody << "localSenderPpus" << paramSeparator << "localReceiverPpus" << paramSeparator;
+	}
+
 	fnBody << "bufferList)" << stmtSeparator;
 	fnBody << indent << "Assert(communicator != NULL)" << stmtSeparator;
 	fnBody << indent << "communicator->setParticipants(participantTags)" << stmtSeparator;
@@ -729,8 +751,9 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 void generateAllCommunicators(const char *headerFileName,
                 const char *programFileName,
                 TaskDef *taskDef,
-                List<CommunicationCharacteristics*> *commCharacterList) {
-	
+                List<CommunicationCharacteristics*> *commCharacterList, 
+		bool batchExecutionMode) {
+
 	std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
@@ -760,10 +783,12 @@ void generateAllCommunicators(const char *headerFileName,
 		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
 		if (array == NULL) {
 			generateScalarCommmunicatorFn(headerFile, 
-					programFile, initials, rootLps, commCharacter);
+					programFile, initials, rootLps, commCharacter, 
+					batchExecutionMode);
 		} else {
 			generateArrayCommmunicatorFn(headerFile, 
-					programFile, initials, rootLps, commCharacter);
+					programFile, initials, rootLps, commCharacter, 
+					batchExecutionMode);
 		}	
 	}
 
