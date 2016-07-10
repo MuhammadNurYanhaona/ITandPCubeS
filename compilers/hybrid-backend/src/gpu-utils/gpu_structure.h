@@ -22,4 +22,21 @@ class GpuDimension {
 	__device__ int getLength() { return range.max - range.min + 1; }	
 }; 
 
+// This class holds hierarchical partition information for an array dimension. This structure is mainly
+// needed for index transformation of arrays that have been partitioned using some index reordering
+// partition function.
+class GpuDimPartConfig {
+  public:
+	int count;
+	int index;
+	GpuRange range;
+	GpuDimPartConfig *parent;
+  public:
+	__device__ bool isIncluded(int index);
+	__device__ int adjustIndex(int index);
+	__device__ int normalizeIndex(int index);
+	__device__ int safeNormalizeIndex(int index, bool matchToMin);
+	
+};
+
 #endif

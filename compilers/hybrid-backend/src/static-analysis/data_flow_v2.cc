@@ -804,6 +804,7 @@ void ExecutionStage::setLpsExecutionFlags() {
 
 void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,        
 		int indentation,
+		Space *gpuContextLps,
 		Space *containerSpace,
 		List<const char*> *accessedArrays,
 		int topmostGpuPps) {
@@ -814,6 +815,12 @@ void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
 
 	decorator::writeCommentHeader(indentation, &stream, "translation of an execution stage start");
 	stream << std::endl;
+
+	// in case the current execution stage accesses some arrays whose indices have been reordered by some index
+	// reordering partition function, create dimension partition metadata objects to switch between the storage
+	// and transformed indices.
+	generateReorderedArrayIndexMetadata(stream, indentation, 
+			gpuContextLps, containerSpace->getParent(), topmostGpuPps);
 
 	// A compute stage may be executing in an LPS that has been mapped to either the GPU, SM, or WARP PPS level.
 	// For the former two mapping, we need to restrict what PPU can execute the current stage.
@@ -847,4 +854,217 @@ void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
 	
 	stream << std::endl;
 	decorator::writeCommentHeader(indentation, &stream, "translation done");
+}
+
+void ExecutionStage::generateReorderedArrayIndexMetadata(std::ofstream &stream,
+		int indentation,
+		Space *gpuContextLps,
+		Space *containerSpace,
+		int topmostGpuPps) {
+
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentation; i++) indentStr << indent;
+	const char *lpsName = space->getName();
+	
+	// determine the arrays used in this stage whose one or more dimensions have been reordered
+	Space *rootLps = space->getRoot();
+	List<const char*> *reorderedArrays = new List<const char*>;
+	VariableAccess *varAccess = NULL;
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+	while ((varAccess = iterator.GetNextValue()) != NULL) {
+		if (!varAccess->isContentAccessed()) continue;
+		const char *varName = varAccess->getName();
+		DataStructure *structure = space->getStructure(varName);
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array == NULL) continue;
+		if (array->isReordered(rootLps)) {
+			reorderedArrays->Append(varName);
+		}
+	}
+
+	// determine how many independent instances of metadata should be needed based on the LPS to PPS mapping
+	int myPps = space->getPpsId();
+        bool warpLevel = (topmostGpuPps - myPps == 2);
+	std::string metadataSuffix = std::string("");
+	std::string metadataIndex = std::string("");
+	if (warpLevel) {
+		metadataSuffix = std::string("[WARP_COUNT]");
+		metadataIndex = std::string("[warpId]");
+	}
+	int containerPps = containerSpace->getPpsId();
+	bool warpLevelCount = (topmostGpuPps - containerPps == 2);
+
+	// investigate the reordered arrays one by one to generate metadata for each
+	for (int i = 0; i < reorderedArrays->NumElements(); i++) {
+		
+		const char *arrayName = reorderedArrays->Nth(i);
+		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(arrayName);
+		int dimensions = array->getDimensionality();
+
+		// determine the number of times the array has been partitioned
+		int partCount = 1;
+                DataStructure *parent = array->getSource();
+                while (!parent->getSpace()->isRoot()) {
+                        partCount++;
+                        parent = parent->getSource();
+                }
+		
+		// generate metadata for each reordered dimension separately; note that dimension index starts 
+		// from 1 -- not from 0
+		for (int j = 0; j < dimensions; j++) {
+			if (!array->isDimensionReordered(j + 1, rootLps)) continue;
+
+			// declare the dimension configuration metadata variable(s)
+			std::ostringstream metadataVarName;
+			metadataVarName << arrayName << "Dim" << j << "PartConfig" << metadataSuffix;
+			stream << indentStr.str() << "__shared__ GpuDimPartConfig ";
+			stream << metadataVarName.str() << "[" << partCount << "]" << stmtSeparator; 
+
+			// assign one thread the responsibility of generating the part configuration depending 
+			// on the LPS mapping
+			if (warpLevel) {
+				stream << indentStr.str() << "if (threadId == 0) {\n";
+			} else {
+				stream << indentStr.str() << "if (warpId == 0 && threadId == 0) {\n";
+			}
+
+			// first set the parent pointers of the configuration object properly
+			stream << indentStr.str() << indent << "// setting up parent links\n";
+			std::ostringstream metadataItemName;
+			metadataItemName << arrayName << "Dim" << j << "PartConfig" << metadataIndex;
+			for (int k = 0; k < partCount - 1; k++) {
+				stream << indentStr.str() << indent << metadataItemName.str();
+				stream << "[" << k << "].parent = &" << metadataItemName.str();
+				stream << '[' << k + 1 << ']' << stmtSeparator;
+			}
+			
+			// then copy dimension information from the current LPS partition
+			stream << indentStr.str() << indent << "// setting up part dimension for current LPS\n";
+			if (!array->isPartitionedAlongDimension(j + 1)) {
+				stream << indentStr.str() << indent;
+				stream << metadataItemName.str() << "[0].count = 1" << stmtSeparator;   
+				stream << indentStr.str() << indent;
+				stream << metadataItemName.str() << "[0].index = 0" << stmtSeparator;
+			} else {
+				int alignedCoordDim = space->getAlignmentDimensionForArray(j, arrayName);
+				stream << indentStr.str() << indent;
+				stream << metadataItemName.str() << "[0].count = space" << lpsName;
+				stream << "LpuCount";
+				if (warpLevelCount) stream << metadataIndex;
+				stream << "[" << alignedCoordDim << "]" << stmtSeparator; 
+				stream << indentStr.str() << indent;
+				stream << metadataItemName.str() << "[0].index = space" << lpsName;
+				stream << "LpuId" << metadataIndex;
+				stream << "[" << alignedCoordDim << "]" << stmtSeparator; 
+			}
+			stream << indentStr.str() << indent;
+			stream << metadataItemName.str() << "[0].range = " << arrayName << "Space";
+			stream << lpsName << "PRanges" << metadataIndex << "[" << j << "]";
+			stream << ".range" << stmtSeparator;
+
+			// now ancestor LPU traversal will start; so maintain an index for tracking what ancestor
+			// is under investigation at this moment
+			int parentIndex = 1;
+			ArrayDataStructure *sourceArray = (ArrayDataStructure *) array->getSource();
+			Space *currentLps = sourceArray->getSpace();
+
+			// first copy dimension information for all ancestor parts that are generated inside the
+			// GPU kernel
+			if (currentLps->isParentSpace(gpuContextLps) || currentLps == gpuContextLps) {
+				
+				stream << indentStr.str() << indent;
+				stream << "// setting up part dimension for ancestor GPU LPUs\n";
+				
+				while (currentLps->isParentSpace(gpuContextLps) 
+						|| currentLps == gpuContextLps) {
+			
+					const char *parentLpsName = currentLps->getName();	
+					int parentPps = currentLps->getPpsId();
+					int grandParentPps = currentLps->getParent()->getPpsId();
+					bool parentAtWarpLevel = (topmostGpuPps - parentPps) == 2;
+					bool grandParentAtWarpLevel = (topmostGpuPps - grandParentPps) == 2;
+
+					if (!sourceArray->isPartitionedAlongDimension(j + 1)) {
+						stream << indentStr.str() << indent;
+						stream << metadataItemName.str() << "[";
+						stream << parentIndex << "].count = 1";
+						stream << stmtSeparator << indentStr.str() << indent;
+						stream << metadataItemName.str() << "[";
+						stream << parentIndex << "].index = 0";
+						stream << stmtSeparator;
+					} else {
+						int alignedCoordDim = currentLps->getAlignmentDimensionForArray(
+								j, arrayName);
+						stream << indentStr.str() << indent;
+						stream << metadataItemName.str() << "[";
+						stream << parentIndex << "].count = space";
+						stream << parentLpsName << "LpuCount";
+						if (grandParentAtWarpLevel) stream << metadataIndex;
+						stream << "[" << alignedCoordDim << "]" << stmtSeparator;
+	 
+						stream << indentStr.str() << indent;
+						stream << metadataItemName.str() << "[";
+						stream << parentIndex << "].index = space";
+						stream << parentLpsName << "LpuId";
+						if (parentAtWarpLevel) stream << metadataIndex;
+						stream << "[" << alignedCoordDim << "]" << stmtSeparator; 
+					}
+					stream << indentStr.str() << indent;
+					stream << metadataItemName.str() << "[" << parentIndex << "].range = ";
+					stream << arrayName << "Space" << parentLpsName << "PRanges"; 
+					if (parentAtWarpLevel) stream << metadataIndex;
+					stream << "[" << j << "]" << ".range" << stmtSeparator;
+									
+					sourceArray = (ArrayDataStructure*) sourceArray->getSource();
+					currentLps = sourceArray->getSpace();
+					parentIndex++;	
+				}
+			} 
+
+			// then copy part dimension information for the host level ancestor LPUs
+			if (!currentLps->isRoot()) {
+				stream << indentStr.str() << indent;
+				stream << "// setting up part dimension for ancestor Host LPUs\n";
+			}
+
+			// determine the metadata instance that has all ancestor host level LPUs' configuration
+			std::ostringstream hostRef;
+			hostRef << "hostLpuConfigs.entries";
+			if (gpuContextLps->isSubpartitionSpace()) {
+				hostRef << "[0]";
+			} else if (topmostGpuPps - gpuContextLps->getPpsId() == 2) {
+				hostRef << "[globalWarpId]";
+			} else {
+				hostRef << "[smId]";
+			}
+			hostRef << "." << arrayName;
+
+			// iterate over the host LPSes as done for the intra-GPU LPSes and copy information in order  
+			int accessIndex = 0;
+			while (!currentLps->isRoot()) {
+			
+				stream << indentStr.str() << indent << metadataItemName.str();
+				stream << "[" << parentIndex << "].count = " << hostRef.str();
+				stream << "PartsCount[" << accessIndex << "][" << j << "]" << stmtSeparator; 
+				stream << indentStr.str() << indent << metadataItemName.str();
+				stream << "[" << parentIndex << "].index = " << hostRef.str();
+				stream << "PartIds[" << accessIndex << "][" << j << "]" << stmtSeparator; 
+				stream << indentStr.str() << indent << metadataItemName.str();
+				stream << "[" << parentIndex << "].range.min = " << hostRef.str();
+				stream << "PartDims[" << accessIndex << "][" << j << "][0]" << stmtSeparator; 
+				stream << indentStr.str() << indent << metadataItemName.str();
+				stream << "[" << parentIndex << "].range.max = " << hostRef.str();
+				stream << "PartDims[" << accessIndex << "][" << j << "][1]" << stmtSeparator; 
+
+				sourceArray = (ArrayDataStructure*) sourceArray->getSource();
+				currentLps = sourceArray->getSpace();
+				parentIndex++;
+				accessIndex++;	
+			}
+
+			// close the if block doing the calculation
+			stream << indentStr.str() << "}\n";
+		
+		}
+	}
 }

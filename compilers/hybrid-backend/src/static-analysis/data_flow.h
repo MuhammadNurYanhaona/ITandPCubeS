@@ -176,6 +176,7 @@ class FlowStage {
 	// mapped to the GPU
 	virtual void generateGpuKernelCode(std::ofstream &stream, 
 			int indentation, 
+			Space *gpuContextLps,
 			Space *containerSpace, 	
 			List<const char*> *accessedArrays,
 			int topmostGpuPps) {}
@@ -298,16 +299,32 @@ class ExecutionStage : public FlowStage {
 	void flagVectorizableLoops() { code->flagInnermostParallelForLoops(); }
 	void print(int indent);
 
-	// helper method for generating back-end code
+	//----------------------------------------------------------------helper methods for generating back-end code
 	void translateCode(std::ofstream &stream);
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	bool isGroupEntry();
 	void setLpsExecutionFlags();
 	void generateGpuKernelCode(std::ofstream &stream, 
 			int indentation, 
+			Space *gpuContextLps,
 			Space *containerSpace, 	
 			List<const char*> *accessedArrays,
 			int topmostGpuPps);
+	
+	// If index reordering partition functions have been used for some array then retrieving the storage index 
+	// for a partition index and vice versa requires recursive transformation of the index based on the partition
+	// function. The recursive transformation process needs the part count, current part's ID, and part dimension
+	// range information at different levels of the partition hierarchy. In the host level code, this information 
+	// is avaiable in the LPU as a part-dimension object per dimension per data part. For GPU kernel's, however, 
+	// an equivalent metadata structure needs to be constructed from information about host level ancestor LPUs
+	// passed as an argument to the kernel, and information generated within the kernel during intra-kernel LPU
+	// expansion. This function does the metadata construction for reordered dimensions of arrays that have been
+	// used inside an execution stage.  
+	void generateReorderedArrayIndexMetadata(std::ofstream &stream,
+                        int indentation,
+			Space *gpuContextLps,
+                        Space *containerSpace,
+                        int topmostGpuPps);
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 
@@ -412,6 +429,7 @@ class CompositeStage : public FlowStage {
 	// override the GPU kernel generation method inherited from the Flow-Stage class
 	virtual void generateGpuKernelCode(std::ofstream &stream, 
 			int indentation, 
+			Space *gpuContextLps,
 			Space *containerSpace, 
 			List<const char*> *accessedArrays, 
 			int topmostGpuPps);

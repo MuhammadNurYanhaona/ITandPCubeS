@@ -483,7 +483,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
         programFile << std::endl;
 
 	/**************************************************************************************************************
-			declare shared metadata structures for LPU part dimensions tracking
+			declare local and shared metadata structures for LPU part dimensions tracking
 	***************************************************************************************************************/
 	
 	// if the GPU context LPS is above the warp level then there will be one structure per variable, otherwise
@@ -498,6 +498,12 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << arrayName << "Space" << contextLpsName << "PRanges";
 		programFile << storageSuffix << "[" << dimensions << "]" << stmtSeparator;
 	}
+	programFile << std::endl;
+
+	// declare a tracker object for storing hierarchical array dimension partition information during index
+	// transformation of arrays using index reordering partition function 
+	programFile << indent << "// index transformation helper variable\n";
+	programFile << indent << "GpuDimPartConfig partConfig" << stmtSeparator;
 	programFile << std::endl;
 
 	/**************************************************************************************************************
@@ -712,7 +718,8 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	List<FlowStage*> *kernelStages = kernelDef->getStageList();
 	for (int i = 0; i < kernelStages->NumElements(); i++) {
 		FlowStage *stage = kernelStages->Nth(i);
-		stage->generateGpuKernelCode(programFile, 2, contextLps, accessedArrays, gpuPpsLevel);
+		stage->generateGpuKernelCode(programFile, 2, 
+				contextLps, contextLps, accessedArrays, gpuPpsLevel);
 	}
 
 	/**************************************************************************************************************

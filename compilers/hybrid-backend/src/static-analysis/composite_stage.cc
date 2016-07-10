@@ -836,7 +836,8 @@ void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream,
 }
 
 void CompositeStage::generateGpuKernelCode(std::ofstream &stream, 
-		int indentLevel, 
+		int indentLevel,
+		Space *gpuContextLps, 
 		Space *containerSpace, 
 		List<const char*> *accessedArrays, 
 		int topmostGpuPps) {
@@ -977,8 +978,8 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		if (syncStage != NULL) continue;
 
 		int nextIndentLevel = (containerSpace != space) ? indentLevel + 1 : indentLevel;
-		stage->generateGpuKernelCode(stream, 
-				nextIndentLevel, space, accessedArrays, topmostGpuPps); 
+		stage->generateGpuKernelCode(stream, nextIndentLevel, 
+				gpuContextLps, space, accessedArrays, topmostGpuPps); 
 	}
 	
 	if (containerSpace != space) {

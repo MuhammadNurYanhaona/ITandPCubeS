@@ -660,6 +660,18 @@ Symbol *Space::getLpuIdSymbol() {
 	return symbol;	
 }
 
+int Space::getAlignmentDimensionForArray(int arrayDimension, const char *arrayName) {
+	ArrayDataStructure *array = (ArrayDataStructure*) getLocalStructure(arrayName);
+	for (int k = 0; k < dimensions; k++) {
+		Coordinate *coordinate = coordSys->getCoordinate(k + 1);
+		Token *token = coordinate->getTokenForDataStructure(arrayName);
+		if (token != NULL && token->getDimensionId() == arrayDimension + 1) {
+			return k;
+		}
+	}
+	return arrayDimension;
+}
+
 bool Space::allocateStructures() {
 	Iterator<DataStructure*> iter = dataStructureList->GetIterator();
 	DataStructure *structure;

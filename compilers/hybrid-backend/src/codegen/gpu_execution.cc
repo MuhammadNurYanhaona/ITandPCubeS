@@ -221,9 +221,14 @@ void generateSuperLpuConfigStruct(Space *gpuContextLps, std::ofstream &headerFil
 		ArrayDataStructure *array = (ArrayDataStructure *) gpuContextLps->getLocalStructure(arrayName);
 		int dimensions = array->getDimensionality();
 	
-		// determine how many host level super parts are there for this array
+		// Determine how many host level super parts are there for this array; notice the special case for
+		// subpartition where the array may be defined in the original LPS but not subpartitioned. In that
+		// case the GPU is directly operating on parent LPS's LPU.
 		int superPartCount = 0;
-		DataStructure *parent = array->getSource();	
+		DataStructure *parent = NULL;
+		if (array->getSpace() != gpuContextLps) parent = array;
+		else parent = array->getSource();
+			
 		while (!parent->getSpace()->isRoot()) {
 			superPartCount++;
 			parent = parent->getSource();
@@ -272,7 +277,17 @@ void generateSuperLpuConfigStructFn(Space *gpuContextLps, const char *initials, 
 		programFile << std::endl << indent << "// processing variable '" << arrayName << "'\n"; 
 		
 		int currentIndex = 0;
-		DataStructure *parent = array->getSource();	
+		
+		// Determine how many host level super parts are there for this array; notice the special case for
+		// subpartition where the array may be defined in the original LPS but not subpartitioned. In that
+		// case the GPU is directly operating on parent LPS's LPU.
+		DataStructure *parent = NULL;
+		if (array->getSpace() != gpuContextLps) {
+			parent = array;
+			currentIndex = -1;
+		}
+		else parent = array->getSource();
+
 		while (!parent->getSpace()->isRoot()) {
 				
 			// iterate over the dimensions
@@ -280,10 +295,9 @@ void generateSuperLpuConfigStructFn(Space *gpuContextLps, const char *initials, 
 				
 				// determine the reference point name for the proper metadata instance
 				std::ostringstream metadata;
-				metadata << "typedLpu->" << arrayName << "PartDims[" << j << "]";
+				metadata << "(&typedLpu->" << arrayName << "PartDims[" << j << "])";
 				for (int k = 0; k <= currentIndex; k++) {
-					if (k == 0) metadata << ".parent";
-					else metadata << "->parent";
+					metadata << "->parent";
 				}
 				
 				// assign properties from the part dimension object to proper fields of the of the 

@@ -289,7 +289,7 @@ class Token {
 		this->dimensionId = dimensionId; 
 	}
 	bool isWildcard() { return dimensionId == wildcardTokenId; }
-	DataStructure *getData() {return data; }
+	DataStructure *getData() { return data; }
 	int getDimensionId() { return dimensionId; }
 };
 
@@ -386,6 +386,10 @@ class Space {
 	int getSegmentedPPS() { return segmentedPPS; }
 	void flagToExecuteCode() { executesCode = true; }
 	bool doesExecuteCode() { return executesCode; }
+
+	// given an array dimension, this function returns the coordinate dimension the array dimension has been
+	// aligned to
+	int getAlignmentDimensionForArray(int arrayDimension, const char *arrayName);
 
 	//---------------------------------------------------------------------- Host code generation helper routines
 	
