@@ -109,6 +109,17 @@ const char *NameTransformer::getArrayIndexStorageSuffix(const char *arrayName,
 	return strdup(indexSuffix.str().c_str());
 }
 
+const char *NameTransformer::getPartConfigReference(const char *arrayName, int dimensionNo) {
+	
+	std::ostringstream reference;
+	reference << "(&" << lpuPrefix << arrayName;
+
+	// dimension numbering starts from 1
+	reference << "PartDims[" << dimensionNo - 1 << "])";
+
+	return strdup(reference.str().c_str());
+}
+
 void NameTransformer::initializePropertyLists(TaskDef *taskDef) {
 	
 	List<TaskGlobalScalar*> *scalarList = TaskGlobalCalculator::calculateTaskGlobals(taskDef);
@@ -196,7 +207,23 @@ const char *HybridNameTransformer::getArrayIndexStorageSuffix(const char *arrayN
 	}
 
 	return strdup(indexSuffix.str().c_str());
-		
+}
+
+const char *HybridNameTransformer::getPartConfigReference(const char *arrayName, int dimensionNo) {
+
+	if (!gpuMode) {
+		return NameTransformer::getPartConfigReference(arrayName, dimensionNo);
+	}
+
+	std::ostringstream reference;
+	reference << "(&" << arrayName << "Dim" << dimensionNo - 1;
+	reference << "PartConfig";
+	if (applyWarpSuffix) {
+		reference << "[warpId]";
+	}
+	reference << "[0])";	
+
+	return strdup(reference.str().c_str());
 }
 
 //--------------------------------------------------- Transformer Setup Utility -------------------------------------------------/

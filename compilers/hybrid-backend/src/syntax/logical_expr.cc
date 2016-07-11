@@ -453,7 +453,7 @@ bool LogicalExpr::transformIndexRestriction(std::ostringstream &stream,
         ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
         std::string lpuPrefix = transformer->getLpuPrefix();
         std::ostringstream partConfigVar;
-        partConfigVar << "(&" << lpuPrefix << arrayName << "PartDims[" << dimensionNo - 1 << "])";
+        partConfigVar << transformer->getPartConfigReference(arrayName, dimensionNo);
 
         // get the Root Space reference to aid in determining the extend of reordering later
         Space *rootSpace = space->getRoot();

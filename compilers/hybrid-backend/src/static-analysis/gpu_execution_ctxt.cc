@@ -505,6 +505,11 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	programFile << indent << "// index transformation helper variable\n";
 	programFile << indent << "GpuDimPartConfig partConfig" << stmtSeparator;
 	programFile << std::endl;
+	
+	// declare an integer to hold intermediate values of a reordered index during the transformation process 
+	programFile << indent << "// create a local transformed index variable for later use\n";
+        programFile << indent << "int xformIndex" << stmtSeparator;
+	programFile << std::endl;
 
 	/**************************************************************************************************************
 				distribute the top level LPUs staged-in from the host

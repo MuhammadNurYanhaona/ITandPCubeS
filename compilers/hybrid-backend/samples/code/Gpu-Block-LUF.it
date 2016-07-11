@@ -103,9 +103,10 @@ Task "Block LU Factorization":
 			}
 			"Saxpy" (Space D) {
 				do {	
-					do { 
-						total = reduce ("sum", u_block[i][m] * l_block[m][j]) 
-					} for m in u_block
+					total = 0.000000
+					do in sequence { 
+						total = total + u_block[i][m] * l_block[m][j]
+					} for m in u_block.dimension2.range
 					u[i][j] = u[i][j] - total
 				} for i, j in u and i > row_range.max and j > row_range.max
 			}

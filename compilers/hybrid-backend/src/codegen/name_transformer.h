@@ -65,6 +65,10 @@ namespace ntransform {
 		virtual const char *getArrayIndexStorageSuffix(const char *arrayName, 
 				int dimensionNo, int dimensionCount, int indentLevel);
 
+		// a part configuration reference is needed when the indices of a reordered dimension of an
+		// array needs be transformed back to actual index and vice versa
+		virtual const char *getPartConfigReference(const char *arrayName, int dimensionNo);
+
 		bool isTaskGlobal(const char *varName);
 		bool isThreadLocal(const char *varName);
 		bool isGlobalArray(const char *varName);
@@ -113,6 +117,7 @@ namespace ntransform {
                                 bool metadata, bool local, Type *type = NULL);
 		const char *getArrayIndexStorageSuffix(const char *arrayName, 
 				int dimensionNo, int dimensionCount, int indentLevel);
+		const char *getPartConfigReference(const char *arrayName, int dimensionNo);
 
 	};
 	

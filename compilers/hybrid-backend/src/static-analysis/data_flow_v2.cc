@@ -816,6 +816,14 @@ void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
 	decorator::writeCommentHeader(indentation, &stream, "translation of an execution stage start");
 	stream << std::endl;
 
+	// declare any local variables found in the computation 
+        std::ostringstream localVars;
+        scope->declareVariables(localVars, indentation);
+        if (localVars.str().length() > 0) {
+                stream <<  indentStr.str() << "// local variable declarations\n";
+                stream << localVars.str() << std::endl;
+        }
+
 	// in case the current execution stage accesses some arrays whose indices have been reordered by some index
 	// reordering partition function, create dimension partition metadata objects to switch between the storage
 	// and transformed indices.
@@ -840,13 +848,12 @@ void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
         		ntransform::NameTransformer::transformer;
 	transformer->setWarpSuffixStat(warpLevel);
 	transformer->setCurrentLpsName(space->getName());
-
-/*	
+	
 	// do code-block translation
 	std::ostringstream codeStream;
 	code->generateCode(codeStream, innerIndent, space);
 	stream << codeStream.str();
-*/
+
 	// close the PPU filtering if block when applicable
 	if (!warpLevel) {
 		stream << indentStr.str() << "}\n";
@@ -881,6 +888,10 @@ void ExecutionStage::generateReorderedArrayIndexMetadata(std::ofstream &stream,
 			reorderedArrays->Append(varName);
 		}
 	}
+
+	if (reorderedArrays->NumElements() == 0) return;
+
+	stream << indentStr.str() << "// generating part dimension configs for reordered array dimensions\n";
 
 	// determine how many independent instances of metadata should be needed based on the LPS to PPS mapping
 	int myPps = space->getPpsId();
@@ -1064,7 +1075,7 @@ void ExecutionStage::generateReorderedArrayIndexMetadata(std::ofstream &stream,
 
 			// close the if block doing the calculation
 			stream << indentStr.str() << "}\n";
-		
 		}
 	}
+	stream << std::endl;
 }

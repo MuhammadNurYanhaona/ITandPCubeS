@@ -309,7 +309,7 @@ void RangeExpr::translateArrayRangeExprCheck(std::ostringstream &exprStream, int
 	int dimensionNo = getDimensionForRange(space);
 
 	std::ostringstream partConfigVar;
-	partConfigVar << "(&" << lpuPrefix << arrayName << "PartDims[" << dimensionNo - 1 << "])";
+	partConfigVar << transformer->getPartConfigReference(arrayName, dimensionNo);	
 
 	// get the Root Space reference to aid in determining the extend of reordering later
 	Space *rootSpace = space->getRoot();
@@ -432,7 +432,7 @@ void RangeExpr::generateAssignmentExprForXformedIndex(std::ostringstream &stream
 	// get the prefix that is common to reach any part-dimension object that will be used during reverse
 	// transformation of transformed index
 	std::ostringstream partConfigVar;
-	partConfigVar << "(&" << lpuPrefix << arrayName << "PartDims[" << dimensionNo - 1 << "])";
+	partConfigVar << transformer->getPartConfigReference(arrayName, dimensionNo);	
 
 	// get the Root Space reference to aid in determining the extend of reordering later
 	Space *rootSpace = space->getRoot();
