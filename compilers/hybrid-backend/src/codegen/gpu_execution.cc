@@ -278,9 +278,9 @@ void generateSuperLpuConfigStructFn(Space *gpuContextLps, const char *initials, 
 		
 		int currentIndex = 0;
 		
-		// Determine how many host level super parts are there for this array; notice the special case for
-		// subpartition where the array may be defined in the original LPS but not subpartitioned. In that
-		// case the GPU is directly operating on parent LPS's LPU.
+		// traverse the host level super parts for this array; notice the special case for subpartition where 
+		// the array may be defined in the original LPS but not subpartitioned. In that case, the GPU is 
+		// directly operating on parent LPS's LPU.
 		DataStructure *parent = NULL;
 		if (array->getSpace() != gpuContextLps) {
 			parent = array;
@@ -299,19 +299,25 @@ void generateSuperLpuConfigStructFn(Space *gpuContextLps, const char *initials, 
 				for (int k = 0; k <= currentIndex; k++) {
 					metadata << "->parent";
 				}
+
+				// an additional index is needed to take care of the special case of subpartitions
+				int storeIndex = currentIndex;
+				if (currentIndex == -1) {
+					storeIndex = 0;
+				}
 				
 				// assign properties from the part dimension object to proper fields of the of the 
 				// current object
-				programFile << indent << arrayName << "PartsCount[" << currentIndex << "]";
+				programFile << indent << arrayName << "PartsCount[" << storeIndex << "]";
 				programFile <<  "[" << j << "] = ";
 				programFile << metadata.str() << "->count" << stmtSeparator;
-				programFile << indent << arrayName << "PartIds[" << currentIndex << "]";
+				programFile << indent << arrayName << "PartIds[" << storeIndex << "]";
 				programFile <<  "[" << j << "] = ";
 				programFile << metadata.str() << "->index" << stmtSeparator;
-				programFile << indent << arrayName << "PartDims[" << currentIndex << "]";
+				programFile << indent << arrayName << "PartDims[" << storeIndex << "]";
 				programFile <<  "[" << j << "][0] = ";
 				programFile << metadata.str() << "->partition.range.min" << stmtSeparator;
-				programFile << indent << arrayName << "PartDims[" << currentIndex << "]";
+				programFile << indent << arrayName << "PartDims[" << storeIndex << "]";
 				programFile <<  "[" << j << "][1] = ";
 				programFile << metadata.str() << "->partition.range.max" << stmtSeparator;
 			}
