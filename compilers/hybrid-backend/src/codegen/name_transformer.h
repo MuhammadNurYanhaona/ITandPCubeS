@@ -7,6 +7,7 @@
 
 class TaskDef;
 class Type;
+class Space;
 
 namespace ntransform {
 
@@ -106,11 +107,13 @@ namespace ntransform {
 		bool gpuMode;
 		bool applyWarpSuffix;
 		const char *currentLpsName;
+		int gpuPps;
 	  public:
-		HybridNameTransformer();
+		HybridNameTransformer(int gpuPps);
 		void setToGpuMode() { gpuMode = true; }
 		void setToHostMode() { gpuMode = false; }
 		bool isGpuMode() { return gpuMode; }
+		bool isMappedToGpu(Space *lps); 
 		void setWarpSuffixStat(bool stat) { applyWarpSuffix = stat; }
 		void setCurrentLpsName(const char *lpsName) { this->currentLpsName = lpsName; }
 		const char *getTransformedName(const char *varName,
@@ -122,7 +125,7 @@ namespace ntransform {
 	};
 	
 	// function to initialize the name transformer for a task
-	void setTransformer(TaskDef *taskDef, bool needHybridTransformer);
+	void setTransformer(TaskDef *taskDef, int topmostGpuPps, bool needHybridTransformer);
 }
 
 #endif

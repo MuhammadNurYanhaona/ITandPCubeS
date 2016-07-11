@@ -148,10 +148,16 @@ void NameTransformer::initializePropertyLists(TaskDef *taskDef) {
 
 //----------------------------------------------------- Hybrid Name Transformer -------------------------------------------------/
 
-HybridNameTransformer::HybridNameTransformer() : NameTransformer() {
+HybridNameTransformer::HybridNameTransformer(int gpuPps) : NameTransformer() {
 	this->gpuMode = false;
 	this->applyWarpSuffix = false;
 	this->currentLpsName = NULL;
+	this->gpuPps = gpuPps;
+}
+
+bool HybridNameTransformer::isMappedToGpu(Space *lps) {
+	int ppsOfLps = lps->getPpsId();
+	return (ppsOfLps <= gpuPps);
 }
 
 const char *HybridNameTransformer::getTransformedName(const char *varName,
@@ -228,14 +234,14 @@ const char *HybridNameTransformer::getPartConfigReference(const char *arrayName,
 
 //--------------------------------------------------- Transformer Setup Utility -------------------------------------------------/
 
-void ntransform::setTransformer(TaskDef *taskDef,  bool needHybridTransformer) {
+void ntransform::setTransformer(TaskDef *taskDef, int topmostGpuPps, bool needHybridTransformer) {
 	
 	NameTransformer *transformer = NameTransformer::transformer;
 	if (transformer == NULL) {
 		if (needHybridTransformer) {
-			transformer = new HybridNameTransformer;
+			transformer = new HybridNameTransformer(topmostGpuPps);
 		} else {
-			transformer = new NameTransformer;
+			transformer = new NameTransformer();
 		}
 		NameTransformer::transformer = transformer;
 	} else {

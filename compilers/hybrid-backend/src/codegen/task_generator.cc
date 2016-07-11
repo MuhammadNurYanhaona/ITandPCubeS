@@ -254,7 +254,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 
 	// initialize the variable transformation map that would be used to translate the code inside initialize 
 	// and compute blocks
-	ntransform::setTransformer(taskDef, hybridMapping);	
+	ntransform::setTransformer(taskDef, 
+			pcubesModel->getGpuTransitionSpaceId(), hybridMapping);	
 
 	// translate the initialize block of the task into a function
 	generateInitializeFunction(headerFile, programFile, initials, 
