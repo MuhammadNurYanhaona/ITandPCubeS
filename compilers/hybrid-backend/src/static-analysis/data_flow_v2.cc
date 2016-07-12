@@ -1041,7 +1041,7 @@ void ExecutionStage::generateReorderedArrayIndexMetadata(std::ofstream &stream,
 			// determine the metadata instance that has all ancestor host level LPUs' configuration
 			std::ostringstream hostRef;
 			hostRef << "hostLpuConfigs.entries";
-			if (gpuContextLps->isSubpartitionSpace()) {
+			if (!gpuContextLps->isSubpartitionSpace()) {
 				hostRef << "[0]";
 			} else if (topmostGpuPps - gpuContextLps->getPpsId() == 2) {
 				hostRef << "[globalWarpId]";
