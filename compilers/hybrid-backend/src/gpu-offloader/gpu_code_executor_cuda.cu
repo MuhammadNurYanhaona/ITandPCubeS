@@ -47,6 +47,7 @@ void GpuCodeExecutor::execute() {
         endTime = tv.tv_sec * 1000000 + tv.tv_usec;
 	timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
 	offloadStats->addStagingOutTime(timeTaken);
+	offloadStats->increaseExecutionCount();
 
 	resetCurrentBatchLpuRanges();
 }

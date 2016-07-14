@@ -11,6 +11,7 @@ OffloadStats::OffloadStats() {
 	timeSpentStagingIn = 0;
 	timeSpentExecution = 0;
 	timeSpentStagingOut = 0;
+	executionCount = 0;
 }
 
 void OffloadStats::describe(std::ofstream &logFile) {
@@ -20,6 +21,8 @@ void OffloadStats::describe(std::ofstream &logFile) {
 	logFile << timeSpentExecution << " Seconds\n";
 	logFile << "Overall time spent staging data out from GPU to CPU: ";
 	logFile << timeSpentStagingOut << " Seconds\n";
+	logFile << "Number of time the offloading function has been Executed: ";
+	logFile << executionCount << "\n";	
 }
 
 //--------------------------------------------------------- GPU Code Executor -------------------------------------------------------------/

@@ -150,7 +150,6 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 			GpuExecutionContext *gpuContext = gpuContextList->Nth(i);
 			// generate the GPU kernel configurations for each execution context at the same time
 			gpuContext->generateKernelConfigs(pcubesModel);
-			gpuContext->describe(1);
 			gpuContextMap->Enter(gpuContext->getContextName(), gpuContext);
 		}
  		GpuExecutionContext::gpuContextMap = gpuContextMap;

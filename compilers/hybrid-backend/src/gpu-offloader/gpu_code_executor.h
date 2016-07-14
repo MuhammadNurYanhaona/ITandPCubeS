@@ -30,11 +30,13 @@ class OffloadStats {
 	double timeSpentStagingIn;
 	double timeSpentExecution;
 	double timeSpentStagingOut;
+	int executionCount;
   public:
 	OffloadStats();
 	void addStagingInTime(double time) { timeSpentStagingIn += time; }
 	void addExecutionTime(double time) { timeSpentExecution += time; }
 	void addStagingOutTime(double time) { timeSpentStagingOut += time; }
+	void increaseExecutionCount() { executionCount++; }
 	void describe(std::ofstream &logFile);
 };
 
