@@ -1398,7 +1398,7 @@ void CompositeStage::generateSyncCodeForGroupTransitions(std::ofstream &stream, 
 }
 
 List<const char*> *CompositeStage::getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel) {
-	
+
 	List<const char*> *arcNameList = new List<const char*>;
 	List<const char*> *ownList = FlowStage::getAllOutgoingDependencyNamesAtNestingLevel(nestingLevel);
 	if (ownList != NULL) {
@@ -1495,6 +1495,8 @@ void CompositeStage::makeAllLpsTransitionExplicit() {
 			// LPS crossing stages (a function used for host code generation) for this. Chek that method
 			// before implementing any new logic here. 
 			CompositeStage *nextContainerStage = new CompositeStage(0, nextLevelLps, NULL);
+			StageSyncReqs *syncReqs = new StageSyncReqs(nextContainerStage);
+			nextContainerStage->synchronizationReqs = syncReqs;
 			nextContainerStage->addStageAtEnd(stage);
 			stageList->RemoveAt(i);
 			stageList->InsertAt(nextContainerStage, i);
@@ -1509,6 +1511,8 @@ void CompositeStage::makeAllLpsTransitionExplicit() {
 			// logic is handled at composite stages only  
 			if (executionStage != NULL && stageLps != myLps) {
 				CompositeStage *nextContainerStage = new CompositeStage(0, stageLps, NULL);
+				StageSyncReqs *syncReqs = new StageSyncReqs(nextContainerStage);
+				nextContainerStage->synchronizationReqs = syncReqs;
 				nextContainerStage->addStageAtEnd(executionStage);
 				stageList->RemoveAt(i);
 				stageList->InsertAt(nextContainerStage, i);
