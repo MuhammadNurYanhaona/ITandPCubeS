@@ -258,8 +258,9 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 	SuperPart *part = getPart(partNo);
 	if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
 		PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
-		char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
-		transferSpec->performTransfer(dataLocation);
+		DataPartIndex partUpdateIndex = dataPartSpec->getDataPartUpdateIndex(partLocator, 
+				&partIndex, dataItemSize);
+		transferSpec->performTransfer(partUpdateIndex);
 		transferCount++;
 	} else if (loggingEnabled) {
 		for (int i = 0; i < indentLevel; i++) logFile << '\t';
@@ -276,8 +277,9 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 		SuperPart *part = getPart(partNo);
 		if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
 			PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
-			char *dataLocation = dataPartSpec->getUpdateLocation(partLocator, &partIndex, dataItemSize);
-			transferSpec->performTransfer(dataLocation);
+			DataPartIndex partUpdateIndex = dataPartSpec->getDataPartUpdateIndex(
+					partLocator, &partIndex, dataItemSize);
+			transferSpec->performTransfer(partUpdateIndex);
 			transferCount++;
 		} else if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';

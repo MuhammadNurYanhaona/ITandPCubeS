@@ -25,6 +25,28 @@
 
 enum TransferDirection { COMM_BUFFER_TO_DATA_PART, DATA_PART_TO_COMM_BUFFER };
 
+/* This class describes the beginning of the storage index of a particular data point in a data part. The index is
+ * later to be used to find the location to read data from or write data to during the interchange between the 
+ * operating memory and communucation buffers when the underlying data structure has multiple versions. For version-
+ * less data structures, the update location could be recorded, giving a lower transfer cost, directly instead of
+ * deriving the location from the index. 
+ */
+class DataPartIndex {
+  protected:
+	DataPart *dataPart;
+	int index;
+  public:
+	DataPartIndex(DataPart *dataPart, int index) {
+		this->dataPart = dataPart;
+		this->index = index;	
+	}
+	inline char *getLocation() {
+		void *data = dataPart->getData();
+		char *charData = reinterpret_cast<char*>(data);
+		return charData + index;
+	}
+};
+
 /* class holding all instructions regarding a single data-point transfer between the communication buffer and the
  * operating memory
  * */
@@ -49,7 +71,7 @@ class TransferSpec {
 
 	// function to be used to do the data transfer once the participating location in the operating memory has been
 	// identified
-	virtual void performTransfer(char *dataPartLocation);
+	virtual void performTransfer(DataPartIndex dataPartIndex);
 };
 
 /* This subclass of transfer specification is used in the case where we do not intend to do a data transfer at an
@@ -67,7 +89,8 @@ class TransferLocationSpec : public TransferSpec {
 	void setBufferLocation(char **bufferLocation) {
 		this->bufferLocation = bufferLocation;
 	}
-	void performTransfer(char *dataPartLocation) {
+	void performTransfer(DataPartIndex dataPartIndex) {
+		char *dataPartLocation = dataPartIndex.getLocation();
 		*bufferLocation = dataPartLocation;
 	}
 };
@@ -98,6 +121,10 @@ class DataPartSpec {
 	// function to be used at the end of part-container tree hierarchy traversal to get the memory location that
 	// should participate in a data transfer
 	char *getUpdateLocation(PartLocator *partLocator, std::vector<int> *partIndex, int dataItemSize);
+
+	// function to be used at the end of part-container tree hierarchy traversal to get the data part index that
+	// should participate in a data transfer
+	DataPartIndex getDataPartUpdateIndex(PartLocator *partLocator, std::vector<int> *partIndex, int dataItemSize);
 };
 
 #endif /* DATA_TRANSFER_H_ */

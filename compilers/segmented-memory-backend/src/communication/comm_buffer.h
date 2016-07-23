@@ -9,7 +9,7 @@
  * or write operation on the communication buffers set for that based on what deemed appropriate.
  * Note that this logic does not work for dynamic LPSes but the communication buffers here can be extended to support
  * dynamic LPSes too. Or a new set of buffer can be created for dynamic LPSes each time their data content changes.
- * Platform specific sub-classes should extend these buffers ,e.g, MPI will need extensions for MPI communications
+ * Platform specific sub-classes should extend these buffers, e.g, MPI will need extensions for MPI communications
  * */
 
 #include "confinement_mgmt.h"
