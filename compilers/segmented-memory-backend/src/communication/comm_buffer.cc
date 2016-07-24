@@ -135,22 +135,26 @@ IndexMappedCommBuffer::IndexMappedCommBuffer(DataExchange *ex, SyncConfig *sC) :
 	senderTransferIndexMapping = NULL;
 	receiverTransferIndexMapping = NULL;
 	if (isSendActivated()) {
-		senderTransferIndexMapping = new DataPartIndex[elementCount];
+		senderTransferIndexMapping = new DataPartIndexList[elementCount];
 		setupMappingBuffer(senderTransferIndexMapping, senderPartList, senderTree, senderDataConfig);
 	}
 	if (isReceiveActivated()) {
-		receiverTransferIndexMapping = new DataPartIndex[elementCount];
+		receiverTransferIndexMapping = new DataPartIndexList[elementCount];
 		setupMappingBuffer(receiverTransferIndexMapping, 
 				receiverPartList, receiverTree, receiverDataConfig);
 	}
 }
         
 IndexMappedCommBuffer::~IndexMappedCommBuffer() {
-	if (senderTransferIndexMapping != NULL) delete[] senderTransferIndexMapping;
-	if (receiverTransferIndexMapping != NULL) delete[] receiverTransferIndexMapping;
+	if (senderTransferIndexMapping != NULL) {
+		delete[] senderTransferIndexMapping;
+	}
+	if (receiverTransferIndexMapping != NULL) {
+		delete[] receiverTransferIndexMapping;
+	}
 }
 
-void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndex *indexMappingBuffer,
+void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBuffer,
                         DataPartsList *dataPartList,
                         PartIdContainer *partContainerTree,
                         DataItemConfig *dataConfig) {
@@ -168,7 +172,7 @@ void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndex *indexMappingBuffer
 	while (iterator->hasMoreElements()) {
 		vector<int> *dataItemIndex = iterator->getNextElement();
 		dataPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
-		transferSpec->setPartIndexReference(&indexMappingBuffer[elementIndex]);
+		transferSpec->setPartIndexListReference(&indexMappingBuffer[elementIndex]);
 		partContainerTree->transferData(transformVector, 
 				transferSpec, dataPartSpec, false, std::cout);
 		elementIndex++;
@@ -312,18 +316,32 @@ IndexMappedPhysicalCommBuffer::IndexMappedPhysicalCommBuffer(DataExchange *excha
 }
 
 void IndexMappedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
+
 	for (int i = 0; i < elementCount; i++) {
-                char *readLocation = senderTransferIndexMapping[i].getLocation();
+		
+		// Notice that data is read from only the first matched location in the operating memory data part
+		// storage. This is because, all locations matching a single entry in the communication buffer 
+		// should have identical content.
+		List<DataPartIndex> *partIndexList = senderTransferIndexMapping[i].getPartIndexList();
+                char *readLocation = partIndexList->Nth(0).getLocation();
                 char *writeLocation = data + i * elementSize;
                 memcpy(writeLocation, readLocation, elementSize);
         }
 }
         
 void IndexMappedPhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream &logFile) {
+	
 	for (int i = 0; i < elementCount; i++) {
                 char *readLocation = data + i * elementSize;
-                char *writeLocation = receiverTransferIndexMapping[i].getLocation();
-                memcpy(writeLocation, readLocation, elementSize);
+		List<DataPartIndex> *partIndexList = receiverTransferIndexMapping[i].getPartIndexList();
+
+		// Unlike in the case for readData, writing should access every single matched location in the data
+		// parts as we need to ensure that all locations matching a single entry in the communication buffer
+		// are synchronized with the same update.	
+		for (int j = 0; j < partIndexList->NumElements(); j++) {
+                	char *writeLocation = partIndexList->Nth(j).getLocation();
+                	memcpy(writeLocation, readLocation, elementSize);
+		}
         }
 }
 
@@ -424,10 +442,19 @@ void PreprocessedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &
 //-------------------------------------------- Index-mapped Virtual Communication Buffer -----------------------------------------/
 
 void IndexMappedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
+
 	for (int i = 0; i < elementCount; i++) {
-                char *readLocation = senderTransferIndexMapping[i].getLocation();
-                char *writeLocation = receiverTransferIndexMapping[i].getLocation();
-                memcpy(writeLocation, readLocation, elementSize);
+
+		// data is read from only one location as all matching locations should have the same content
+		List<DataPartIndex> *sourcePartIndexList = senderTransferIndexMapping[i].getPartIndexList();
+                char *readLocation = sourcePartIndexList->Nth(0).getLocation();
+			
+		// update is propagated to all matching locations as they need have equivalent in data content
+		List<DataPartIndex> *destPartIndexList = receiverTransferIndexMapping[i].getPartIndexList();
+		for (int j = 0; j < destPartIndexList->NumElements(); j++) {
+                	char *writeLocation = destPartIndexList->Nth(j).getLocation();
+                	memcpy(writeLocation, readLocation, elementSize);
+		}
         }
 }
 

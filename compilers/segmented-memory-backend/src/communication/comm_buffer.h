@@ -23,7 +23,7 @@
 #include <fstream>
 #include <sstream>
 
-class DataPartIndex;
+class DataPartIndexList;
 
 /* To configure the communication buffers properly, we need the data-parts-list representing the operating memory for
  * a data structure for involved LPSes and data item size along with the other information provided by a confinement
@@ -152,8 +152,8 @@ class PreprocessedCommBuffer : public CommBuffer {
  */
 class IndexMappedCommBuffer : public CommBuffer {
   protected:
-	DataPartIndex *senderTransferIndexMapping;
-	DataPartIndex *receiverTransferIndexMapping;
+	DataPartIndexList *senderTransferIndexMapping;
+	DataPartIndexList *receiverTransferIndexMapping;
   public:
 	IndexMappedCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	~IndexMappedCommBuffer();
@@ -161,7 +161,7 @@ class IndexMappedCommBuffer : public CommBuffer {
   	virtual void readData(bool loggingEnabled, std::ostream &logFile) = 0;
   	virtual void writeData(bool loggingEnabled, std::ostream &logFile) = 0;
   private:
-	void setupMappingBuffer(DataPartIndex *indexMappingBuffer,
+	void setupMappingBuffer(DataPartIndexList *indexMappingBuffer,
                         DataPartsList *dataPartList,
                         PartIdContainer *partContainerTree,
                         DataItemConfig *dataConfig);	

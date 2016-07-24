@@ -22,6 +22,7 @@
 #include "../runtime/structure.h"
 #include "../memory-management/allocation.h"
 #include "../partition-lib/partition.h"
+#include "../utils/list.h"
 
 enum TransferDirection { COMM_BUFFER_TO_DATA_PART, DATA_PART_TO_COMM_BUFFER };
 
@@ -49,6 +50,23 @@ class DataPartIndex {
 		char *charData = reinterpret_cast<char*>(data);
 		return charData + index;
 	}
+	inline DataPart *getDataPart() { return dataPart; }
+	inline int getIndex() { return index; }
+};
+
+/* This class is usefull when more than one location in a data part might need to be accessed (typically for writing 
+ * purpose) for an index in the communication buffer. For example, if the data parts have boundary over-lappings in 
+ * the form of padding then we may have different data parts in the same segments that should receive an update from 
+ * the communication buffer.
+ */
+class DataPartIndexList {
+  protected:
+	List<DataPartIndex> *partIndexList;
+  public:
+	DataPartIndexList() { partIndexList = new List<DataPartIndex>; }
+	~DataPartIndexList() { delete partIndexList; }
+	inline void addPartIndex(DataPartIndex partIndex) { partIndexList->Append(partIndex); }
+	inline List<DataPartIndex> *getPartIndexList() { return partIndexList; }
 };
 
 /* class holding all instructions regarding a single data-point transfer between the communication buffer and the
@@ -103,20 +121,23 @@ class TransferLocationSpec : public TransferSpec {
  * for data structures having multiple versions. For those data structures, the memory location of update/read for a 
  * particular point in the communication buffer shifts as different versions occupies separate memory addresses but the
  * index being accessed within those memory allocations does not change.
+ *
+ * Notice that a list of data-part-index has been maintained instead of just one. This is done because there might be
+ * more than one operating memory data part location per entry in the communication buffer.
  */
 class TransferIndexSpec : public TransferSpec {
   private:
-	DataPartIndex *partIndexReference;
+	DataPartIndexList *partIndexListRef;
   public:
 	// the transfer direction used here is irrelevant; one is picked because the super class constructor needs one
 	TransferIndexSpec(int elementSize) : TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize) {
-		partIndexReference = NULL;
+		partIndexListRef = NULL;
 	}
-	void setPartIndexReference(DataPartIndex *indexRef) {
-		this->partIndexReference = indexRef;
+	void setPartIndexListReference(DataPartIndexList *indexListRef) {
+		this->partIndexListRef = indexListRef;
 	}
 	void performTransfer(DataPartIndex dataPartIndex) {
-		*partIndexReference = dataPartIndex;
+		partIndexListRef->addPartIndex(dataPartIndex);
 	}
 };
 
