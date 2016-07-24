@@ -36,6 +36,10 @@ class DataPartIndex {
 	DataPart *dataPart;
 	int index;
   public:
+	DataPartIndex() {
+		this->dataPart = NULL;
+		this->index = -1;
+	}
 	DataPartIndex(DataPart *dataPart, int index) {
 		this->dataPart = dataPart;
 		this->index = index;	
@@ -92,6 +96,27 @@ class TransferLocationSpec : public TransferSpec {
 	void performTransfer(DataPartIndex dataPartIndex) {
 		char *dataPartLocation = dataPartIndex.getLocation();
 		*bufferLocation = dataPartLocation;
+	}
+};
+
+/* This subclass of transfer specification serve the purpose similar to Transfer-Location-Spec class of the above but 
+ * for data structures having multiple versions. For those data structures, the memory location of update/read for a 
+ * particular point in the communication buffer shifts as different versions occupies separate memory addresses but the
+ * index being accessed within those memory allocations does not change.
+ */
+class TransferIndexSpec : public TransferSpec {
+  private:
+	DataPartIndex *partIndexReference;
+  public:
+	// the transfer direction used here is irrelevant; one is picked because the super class constructor needs one
+	TransferIndexSpec(int elementSize) : TransferSpec(COMM_BUFFER_TO_DATA_PART, elementSize) {
+		partIndexReference = NULL;
+	}
+	void setPartIndexReference(DataPartIndex *indexRef) {
+		this->partIndexReference = indexRef;
+	}
+	void performTransfer(DataPartIndex dataPartIndex) {
+		*partIndexReference = dataPartIndex;
 	}
 };
 
