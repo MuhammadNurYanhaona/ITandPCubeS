@@ -1,0 +1,7 @@
+"Hybrid Execution Test" {
+	Model: Hybrid-Model	
+	Space A: 	5	// Node
+	Space B: 	3	// GPU
+	Space C:	2	// SM
+	Space D:	1	// Warp
+}

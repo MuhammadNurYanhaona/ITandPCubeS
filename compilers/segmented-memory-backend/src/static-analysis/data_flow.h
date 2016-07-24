@@ -139,8 +139,8 @@ class FlowStage {
 	void setExecuteCondition(Expr *condition) { executeCond = condition; }
 	Expr *getExecuteCondition() { return executeCond; }
 
-	// This virtual method is used to recursively generate the run method for the task for the multi-core back
-	// end compiler.
+	// This virtual method is used to recursively generate the run method for the task for the multi-core and 
+	// segmented-memory back end compilers.
 	virtual void generateInvocationCode(std::ofstream &stream, 
 			int indentation, Space *containerSpace) {}
 

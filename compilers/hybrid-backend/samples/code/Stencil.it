@@ -1,0 +1,55 @@
+Program (args) {         
+	stencilEnv = new TaskEnvironment(name: "Five Points Stencil")
+	bind_input(stencilEnv, "plate", args.input_file)
+	iterations = args.iterations
+	p = args.p
+	k = args.k
+	l = args.l
+	m = args.m
+	n = args.n
+        execute("Five Points Stencil"; stencilEnv; Initialize: iterations; Partition: p, k, l, m, n)
+        bind_output(stencilEnv, "plate", args.output_file)
+}
+
+Task "Five Points Stencil":
+	Define:
+		plate: 2D Array of Real double-precision
+		t: Epoch
+		local_rf, global_rf, total_rf: Range
+		iteration_1, iteration_2, iteration_3: Integer
+	Environment:
+		plate: link
+	Initialize (iterations):
+		total_rf.min = local_rf.min = global_rf.min = 0
+		total_rf.max = ((iterations + partition.m - 1) / partition.m) - 1
+		global_rf.max = ((partition.m + partition.n - 1) / partition.n) - 1
+		local_rf.max = partition.n - 1
+	Compute:
+		"Refine Global Estimate" (Space A) {
+			"Refine Local Estimate" (Space B) {
+				"Calculate Estimate" (Space B) {
+					localRows = plate.local.dimension1.range
+					localCols = plate.local.dimension2.range
+					do { 
+						plate[i][j] at (t)				\
+						= 0.25 * (plate[i - 1][j] 			\
+						+ plate[i + 1][j] 				\
+						+ plate[i][j - 1]				\
+						+ plate[i][j + 1]) at (t - 1)
+					} for i, j in plate 					\
+					and (i > localRows.min and i < localRows.max) 		\
+					and (j > localCols.min and j < localCols.max)
+				}
+				Repeat: from "Calculate Estimate" for iteration_1 in local_rf
+			} 
+			Repeat: from "Refine Local Estimate" for iteration_2 in global_rf
+		}
+		Repeat: from "Refine Global Estimate" for iteration_3 in total_rf
+	Partition (p, k, l, m, n):
+		Space A <1D> { 
+			plate: block_count(p) padding(m)
+		}
+		Space B <2D> divides Space A partitions { 
+			plate: block_count(k, l) padding(n, n)
+		}
+

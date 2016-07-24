@@ -1,0 +1,56 @@
+Program (args) {
+	length = args.length
+	m = args.m
+	p = args.p
+        firstEnv = new TaskEnvironment(name: "First Task")
+        execute("First Task"; firstEnv; Initialize: length; Partition: m)
+        secondEnv = new TaskEnvironment(name: "Second Task")
+        secondEnv.a = firstEnv.a
+        execute("Second Task"; secondEnv; Partition: p)
+        thirdEnv = new TaskEnvironment(name: "Third Task")
+        thirdEnv.a = secondEnv.a
+        execute("Third Task"; thirdEnv)
+	bind_output(thirdEnv, "a", args.output_file)
+}
+
+Task "First Task":
+	Define:
+		a: 1D Array of Integer
+	Environment:
+		a: create
+	Initialize(length):
+		a.dimension.range.min = 0
+		a.dimension.range.max = length - 1
+	Compute:
+		"Assign Index Values" (Space A) {
+			do { a[i] = i } for i in a
+		}
+	Partition(b):
+		Space A <1D> { a: block_stride(b) } 
+
+Task "Second Task":
+	Define:
+		a: 1D Array of Integer
+	Environment:
+		a: link
+	Compute:
+		"Square Values" (Space A) {
+			do { a[i] = a[i] * a[i] } for i in a
+		}
+	Partition(b):
+		Space A <1D> { a: block_size(b) } 
+
+Task "Third Task":
+	Define:
+		a: 1D Array of Integer
+		threshold: Integer
+	Environment:
+		a: link
+	Initialize:
+		threshold = a.dimension.length / 2
+	Compute:
+		"Make Cubes" (Space A) {
+			do { a[i] = a[i] * i } for i in a and i < threshold
+		}
+	Partition(b):
+		Space A <1D> { a: stride() } 

@@ -576,8 +576,8 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 	// reset the name transformer to user common "lpu." prefix for array access in case it is been modified
 	ntransform::NameTransformer::transformer->setLpuPrefix("lpu->");
 
-	// create local variables for all array dimensions so that later on name-transformer that add 
-	// prefix/suffix to accessed global variables can work properly
+	// create local variables for all array dimensions so that later on the name-transformer, that adds 
+	// prefix/suffix to accessed global variables, can work properly
 	stream <<  localMdHd;
 	stream << "\t// create local copies of partition and storage dimension configs of all arrays\n";
 	std::string stmtIndent = "\t";

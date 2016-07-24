@@ -1,0 +1,140 @@
+Program (args) { 
+	lufEnv = new TaskEnvironment(name: "Block LU Factorization")
+        bind_input(lufEnv, "a", args.input_file)
+        execute("Block LU Factorization"; lufEnv; Initialize: args.iterations; Partition: args.b, args.m, args.n)
+        bind_output(lufEnv, "u", args.output_file_1)
+        bind_output(lufEnv, "l", args.output_file_2)
+        bind_output(lufEnv, "p", args.output_file_3)
+}
+
+Task "Block LU Factorization":
+	Define:
+		a, u, l: 2D Array of Real double-precision
+		p: 1D Array of Integer
+		l_row, l_column, p_column: 1D Array of Real double-precision
+		u_block, l_block: 2D Array of Real double-precision
+		pivot, k, r, block_size: Integer
+		row_range: Range
+		iter_range: Range
+	Environment:
+		a: link
+		u, l, p: create
+	Initialize(iterations):
+		iter_range.min = 0
+		iter_range.max = iterations - 1
+		u.dimension1 = l.dimension1 = a.dimension2
+                u.dimension2 = l.dimension2 = a.dimension1
+		p.dimension = a.dimension1
+		block_size = partition.b
+		l_row.dimension = l.dimension2
+		l_column.dimension = p_column.dimension = l.dimension1
+		u_block.dimension1 = u.dimension1
+		u_block.dimension2.range.min = l_block.dimension1.range.min = 0
+		u_block.dimension2.range.max = l_block.dimension1.range.max = block_size - 1
+		l_block.dimension2 = l.dimension2
+	Compute:
+		"Prepare L and U" (Space B) {
+			do { u[j][i] = a[i][j] } for i, j in a
+			do { l[i][i] = 1 } for i in l
+		}
+		"Compute L and U Block" (Space A) {
+			"Calculate Row Range" (Space A) {
+				first_row = r * block_size
+				last_row = first_row + block_size - 1
+				if (last_row > a.dimension1.range.max) { 
+					last_row = a.dimension1.range.max 
+				}
+				row_range.min = first_row
+				row_range.max = last_row
+			}
+			"Select Pivot" (Space B)
+			Activate if k in u.local.dimension1.range {
+				do { pivot = reduce ("maxEntry", u[k][j]) } for j in u and j >= k
+			}
+			"Store Pivot" (Space A) {	
+				p[k] = pivot
+			}
+			"Interchange Rows" (Space B) {
+				if (k != pivot) {
+					do {    pivot_entry = u[i][k]
+						u[i][k] = u[i][pivot]
+						u[i][pivot] = pivot_entry
+					} for i in u and i >= k
+					do {    pivot_entry = l[i][k]
+						l[i][k] = l[i][pivot]
+						l[i][pivot] = pivot_entry
+					} for i in l and i < k
+				}
+			}
+			"Update L" (Space B)
+			Activate if k in l.local.dimension1.range {
+				do {    l[k][j] = u[k][j] / u[k][k]
+					u[k][j] = 0
+					l_row[j] = l[k][j]
+				} for j in l and j > k
+			}
+			"Update U Rows Block" (Space B) {			
+				do {	u[i][j] = u[i][j] - l_row[j] * u[i][k] 
+				} for i, j in u and i > k and i <= row_range.max and j > k
+			}
+			"Update U Columns Block" (Space A) {
+				"Collect L Column Part" (Space B) {
+					do {	l_column[i] = l[i][k]
+					} for i in l and i >= row_range.min and i < k
+				}
+				"Generate Pivot Column" (Space A) {
+					do { p_column[i] = l_column[i]
+					} for i in l_column and i >= row_range.min and i < k
+				}
+				"Update U Columns" (Space B) {
+					do {	u[i][k] = u[i][k] - u[i][j] * p_column[j]
+					} for i, j in u and i > row_range.max and j >= row_range.min and j < k
+				}
+			}
+			Repeat: from "Select Pivot" for k in row_range 
+		}
+		"Update Remaining U Section" (Space A) {
+			"Copy Updated Block of U" (Space B) {
+				do {	column = j - row_range.min
+					u_block[i][column] = u[i][j] 
+				} for i, j in u and i > row_range.max and j >= row_range.min and j <= row_range.max
+			}
+			"Copy Updated Block of L" (Space B) 
+			Activate if r in l.local.dimension1.range {
+				do {	row = i - row_range.min
+					l_block[row][j] = l[i][j] 
+				} for i, j in l and i >= row_range.min and i <= row_range.max and j > row_range.max
+			}
+			"Saxpy" (Space D) {
+				do {	
+					total = 0.000000
+					do in sequence { 
+						total = total + u_block[i][m] * l_block[m][j]
+					} for m in u_block.dimension2.range
+					u[i][j] = u[i][j] - total
+				} for i, j in u and i > row_range.max and j > row_range.max
+			}
+			Repeat: from "Saxpy" foreach Space C sub-partition
+		}
+		Repeat: from "Compute L and U Block" for r in iter_range 		
+	Partition(b, m, n):
+		Space A <un-partitioned> { 
+			a, p, l_column, l_row, p_column, l_block, u_block 
+		}
+		Space B <1D> divides Space A partitions {
+			a<dim2>, u<dim1>, u_block<dim1>, l<dim1>, l_column: block_stride(b)
+			l_row, p_column, l_block: replicated 
+		}
+		Space C <2D> divides Space B partitions {
+			u: block_size(b, b)
+			u_block: block_size(b), replicated
+			l_block: replicated, block_size(b)	
+			Sub-partition <1D> <unordered> {
+				u_block<dim2>, l_block<dim1>: block_size(b)
+			}
+		}
+		Space D <2D> divides Space C sub-partitions {
+			u: block_size(m, n)
+			u_block: block_size(m), replicated
+			l_block: replicated, block_size(n)
+		} 

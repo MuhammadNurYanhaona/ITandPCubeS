@@ -1,0 +1,5 @@
+"LU Factorization" {
+	// syntax LPS ':' PPS
+	Space A: 5	// Socket
+	Space B: 2	// Core-Pair
+}

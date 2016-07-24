@@ -1,0 +1,70 @@
+Program (args) {
+	length = args.length
+	m = args.m
+	n = args.n
+	p = args.p
+        firstEnv = new TaskEnvironment(name: "First Task")
+        execute("First Task"; firstEnv; Initialize: length; Partition: m)
+        secondEnv = new TaskEnvironment(name: "Second Task")
+        secondEnv.a = firstEnv.a
+        execute("Second Task"; secondEnv; Partition: n)
+	threshold = (length + 1) / 2
+        thirdEnv = new TaskEnvironment(name: "Third Task")
+        thirdEnv.a = secondEnv.a[0...threshold]
+        execute("Third Task"; thirdEnv)
+        fourthEnv = new TaskEnvironment(name: "Last Task")
+        fourthEnv.a = secondEnv.a
+        execute("Last Task"; fourthEnv; Partition: p)
+	bind_output(fourthEnv, "a", args.output_file)
+}
+
+Task "First Task":
+	Define:
+		a: 1D Array of Integer
+	Environment:
+		a: create
+	Initialize(length):
+		a.dimension.range.min = 0
+		a.dimension.range.max = length - 1
+	Compute:
+		"Assign Index Values" (Space A) {
+			do { a[i] = i } for i in a
+		}
+	Partition(b):
+		Space A <1D> { a: block_stride(b) } 
+
+Task "Second Task":
+	Define:
+		a: 1D Array of Integer
+	Environment:
+		a: link
+	Compute:
+		"Square Values" (Space A) {
+			do { a[i] = a[i] * a[i] } for i in a
+		}
+	Partition(b):
+		Space A <1D> { a: block_size(b) } 
+
+Task "Third Task":
+	Define:
+		a: 1D Array of Integer
+	Environment:
+		a: link
+	Compute:
+		"Make Cubes" (Space A) {
+			do { a[i] = a[i] * i } for i in a
+		}
+	Partition:
+		Space A <1D> { a: stride() } 
+
+Task "Last Task":
+	Define:
+		a: 1D Array of Integer
+	Environment:
+		a: link
+	Compute:
+		"Add One" (Space A) {
+			do { a[i] = a[i] + 1 } for i in a
+		}
+	Partition(b):
+		Space A <1D> { a: block_count(b) } 

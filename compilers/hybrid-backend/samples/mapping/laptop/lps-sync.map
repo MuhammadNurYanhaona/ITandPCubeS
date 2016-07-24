@@ -1,0 +1,6 @@
+"Test LPS Sync" {
+	// syntax LPS ':' PPS
+	Space A: 3	// CPU
+	Space B: 1	// Hyperthread
+	Space C: 2	// Core
+}

@@ -1,0 +1,38 @@
+// for error reporting and diagnostics
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <cstdlib>
+#include <stdio.h>
+#include <time.h>
+#include <sys/time.h>
+
+// for tuple definitions found in the source code
+#include "tuple.h"
+#include <vector>
+
+// for LPU and PPU management data structures
+#include "../../src/runtime/structure.h"
+
+// for CPU side utility routines
+#include "../../src/utils/list.h"
+#include "../../src/utils/hashtable.h"
+#include "../../src/utils/binary_search.h"
+#include "../../src/utils/id_generation.h"
+
+// for GPU side utility routines
+#include "../../src/gpu-utils/gpu_utils.h"
+#include "../../src/gpu-utils/gpu_constant.h"
+#include "../../src/gpu-utils/gpu_structure.h"
+#include "../../src/gpu-utils/gpu_partition.h"
+
+// for interpreting LPU data parts
+#include "../../src/memory-management/allocation.h"
+
+// for offloading computation to GPU
+#include "../../src/gpu-offloader/lpu_parts_tracking.h"
+#include "../../src/gpu-offloader/gpu_code_executor.h"
+
+// for cuda runtime libraries
+#include <cuda.h>
+#include <cuda_runtime.h>
