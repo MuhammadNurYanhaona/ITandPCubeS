@@ -647,7 +647,7 @@ void generateArrayCommmunicatorFn(std::ofstream &headerFile,
 	// of operating memory addresses to populate (and vice versa) elements of the communication buffer for a data exchange
 	// note that the default version count is 0 
 	int versionCount = structure->getVersionCount();
-	const char *bufferTypePrefix = (versionCount > 0) ? "" : "Preprocessed";
+	const char *bufferTypePrefix = (versionCount > 0) ? "IndexMapped" : "Preprocessed";
 
 	// instantiate a list of communication buffers to add virtual/physical communication buffers into it for data exchanges
 	// based on whether or not the exchange demands cross-segments communication 

@@ -9,7 +9,7 @@
  * or write operation on the communication buffers set for that based on what deemed appropriate.
  * Note that this logic does not work for dynamic LPSes but the communication buffers here can be extended to support
  * dynamic LPSes too. Or a new set of buffer can be created for dynamic LPSes each time their data content changes.
- * Platform specific sub-classes should extend these buffers ,e.g, MPI will need extensions for MPI communications
+ * Platform specific sub-classes should extend these buffers, e.g, MPI will need extensions for MPI communications
  * */
 
 #include "confinement_mgmt.h"
@@ -22,6 +22,8 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+
+class DataPartIndexList;
 
 /* To configure the communication buffers properly, we need the data-parts-list representing the operating memory for
  * a data structure for involved LPSes and data item size along with the other information provided by a confinement
@@ -142,6 +144,29 @@ class PreprocessedCommBuffer : public CommBuffer {
 			DataItemConfig *dataConfig);
 };
 
+/* This extension is similar to the Preprocessed-Comm-Buffer extension with one critical difference that it keeps track
+ * of the index in different data parts a communication buffer should read data from or write data to as opposed to the
+ * actual locations of read/update. This form of partial pre-processing is useful to optimize data transfer for data 
+ * structures having multiple versions. Actual memory location tracking for such data structures is infeasible as indi-
+ * vidual versions have separate memory allocations. 
+ */
+class IndexMappedCommBuffer : public CommBuffer {
+  protected:
+	DataPartIndexList *senderTransferIndexMapping;
+	DataPartIndexList *receiverTransferIndexMapping;
+  public:
+	IndexMappedCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
+	~IndexMappedCommBuffer();
+
+  	virtual void readData(bool loggingEnabled, std::ostream &logFile) = 0;
+  	virtual void writeData(bool loggingEnabled, std::ostream &logFile) = 0;
+  private:
+	void setupMappingBuffer(DataPartIndexList *indexMappingBuffer,
+                        DataPartsList *dataPartList,
+                        PartIdContainer *partContainerTree,
+                        DataItemConfig *dataConfig);	
+};
+
 /* Implementation class where there is actually a physical communication buffer that will hold data before a send to 
  * and/or after a receive from of data belonging to the operating memory data parts
  * */
@@ -196,6 +221,20 @@ class PreprocessedPhysicalCommBuffer : public PreprocessedCommBuffer {
 	char *getData() { return data; }
 };
 
+/* The extension of physical communication buffer to be used with index-mapping enabled
+ * */
+class IndexMappedPhysicalCommBuffer : public IndexMappedCommBuffer {
+  protected:
+	char *data;
+  public:
+	IndexMappedPhysicalCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
+	~IndexMappedPhysicalCommBuffer() { delete[] data; }
+	void readData(bool loggingEnabled, std::ostream &logFile);
+        void writeData(bool loggingEnabled, std::ostream &logFile);
+	void setData(char *data) { this->data = data; }
+        char *getData() { return data; } 	
+};
+
 /* This extension is for situations where we do not want any intervening memory to be allocated for the communication
  * buffer but, rather, want to copy data directly from one operating memory to another. Obviously, this can only be
  * done when the sender and receiver are both local to the current segment.
@@ -219,6 +258,16 @@ class PreprocessedVirtualCommBuffer : public PreprocessedCommBuffer {
 			SyncConfig *syncConfig) : PreprocessedCommBuffer(exchange, syncConfig) {}
 	void readData(bool loggingEnabled, std::ostream &logFile);
 	void writeData(bool loggingEnabled, std::ostream &logFile) {}
+};
+
+/* This is the virtual communication buffer extension with index-mapping enabled
+ * */
+class IndexMappedVirtualCommBuffer : public IndexMappedCommBuffer {
+  public:
+	IndexMappedVirtualCommBuffer(DataExchange *exchange,
+                        SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig) {}
+	void readData(bool loggingEnabled, std::ostream &logFile);
+        void writeData(bool loggingEnabled, std::ostream &logFile) {}
 };
 
 /* This class contains all communication buffers related to a particular data synchronization and does the buffer read

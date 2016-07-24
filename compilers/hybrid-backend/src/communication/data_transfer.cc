@@ -24,7 +24,8 @@ void TransferSpec::setBufferEntry(char *bufferEntry, vector<int> *dataIndex) {
 	this->dataIndex = dataIndex;
 }
 
-void TransferSpec::performTransfer(char *dataPartLocation) {
+void TransferSpec::performTransfer(DataPartIndex dataPartIndex) {
+	char *dataPartLocation = dataPartIndex.getLocation();
 	if (direction == COMM_BUFFER_TO_DATA_PART) {
 		memcpy(dataPartLocation, bufferEntry, elementSize);
 	} else {
@@ -55,30 +56,33 @@ void DataPartSpec::initPartTraversalReference(vector<int> *dataIndex, vector<Xfo
 
 char *DataPartSpec::getUpdateLocation(PartLocator *partLocator, vector<int> *partIndex, int dataItemSize) {
 
+	DataPartIndex dataPartIndex = getDataPartUpdateIndex(partLocator, partIndex, dataItemSize);
+	return dataPartIndex.getLocation();
+}
+
+DataPartIndex DataPartSpec::getDataPartUpdateIndex(PartLocator *partLocator, 
+		vector<int> *partIndex, int dataItemSize) {
+
 	int partNo = partLocator->getPartListIndex();
-	DataPart *dataPart = partList->Nth(partNo);
-	PartMetadata *metadata = dataPart->getMetadata();
-	Dimension *partDimensions = metadata->getBoundary();
+        DataPart *dataPart = partList->Nth(partNo);
+        PartMetadata *metadata = dataPart->getMetadata();
+        Dimension *partDimensions = metadata->getBoundary();
 
-	int dataPointNo = 0;
-	int multiplier = 1;
-	for (int i = partIndex->size() - 1; i >= 0; i--) {
-		
-		int firstIndex = partDimensions[i].range.min;
-		int lastIndex = partDimensions[i].range.max;
-		int dimensionIndex = partIndex->at(i);
-		
-		Assert(firstIndex <= dimensionIndex && dimensionIndex <= lastIndex);
-		
-		dataPointNo += (dimensionIndex - firstIndex) * multiplier;
-		multiplier *= partDimensions[i].length;
-	}
+        int dataPointNo = 0;
+        int multiplier = 1;
+        for (int i = partIndex->size() - 1; i >= 0; i--) {
 
-	void *data = dataPart->getData();
-	char *charData = reinterpret_cast<char*>(data);
-	
-	Assert(dataPointNo < metadata->getSize());
+                int firstIndex = partDimensions[i].range.min;
+                int lastIndex = partDimensions[i].range.max;
+                int dimensionIndex = partIndex->at(i);
 
-	char *updateLocation = charData + dataItemSize * dataPointNo;
-	return updateLocation;
+                Assert(firstIndex <= dimensionIndex && dimensionIndex <= lastIndex);
+
+                dataPointNo += (dimensionIndex - firstIndex) * multiplier;
+                multiplier *= partDimensions[i].length;
+        }
+
+        Assert(dataPointNo < metadata->getSize());
+	DataPartIndex dataPartIndex = DataPartIndex(dataPart, dataItemSize * dataPointNo);
+	return dataPartIndex;
 }
