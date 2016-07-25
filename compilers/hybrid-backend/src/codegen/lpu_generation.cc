@@ -288,9 +288,11 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		int allocationJump = 0;
 		if (allocatedElsewhere) {
 			Space *currentSpace = lps;
+			DataStructure *currStruct = array;
 			while (currentSpace != allocatorLps) {
+				currStruct = currStruct->getSource();
+				currentSpace = currStruct->getSpace();
 				allocationJump++;
-				currentSpace = currentSpace->getParent();
 			}   
 		}
 		

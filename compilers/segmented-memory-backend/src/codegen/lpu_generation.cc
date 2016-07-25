@@ -286,10 +286,12 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		int allocationJump = 0;
 		if (allocatedElsewhere) {
 			Space *currentSpace = lps;
-			while (currentSpace != allocatorLps) {
+			DataStructure *currStruct = array;
+                        while (currentSpace != allocatorLps) {
+				currStruct = currStruct->getSource();
+				currentSpace = currStruct->getSpace();
 				allocationJump++;
-				currentSpace = currentSpace->getParent();
-			}   
+                        }
 		}
 		
 		// retrieve the iterator reference for the part and from it a template part-Id object
