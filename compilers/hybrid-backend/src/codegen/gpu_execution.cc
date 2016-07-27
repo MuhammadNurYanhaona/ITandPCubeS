@@ -770,6 +770,12 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	headerFile << indent << initials << "::ThreadLocals " << "*threadLocalsHost";
 	headerFile << paramSeparator << "*threadLocalsGpu" << stmtSeparator;
 
+	// a GPU code executor needs a host and a GPU instance of stage execution tracker object so that the host
+	// can determine what compute stages have been executed inside the GPU (and how many times) and what did not
+	headerFile << indent << initials << "::"; 
+	headerFile << "Context" << gpuContext->getContextId() << "ExecutionTracker ";
+	headerFile << "*stageExecutionTrackerHost, *stageExecutionTrackerGpu" << stmtSeparator;
+
 	// finally, a GPU code executor should maintain a context specific metadata structure instance to propagate
 	// host level LPU configuration information during kernel invocations; ancestor LPU metadata is needed for 
 	// proper array index transformations
@@ -777,7 +783,7 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	headerFile << indent << initials << "::Space" << contextLpsName << "AncestorLpuConfigsAggregate ";
 	headerFile << "hostLpuConfigs" << stmtSeparator; 
 
-	// define the constructor and four functions a context specific code executor should give implementation for
+	// define the constructor and five functions a context specific code executor should give implementation for
 	headerFile << "  public:\n";
 	headerFile << indent << className << "(LpuBatchController *lpuBatchController";
 	headerFile << paramSeparator << paramIndent << initials << "::ArrayMetadata arrayMetadata";
@@ -788,6 +794,7 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	headerFile << indent << "void offloadFunction()" << stmtSeparator;
 	headerFile << indent << "void initialize()" << stmtSeparator;
 	headerFile << indent << "void cleanup()" << stmtSeparator;
+	headerFile << indent << "int getExecutionCount(const char *stageCounterName)" << stmtSeparator;
 	headerFile << indent << "void extractAncestorLpuConfigs(LPU *lpu" << paramSeparator;
 	headerFile << "int ppuGroupIndex)" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
@@ -802,40 +809,56 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 	generateGpuCodeExecutorInitializer(gpuContext, initials, programFile);
 	generateGpuCodeExecutorOffloadFn(gpuContext,  pcubesModel, initials, programFile);
 	generateGpuCodeExecutorCleanupFn(gpuContext, initials, programFile);
+	generateGpuCodeExecutorGetStageExecCountFn(gpuContext, initials, programFile);
 	generateGpuCodeExecutorAncestorLpuExtractFn(gpuContext, initials, programFile);
 }
 
 void generateGpuCodeExecutors(List<GpuExecutionContext*> *gpuExecutionContextList,
                 PCubeSModel *pcubesModel,
                 const char *initials,
-                const char *headerFileName, const char *programFileName) {
+                const char *headerFileName, 
+		const char *programFileName, const char *cudaProgramFileName) {
 	
 	std::cout << "Generating GPU code executors\n";
 
-	std::ofstream programFile, headerFile;
+	std::ofstream headerFile, programFile, cudaProgramFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        cudaProgramFile.open (cudaProgramFileName, std::ofstream::out | std::ofstream::app);
+        if (!headerFile.is_open()) {
+                std::cout << "Unable to open output header file";
+                std::exit(EXIT_FAILURE);
+        }
         if (!programFile.is_open()) {
                 std::cout << "Unable to open output program file";
                 std::exit(EXIT_FAILURE);
         }
-        if (!headerFile.is_open()) {
-                std::cout << "Unable to open output header file";
+        if (!cudaProgramFile.is_open()) {
+                std::cout << "Unable to open output CUDA program file";
                 std::exit(EXIT_FAILURE);
         }
 
 	const char *header = "GPU code executors";
         decorator::writeSectionHeader(headerFile, header);
         decorator::writeSectionHeader(programFile, header);
+        decorator::writeSectionHeader(cudaProgramFile, header);
 
 	for (int i = 0; i < gpuExecutionContextList->NumElements(); i++) {
+		
 		GpuExecutionContext *context = gpuExecutionContextList->Nth(i);
+
+		// generate the compute stages's execution tracking structure and its member function
+		generateStageExecutionTrackerStruct(context,
+                		pcubesModel, initials, headerFile, programFile);  
+		
+		// generate the GPU code executor class and its member functions
 		generateGpuCodeExecutorForContext(context, 
-				pcubesModel, initials, headerFile, programFile);		
+				pcubesModel, initials, headerFile, cudaProgramFile);		
 	}
 
 	headerFile.close();
 	programFile.close();
+	cudaProgramFile.close();
 }
 
 void generateGpuCodeExecutorConstructor(GpuExecutionContext *gpuContext,
@@ -868,6 +891,9 @@ void generateGpuCodeExecutorConstructor(GpuExecutionContext *gpuContext,
 	programFile << indent << "this->taskGlobalsGpu = NULL" << stmtSeparator;
 	programFile << indent << "this->threadLocalsHost = threadLocals" << stmtSeparator;
 	programFile << indent << "this->threadLocalsGpu = NULL" << stmtSeparator;
+	programFile << indent << "this->stageExecutionTrackerHost = new Context"; 
+	programFile << gpuContext->getContextId() << "ExecutionTracker()" << stmtSeparator;
+	programFile << indent << "this->stageExecutionTrackerGpu = NULL" << stmtSeparator;
 
 	programFile << "}\n";
 }
@@ -899,6 +925,18 @@ void generateGpuCodeExecutorInitializer(GpuExecutionContext *gpuContext,
 	programFile << indent << "cudaMemcpy(threadLocalsGpu" << paramSeparator;
 	programFile << "threadLocalsHost" << paramSeparator;
 	programFile << "threadLocalsSize" << paramSeparator;
+	programFile << "cudaMemcpyHostToDevice)" << stmtSeparator;
+
+	// reset the host instance of stage execution tracker and stage it into the GPU card memory
+	programFile << std::endl;
+	programFile << indent << "stageExecutionTrackerHost->resetCounters()" << stmtSeparator;
+	programFile << indent << "int execTrackerSize = sizeof(*stageExecutionTrackerHost)";
+	programFile << stmtSeparator;
+	programFile << indent << "cudaMalloc((void **) &stageExecutionTrackerGpu" << paramSeparator;
+	programFile << "execTrackerSize)" << stmtSeparator;
+	programFile << indent << "cudaMemcpy(stageExecutionTrackerGpu" << paramSeparator;
+	programFile << "stageExecutionTrackerHost" << paramSeparator;
+	programFile << "execTrackerSize" << paramSeparator;
 	programFile << "cudaMemcpyHostToDevice)" << stmtSeparator;
 	
 	programFile << "}\n";
@@ -1000,10 +1038,32 @@ void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext,
 	programFile << "threadLocalsSize" << paramSeparator;
 	programFile << "cudaMemcpyDeviceToHost)" << stmtSeparator;
 
+	programFile << indent << "int execTrackerSize = sizeof(*stageExecutionTrackerHost)";
+	programFile << stmtSeparator;
+	programFile << indent << "cudaMemcpy(stageExecutionTrackerHost" << paramSeparator;
+	programFile << "stageExecutionTrackerGpu" << paramSeparator;
+	programFile << "execTrackerSize" << paramSeparator;
+	programFile << "cudaMemcpyDeviceToHost)" << stmtSeparator;
+
 	// then invoke the superclass's cleanup function to tear down the GPU device context
 	programFile << '\n' << indent << "GpuCodeExecutor::cleanup()" << stmtSeparator;
 
 	programFile << "}\n"; 
+}
+
+void generateGpuCodeExecutorGetStageExecCountFn(GpuExecutionContext *gpuContext,   
+                const char *initials, std::ofstream &programFile) {
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "CodeExecutor";
+	std::string className = classNameStr.str();
+
+	programFile << std::endl;
+	programFile << "int " << initials << "::" << className;
+	programFile << "::getExecutionCount(const char *stageCounterName) {\n";
+	programFile << indent << "return stageExecutionTrackerHost->getExecutionCount(stageCounterName)";
+	programFile << stmtSeparator;
+	programFile << "}\n";
 }
 
 void generateGpuCodeExecutorAncestorLpuExtractFn(GpuExecutionContext *gpuContext,
@@ -1025,6 +1085,149 @@ void generateGpuCodeExecutorAncestorLpuExtractFn(GpuExecutionContext *gpuContext
 	programFile << "}\n";
 }
 
+void generateStageExecutionTrackerStruct(GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel, 
+                const char *initials,
+                std::ofstream &headerFile, std::ofstream &programFile) {
+
+	const char *contextName = gpuContext->getContextName();
+	std::ostringstream subsectionHeader;
+	subsectionHeader << contextName << " stage execution tracker";
+	const char *subHeader =strdup(subsectionHeader.str().c_str());	
+        decorator::writeSubsectionHeader(headerFile, subHeader);
+        decorator::writeSubsectionHeader(programFile, subHeader);
+
+	int topmostGpuPps = pcubesModel->getGpuTransitionSpaceId();
+	List<ExecutionStage*> *executeStageList = gpuContext->getComputeStagesOfFlowContext();
+
+	// declare the tracker structure in the header file
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "ExecutionTracker";
+	std::string className = classNameStr.str();
+	headerFile << "class " << className << "{";
+	
+	// their will be one execution tracker entry per execution stage per PPU that will execute that stage
+	headerFile << "\n  public:\n";
+	for (int i = 0; i < executeStageList->NumElements(); i++) {
+		ExecutionStage *stage = executeStageList->Nth(i);
+		Space *lps = stage->getSpace();
+		int ppsId = lps->getPpsId();
+		int ppuCount = 1;
+		if (topmostGpuPps - ppsId > 0) {
+			ppuCount *= pcubesModel->getSMCount();
+		} 
+		if (topmostGpuPps - ppsId > 1) {
+			ppuCount *= pcubesModel->getWarpCount();
+		}
+		headerFile << indent << "int " << stage->getName() << "ExecutionCounter[" << ppuCount << "]";
+		headerFile << stmtSeparator;
+	}
+
+	// declare a function to reset all the counters and another one to determine how many times a particular stage
+	// has been executed
+	headerFile << "  public:\n";
+	headerFile << indent << "void resetCounters()" << stmtSeparator;
+	headerFile << indent << "int getExecutionCount(const char *counterName)" << stmtSeparator;
+	headerFile << "}" << stmtSeparator;
+
+	// define the two functions in the program file
+	generateStateExecTrackerCounterResetFn(gpuContext, pcubesModel, initials, programFile);  
+	generateStateExecTrackerCounterGatherFn(gpuContext, pcubesModel, initials, programFile);  
+}
+
+void generateStateExecTrackerCounterResetFn(GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile) {
+	
+	int topmostGpuPps = pcubesModel->getGpuTransitionSpaceId();
+	List<ExecutionStage*> *executeStageList = gpuContext->getComputeStagesOfFlowContext();
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "ExecutionTracker";
+	std::string className = classNameStr.str();
+	programFile << std::endl;
+	programFile << "void " << initials << "::" << className << "::resetCounters() {\n";
+
+	// iterate over all the execution stages of the GPU context's computation flow	
+	for (int i = 0; i < executeStageList->NumElements(); i++) {
+		
+		// determine the name of the counter
+		ExecutionStage *stage = executeStageList->Nth(i);
+		std::ostringstream counterName;
+		counterName << stage->getName() << "ExecutionCounter";
+		
+		// determine the number of entries the counter has
+		Space *lps = stage->getSpace();
+		int ppsId = lps->getPpsId();
+		int ppuCount = 1;
+		if (topmostGpuPps - ppsId > 0) {
+			ppuCount *= pcubesModel->getSMCount();
+		} 
+		if (topmostGpuPps - ppsId > 1) {
+			ppuCount *= pcubesModel->getWarpCount();
+		}
+
+		// set all entries of the counter to zero
+		programFile << indent << "for (int i = 0; i < " << ppuCount << "; i++) ";
+		programFile << counterName.str() << "[i] = 0" << stmtSeparator;
+	}
+
+	programFile << "}\n";
+}
+    
+void generateStateExecTrackerCounterGatherFn(GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile) {
+	
+	int topmostGpuPps = pcubesModel->getGpuTransitionSpaceId();
+	List<ExecutionStage*> *executeStageList = gpuContext->getComputeStagesOfFlowContext();
+	
+	std::ostringstream classNameStr;
+	classNameStr << "Context" << gpuContext->getContextId() << "ExecutionTracker";
+	std::string className = classNameStr.str();
+	programFile << std::endl;
+	programFile << "int " << initials << "::" << className;
+	programFile << "::getExecutionCount(const char *counterName) {\n";
+
+	// have a series of if-else block for different counters to compare the argument against
+	for (int i = 0; i < executeStageList->NumElements(); i++) {
+
+                // determine the name of the counter
+                ExecutionStage *stage = executeStageList->Nth(i);
+                std::ostringstream counterName;
+                counterName << stage->getName() << "ExecutionCounter";
+
+		// generate the if block
+		programFile << indent;
+		if (i > 0) programFile << " else ";
+		programFile << "if (strcmp(\"" << counterName.str() << "\"" << paramSeparator;
+		programFile << "counterName) == 0) {\n";
+		
+		// determine the number of entries in the counter
+		Space *lps = stage->getSpace();
+		int ppsId = lps->getPpsId();
+		int ppuCount = 1;
+		if (topmostGpuPps - ppsId > 0) {
+			ppuCount *= pcubesModel->getSMCount();
+		} 
+		if (topmostGpuPps - ppsId > 1) {
+			ppuCount *= pcubesModel->getWarpCount();
+		}
+	
+		// sum up the execution counter's entries
+		programFile << doubleIndent << "int total = 0" << stmtSeparator;
+		programFile << doubleIndent << "for (int i = 0; i < " << ppuCount << "; i++) {\n";
+		programFile << tripleIndent << "total += " << counterName.str() << "[i]" << stmtSeparator;
+		programFile << doubleIndent << "}\n";	
+		programFile << doubleIndent << "return total" << stmtSeparator;
+		programFile << indent << "}";	 
+	}
+	programFile << "\n";
+
+	programFile << indent << "return 0" << stmtSeparator;
+	programFile << "}\n";
+}
+
 void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
                 GpuExecutionContext *gpuContext,
                 PCubeSModel *pcubesModel,
@@ -1039,6 +1242,10 @@ void generateGpuCodeExecutorKernel(CompositeStage *kernelDef,
 	programFile << string_utils::toUpper(initials) << "Partition partition" << paramSeparator;
 	programFile << paramIndent << initials << "::TaskGlobals *taskGlobals" << paramSeparator;
 	programFile << paramIndent << initials << "::ThreadLocals *threadLocals" << paramSeparator;
+	// then add another parameter for the stage execution tracker GPU pointer
+	programFile << paramIndent << initials << "::Context";
+	programFile << gpuContext->getContextId() << "ExecutionTracker *stageExecutionTracker";
+	programFile << paramSeparator;
 	// then add another parameter for the launch configuration metadata 
 	Space *contextLps = gpuContext->getContextLps();
 	const char *lpsName = contextLps->getName();

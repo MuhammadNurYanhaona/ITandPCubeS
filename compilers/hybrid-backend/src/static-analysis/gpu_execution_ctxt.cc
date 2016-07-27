@@ -121,6 +121,7 @@ void KernelGroupConfig::generateKernelGroupExecutionCode(std::ofstream &programF
 		programFile << "arrayMetadata" << paramSeparator;
 		programFile << "partition" << paramSeparator << paramIndent << indentStr.str();
 		programFile << "taskGlobalsGpu" << paramSeparator << "threadLocalsGpu";
+		programFile << paramSeparator << "stageExecutionTrackerGpu";
 		programFile << paramSeparator << paramIndent << indentStr.str();
 		programFile << "launchMetadata" << paramSeparator;
 		programFile << "hostLpuConfigs" << paramSeparator << "maxPartSizes";
@@ -389,7 +390,52 @@ void GpuExecutionContext::generateInvocationCode(std::ofstream &stream,
 
 	// tear down the gpu offloading context and close the scope
 	stream << '\n' << indent.str() << "gpuCodeExecutor->cleanup()" << stmtSeparator;
+
+	// if applicable, update stage execution counters related to the GPU sub-flow context that will be needed 
+	// to activate data synchronizers and communicators
+	List<ExecutionStage*> *execStageList = getComputeStagesOfFlowContext();
+	for (int i = 0; i < execStageList->NumElements(); i++) {
+		ExecutionStage *execStage =execStageList->Nth(i);
+		StageSyncReqs *syncReqs = execStage->getAllSyncRequirements();
+		List<SyncRequirement*> *syncList = syncReqs->getAllSyncRequirements();
+		for (int i = 0; i < syncList->NumElements(); i++) {
+			DependencyArc *arc = syncList->Nth(i)->getDependencyArc();
+			if (arc->doesRequireSignal()) {
+				stream << indent.str() << arc->getArcName();
+				stream << " += gpuCodeExecutor->getExecutionCount(\"";
+				stream << execStage->getName() << "ExecutionCounter";
+				stream << "\")" << stmtSeparator;
+			}
+		}
+	}
+
 	stream << indent.str() << "} // GPU LPU offloading context ends\n";
+}
+
+List<ExecutionStage*> *GpuExecutionContext ::getComputeStagesOfFlowContext() {
+	
+	List<ExecutionStage*> *executeStageList = new List<ExecutionStage*>;
+	std::deque<FlowStage*> stageQueue;
+	for (int i = 0; i < contextFlow->NumElements(); i++) {
+		stageQueue.push_back(contextFlow->Nth(i));
+	}
+
+	while (!stageQueue.empty()) {
+		FlowStage *currentStage = stageQueue.front();
+		stageQueue.pop_front();
+		if (dynamic_cast<ExecutionStage*>(currentStage) != NULL) {
+			executeStageList->Append((ExecutionStage*) currentStage);
+			continue;
+		}
+		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(currentStage);
+		if (compositeStage == NULL) continue;
+		List<FlowStage*> *nestedStages = compositeStage->getStageList();
+		for (int i = 0; i < nestedStages->NumElements(); i++) {
+			stageQueue.push_back(nestedStages->Nth(i));
+		} 
+	}
+
+	return executeStageList;
 }
 
 void GpuExecutionContext::describe(int indentLevel) {
@@ -1078,5 +1124,3 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 	}
 	stream << "]" << stmtSeparator;	
 }
-
-

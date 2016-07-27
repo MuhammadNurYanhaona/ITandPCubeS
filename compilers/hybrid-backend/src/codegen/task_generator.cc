@@ -288,7 +288,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 		
 		// this part is using the cuda program file as it generates CUDA code 
 		generateGpuCodeExecutors(gpuContextList, 
-				pcubesModel, initials, headerFile, cudaProgramFile);
+				pcubesModel, initials, 
+				headerFile, programFile, cudaProgramFile);
 
 		generateBatchComputeFunction(taskDef, 
 				headerFile, programFile, initials, communicatorCount);

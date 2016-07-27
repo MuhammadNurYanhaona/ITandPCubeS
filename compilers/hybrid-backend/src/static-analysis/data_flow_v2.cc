@@ -854,10 +854,23 @@ void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
 	code->generateCode(codeStream, innerIndent, space);
 	stream << codeStream.str();
 
+	// increment the counter that tracks the number of times a PPU has executed a particular computation stage
+	std::string execCounterSuffix = std::string("[0]");
+	if (topmostGpuPps - myPps == 1) {
+		execCounterSuffix = std::string("[smId]");
+	} else {
+		execCounterSuffix = std::string("[globalWarpId]");
+	}
+	stream << std::endl;
+	if (!warpLevel) stream << indent;
+	stream << indentStr.str() << "if (threadId == 0) stageExecutionTracker->";
+	stream << name << "ExecutionCounter" << execCounterSuffix << "++" << stmtSeparator;
+	
 	// close the PPU filtering if block when applicable
 	if (!warpLevel) {
 		stream << indentStr.str() << "}\n";
 	}
+
 	
 	stream << std::endl;
 	decorator::writeCommentHeader(indentation, &stream, "translation done");

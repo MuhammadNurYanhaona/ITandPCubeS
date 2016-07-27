@@ -127,9 +127,10 @@ void generateGpuCodeExecutorForContext(GpuExecutionContext *gpuContext,
 void generateGpuCodeExecutors(List<GpuExecutionContext*> *gpuExecutionContextList, 
 		PCubeSModel *pcubesModel,
 		const char *initials, 
-		const char *headerFile, const char *programFile);
+		const char *headerFile, 
+		const char *programFile, const char *cudaProgramFile);
 
-// these are five auxiliary functions to be used by the Gpu-Code-Executor generator function of the above to
+// these are six auxiliary functions to be used by the Gpu-Code-Executor generator function of the above to
 // provide implementations for the constructor and some inherited functions
 void generateGpuCodeExecutorConstructor(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
@@ -140,8 +141,27 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 		const char *initials, std::ofstream &programFile);
 void generateGpuCodeExecutorCleanupFn(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
+void generateGpuCodeExecutorGetStageExecCountFn(GpuExecutionContext *gpuContext, 
+		const char *initials, std::ofstream &programFile);
 void generateGpuCodeExecutorAncestorLpuExtractFn(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
+
+// Just like their host level counterparts, compute stages to be executed as part of GPU kernels might be
+// protected by some execution conditions. It is required that the host knows what stages have been executed
+// so that appropriate decisions about communications can be made for data dependencies emanating from
+// conditionally executed stages. The following functions generate a data structure and its member functions
+// that is shared between the host and the GPU to keep track of the number of times different compute stages
+// have been executed as part of a GPU context.
+void generateStageExecutionTrackerStruct(GpuExecutionContext *gpuContext,
+                PCubeSModel *pcubesModel, 
+		const char *initials, 
+		std::ofstream &headerFile, std::ofstream &programFile);
+void generateStateExecTrackerCounterResetFn(GpuExecutionContext *gpuContext,
+		PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile);	 
+void generateStateExecTrackerCounterGatherFn(GpuExecutionContext *gpuContext,
+		PCubeSModel *pcubesModel,
+                const char *initials, std::ofstream &programFile);	 
 
 // these two functions are used to generate kernels related to the offloading context a GPU-Code-Executor is
 // responsible for

@@ -134,6 +134,10 @@ class GpuExecutionContext {
 	// with intermediate host level code)
 	void generateContextFlowImplementerCode(std::ofstream &programFile, int indentLevel);
 
+	// As the name suggests, this function returns the list of compute stages that are part of the sub-flow this
+	// GPU execution context encompases.
+	List<ExecutionStage*> *getComputeStagesOfFlowContext();
+
 	void describe(int indent);
   private:
 	// It can happen that the computation flow dives into a lower level LPS in the GPU directly from a host

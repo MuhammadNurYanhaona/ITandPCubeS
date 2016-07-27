@@ -86,6 +86,11 @@ class GpuCodeExecutor {
 	// tears down the CUDA context and prints the collected statistics. 
 	virtual void initialize();
 	virtual void cleanup();
+
+	// Subclasses should provide implementation for this function so that the host can determine how many times different
+	// compute stages that are parts of the sub-flow the GPU-Code-Executor is responsible for executed inside the GPU.
+	// This information is needed to make decision about a host's role during communication across segments.
+	virtual int getExecutionCount(const char *stageCounterName) = 0; 
   protected:
 	// subclasses should provide implementation for this function should that invokes the proper sequence of GPU kernels 
 	// to perform the compute stages relevant to the current context 
