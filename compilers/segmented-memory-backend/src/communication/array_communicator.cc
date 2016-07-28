@@ -538,14 +538,23 @@ void DownSyncCommunicator::sendData() {
 	if (replicated) discoverSender(true);
 
 	if (commMode == BROADCAST) {
+
+		// in the broadcast transfer mode there is just one buffer content to communicate
 		CommBuffer *buffer = commBufferList->Nth(0);
-		char *data = buffer->getData();
-		int bufferSize = buffer->getBufferSize();
-		int status = MPI_Bcast(data, bufferSize, MPI_CHAR, myRank, mpiComm);
-		if (status != MPI_SUCCESS) {
-			cout << "Segment " << localSegmentTag << ": could not broadcast update to lower level LPS\n";
-			exit(EXIT_FAILURE);
+
+		// issue the MPI broadcast only when there are some other segments waiting to receive the data
+		DataExchange *exchange = buffer->getExchange();
+		if (!exchange->isIntraSegmentExchange(localSegmentTag)) {
+			char *data = buffer->getData();
+			int bufferSize = buffer->getBufferSize();
+			int status = MPI_Bcast(data, bufferSize, MPI_CHAR, myRank, mpiComm);
+			if (status != MPI_SUCCESS) {
+				cout << "Segment " << localSegmentTag;
+				cout << ": could not broadcast update to lower level LPS\n";
+				exit(EXIT_FAILURE);
+			}
 		}
+
 		// need to update own operating memory data as the sender will bypass the receive call on the communicator
 		buffer->writeData(false, *logFile);
 	} else {		
