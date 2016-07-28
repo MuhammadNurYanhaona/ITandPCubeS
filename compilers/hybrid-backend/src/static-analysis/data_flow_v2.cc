@@ -841,13 +841,24 @@ void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
 		stream << indentStr.str() << "if (warpId == 0) {\n";
 		innerIndent++;
 	}
-	
+
 	// set up appropriate mode for the name transformer that adds prefix and suffixes to the variables used in
 	// statements inside the execution stage
 	ntransform::HybridNameTransformer *transformer = (ntransform::HybridNameTransformer*)
         		ntransform::NameTransformer::transformer;
 	transformer->setWarpSuffixStat(warpLevel);
 	transformer->setCurrentLpsName(space->getName());
+
+	 // if the execution block has an activation condition on it then we need to evaluate it before proceeding
+        // into executing anything further
+        if (executeCond != NULL) {
+		if (!warpLevel) stream << indent;
+                stream <<  indentStr.str() << "if(!(";
+                std::ostringstream conditionStream;
+                executeCond->translate(conditionStream, innerIndent, 0, space);
+                stream << conditionStream.str();
+                stream << ")) continue" << stmtSeparator;
+        }
 	
 	// do code-block translation
 	std::ostringstream codeStream;
