@@ -27,12 +27,14 @@
 // A statistics gathering class that records the total time spent handling different aspects of GPU LPU offloading
 class OffloadStats {
   protected:
+	double timeSpentDataPartsPreparation;
 	double timeSpentStagingIn;
 	double timeSpentExecution;
 	double timeSpentStagingOut;
 	int executionCount;
   public:
 	OffloadStats();
+	void addDataPartsPreparationTime(double time) { timeSpentDataPartsPreparation += time; }
 	void addStagingInTime(double time) { timeSpentStagingIn += time; }
 	void addExecutionTime(double time) { timeSpentExecution += time; }
 	void addStagingOutTime(double time) { timeSpentStagingOut += time; }

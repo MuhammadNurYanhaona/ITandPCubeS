@@ -8,6 +8,7 @@
 //-------------------------------------------------------- Offload Statistics -------------------------------------------------------------/
 
 OffloadStats::OffloadStats() {
+	timeSpentDataPartsPreparation = 0;
 	timeSpentStagingIn = 0;
 	timeSpentExecution = 0;
 	timeSpentStagingOut = 0;
@@ -15,6 +16,8 @@ OffloadStats::OffloadStats() {
 }
 
 void OffloadStats::describe(std::ofstream &logFile) {
+	logFile << "Overall time spent preparing data parts in the CPU: ";
+	logFile << timeSpentDataPartsPreparation << " Seconds\n";
 	logFile << "Overall time spent staging data into GPU from CPU: ";
 	logFile << timeSpentStagingIn << " Seconds\n";
 	logFile << "Overall time spent executing kernels for the LPUs: ";
@@ -42,14 +45,31 @@ void GpuCodeExecutor::submitNextLpu(LPU *lpu, int ppuGroupIndex) {
                 } else {
                         lpuBatchRangeVector->at(ppuGroupIndex).max++;
                 }
+
+		struct timeval tv;
+        	gettimeofday(&tv, NULL);
+        	long startTime = tv.tv_sec * 1000000 + tv.tv_usec;
 		lpuBatchController->addLpuToTheCurrentBatch(lpu, ppuGroupIndex);
+		gettimeofday(&tv, NULL);
+		long endTime = tv.tv_sec * 1000000 + tv.tv_usec;
+		double timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
+		offloadStats->addDataPartsPreparationTime(timeTaken);
+
 		return;	
 	}
 	if (!lpuBatchController->isEmptyBatch()) {
 		execute();
 	}
 
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	long startTime = tv.tv_sec * 1000000 + tv.tv_usec;
 	lpuBatchController->addLpuToTheCurrentBatch(lpu, ppuGroupIndex);
+	gettimeofday(&tv, NULL);
+	long endTime = tv.tv_sec * 1000000 + tv.tv_usec;
+	double timeTaken = ((endTime - startTime) * 1.0) / (1000 * 1000);
+	offloadStats->addDataPartsPreparationTime(timeTaken);
+	
 	extractAncestorLpuConfigs(lpu, ppuGroupIndex);
 	lpuBatchRangeVector->at(ppuGroupIndex) = Range(lpu->id);
 }
