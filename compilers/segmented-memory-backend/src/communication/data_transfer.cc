@@ -10,6 +10,82 @@
 
 using namespace std;
 
+//----------------------------------------------------- Data Part Index List ------------------------------------------------------/
+
+void DataPartIndexList::clone(DataPartIndexList source) {
+	this->partIndexList->clear();
+	this->partIndexList->AppendAll(source.partIndexList);
+}
+
+int DataPartIndexList::read(char *destBuffer, int elementSize) {
+	
+	// Notice that data is read from only the first matched location in the operating memory data part storage. 
+	// This is because, all locations matching a single entry in the communication buffer should have identical 
+	// content.
+	char *readLocation = partIndexList->Nth(0).getLocation();
+        memcpy(destBuffer, readLocation, elementSize);
+	return 1;
+}
+        
+int DataPartIndexList::write(char *sourceBuffer, int elementSize) {
+
+	// Unlike in the case for read, writing should access every single matched location in the data parts as we 
+	// need to ensure that all locations matching a single entry in the communication buffer are synchronized 
+	// with the same update.       
+	for (int j = 0; j < partIndexList->NumElements(); j++) {
+		char *writeLocation = partIndexList->Nth(j).getLocation();
+		memcpy(writeLocation, sourceBuffer, elementSize);
+	}
+
+	// The return value is still once as only one element has been read from the source buffer
+	return 1;
+}
+
+//-------------------------------------------------- Data Part Swift Index List ---------------------------------------------------/
+
+DataPartSwiftIndexList::DataPartSwiftIndexList(DataPart *dataPart) : DataPartIndexList() {
+	this->dataPart = dataPart;
+	partIndexes = new List<int>;
+} 
+
+DataPartSwiftIndexList::~DataPartSwiftIndexList() {
+	delete partIndexes;
+	delete[] indexArray;
+}
+
+void DataPartSwiftIndexList::setupIndexArray() {
+	int indexCount = partIndexes->NumElements();
+	indexArray = new int[indexCount];
+	for (int i = 0; i < indexCount; i++) {
+		indexArray[i] = partIndexes->Nth(i);
+	}
+	sequenceLength = indexCount;
+}
+
+int DataPartSwiftIndexList::read(char *destBuffer, int elementSize) {
+	void *data = dataPart->getData();
+        char *charData = reinterpret_cast<char*>(data);
+	char *currBufferIndex = destBuffer;
+	for (int i = 0; i < sequenceLength; i++) {
+		char *readLocation = charData + indexArray[i];
+		memcpy(currBufferIndex, readLocation, elementSize);
+		currBufferIndex += elementSize;
+	}
+	return sequenceLength;
+}
+        
+int DataPartSwiftIndexList::write(char *sourceBuffer, int elementSize) {
+	void *data = dataPart->getData();
+        char *charData = reinterpret_cast<char*>(data);
+	char *currBufferIndex = sourceBuffer;
+	for (int i = 0; i < sequenceLength; i++) {
+		char *writeLocation = charData + indexArray[i];
+		memcpy(writeLocation, currBufferIndex, elementSize);
+		currBufferIndex += elementSize;
+	}
+	return sequenceLength;
+}
+
 //---------------------------------------------------- Transfer Specification -----------------------------------------------------/
 
 TransferSpec::TransferSpec(TransferDirection direction, int elementSize) {

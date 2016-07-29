@@ -228,11 +228,29 @@ class IndexMappedPhysicalCommBuffer : public IndexMappedCommBuffer {
 	char *data;
   public:
 	IndexMappedPhysicalCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
-	~IndexMappedPhysicalCommBuffer() { delete[] data; }
-	void readData(bool loggingEnabled, std::ostream &logFile);
-        void writeData(bool loggingEnabled, std::ostream &logFile);
+	virtual ~IndexMappedPhysicalCommBuffer() { delete[] data; }
+	virtual void readData(bool loggingEnabled, std::ostream &logFile);
+        virtual void writeData(bool loggingEnabled, std::ostream &logFile);
 	void setData(char *data) { this->data = data; }
         char *getData() { return data; } 	
+};
+
+/* This extension to the index-mapped-physical-buffer is useful to reduce buffer management overhead when the large
+ * sequences of elements in the comm buffer correspond to indices of the same data parts.
+ */
+class SwiftIndexMappedPhysicalCommBuffer : public IndexMappedPhysicalCommBuffer {
+  protected:
+	List<DataPartIndexList*> *senderSwiftIndexMapping;
+	List<DataPartIndexList*> *receiverSwiftIndexMapping;
+  public:
+	SwiftIndexMappedPhysicalCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
+	~SwiftIndexMappedPhysicalCommBuffer();
+	void readData(bool loggingEnabled, std::ostream &logFile);
+        void writeData(bool loggingEnabled, std::ostream &logFile);
+  private:
+	void setupSwiftIndexMapping(DataPartIndexList *transferIndexMapping,
+			List<DataPartIndexList*> *swiftIndexMapping, 
+			bool allowMultPartIndexesForSameBufferIndex);
 };
 
 /* This extension is for situations where we do not want any intervening memory to be allocated for the communication
