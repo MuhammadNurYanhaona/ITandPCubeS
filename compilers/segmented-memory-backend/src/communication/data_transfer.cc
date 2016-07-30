@@ -17,6 +17,11 @@ void DataPartIndexList::clone(DataPartIndexList *source) {
 	this->partIndexList->AppendAll(source->partIndexList);
 }
 
+void DataPartIndexList::clonePartIndexList(List<DataPartIndex> *sourcePartIndexList) {
+	this->partIndexList->clear();
+	this->partIndexList->AppendAll(sourcePartIndexList);
+}
+
 int DataPartIndexList::read(char *destBuffer, int elementSize) {
 	
 	// Notice that data is read from only the first matched location in the operating memory data part storage. 

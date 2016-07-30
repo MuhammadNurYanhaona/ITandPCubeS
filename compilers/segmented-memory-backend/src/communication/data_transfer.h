@@ -68,6 +68,7 @@ class DataPartIndexList {
 	inline void addPartIndex(DataPartIndex partIndex) { partIndexList->Append(partIndex); }
 	inline List<DataPartIndex> *getPartIndexList() { return partIndexList; }
 	void clone(DataPartIndexList *source);
+	void clonePartIndexList(List<DataPartIndex> *sourcePartIndexList);
 
 	// As the function names suggest, these two functions are provided to aid data transfer to and from the data
 	// part indexes represented by this class. The return value indicates the number of steps the source or des-

@@ -235,7 +235,7 @@ class IndexMappedPhysicalCommBuffer : public IndexMappedCommBuffer {
         char *getData() { return data; } 	
 };
 
-/* This extension to the index-mapped-physical-buffer is useful to reduce buffer management overhead when the large
+/* This extension to the index-mapped-physical-buffer is useful to reduce buffer management overhead when many large
  * sequences of elements in the comm buffer correspond to indices of the same data parts.
  */
 class SwiftIndexMappedPhysicalCommBuffer : public IndexMappedPhysicalCommBuffer {
@@ -284,8 +284,28 @@ class IndexMappedVirtualCommBuffer : public IndexMappedCommBuffer {
   public:
 	IndexMappedVirtualCommBuffer(DataExchange *exchange,
                         SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig) {}
-	void readData(bool loggingEnabled, std::ostream &logFile);
+	~IndexMappedVirtualCommBuffer() {}
+	virtual void readData(bool loggingEnabled, std::ostream &logFile);
         void writeData(bool loggingEnabled, std::ostream &logFile) {}
+};
+
+/* This extension to the index-mapped-virtual-buffer is useful to reduce buffer management overhead when many large
+ * sequences of elements in the comm buffer correspond to indices of the same data parts.
+ */
+class SwiftIndexMappedVirtualCommBuffer : public IndexMappedVirtualCommBuffer {
+  private:
+	// unlike all other virtual communication buffer; we maintain an intermediate data buffer for this class. This
+	// is to simplify the transfer logic between the sender and receiver sides    
+	char *data;
+	
+	List<DataPartIndexList*> *senderSwiftIndexMapping;
+	List<DataPartIndexList*> *receiverSwiftIndexMapping;
+  public:
+	SwiftIndexMappedVirtualCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
+	~SwiftIndexMappedVirtualCommBuffer();
+	void readData(bool loggingEnabled, std::ostream &logFile);
+  private:
+	void generateSwiftIndexMappings();  
 };
 
 /* This class contains all communication buffers related to a particular data synchronization and does the buffer read
