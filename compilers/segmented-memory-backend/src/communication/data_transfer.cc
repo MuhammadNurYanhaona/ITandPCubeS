@@ -12,9 +12,9 @@ using namespace std;
 
 //----------------------------------------------------- Data Part Index List ------------------------------------------------------/
 
-void DataPartIndexList::clone(DataPartIndexList source) {
+void DataPartIndexList::clone(DataPartIndexList *source) {
 	this->partIndexList->clear();
-	this->partIndexList->AppendAll(source.partIndexList);
+	this->partIndexList->AppendAll(source->partIndexList);
 }
 
 int DataPartIndexList::read(char *destBuffer, int elementSize) {

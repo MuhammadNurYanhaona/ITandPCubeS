@@ -400,10 +400,11 @@ void SwiftIndexMappedPhysicalCommBuffer::setupSwiftIndexMapping(DataPartIndexLis
 			List<DataPartIndexList*> *swiftIndexMapping,
                         bool allowMultPartIndexesForSameBufferIndex) {
 
-	DataPartSwiftIndexList *currSwiftIndex = NULL;	
+	DataPartSwiftIndexList *currSwiftIndex = NULL;
+	DataPartIndexList *currEntry = new DataPartIndexList();	
 	for (int i = 0; i < elementCount; i++) {
-		DataPartIndexList currEntry = transferIndexMapping[i];
-		List<DataPartIndex> *indexList = currEntry.getPartIndexList();
+		currEntry->clone(&transferIndexMapping[i]);
+		List<DataPartIndex> *indexList = currEntry->getPartIndexList();
 		if (!allowMultPartIndexesForSameBufferIndex || indexList->NumElements() == 1) {
 			DataPartIndex partIndex = indexList->Nth(0);
 			if (currSwiftIndex == NULL) {
@@ -413,6 +414,7 @@ void SwiftIndexMappedPhysicalCommBuffer::setupSwiftIndexMapping(DataPartIndexLis
 				if (currSwiftIndex->getDataPart() == partIndex.getDataPart()) {
 					currSwiftIndex->addIndex(partIndex.getIndex());
 				} else {
+					currSwiftIndex->setupIndexArray();
 					swiftIndexMapping->Append(currSwiftIndex);
 					currSwiftIndex = new DataPartSwiftIndexList(partIndex.getDataPart());
 					currSwiftIndex->addIndex(partIndex.getIndex());
@@ -420,6 +422,7 @@ void SwiftIndexMappedPhysicalCommBuffer::setupSwiftIndexMapping(DataPartIndexLis
 			}
 		} else {
 			if (currSwiftIndex != NULL) {
+				currSwiftIndex->setupIndexArray();
 				swiftIndexMapping->Append(currSwiftIndex);
 				DataPartIndexList *cloneEntry = new DataPartIndexList();
 				cloneEntry->clone(currEntry);
@@ -432,7 +435,10 @@ void SwiftIndexMappedPhysicalCommBuffer::setupSwiftIndexMapping(DataPartIndexLis
 			}
 		} 
 	}
-	if (currSwiftIndex != NULL) swiftIndexMapping->Append(currSwiftIndex);
+	if (currSwiftIndex != NULL) {
+		currSwiftIndex->setupIndexArray();
+		swiftIndexMapping->Append(currSwiftIndex);
+	}
 }
 
 //------------------------------------------------- Virtual Communication Buffer -------------------------------------------------/
