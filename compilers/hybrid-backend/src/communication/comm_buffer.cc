@@ -345,6 +345,102 @@ void IndexMappedPhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream 
         }
 }
 
+//---------------------------------------- Swift-Index-mapped Physical Communication Buffer --------------------------------------/
+
+SwiftIndexMappedPhysicalCommBuffer::SwiftIndexMappedPhysicalCommBuffer(
+		DataExchange *exchange, SyncConfig *syncConfig) 
+		: IndexMappedPhysicalCommBuffer(exchange, syncConfig) {
+	
+	senderSwiftIndexMapping = new List<DataPartIndexList*>;
+	receiverSwiftIndexMapping = new List<DataPartIndexList*>;
+	if (isSendActivated()) {
+		setupSwiftIndexMapping(senderTransferIndexMapping, senderSwiftIndexMapping, false);
+	}
+	if (isReceiveActivated()) {
+		setupSwiftIndexMapping(receiverTransferIndexMapping, receiverSwiftIndexMapping, true);
+	}
+}
+
+SwiftIndexMappedPhysicalCommBuffer::~SwiftIndexMappedPhysicalCommBuffer() {
+
+	while (senderSwiftIndexMapping->NumElements() > 0) {
+		DataPartIndexList *entry = senderSwiftIndexMapping->Nth(0);
+		senderSwiftIndexMapping->RemoveAt(0);
+		delete entry;
+	}
+	delete senderSwiftIndexMapping;
+
+	while (receiverSwiftIndexMapping->NumElements() > 0) {
+		DataPartIndexList *entry = receiverSwiftIndexMapping->Nth(0);
+		receiverSwiftIndexMapping->RemoveAt(0);
+		delete entry;
+	}
+	delete receiverSwiftIndexMapping;
+}
+
+void SwiftIndexMappedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
+	int index = 0;
+	for (int i = 0; i < senderSwiftIndexMapping->NumElements(); i++) {
+		DataPartIndexList *partIndexList = senderSwiftIndexMapping->Nth(i);
+		char *bufferIndex = data + index * elementSize;
+		index += partIndexList->read(bufferIndex, elementSize);
+	}
+}
+
+void SwiftIndexMappedPhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream &logFile) {
+	int index = 0;
+	for (int i = 0; i < receiverSwiftIndexMapping->NumElements(); i++) {
+		DataPartIndexList *partIndexList = receiverSwiftIndexMapping->Nth(i);
+		char *bufferIndex = data + index * elementSize;
+		index += partIndexList->write(bufferIndex, elementSize);
+	}
+}
+
+void SwiftIndexMappedPhysicalCommBuffer::setupSwiftIndexMapping(DataPartIndexList *transferIndexMapping,
+			List<DataPartIndexList*> *swiftIndexMapping,
+                        bool allowMultPartIndexesForSameBufferIndex) {
+
+	DataPartSwiftIndexList *currSwiftIndex = NULL;
+	DataPartIndexList *currEntry = new DataPartIndexList();	
+	for (int i = 0; i < elementCount; i++) {
+		currEntry->clone(&transferIndexMapping[i]);
+		List<DataPartIndex> *indexList = currEntry->getPartIndexList();
+		if (!allowMultPartIndexesForSameBufferIndex || indexList->NumElements() == 1) {
+			DataPartIndex partIndex = indexList->Nth(0);
+			if (currSwiftIndex == NULL) {
+				currSwiftIndex = new DataPartSwiftIndexList(partIndex.getDataPart());
+				currSwiftIndex->addIndex(partIndex.getIndex());
+			} else {
+				if (currSwiftIndex->getDataPart() == partIndex.getDataPart()) {
+					currSwiftIndex->addIndex(partIndex.getIndex());
+				} else {
+					currSwiftIndex->setupIndexArray();
+					swiftIndexMapping->Append(currSwiftIndex);
+					currSwiftIndex = new DataPartSwiftIndexList(partIndex.getDataPart());
+					currSwiftIndex->addIndex(partIndex.getIndex());
+				}
+			}
+		} else {
+			if (currSwiftIndex != NULL) {
+				currSwiftIndex->setupIndexArray();
+				swiftIndexMapping->Append(currSwiftIndex);
+				DataPartIndexList *cloneEntry = new DataPartIndexList();
+				cloneEntry->clone(currEntry);
+				swiftIndexMapping->Append(cloneEntry);
+				currSwiftIndex = NULL;	
+			} else {
+				DataPartIndexList *cloneEntry = new DataPartIndexList();
+				cloneEntry->clone(currEntry);
+				swiftIndexMapping->Append(cloneEntry);
+			}
+		} 
+	}
+	if (currSwiftIndex != NULL) {
+		currSwiftIndex->setupIndexArray();
+		swiftIndexMapping->Append(currSwiftIndex);
+	}
+}
+
 //------------------------------------------------- Virtual Communication Buffer -------------------------------------------------/
 
 void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
@@ -456,6 +552,172 @@ void IndexMappedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &l
                 	memcpy(writeLocation, readLocation, elementSize);
 		}
         }
+}
+
+//----------------------------------------- Swift-Index-mapped Virtual Communication Buffer --------------------------------------/
+
+SwiftIndexMappedVirtualCommBuffer::SwiftIndexMappedVirtualCommBuffer(
+		DataExchange *exchange, SyncConfig *syncConfig) 
+		: IndexMappedVirtualCommBuffer(exchange, syncConfig) {
+
+	int bufferSize = elementCount * elementSize;
+	data = new char[bufferSize];
+	for (int i = 0; i < bufferSize; i++) {
+		data[i] = 0;
+	}
+
+	generateSwiftIndexMappings();
+}
+
+SwiftIndexMappedVirtualCommBuffer::~SwiftIndexMappedVirtualCommBuffer() {
+	
+	delete[] data;
+
+	while (senderSwiftIndexMapping->NumElements() > 0) {
+                DataPartIndexList *entry = senderSwiftIndexMapping->Nth(0);
+                senderSwiftIndexMapping->RemoveAt(0);
+                delete entry;
+        }
+        delete senderSwiftIndexMapping;
+
+        while (receiverSwiftIndexMapping->NumElements() > 0) {
+                DataPartIndexList *entry = receiverSwiftIndexMapping->Nth(0);
+                receiverSwiftIndexMapping->RemoveAt(0);
+                delete entry;
+        }
+        delete receiverSwiftIndexMapping;
+}
+
+void SwiftIndexMappedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
+
+	int index = 0;
+        for (int i = 0; i < senderSwiftIndexMapping->NumElements(); i++) {
+                DataPartIndexList *partIndexList = senderSwiftIndexMapping->Nth(i);
+                char *bufferIndex = data + index * elementSize;
+                index += partIndexList->read(bufferIndex, elementSize);
+        }
+
+	index = 0;
+        for (int i = 0; i < receiverSwiftIndexMapping->NumElements(); i++) {
+                DataPartIndexList *partIndexList = receiverSwiftIndexMapping->Nth(i);
+                char *bufferIndex = data + index * elementSize;
+                index += partIndexList->write(bufferIndex, elementSize);
+        }
+}
+
+void SwiftIndexMappedVirtualCommBuffer::generateSwiftIndexMappings() {
+	
+	// prepare the sender-side swift index mapping
+	senderSwiftIndexMapping = new List<DataPartIndexList*>;
+	DataPartSwiftIndexList *currSwiftIndex = NULL;
+	DataPartIndexList *currSendEntry = new DataPartIndexList();	
+	for (int i = 0; i < elementCount; i++) {
+		currSendEntry->clone(&senderTransferIndexMapping[i]);
+		List<DataPartIndex> *indexList = currSendEntry->getPartIndexList();
+		DataPartIndex partIndex = indexList->Nth(0);
+		if (currSwiftIndex == NULL) {
+			currSwiftIndex = new DataPartSwiftIndexList(partIndex.getDataPart());
+			currSwiftIndex->addIndex(partIndex.getIndex());
+		} else {
+			if (currSwiftIndex->getDataPart() == partIndex.getDataPart()) {
+				currSwiftIndex->addIndex(partIndex.getIndex());
+			} else {
+				currSwiftIndex->setupIndexArray();
+				senderSwiftIndexMapping->Append(currSwiftIndex);
+				currSwiftIndex = new DataPartSwiftIndexList(partIndex.getDataPart());
+				currSwiftIndex->addIndex(partIndex.getIndex());
+			}
+		}
+	}
+	if (currSwiftIndex != NULL) {
+		currSwiftIndex->setupIndexArray();
+		senderSwiftIndexMapping->Append(currSwiftIndex);
+	}
+
+	// prepare the receiver-side swift index mapping
+	receiverSwiftIndexMapping = new List<DataPartIndexList*>;
+	currSwiftIndex = NULL;
+	DataPartIndexList *currRecvEntry = new DataPartIndexList();
+	List<DataPartIndex> *refIndexList = new List<DataPartIndex>;	
+	for (int i = 0; i < elementCount; i++) {
+
+		currRecvEntry->clone(&receiverTransferIndexMapping[i]);
+		List<DataPartIndex> *recvIndexList = currRecvEntry->getPartIndexList();
+
+		// If there is only one receive index for this communication buffer entry then augment existing or start 
+		// a new swift index mapping.
+		if (recvIndexList->NumElements() == 1) {
+			DataPartIndex partIndex = recvIndexList->Nth(0);
+			DataPart *dataPart = partIndex.getDataPart();
+			int index = partIndex.getIndex();
+			if (currSwiftIndex == NULL) { 
+				currSwiftIndex = new DataPartSwiftIndexList(dataPart);
+				currSwiftIndex->addIndex(index);
+			} else {
+				if (currSwiftIndex->getDataPart() == dataPart) {
+					currSwiftIndex->addIndex(index);
+				} else {
+					currSwiftIndex->setupIndexArray();
+					receiverSwiftIndexMapping->Append(currSwiftIndex);
+					currSwiftIndex = new DataPartSwiftIndexList(dataPart);
+					currSwiftIndex->addIndex(index);
+				}
+			}
+		// If there are more than one receive indices then first we try to avoid sender index being unwittingly
+		// repeated in the receiver side. After eliminating such redundancy, we may be able to create a new swift 
+		// mapping. Otherwise, just store the original transfer mapping 
+		} else {
+			
+			// filering receive part indexes
+			currSendEntry->clone(&senderTransferIndexMapping[i]);
+			DataPartIndex sendPartIndex = currSendEntry->getPartIndexList()->Nth(0);
+			refIndexList->clear();
+			for (int j = 0; j < recvIndexList->NumElements(); j++) {
+				DataPartIndex recvPartIndex = recvIndexList->Nth(j);
+				if (sendPartIndex.getDataPart() != recvPartIndex.getDataPart()) {
+					refIndexList->Append(recvPartIndex);
+				}	
+			}
+
+			// attempt to agment existing or start a new swift index mapping
+			if (refIndexList->NumElements() == 1) {
+				DataPartIndex partIndex = refIndexList->Nth(0);
+				DataPart *dataPart = partIndex.getDataPart();
+				int index = partIndex.getIndex();	
+				if (currSwiftIndex == NULL) { 
+					currSwiftIndex = new DataPartSwiftIndexList(dataPart);
+					currSwiftIndex->addIndex(index);
+				} else {
+					if (currSwiftIndex->getDataPart() == dataPart) {
+						currSwiftIndex->addIndex(index);
+					} else {
+						currSwiftIndex->setupIndexArray();
+						receiverSwiftIndexMapping->Append(currSwiftIndex);
+						currSwiftIndex = new DataPartSwiftIndexList(dataPart);
+						currSwiftIndex->addIndex(index);
+					}
+				}
+			// if failed then store the normal index mapping
+			} else {
+				if (currSwiftIndex != NULL) {
+					currSwiftIndex->setupIndexArray();
+					receiverSwiftIndexMapping->Append(currSwiftIndex);
+					DataPartIndexList *cloneEntry = new DataPartIndexList();
+					cloneEntry->clonePartIndexList(refIndexList);
+					receiverSwiftIndexMapping->Append(cloneEntry);
+					currSwiftIndex = NULL;	
+				} else {
+					DataPartIndexList *cloneEntry = new DataPartIndexList();
+					cloneEntry->clonePartIndexList(refIndexList);
+					receiverSwiftIndexMapping->Append(cloneEntry);
+				}
+			}
+		}
+	}
+	if (currSwiftIndex != NULL) {
+		currSwiftIndex->setupIndexArray();
+		receiverSwiftIndexMapping->Append(currSwiftIndex);
+	}
 }
 
 //-------------------------------------------------- Communication Buffer Manager ------------------------------------------------/

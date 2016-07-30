@@ -284,7 +284,7 @@ class IndexMappedVirtualCommBuffer : public IndexMappedCommBuffer {
   public:
 	IndexMappedVirtualCommBuffer(DataExchange *exchange,
                         SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig) {}
-	~IndexMappedVirtualCommBuffer() {}
+	virtual ~IndexMappedVirtualCommBuffer() {}
 	virtual void readData(bool loggingEnabled, std::ostream &logFile);
         void writeData(bool loggingEnabled, std::ostream &logFile) {}
 };

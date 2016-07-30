@@ -60,13 +60,43 @@ class DataPartIndex {
  * the communication buffer.
  */
 class DataPartIndexList {
-  protected:
+  private:
 	List<DataPartIndex> *partIndexList;
   public:
 	DataPartIndexList() { partIndexList = new List<DataPartIndex>; }
-	~DataPartIndexList() { delete partIndexList; }
+	virtual ~DataPartIndexList() { delete partIndexList; }
 	inline void addPartIndex(DataPartIndex partIndex) { partIndexList->Append(partIndex); }
 	inline List<DataPartIndex> *getPartIndexList() { return partIndexList; }
+	void clone(DataPartIndexList *source);
+	void clonePartIndexList(List<DataPartIndex> *sourcePartIndexList);
+
+	// As the function names suggest, these two functions are provided to aid data transfer to and from the data
+	// part indexes represented by this class. The return value indicates the number of steps the source or des-
+	// tination pointer in the communication buffer should be advanced before the next call to read/write has been 
+	// made.
+	virtual int read(char *destBuffer, int elementSize);
+	virtual int write(char *sourceBuffer, int elementSize);
+};
+
+/* This class has been provided to optimize for the case when the majority of indexes that participate in data 
+ * transfers belong to the same data part. If that is the case then we can retrieve the data part only once and read
+ * or write a sequence of entries. This strategy has the potential for drastically reducing the overhead during comm
+ * buffer preparation when the number of data parts are few but large in sizes. 
+ */
+class DataPartSwiftIndexList : public DataPartIndexList {
+  private:
+	DataPart *dataPart;
+	List<int> *partIndexes;
+	int sequenceLength;
+	int *indexArray;
+  public:
+	DataPartSwiftIndexList(DataPart *dataPart);
+	~DataPartSwiftIndexList();
+	DataPart *getDataPart() { return dataPart; }
+	void addIndex(int index) { partIndexes->Append(index); }
+	void setupIndexArray();
+	int read(char *destBuffer, int elementSize);
+	int write(char *sourceBuffer, int elementSize);
 };
 
 /* class holding all instructions regarding a single data-point transfer between the communication buffer and the
