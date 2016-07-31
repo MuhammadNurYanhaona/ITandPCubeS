@@ -145,12 +145,62 @@ float GpuMemoryConsumptionStat::getConsumptionLevel() {
 	return (100.0 * currSpaceConsumption) / consumptionLimit;
 }
 
+//------------------------------------------------------------- LPU Data Part Lister ------------------------------------------------------------/
+
+LpudataPartLister::LpuDataPartLister() {
+	dataPartList = new List<LpuDataPart*>();
+	dataPartTree = new PartIdNode();
+}
+
+LpuDataPartLister::~LpuDataPartLister() {
+	clear();
+	delete dataPartList;
+	delete dataPartTree;
+}
+
+void LpuDataPartLister::clear() {
+	 
+	while (partList->NumElements() > 0) {
+		LpuDataPart *dataPart = dataPartList->Nth(0);
+		dataPartList->RemoveAt(0);
+		delete dataPart;
+	}
+
+	delete dataPartTree;
+	dataPartTree = new PartIdNode();	
+}
+
+bool LpuDataPartLister::isAlreadyIncluded(List<int*> *dataPartId) {
+	if (dataPartList->NumElements() == 0) return false;
+	int idDimensions = dataPartList->Nth(0)->getDataDimensions();
+	return dataPartTree->doesPartExist(dataPartId, idDimensions);
+}
+
+// notice that this function assumes that the part being searched has been recorded previously
+int LpuDataPartLister::getPartStorageIndex(List<int*> *dataPartId) {
+	int idDimensions = dataPartList->Nth(0)->getDataDimensions();
+	return dataPartTree->getPartStorageIndex(dataPartId, idDimensions);
+}
+        
+int LpuDataPartLister::addDataPart(LpuDataPart *dataPart) {
+	
+	int partDimensions = dataPart->getDataDimensions();
+	List<int*> *partId = dataPart->getId();
+	int storageIndex = dataPartList->NumElements();
+
+	if (dataPartTree->insertPartId(partId, partDimensions, storageIndex)) {
+		dataPartList->Append(dataPart);
+		return storageIndex;
+	}
+	return -1;
+}
+
 //------------------------------------------------------------ LPU Data Part Tracker ------------------------------------------------------------/
 
 LpuDataPartTracker::LpuDataPartTracker(int distinctPpuCount) {
 	this->distinctPpuCount = distinctPpuCount;
 	partIndexMap = new Hashtable<std::vector<List<int>*>*>;
-	dataPartMap = new Hashtable<List<LpuDataPart*>*>;
+	dataPartListerMap = new Hashtable<LpuDataPartLister*>;
 	maxDataPartSizes = new Hashtable<int*>;
 	this->logFile = NULL;
 }
@@ -168,7 +218,7 @@ void LpuDataPartTracker::initialize(List<const char*> *varNames) {
 		}
 		partIndexMap->Enter(varName, partIndexVector);
 		
-		dataPartMap->Enter(varName, new List<LpuDataPart*>);
+		dataPartListerMap->Enter(varName, new LpuDataPartLister);
 		
 		int *maxPartSize = new int[1];
 		*maxPartSize = 0;
@@ -176,25 +226,26 @@ void LpuDataPartTracker::initialize(List<const char*> *varNames) {
 	}
 }
 
+List<LpuDataPart*> *getDataPartList(const char *varName) { 
+	LpuDataPartLister *partLister = dataPartListerMap->Lookup(varName); 
+	return partLister->getDataPartList();
+}
+
 bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName, int ppuIndex) {
 	
 	std::vector<List<int>*> *partIndexListVector = partIndexMap->Lookup(varName);
 	List<int> *partIndexList = partIndexListVector->at(ppuIndex);
-	List<LpuDataPart*> *dataPartList = dataPartMap->Lookup(varName);
+	LpuDataPartLister *dataPartLister = dataPartListerMap->Lookup(varName);
 
-	int matchingIndex = -1;
+	
 	List<int*> *dataPartId = dataPart->getId();
-	for (int i = 0; i < dataPartList->NumElements(); i++) {
-		LpuDataPart *includedPart = dataPartList->Nth(i);
-		if (includedPart->isMatchingId(dataPartId)) {
-			matchingIndex = i;
-			break;
-		}
-	}
-	if (matchingIndex == -1) {		
-		
-		partIndexList->Append(dataPartList->NumElements());	
-		dataPartList->Append(dataPart);
+	if (dataPartLister->isAlreadyIncluded(dataPartId)) {
+		int storageIndex = dataPartLister->getPartStorageIndex(dataPartId);	
+		partIndexList->Append(storageIndex);
+		return false;
+	} else {
+		int storageIndex = dataPartLister->addDataPart(dataPart);
+		partIndexList->Append(storageIndex);	
 
 		int *maxPartSize = maxDataPartSizes->Lookup(varName);
 		if (*maxPartSize < dataPart->getSize()) {
@@ -202,19 +253,12 @@ bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName,
 		}
 
 		return true;
-	} else {
-		partIndexList->Append(matchingIndex);
-		return false;
 	}
 }
 
 bool LpuDataPartTracker::isAlreadyIncluded(List<int*> *dataPartId, const char *varName) {
-	List<LpuDataPart*> *dataPartList = dataPartMap->Lookup(varName);
-	for (int i = 0; i < dataPartList->NumElements(); i++) {
-		LpuDataPart *includedPart = dataPartList->Nth(i);
-		if (includedPart->isMatchingId(dataPartId)) return true;
-	}
-	return false;	
+	LpuDataPartLister *dataPartLister = dataPartListerMap->Lookup(varName);
+	return dataPartLister->isAlreadyIncluded(dataPartId);
 }
 
 void LpuDataPartTracker::clear() {
@@ -229,14 +273,10 @@ void LpuDataPartTracker::clear() {
 		}
 	}
 
-	List<LpuDataPart*> *partList = NULL;
-	Iterator<List<LpuDataPart*>*> partListIterator = dataPartMap->GetIterator();
-	while ((partList = partListIterator.GetNextValue()) != NULL) {
-		while (partList->NumElements() > 0) {
-			LpuDataPart *dataPart = partList->Nth(0);
-			partList->RemoveAt(0);
-			delete dataPart;
-		}
+	LpuDataPartLister *partLister = NULL;
+	Iterator<LpuDataPartLister*> partListIterator = dataPartListerMap->GetIterator();
+	while ((partLister = partListIterator.GetNextValue()) != NULL) {
+		partLister->clear();
 	}
 
 	int *maxPartSize = NULL;

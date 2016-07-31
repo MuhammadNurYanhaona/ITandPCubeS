@@ -7,6 +7,7 @@
 // item -- as opposed to just one. This library holds all management structures and functions needed for tracking, synchronizing, 
 // cleaning up LPU data parts for host and GPU interaction.
 
+#include "part_id_tree.h"
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../runtime/structure.h"
@@ -67,6 +68,7 @@ class LpuDataPart {
 	virtual int getSize();
 	void flagReadOnly() { readOnly = true; }
 	bool isReadOnly() { return readOnly; }
+	int getDataDimensions() { return dimensionality; }
 	virtual void describe(std::ofstream &stream, int indentLevel);
 };
 
@@ -111,6 +113,30 @@ class GpuMemoryConsumptionStat {
 	float getConsumptionLevel();	
 }; 
 
+/* This class keeps track of all parts for a particular data structure and provides efficient mechanism to store and search them. 
+ */
+class LpuDataPartLister {
+  private:
+	List<LpuDataPart*> *dataPartList;
+	PartIdNode *dataPartTree;
+  public:
+	LpuDataPartLister();
+	~LpuDataPartLister();
+	void clear();
+	
+	// tells if a data part with the matching ID is already in the data part list
+	bool isAlreadyIncluded(List<int*> *dataPartId);
+	
+	// returns the index in the data part list of the data part having the argument part-ID
+	int getPartStorageIndex(List<int*> *dataPartId);
+
+	// adds a new data part in the data part list and returns the index in the list the part has been put into; if a part with
+	// the same ID is already in the list then it returns -1 to indicate the insertion has failed
+	int addDataPart(LpuDataPart *dataPart);
+
+	List<LpuDataPart*> *getDataPartList() { return dataPartList; }
+};
+
 /* This class keeps track of the data parts of different LPUs that are part of the current batch that is under execution or going
  * to be executed. 
  */
@@ -123,7 +149,7 @@ class LpuDataPartTracker {
 	Hashtable<std::vector<List<int>*>*> *partIndexMap;
 	// The actual data parts are, however, not distinguished by LPUs as multiple LPUs intended for different PPUs may share a
 	// single data part
-  	Hashtable<List<LpuDataPart*>*> *dataPartMap;
+  	Hashtable<LpuDataPartLister*> *dataPartListerMap;
 	// To be able to allocate and assign parts of dynamic SM memory properly, we need to know the maximum memory requirement for
 	// a data part of individual variables used inside the GPU kernels. This property is used to keep track of the maximum memory 
 	// consumption per data part per variable 
@@ -137,7 +163,7 @@ class LpuDataPartTracker {
 	std::vector<List<int>*> *getPartIndexListVector(const char *varName) { 
 		return partIndexMap->Lookup(varName); 
 	}
-	List<LpuDataPart*> *getDataPartList(const char *varName) { return dataPartMap->Lookup(varName); } 
+	List<LpuDataPart*> *getDataPartList(const char *varName); 
 	int getMaxPartSize(const char *varName) { return *(maxDataPartSizes->Lookup(varName)); }
 	
         // An addition of a new LPU data part for a particular property may fail as that part may have been already included as part
