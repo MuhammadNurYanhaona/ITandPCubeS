@@ -147,7 +147,7 @@ float GpuMemoryConsumptionStat::getConsumptionLevel() {
 
 //------------------------------------------------------------- LPU Data Part Lister ------------------------------------------------------------/
 
-LpudataPartLister::LpuDataPartLister() {
+LpuDataPartLister::LpuDataPartLister() {
 	dataPartList = new List<LpuDataPart*>();
 	dataPartTree = new PartIdNode();
 }
@@ -160,7 +160,7 @@ LpuDataPartLister::~LpuDataPartLister() {
 
 void LpuDataPartLister::clear() {
 	 
-	while (partList->NumElements() > 0) {
+	while (dataPartList->NumElements() > 0) {
 		LpuDataPart *dataPart = dataPartList->Nth(0);
 		dataPartList->RemoveAt(0);
 		delete dataPart;
@@ -226,7 +226,7 @@ void LpuDataPartTracker::initialize(List<const char*> *varNames) {
 	}
 }
 
-List<LpuDataPart*> *getDataPartList(const char *varName) { 
+List<LpuDataPart*> *LpuDataPartTracker::getDataPartList(const char *varName) { 
 	LpuDataPartLister *partLister = dataPartListerMap->Lookup(varName); 
 	return partLister->getDataPartList();
 }

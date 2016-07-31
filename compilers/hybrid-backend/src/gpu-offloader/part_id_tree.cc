@@ -14,7 +14,7 @@ PartIdNode::~PartIdNode() {
         }
 }
 
-void PartIdNode::print(int indent, std::ostream *stream) {
+void PartIdNode::print(int indentLevel, std::ostream *stream) {
 	std::ostringstream indent;
         for (int i = 0; i < indentLevel; i++) indent << '\t';
         for (unsigned int i = 0; i < partArray.size(); i++) {

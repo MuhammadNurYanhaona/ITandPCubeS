@@ -30,7 +30,7 @@ class PartIdNode {
 	std::vector<int> partStoreIndices;
   public:
 	~PartIdNode();
-	void print(int indent, std::ostream *stream);
+	void print(int indentLevel, std::ostream *stream);
 	
 	// This function attempts to insert a new part Id in the tree. If the part Id already exists then it returns
 	// false; otherwise it returns true. Notice that the argument for the last parameter is by default -1. This
