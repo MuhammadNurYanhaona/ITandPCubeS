@@ -8,7 +8,7 @@
 #include <cstdlib>
 
 PartIdNode::~PartIdNode() {
-	for (unsigned int i = 0; i < partArray.size(); i++) {
+	for (unsigned int i = 0; i < children.size(); i++) {
                 PartIdNode *child = children[i];
                 delete child;
         }
