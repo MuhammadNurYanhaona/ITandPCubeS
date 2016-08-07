@@ -225,6 +225,29 @@ void KernelGroupConfig::generateKernelConfig(std::deque<FlowStage*> *stageQueue,
 	}
 }
 
+//-------------------------------------------------------- Variable Locality Spec ----------------------------------------------------------/
+
+GpuVarLocalitySpec::GpuVarLocalitySpec(const char *vN, Space *aLps, bool sCS, bool rPWI) {
+	varName = vN;
+	allocatingLps = aLps;
+	smLocalCopySupported = sCS;
+	reqPerWarpInstances = rPWI;
+}
+
+void GpuVarLocalitySpec::describe(int indentLevel) {
+	std::ostringstream indentStr;
+	for (int i = 0; i < indentLevel; i++) indentStr << '\t';
+	std::cout << indentStr.str() << " Variable: " << varName << "\n";
+	indentStr << '\t';
+	std::cout << indentStr.str() << "Needed in Space: " << allocatingLps->getName() << '\n';
+	std::cout << indentStr.str();
+	if (smLocalCopySupported) std::cout << "Can be stored in SM\n";
+	else std::cout << "Cannot be stored in SM\n";
+	std::cout << indentStr.str();
+	if (reqPerWarpInstances) std::cout << "Each warp will have personal copy\n";
+	else std::cout << "All warps should share a single copy\n";
+}
+
 //--------------------------------------------------------- GPU Execution Context ----------------------------------------------------------/
 
 Hashtable<GpuExecutionContext*> *GpuExecutionContext::gpuContextMap = NULL;
@@ -238,6 +261,7 @@ GpuExecutionContext::GpuExecutionContext(int topmostGpuPps, List<FlowStage*> *co
 	} else contextType = LOCATION_INDIPENDENT_LPU_DISTR_CONTEXT;
 	performVariableAccessAnalysis();
 	kernelConfigList = NULL;
+	this->varAllocInstrList = NULL;
 }
 
 int GpuExecutionContext::getContextId() {
@@ -354,6 +378,43 @@ void GpuExecutionContext::generateKernelConfigs(PCubeSModel *pcubesModel) {
 				currentSubflow);
 			groupConfig->generateKernelConfig(pcubesModel, contextLps);
 			kernelConfigList->Append(groupConfig);
+		}
+	}
+}
+
+void GpuExecutionContext::analyzeVarAllocReqs(PartitionHierarchy *lpsHierarchy) {
+
+	varAllocInstrList = new List<GpuVarLocalitySpec*>;
+	List<const char*> *accessedVariables = getVariableAccessList();
+	List<ExecutionStage*> *execStageList = getComputeStagesOfFlowContext();
+	int gpuPpsId = lpsHierarchy->getPCubeSModel()->getGpuTransitionSpaceId();
+	int smPpsId = gpuPpsId - 1;
+	Space *rootLps = lpsHierarchy->getRootSpace();
+
+	for (int i = 0; i < accessedVariables->NumElements(); i++) {
+
+		// Scalar variables are kept on the GPU card memory; so allocation analysis is done for arrays only
+		const char *varName = accessedVariables->Nth(i);
+		DataStructure *structure = rootLps->getStructure(varName);
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array == NULL) continue;
+
+		Space *varNeedingLps = getEarliestLpsNeedingVar(varName, execStageList, lpsHierarchy);
+		int ppsId = varNeedingLps->getPpsId();
+		if (ppsId > smPpsId) {
+			GpuVarLocalitySpec *varLocSpec = new GpuVarLocalitySpec(varName, 
+					varNeedingLps, false, false);
+			varAllocInstrList->Append(varLocSpec);
+		} else {
+			Space *allocLps = getInnermostSMLpsForVarCopy(varName, smPpsId, varNeedingLps);
+			ppsId = allocLps->getPpsId();
+			GpuVarLocalitySpec *varLocSpec = NULL;
+			if (ppsId == smPpsId) {
+				varLocSpec = new GpuVarLocalitySpec(varName, allocLps, true, false);
+			} else {
+				varLocSpec = new GpuVarLocalitySpec(varName, allocLps, true, true);
+			}
+			varAllocInstrList->Append(varLocSpec);
 		}
 	}
 }
@@ -1123,4 +1184,80 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 		}	
 	}
 	stream << "]" << stmtSeparator;	
+}
+
+Space *GpuExecutionContext::getEarliestLpsNeedingVar(const char *varName, 
+		List<ExecutionStage*> *execStageList, PartitionHierarchy *lpsHierarchy) {
+
+	Space *currentLps = NULL;
+	for (int i = 0; i < execStageList->NumElements(); i++) {
+		ExecutionStage *stage = execStageList->Nth(i);
+		VariableAccess *varAccess =  stage->getAccessMap()->Lookup(varName);
+		if (varAccess == NULL) continue;
+		if (!varAccess->isContentAccessed()) continue;
+		Space *stageLps = stage->getSpace();
+		if (currentLps == NULL) {
+			currentLps = stageLps;
+		} else {
+			currentLps = lpsHierarchy->getCommonAncestor(currentLps, stageLps);
+		}
+	}
+
+	// The selected LPS must have the variable being partitioned in it. otherwise, return the closest ancestor
+	// LPS that has the variable
+	DataStructure *variable = NULL;
+	while ((variable = currentLps->getLocalStructure(varName)) == NULL) {
+		currentLps = currentLps->getParent();
+	}
+
+	// The final twist here is for subpartitioned LPSes. If the variable is subpartitioned then we need to 
+	// return the subpartition LPS; otherwise, the parent LPS of the subpartition should be returned. To have
+	// this done appropriately we just get and return the LPS from the variable.
+	return variable->getSpace();
+}
+
+Space *GpuExecutionContext::getInnermostSMLpsForVarCopy(const char *varName, 
+                        int smPpsId, Space *earliestLpsNeedingVar) {
+
+	// currently this analysis is done for arrays only; so we can safely type-cast the variable to an array
+	ArrayDataStructure *array = (ArrayDataStructure *) earliestLpsNeedingVar->getLocalStructure(varName);
+	
+	Space *selectedLps = earliestLpsNeedingVar;
+	bool warpLevel = (smPpsId - earliestLpsNeedingVar->getPpsId()) == 1;
+	if (warpLevel) {
+		while (true) {
+			ArrayDataStructure *source = (ArrayDataStructure*) array->getSource();
+			Space *parentLps = source->getSpace();
+			int parentPpsId = parentLps->getPpsId();
+			if (parentPpsId > smPpsId) {
+				// if we are crossing the SM memory boundary when trying to uplift variable copy 
+				// then there is no hope
+				return selectedLps;
+			} else if (parentPpsId == smPpsId) {
+				// if the parent is at the SM level we have found our LPS to avoid separate warp
+				// level data part instances
+				selectedLps = parentLps;
+				break;
+			} else {
+				// if the parent of the current warp level LPS is also mapped to the warp level 
+				// then we need to check if uplifting the copy operation to the parent LPS 
+				// increases the memory requirement
+				if (source->isPartitioned()) return selectedLps;
+				selectedLps = parentLps;
+				array = source;
+			}
+		}
+	}
+
+	// attempt data copy uplifting at the SM level
+	array = (ArrayDataStructure *) selectedLps->getLocalStructure(varName);
+	while (true) {
+		ArrayDataStructure *source = (ArrayDataStructure *) array->getSource();
+		Space *parentLps = source->getSpace();
+		int parentPpsId = parentLps->getPpsId();
+		if (parentPpsId > smPpsId || source->isPartitioned()) return selectedLps;
+		array = source;
+		selectedLps = parentLps;
+	}
+	return selectedLps;
 }

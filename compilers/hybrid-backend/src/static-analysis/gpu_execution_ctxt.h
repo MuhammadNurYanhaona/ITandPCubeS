@@ -77,6 +77,28 @@ class KernelGroupConfig {
 			List<SyncRequirement*> *configSyncSignals);	
 };
 
+/* For most computation efficient GPU kernel implementations use SM's shared memory to temporary hold data structures
+ * or their part while the threads doing computation instead of doing computation on GPU card memory directly. So 
+ * this class is provided to hold info of what data structures can be fit into SM's shared memory and what strcutures 
+ * should be used directly from the card memory. 
+ */ 
+class GpuVarLocalitySpec {
+  private:
+	const char *varName;
+	Space *allocatingLps;
+	bool smLocalCopySupported;
+	// this tells if the warps of an SM will require separate local copies of the variable under concern instead
+	// of using a common copy generated in the SM for all warps
+	bool reqPerWarpInstances;
+  public:
+	GpuVarLocalitySpec(const char *vN, Space *aLps, bool sCS, bool rPWI);
+	const char *getVarName() { return varName; }
+	Space *getAllocatingLps() { return allocatingLps; }
+	bool isSmLocalCopySupported() { return smLocalCopySupported; }
+	bool doesReqPerWarpInstances() { return reqPerWarpInstances; }
+	void describe(int indentLevel);
+};
+
 /* This class represents a particular sub-flow in a task's computation flow that should be executed in the GPU */
 class GpuExecutionContext {
   protected:
@@ -92,6 +114,9 @@ class GpuExecutionContext {
 	List<const char*> *epochDependentVarAccesses;
 	// generated configurations of groups of kernel that will execute the logic of the context flow in the GPU
 	List<KernelGroupConfig*> *kernelConfigList;
+	// generated instructions regarding what variables to be allocated and accessed from SM memory and what from
+	// the GPU card memory
+	List<GpuVarLocalitySpec*> *varAllocInstrList;
   public:
 	// A static access point to all GPU execution contexts of a task is maintained here so that they can be 
 	// accessed during code generation process. This is needed as LPU traversal process for execution contexts  
@@ -103,6 +128,7 @@ class GpuExecutionContext {
 	Space *getContextLps() { return contextLps; }
 	GpuContextType getContextType() { return contextType; }
 	List<KernelGroupConfig*> *getKernelConfigList() { return kernelConfigList; }
+	List<GpuVarLocalitySpec*> *getVarAllocInstrList() { return varAllocInstrList; }
 
 	// the context ID, which is the index of the first flow stage within the context, is used for searching the 
 	// context during code generation
@@ -122,6 +148,10 @@ class GpuExecutionContext {
 	// context
 	void generateKernelConfigs(PCubeSModel *pcubesModel);
 
+	// this rounte generates GPU-memory allocation instructions that are applicables for all kernels of the current
+	// GPU context subflow
+	void analyzeVarAllocReqs(PartitionHierarchy *lpsHierarchy);
+	 
 	// this routine is used to generate LPU generation and traversal code inside the generated task::run function
 	// based on the GPU context type 
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *callingCtxtLps);
@@ -187,6 +217,23 @@ class GpuExecutionContext {
 			ArrayDataStructure *array, 
 			const char *indentPrefix, 
 			bool warpLevel, int transferDirection);
+
+	// this is a supporting function needed to determine inside GPU data locality specification for a variable
+	Space *getEarliestLpsNeedingVar(const char *varName, 
+			List<ExecutionStage*> *execStageList, 
+			PartitionHierarchy *lpsHierarchy);
+
+	// This function is provided to try make an adjustment of the result of the getEarliestLpsNeedingVar function
+	// to reduce the number of data transfer happens between the GPU card memory to SM memory for a particular data
+	// structure. First, if the LPS needing the variable is mapped to warps (resulting in separate SM local copies 
+	// being made for pieces belonging to different warps) then the function try to lift the copy operation to an
+	// ancestor LPS mapped to the SM, if exists. If the first transformation is successful then all warps can just
+	// operate on regions of a single SM local data part. Second, the function tries to move up the copy in and out 
+	// of the data part to some upper LPS mapped to SM without increasing the amount of memory needed, if possible.
+	// If the second transformation is successful then the number of global-to-Local and vice versa transfers happens
+	// less frequently. 
+	Space *getInnermostSMLpsForVarCopy(const char *varName, 
+			int smPpsId, Space *earliestLpsNeedingVar);
 };
 
 #endif
