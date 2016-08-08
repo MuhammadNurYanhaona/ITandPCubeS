@@ -407,6 +407,14 @@ void GpuExecutionContext::analyzeVarAllocReqs(PartitionHierarchy *lpsHierarchy) 
 			varAllocInstrList->Append(varLocSpec);
 		} else {
 			Space *allocLps = getInnermostSMLpsForVarCopy(varName, smPpsId, varNeedingLps);
+			
+			// This is an safety check that ensures that once it is known that the array data parts can 
+			// be stored inside GPU SMs, the allocator LPS is not mapped above it. Although this is not
+			// supposed to be allowed by the getInnermostSMLpsForVarCopy function, it can happen if the
+			// context LPS for the GPU sub-flow is a sub-partition LPS and the array is partitioned only
+			// in the parent LPS not in the context LPS.
+			if (contextLps->isParentSpace(allocLps)) allocLps = contextLps;
+
 			ppsId = allocLps->getPpsId();
 			GpuVarLocalitySpec *varLocSpec = NULL;
 			if (ppsId == smPpsId) {
@@ -1213,7 +1221,8 @@ Space *GpuExecutionContext::getEarliestLpsNeedingVar(const char *varName,
 	// The final twist here is for subpartitioned LPSes. If the variable is subpartitioned then we need to 
 	// return the subpartition LPS; otherwise, the parent LPS of the subpartition should be returned. To have
 	// this done appropriately we just get and return the LPS from the variable.
-	return variable->getSpace();
+	if (currentLps == contextLps) return currentLps;
+	else return variable->getSpace();
 }
 
 Space *GpuExecutionContext::getInnermostSMLpsForVarCopy(const char *varName, 
@@ -1225,7 +1234,7 @@ Space *GpuExecutionContext::getInnermostSMLpsForVarCopy(const char *varName,
 	Space *selectedLps = earliestLpsNeedingVar;
 	bool warpLevel = (smPpsId - earliestLpsNeedingVar->getPpsId()) == 1;
 	if (warpLevel) {
-		while (true) {
+		while (selectedLps != contextLps) {
 			ArrayDataStructure *source = (ArrayDataStructure*) array->getSource();
 			Space *parentLps = source->getSpace();
 			int parentPpsId = parentLps->getPpsId();
@@ -1251,7 +1260,7 @@ Space *GpuExecutionContext::getInnermostSMLpsForVarCopy(const char *varName,
 
 	// attempt data copy uplifting at the SM level
 	array = (ArrayDataStructure *) selectedLps->getLocalStructure(varName);
-	while (true) {
+	while (selectedLps != contextLps) {
 		ArrayDataStructure *source = (ArrayDataStructure *) array->getSource();
 		Space *parentLps = source->getSpace();
 		int parentPpsId = parentLps->getPpsId();

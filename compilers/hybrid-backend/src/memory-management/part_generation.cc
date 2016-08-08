@@ -86,6 +86,13 @@ Dimension DimPartitionConfig::getDimensionFromParent(List<int> *partIdList, int 
 	return parentConfig->getPartDimension(parentPartId, parentDataDimension);
 }
 
+int DimPartitionConfig::getLargestPartDimLength(int parentDimLength) {
+        Dimension parentDim;
+        parentDim.setLength(parentDimLength);
+        int partDim = getPartDimension(0, parentDim).getLength();
+        return partDim + paddings[0] + paddings[1];
+}
+
 DimensionMetadata *DimPartitionConfig::generateDimMetadata(List<int> *partIdList) {
 
 	int position = partIdList->NumElements() - 1;
@@ -860,6 +867,15 @@ void DataPartitionConfig::updatePartDimensionInfo(int *lpuId,
 		partDims[i].parent = &(parentPartDims[i]);
 		partDims[i].count = dimConfig->pickPartCount(lpuCounts);
 		partDims[i].index = partIdInDim;
+	}
+}
+
+void DataPartitionConfig::getLargestPartDimLengths(int *parentDimLengths) {
+	for (int d = 0; d < dimensionCount; d++) {
+		DimPartitionConfig *dimPartConfig = dimensionConfigs->Nth(d);
+		int parentDimLength = parentDimLengths[d];
+		int partDimLength = dimPartConfig->getLargestPartDimLength(parentDimLength);
+			parentDimLengths[d] = partDimLength;
 	}
 }
 

@@ -15,6 +15,9 @@
 #include <fstream>
 #include <vector>
 
+class LpuBatchController;
+class DataPartitionConfig;
+
 /* For computation over valid transformed indexes we need to copy in the storage and partition dimension information of each data 
  * part in the GPU. A part-dimension object (a part of an LPU) is not suitable for directly being copied into the GPU memory due to
  * its hierarchical nature. So we have the following class to transform the part-dimension object into a GPU friendly format.
@@ -31,6 +34,7 @@ class PartDimRanges {
 	int getDepth() { return depth; }
 	void copyIntoBuffer(int *buffer);
 	void describe(std::ofstream &stream, int indentLevel);
+	int getStorageDimLength(int dimNo);
 };
 
 /* This class is used to extract any particular array and its associated information that is part of an LPU. We cannot retain the
@@ -70,6 +74,12 @@ class LpuDataPart {
 	bool isReadOnly() { return readOnly; }
 	int getDataDimensions() { return dimensionality; }
 	virtual void describe(std::ofstream &stream, int indentLevel);
+	
+	// these two functions are provided to simplify code generation for determining the size of the largest subpart that may 
+	// be copied into and out of the SM memory for a larger data part residing in the GPU card memory.
+	void copyDimLengths(int *dimLengthArray);
+	virtual int getSizeForSubpartsWithDimLengths(int *subpartLengthsArray);
+
 };
 
 /* This extension to the above LPU Data Part class is needed to stage-in/out properties that have multiple epoch versions. */
@@ -91,6 +101,7 @@ class VersionedLpuDataPart : public LpuDataPart {
 	void advanceEpochVersion();
 	int getSize() { return LpuDataPart::getSize() * versionCount; }
 	void describe(std::ofstream &stream, int indentLevel);
+	int getSizeForSubpartsWithDimLengths(int *subpartLengthsArray);
 };
 
 /* In most likely cases, the memory capacity of the GPU will be far less than the memory capacity of the host machine. Therefore, 
@@ -155,9 +166,12 @@ class LpuDataPartTracker {
 	// consumption per data part per variable 
 	Hashtable<int*> *maxDataPartSizes;	
 
+	// a back pointer to the the lpu-batch-controller is maintained to get access to its part-size determining function
+	LpuBatchController *batchController;
+
 	std::ofstream *logFile;
   public:
-	LpuDataPartTracker(int distinctPpuCount);
+	LpuDataPartTracker(int distinctPpuCount, LpuBatchController *batchController);
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 	void initialize(List<const char*> *varNames);
 	std::vector<List<int>*> *getPartIndexListVector(const char *varName) { 
@@ -293,9 +307,14 @@ class LpuBatchController {
 	LpuDataPartTracker *dataPartTracker;
 	LpuDataBufferManager *bufferManager; 		
 	GpuMemoryConsumptionStat *gpuMemStat;
+
+	// a reference to the map of partition configurations of different data structure is maintained so that subclasses can give
+	// proper implementation of the calculateSmMemReqForDataPart function 
+	Hashtable<DataPartitionConfig*> *partConfigMap;
+
 	std::ofstream *logFile;
   public:
-	LpuBatchController();
+	LpuBatchController(Hashtable<DataPartitionConfig*> *partConfigMap);
 	void setBufferManager(LpuDataBufferManager *manager) { this->bufferManager = manager; }
 	void initialize(int lpuCountThreshold, 
 			long memoryConsumptionLimit, 
@@ -316,9 +335,16 @@ class LpuBatchController {
 	void updateBatchDataPartsFromGpuResults();
 	void resetController();	
 
-	// Task:LPS specific sub-classes of the batch controller should provide implementation for the following two functions
+	// Task:LPS specific sub-classes of the batch controller should provide implementation for the following three functions.
+	// In particular, the implementation of the third function is important to determine what LPU data parts should be copied
+	// into the SMs's shared memory and what should be left on the GPU card memory and be accessed from there during kernel
+	// computation. This is a critical analysis as SM memory is at the range of 100 times fater than the card memory but not
+	// all data structures can be fit into it.
 	virtual int calculateLpuMemoryRequirement(LPU *lpu) = 0;
 	virtual void addLpuToTheCurrentBatch(LPU *lpu, int ppuIndex) { currentBatchSize++; }
+	virtual int calculateSmMemReqForDataPart(const char *varName, LpuDataPart *dataPart) {
+		return dataPart->getSize();
+	}
 };
 
 #endif

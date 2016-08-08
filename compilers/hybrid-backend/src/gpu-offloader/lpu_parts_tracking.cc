@@ -2,6 +2,7 @@
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
 #include "../runtime/structure.h"
+#include "../memory-management/part_generation.h"
 
 #include <cstdlib>
 #include <fstream>
@@ -52,6 +53,11 @@ void PartDimRanges::describe(std::ofstream &stream, int indentLevel) {
 	stream << "]\n";	
 }
 
+int PartDimRanges::getStorageDimLength(int dimNo) {
+	Range dimRange = ranges[dimNo];
+	return dimRange.max - dimRange.min + 1;
+}
+
 //---------------------------------------------------------------- LPU Data Part ----------------------------------------------------------------/
 
 LpuDataPart::LpuDataPart(int dimensionality,
@@ -100,6 +106,20 @@ void LpuDataPart::describe(std::ofstream &stream, int indentLevel) {
 	partDimRanges->describe(stream, indentLevel + 1);
 }
 
+void LpuDataPart::copyDimLengths(int *dimLengthArray) {
+	for (int i = 0; i < dimensionality; i++) {
+		dimLengthArray[i] = partDimRanges->getStorageDimLength(i);
+	}
+}
+        
+int LpuDataPart::getSizeForSubpartsWithDimLengths(int *subpartLengthsArray) {
+	int subpartElemCount = 1;
+	for (int i = 0; i < dimensionality; i++) {
+		subpartElemCount *= subpartLengthsArray[i];
+	}
+	return subpartElemCount * elementSize;
+}
+
 //----------------------------------------------------------- Versioned LPU Data Part -----------------------------------------------------------/
 
 VersionedLpuDataPart::VersionedLpuDataPart(int dimensionality,
@@ -127,6 +147,11 @@ void VersionedLpuDataPart::describe(std::ofstream &stream, int indentLevel) {
 	std::ostringstream indent;
         for (int i = 0; i <= indentLevel; i++) indent << '\t';
 	stream << indent.str() << "Version Count: " << versionCount << "\n";
+}
+
+int VersionedLpuDataPart::getSizeForSubpartsWithDimLengths(int *subpartLengthsArray) {
+	int versionSize = LpuDataPart::getSizeForSubpartsWithDimLengths(subpartLengthsArray);
+	return versionSize * versionCount;
 }
 
 //--------------------------------------------------------- GPU Memory Consumption Stat ---------------------------------------------------------/
@@ -197,12 +222,13 @@ int LpuDataPartLister::addDataPart(LpuDataPart *dataPart) {
 
 //------------------------------------------------------------ LPU Data Part Tracker ------------------------------------------------------------/
 
-LpuDataPartTracker::LpuDataPartTracker(int distinctPpuCount) {
+LpuDataPartTracker::LpuDataPartTracker(int distinctPpuCount, LpuBatchController *batchController) {
 	this->distinctPpuCount = distinctPpuCount;
 	partIndexMap = new Hashtable<std::vector<List<int>*>*>;
 	dataPartListerMap = new Hashtable<LpuDataPartLister*>;
 	maxDataPartSizes = new Hashtable<int*>;
 	this->logFile = NULL;
+	this->batchController = batchController;
 }
 
 void LpuDataPartTracker::initialize(List<const char*> *varNames) {
@@ -248,8 +274,9 @@ bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName,
 		partIndexList->Append(storageIndex);	
 
 		int *maxPartSize = maxDataPartSizes->Lookup(varName);
-		if (*maxPartSize < dataPart->getSize()) {
-			*maxPartSize = dataPart->getSize();
+		int partSize = batchController->calculateSmMemReqForDataPart(varName, dataPart);
+		if (*maxPartSize < partSize) {
+			*maxPartSize = partSize;
 		}
 
 		return true;
@@ -483,7 +510,7 @@ void LpuDataBufferManager::reset() {
 
 //------------------------------------------------------------- LPU Batch Controller ------------------------------------------------------------/
 
-LpuBatchController::LpuBatchController() {
+LpuBatchController::LpuBatchController(Hashtable<DataPartitionConfig*> *partConfigMap) {
 	propertyNames = NULL;
 	toBeModifiedProperties = NULL;
 	batchLpuCountThreshold = 1;
@@ -492,6 +519,7 @@ LpuBatchController::LpuBatchController() {
 	dataPartTracker = NULL;
 	bufferManager = NULL;
 	this->logFile = NULL;
+	this->partConfigMap = partConfigMap;
 }
 
 void LpuBatchController::initialize(int lpuCountThreshold, 
@@ -506,7 +534,7 @@ void LpuBatchController::initialize(int lpuCountThreshold,
 	currentBatchSize = 0;
 	this->distinctPpuCount = distinctPpuCount;
 	gpuMemStat = new GpuMemoryConsumptionStat(memoryConsumptionLimit);
-	dataPartTracker = new LpuDataPartTracker(distinctPpuCount);
+	dataPartTracker = new LpuDataPartTracker(distinctPpuCount, this);
 	dataPartTracker->initialize(propertyNames);
 }
 

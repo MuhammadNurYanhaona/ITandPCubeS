@@ -279,17 +279,20 @@ void generateBatchComputeFunction(TaskDef *taskDef, const char *headerFileName,
 	programFile << "\n\t// setting up logging\n";
 	programFile << "\tbatchPpuState->enableLogging(&logFile);\n";
 
-	// instanciate the map of GPU code executor within the batch PPU state controller
-	programFile << "\n\t// setting up all the GPU code executors\n";
- 	programFile << "\tbatchPpuState->setGpuCodeExecutors(getGpuCodeExecutorMap(*arrayMetadata";
-	programFile << paramSeparator << paramIndent << "partition" << paramSeparator;
-	programFile << "taskGlobals" << paramSeparator << "threadLocals" << paramSeparator;
-	programFile << "logFile" << "));\n";
-
 	// extract the state of the first PPU Controller (that does all host level LPS computation) for accessing
 	// the communicators and implementing epoch version updates of data structures when needed
 	programFile << "\n\t// extracting the first PPU controller's state for resource access\n";
 	programFile << "\tThreadState *threadState = ppuStates->at(0);\n";
+
+	// instanciate the map of GPU code executor within the batch PPU state controller
+	programFile << "\n\t// setting up all the GPU code executors\n";
+	programFile << indent << "Hashtable<DataPartitionConfig*> *partConfigMap = ";
+	programFile << "threadState->getPartConfigMap()" << stmtSeparator;
+ 	programFile << "\tbatchPpuState->setGpuCodeExecutors(getGpuCodeExecutorMap(*arrayMetadata";
+	programFile << paramSeparator << paramIndent << "partition" << paramSeparator;
+	programFile << "taskGlobals" << paramSeparator << "threadLocals" << paramSeparator;
+	programFile << paramIndent << "partConfigMap" << paramSeparator;
+	programFile << "logFile" << "))" << stmtSeparator;
 
 	// if the task involves communications then create communicator counter variables for each data dependency
         // requiring communication

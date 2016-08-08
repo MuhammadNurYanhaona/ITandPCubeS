@@ -121,6 +121,10 @@ class DimPartitionConfig {
 	// similar to the above, this function retrieves the parts count along a dimension from lpu counts 
 	virtual int pickPartCount(int *lpuCount) { return lpuCount[lpsAlignment]; }
 
+	// this function makes a conservative estimate of what may be the largest part dimension length given the
+	// length of the parent dimension 
+	int getLargestPartDimLength(int parentDimLength);
+
 	// an accumulator function that returns results of different dimension configuration utilies above 
 	DimensionMetadata *generateDimMetadata(List<int> *partIdList);
 
@@ -215,6 +219,7 @@ class BlockSizeConfig : public DimPartitionConfig {
 			partitionArgs, paddings, ppuCount, lpsAlignment) {}
 	
 	int getPartsCount(Dimension parentDimension);
+	int getLargestPartDimLength(int parentDimLength);
 	Dimension getPartDimension(int partId, Dimension parentDimension);
 	PartitionInstr *getPartitionInstr();
 	bool isDegenerativeCase() { return false; }
@@ -234,6 +239,7 @@ class BlockCountConfig : public DimPartitionConfig {
 			partitionArgs, paddings, ppuCount, lpsAlignment) {}
 	
 	int getPartsCount(Dimension parentDimension);
+	int getLargestPartDimLength(int parentDimLength);
 	Dimension getPartDimension(int partId, Dimension parentDimension);
 	PartitionInstr *getPartitionInstr();
 	bool isDegenerativeCase() { return partitionArgs[0] == 1; }
@@ -249,6 +255,7 @@ class StrideConfig : public DimPartitionConfig {
 			: DimPartitionConfig(dimension, NULL, ppuCount, lpsAlignment) {}
 	
 	int getPartsCount(Dimension parentDimension);
+	int getLargestPartDimLength(int parentDimLength);
 	Dimension getPartDimension(int partId, Dimension parentDimension);
 	int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
 			List<int> *partCountList, 
@@ -272,6 +279,7 @@ class BlockStrideConfig : public DimPartitionConfig {
 			partitionArgs, ppuCount, lpsAlignment) {}
 	
 	int getPartsCount(Dimension parentDimension);
+	int getLargestPartDimLength(int parentDimLength);
 	Dimension getPartDimension(int partId, Dimension parentDimension);
 	int getOriginalIndex(int partIndex, int position, List<int> *partIdList, 
 			List<int> *partCountList, 
@@ -340,6 +348,13 @@ class DataPartitionConfig {
 	// some recursions
 	void updatePartDimensionInfo(int *lpuId, int *lpuCounts, 
 			PartDimension *partDims, PartDimension *parentPartDims);
+
+	// This function has been added to aid GPU SM memory allocation decision. Given the lengths along different
+	// dimensions of a parent data part, it determines the dimension lengths for the largest subpart. Note that
+	// this function makes a conservative estimate -- not the exact calculation -- of the subpart's dimensions.
+	// Further, it is an in-place update mechanism where parent part's information is replaced by the subpart's
+	// information.  
+	void getLargestPartDimLengths(int *parentDimLengths);
 
 	// function to be used to determine how many LPUs should be there within an LPS at runtime; when
 	// the second argument is NULL, data-dimension should be used to determine the parts count

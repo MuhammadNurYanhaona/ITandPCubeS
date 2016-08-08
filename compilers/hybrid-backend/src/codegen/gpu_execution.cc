@@ -13,6 +13,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <iostream>
+#include <stack>
 
 void initializeCudaProgramFile(const char *initials, 
 		const char *headerFileName, const char *programFileName) {
@@ -449,17 +450,22 @@ void generateLpuBatchControllerForLps(GpuExecutionContext *gpuContext,
 	// declare the class in the header file
 	headerFile << "class " << className << " : public LpuBatchController {\n";
 	headerFile << "  public:\n";
-	headerFile << indent << className << "()" << stmtSeparator;
+	headerFile << indent << className;
+	headerFile << "(Hashtable<DataPartitionConfig*> *partConfigMap)" << stmtSeparator;
 	headerFile << indent << "int calculateLpuMemoryRequirement(LPU *lpu)" << stmtSeparator;
 	headerFile << indent << "void addLpuToTheCurrentBatch(LPU *lpu" << paramSeparator;
 	headerFile << "int ppuIndex)" << stmtSeparator;
+	headerFile << indent << "int calculateSmMemReqForDataPart(";
+	headerFile << "const char *varName" << paramSeparator;
+	headerFile << "LpuDataPart *dataPart)" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
 
-	// then add implementation for the constructor and the two virtual functions inherited from the base 
+	// then add implementation for the constructor and the three virtual functions inherited from the base 
 	// class in the program file
 	generateLpuBatchControllerConstructor(gpuContext, pcubesModel, initials, programFile);
 	generateLpuBatchControllerLpuAdder(gpuContext, initials, programFile);
 	generateLpuBatchControllerMemchecker(gpuContext, initials, programFile);	
+	generateLpuBatchControllerSmMemReqFinder(gpuContext,pcubesModel,  initials, programFile);	
 }
 
 void generateLpuBatchControllers(List<GpuExecutionContext*> *gpuExecutionContextList,
@@ -517,7 +523,9 @@ void generateLpuBatchControllerConstructor(GpuExecutionContext *gpuContext, PCub
 
 	programFile << std::endl;
 	programFile << initials << "::" << className << "::" << className;
-	programFile << "() : LpuBatchController() {\n";
+	programFile << "(" << paramIndent;
+	programFile << "Hashtable<DataPartitionConfig*> *partConfigMap) : ";
+	programFile << "LpuBatchController(partConfigMap) {\n";
 
 	// Determine the list of arrays and how they are accessed within the current subflow. Note that scalar and
 	// non-array collections are staged in and out separately. So here we are only concerned about arrays. 
@@ -735,8 +743,103 @@ void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext,
 		programFile << indent << "}\n";
 	}
 	
-	//return the size and close the program file
+	// return the size and close the program file
 	programFile << indent << "return size" << stmtSeparator;
+	programFile << "}\n";
+}
+
+void generateLpuBatchControllerSmMemReqFinder(GpuExecutionContext *gpuContext,
+        PCubeSModel *pcubesModel,        
+	const char *initials, std::ofstream &programFile) {
+
+	Space *gpuContextLps = gpuContext->getContextLps();
+	List<GpuVarLocalitySpec*> *varLocalityInfoList = gpuContext->getVarAllocInstrList();
+
+	std::ostringstream classNameStr;
+        classNameStr << "Context" << gpuContext->getContextId() << "LpuBatchController";
+        std::string className = classNameStr.str();
+
+	// write the function signature
+        programFile << std::endl;
+        programFile << "int " << initials << "::" << className;
+        programFile << "::calculateSmMemReqForDataPart(";
+	programFile << "const char *varName" << paramSeparator;
+	programFile << "LpuDataPart *dataPart) {\n\n";
+	
+	// generate a separate size determining condition block for each variable in the locality info list
+	for (int i = 0; i < varLocalityInfoList->NumElements(); i++) {
+		GpuVarLocalitySpec *varSpec =  varLocalityInfoList->Nth(i);
+		const char *varName = varSpec->getVarName();
+		Space *allocatorLps = varSpec->getAllocatingLps();
+		bool canStoreInSm = varSpec->isSmLocalCopySupported();
+		programFile << indent << "if(strcmp(varName" << paramSeparator << "\"";
+		programFile << varName << "\") == 0) {\n";
+
+		// if the variable cannot be stored in the SM memory then there is no additional memory overhead for it
+		if (!canStoreInSm) {
+			programFile << doubleIndent << "return 0" << stmtSeparator;
+
+		// Otherwise several conditions should be checked
+		} else {
+			// if the allocator LPS and the GPU context LPSes are the same then the data part's get size 
+			// function is sufficient as whole top level parts will be needed in the SM
+			if (gpuContextLps == allocatorLps) {
+				programFile << doubleIndent << "return dataPart->getSize()" << stmtSeparator;
+			
+			// Otherwise, the size needs to be determined using partition configuration information
+			} else {
+				// first retrieve the references of the variable in two LPSes 
+				DataStructure *allocVar = allocatorLps->getLocalStructure(varName);
+				DataStructure *topVar = gpuContextLps->getLocalStructure(varName);
+				
+				// need to retrieve all data partition specs from GPU context LPS to the allocator LPS
+				// to determine the largest subpart at allocator LPS for the context LPS
+				std::stack<Space*> partitionSpecs;
+				while (allocVar != topVar) {
+					partitionSpecs.push(allocVar->getSpace());
+					allocVar = allocVar->getSource();
+				}
+				
+				// SM allocation is an issue for arrays only; so cast the structure to an array and 
+				// determine its dimensionality
+				ArrayDataStructure *array = (ArrayDataStructure *) topVar;
+				int dimensions = array->getDimensionality();
+				
+				// create an array to hold the submitted part's dimension lengths
+				programFile << doubleIndent << "int partDimLengths[" << dimensions << "]";
+				programFile << stmtSeparator;
+				programFile << doubleIndent << "dataPart->copyDimLengths(partDimLengths)";
+				programFile << stmtSeparator;
+
+				// then iteratively derive the largest sub-part size for the allocating LPS using the
+				// partition functions
+				programFile << doubleIndent << "DataPartitionConfig *partConfig = NULL";
+				programFile << stmtSeparator;
+				while (!partitionSpecs.empty()) {
+					Space *interimLps = partitionSpecs.top();
+					partitionSpecs.pop();
+					
+					programFile << doubleIndent << "partConfig = partConfigMap->Lookup(";
+					programFile << '"' << varName << "Space" << interimLps->getName();
+					programFile << "Config\")" << stmtSeparator;
+					programFile << doubleIndent << "partConfig->getLargestPartDimLengths";
+					programFile << "(partDimLengths)" << stmtSeparator;
+				}
+
+				// finally, calculate the size requirements for the sub-part using a DataPart member
+				// function and return it
+				programFile << doubleIndent << "return dataPart->getSizeForSubpartsWithDimLengths";
+				programFile << "(partDimLengths)" << stmtSeparator;
+			}
+		}
+		programFile << indent << "}\n";
+	}
+
+	// if no condition has matched then this is a code generation anomally
+	programFile << std::endl;
+	programFile << indent << "std::cout << \"dont know how handle the variable in the GPU\\n\"";
+	programFile << stmtSeparator;
+	programFile << indent << "std::exit(EXIT_FAILURE)" << stmtSeparator;
 	programFile << "}\n";
 }
 
@@ -976,23 +1079,29 @@ void generateGpuCodeExecutorOffloadFn(GpuExecutionContext *gpuContext,
 
 	// determine dynamic memory requirement for the kernels of this GPU execution context and initialize
 	// a max part size metadata that will be used as an arguments for the CUDA kernels
+	List<GpuVarLocalitySpec*> *varLocalitySpecList = gpuContext->getVarAllocInstrList();
 	programFile << indent << "// determining dynamic shared memory requirements\n";	
 	const char *contextName = gpuContext->getContextName();
 	programFile << indent << "int dynamicSharedMemorySize = 0" << stmtSeparator;
 	programFile << indent << contextName << "MaxPartSizes maxPartSizes" << stmtSeparator;
-	for (int i = 0; i < accessedArrays->NumElements(); i++) {
-		const char *arrayName = accessedArrays->Nth(i);
+	for (int i = 0; i < varLocalitySpecList->NumElements(); i++) {
+		GpuVarLocalitySpec *varSpec = varLocalitySpecList->Nth(i);
+		const char *arrayName = varSpec->getVarName();
 		programFile << indent << "int " << arrayName << "MaxSize = lpuBatchController->";
 		programFile << "getMaxPartSizeForProperty(\"" << arrayName << "\")";
 		programFile << stmtSeparator;
-		programFile << indent << "dynamicSharedMemorySize += getAlignedPartSize(";
-		programFile << arrayName << "MaxSize)" << stmtSeparator;
 		programFile << indent << "maxPartSizes." << arrayName << "MaxPartSize = ";
 		programFile << "getAlignedPartSize(" << arrayName << "MaxSize)" << stmtSeparator;
-	}
-	bool warpMapping = (pcubesModel->getGpuTransitionSpaceId() - contextLps->getPpsId() == 2);
-	if (warpMapping) {
-		programFile << indent << "dynamicSharedMemorySize *= WARP_COUNT" << stmtSeparator;
+		if (varSpec->isSmLocalCopySupported()) {
+			if (!varSpec->doesReqPerWarpInstances()) {
+				programFile << indent << "dynamicSharedMemorySize += getAlignedPartSize(";
+				programFile << arrayName << "MaxSize)" << stmtSeparator;
+			} else {
+				programFile << indent << "dynamicSharedMemorySize += getAlignedPartSize(";
+				programFile << arrayName << "MaxSize)";
+				programFile << " * WARP_COUNT" << stmtSeparator;
+			}
+		}
 	}
 	programFile << std::endl;
 
@@ -1358,6 +1467,7 @@ void generateGpuExecutorMapFn(List<GpuExecutionContext*> *gpuExecutionContextLis
 	fnHeader << paramSeparator << paramIndent << upperInitials << "Partition partition";
 	fnHeader << paramSeparator << paramIndent << initials << "::TaskGlobals *taskGlobals";
 	fnHeader << paramSeparator << paramIndent << initials << "::ThreadLocals *threadLocals";
+	fnHeader << paramSeparator << paramIndent << "Hashtable<DataPartitionConfig*> *partConfigMap";
 	fnHeader << paramSeparator << paramIndent << "std::ofstream &logFile)";
 
 	// write the function header in the header and program files
@@ -1377,7 +1487,7 @@ void generateGpuExecutorMapFn(List<GpuExecutionContext*> *gpuExecutionContextLis
 		int contextId = context->getContextId();
 		programFile << std::endl;
 		programFile << indent << "LpuBatchController *lpuBatchController" << contextId << " = ";
-		programFile << "new Context" << contextId << "LpuBatchController()";
+		programFile << "new Context" << contextId << "LpuBatchController(partConfigMap)";
 		programFile << stmtSeparator;
 		programFile << indent << "lpuBatchController" << contextId << "->setLogFile(&logFile)";
 		programFile << stmtSeparator;

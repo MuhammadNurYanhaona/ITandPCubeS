@@ -98,14 +98,17 @@ void generateLpuBatchControllers(List<GpuExecutionContext*> *gpuExecutionContext
 		const char *initials, 
 		const char *headerFile, const char *programFile);
 
-// these three are supporting routines used by the generateLpuBatchControllerForLps routine that provide 
-// implementations for three functions of an LPU batch controller
+// these four are supporting routines used by the generateLpuBatchControllerForLps routine that provide 
+// implementations for four functions of an LPU batch controller
 void generateLpuBatchControllerConstructor(GpuExecutionContext *gpuContext, 
 		PCubeSModel *pcubesModel,
 		const char *initials, std::ofstream &programFile);
 void generateLpuBatchControllerLpuAdder(GpuExecutionContext *gpuContext, 
 		const char *initials, std::ofstream &programFile);
 void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext, 
+		const char *initials, std::ofstream &programFile);
+void generateLpuBatchControllerSmMemReqFinder(GpuExecutionContext *gpuContext, 
+		PCubeSModel *pcubesModel,
 		const char *initials, std::ofstream &programFile);
 
 /*---------------------------------------------------------------------------------------------------------- 
