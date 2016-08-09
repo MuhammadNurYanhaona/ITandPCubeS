@@ -534,23 +534,13 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	List<const char*> *arrayNames = contextLps->getLocallyUsedArrayNames();
         List<const char*> *accessedArrays 
 			= string_utils::intersectLists(getVariableAccessList(), arrayNames);
-
-	std::string storageSuffix;
-	std::string storageIndex;
-	std::string distrIndex;
-	std::string jumpExpr;
-	bool smLevel = (contextPps == gpuPpsLevel || contextPps == gpuPpsLevel - 1);
-	if (smLevel) {
-		storageSuffix = std::string("");
-		storageIndex = std::string("");
-		distrIndex = std::string("smId");
-		jumpExpr = std::string("SM_COUNT");
-	} else {
-		storageSuffix = std::string("[WARP_COUNT]");
-		storageIndex = std::string("[warpId]");
-		distrIndex = std::string("globalWarpId");
-		jumpExpr = std::string("SM_COUNT * WARP_COUNT");
-	}
+	bool gpuLevel = (contextPps == gpuPpsLevel);
+	bool smLevel = (contextPps == gpuPpsLevel - 1);
+	bool warpLevel = (contextPps == gpuPpsLevel - 2);
+	GpuCodeConstants *gpuCons = NULL;
+	if (gpuLevel) gpuCons = GpuCodeConstants::getConstantsForGpuLevel();
+	else if (smLevel) gpuCons = GpuCodeConstants::getConstantsForSmLevel();
+	else gpuCons = GpuCodeConstants::getConstantsForWarpLevel();
 
 	/**************************************************************************************************************
 		     Assign shared memory data part referrences for variables from the memory panel.
@@ -558,15 +548,21 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 
         // first do the declarations
         programFile << indent << "// global and shared memory data parts holders' declarations\n";
-        for (int i = 0; i < accessedArrays->NumElements(); i++) {
-                const char *arrayName = accessedArrays->Nth(i);
+	for (int i = 0; i < varAllocInstrList->NumElements(); i++) {
+		GpuVarLocalitySpec *varSpec = varAllocInstrList->Nth(i);
+		const char *arrayName = varSpec->getVarName();
                 ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(arrayName);
                 ArrayType *arrayType = (ArrayType*) array->getType();
                 Type *elemType = arrayType->getTerminalElementType();
                 programFile << indent << "__shared__ " << elemType->getCType();
-                programFile << " *" << arrayName << storageSuffix << paramSeparator;
-                programFile << " *" << arrayName << "_global" << storageSuffix << stmtSeparator;
-        }
+		if (varSpec->doesReqPerWarpInstances()) {
+			programFile << " *" << arrayName << "[WARP_COUNT]" << paramSeparator;
+			programFile << " *" << arrayName << "_global[WARP_COUNT]" << stmtSeparator;
+		} else {
+			programFile << " *" << arrayName << paramSeparator;
+			programFile << " *" << arrayName << "_global" << stmtSeparator;
+		}
+	}
         programFile << std::endl;
 
 	// then do the assignment of indices from the shared memory panel to the shared data part holder refereces; 
@@ -575,24 +571,26 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
         programFile << indent << "// shared memory data parts holders allocation\n";
         programFile << indent << "if (warpId == 0 && threadId == 0) {\n";
         programFile << doubleIndent << "panelIndex = 0" << stmtSeparator;
-        for (int i = 0; i < accessedArrays->NumElements(); i++) {
-                const char *arrayName = accessedArrays->Nth(i);
+	for (int i = 0; i < varAllocInstrList->NumElements(); i++) {
+		GpuVarLocalitySpec *varSpec = varAllocInstrList->Nth(i);
+		const char *arrayName = varSpec->getVarName();
                 ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(arrayName);
                 ArrayType *arrayType = (ArrayType*) array->getType();
                 Type *elemType = arrayType->getTerminalElementType();
 		std::string indentLevel = std::string(doubleIndent);
-                if (!smLevel) {
+                if (varSpec->doesReqPerWarpInstances()) {
 			programFile << doubleIndent << "for (int i = 0; i < WARP_COUNT; i++) {\n";
 			indentLevel = std::string(tripleIndent);
 		}		
 		programFile << indentLevel << arrayName;
-		if (!smLevel)  programFile << "[i]"; 
+		if (varSpec->doesReqPerWarpInstances())  programFile << "[i]"; 
 		programFile<< " = (" << elemType->getCType() << "*) ";
 		programFile << "(memoryPanel + panelIndex)" << stmtSeparator;
 		programFile << indentLevel << "panelIndex += " << "maxPartSizes." << arrayName;
 		programFile << "MaxPartSize" << stmtSeparator;		
-		if (!smLevel) programFile << doubleIndent << "}\n";
-        }
+		if (varSpec->doesReqPerWarpInstances()) programFile << doubleIndent << "}\n";
+	}
+
         programFile << indent << "}\n";
         programFile << indent << "__syncthreads()" << stmtSeparator;
         programFile << std::endl;
@@ -603,15 +601,15 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	
 	// if the GPU context LPS is above the warp level then there will be one structure per variable, otherwise
 	// there will be one per warp
-	programFile << indent << "// metadata declaration for holding LPU storage dimension information\n";
+	programFile << indent << "// metadata declaration for holding Topmost LPU storage dimensions\n";
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {
 		const char *arrayName = accessedArrays->Nth(i);
                 ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(arrayName);
 		int dimensions = array->getDimensionality();
-		programFile << indent << "__shared__ GpuDimension " << arrayName << "SRanges";
-		programFile << storageSuffix << "[" << dimensions << "]" << paramSeparator;
+		programFile << indent << "__shared__ GpuDimension " << arrayName << "SGRanges";
+		programFile << gpuCons->storageSuffix << "[" << dimensions << "]" << paramSeparator;
 		programFile << arrayName << "Space" << contextLpsName << "PRanges";
-		programFile << storageSuffix << "[" << dimensions << "]" << stmtSeparator;
+		programFile << gpuCons->storageSuffix << "[" << dimensions << "]" << stmtSeparator;
 	}
 	programFile << std::endl;
 
@@ -631,72 +629,11 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	***************************************************************************************************************/
 	
 	programFile << indent << "{ // scope starts for distribution of staged-in LPUs\n\n";
-	int lpsDimension = contextLps->getDimensionCount();
-	
-	// for location sensitive contexts, each PPU has its own independent sub-batch of LPUs to operate on
-	if (contextType == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
-		
-		// declare and initialize LPU counters
-		programFile << indent << "__shared__ int space" << contextLpsName << "LpuCount";
-		programFile << storageSuffix << "[" << lpsDimension << "]" << stmtSeparator;
-		if (smLevel) {
-			programFile << indent << "if (warpId == 0 && threadId == 0) {\n";
-		} else {
-			programFile << indent << "if (threadId == 0) {\n";
-		}
-		for (int i = 0; i < lpsDimension; i++) {
-			programFile << doubleIndent << "space" << contextLpsName << "LpuCount";
-			programFile << storageIndex << "[";
-			programFile << i << "] = launchMetadata.entries[" << distrIndex << "].";
-			programFile << "lpuCount" << i + 1 << stmtSeparator;
-		}
-		programFile << indent << "}\n";
-		programFile << indent << "__syncthreads()" << stmtSeparator << std::endl; 
+	generateStagedInLpuDistributionLoop(programFile, pcubesModel);
 
-		// make the PPU iterate over their respective batch ranges
-		programFile << indent << "for (int space" << contextLpsName;
-		programFile << "LinearId = launchMetadata.entries[" << distrIndex << "]";
-		programFile << ".batchRangeMin; " << paramIndent << indent;
-		programFile << "space" << contextLpsName;
-		programFile << "LinearId <= launchMetadata.entries[" << distrIndex << "].batchRangeMax; ";
-		programFile << "space" << contextLpsName;
-		programFile << "LinearId++) {\n\n";
-		
-		// if the batch range for the current PPU starts with an invalid identifier then the PPU does not
-		// participate in any computation
-		// TODO need to determine how to avoid possible deadlocks for this
-		programFile << doubleIndent  << "// exiting if the batch range is invalid;";
-		programFile << " can we have a deadlock here?\n";
-		programFile << doubleIndent << "if (space";
-		programFile << contextLpsName << "LinearId == INVALID_ID) break" << stmtSeparator;
-	
-	// for location agnostic contexts, a single batch of LPUs gets distributed among all PPUs
- 	} else {
-		
-		// declare and initialize an LPU counter
-		programFile << indent << "__shared__ int space" << contextLpsName << "LpuCount";
-		programFile << "[" << lpsDimension << "]" << stmtSeparator;
-		programFile << indent << "if (warpId == 0 && threadId == 0) {\n";
-		for (int i = 0; i < lpsDimension; i++) {
-			programFile << doubleIndent << "space" << contextLpsName << "LpuCount";
-			programFile << "[" << i << "] = launchMetadata.entries[0].";
-			programFile << "lpuCount" << i + 1 << stmtSeparator;
-		}
-		programFile << indent << "}\n";
-		programFile << indent << "__syncthreads()" << stmtSeparator << std::endl; 
-
-		// distribute the LPU by letting the PPUs stride over the batch range
-		programFile << indent << "for (int space" << contextLpsName; 
-		programFile << "LinearId = launchMetadata.entries[0]";
-		programFile << ".batchRangeMin + " << distrIndex << "; ";
-		programFile << paramIndent << indent << "space" << contextLpsName;
-		programFile << "LinearId <= launchMetadata.entries[0].batchRangeMax; ";
-		programFile << "space" << contextLpsName << "LinearId += " << jumpExpr << ") {\n";
-	}
-		
-	// SM level LPU iterations will always be preceeded by a syncthreads to ensure that all warps have
+	// GPU or SM level LPU iterations will always be preceeded by a syncthreads to ensure that all warps have
 	// completed previous LPU processing
-	if (smLevel) {
+	if (gpuLevel || smLevel) {
 		programFile << std::endl << doubleIndent;
 		programFile << "// ensure all warps finished processing the last LPU\n";
 		programFile << doubleIndent << "__syncthreads()" << stmtSeparator;
@@ -712,7 +649,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	// before processing can start on any LPU, we need to read dimension information of all component data 
 	// parts and index into the appropriate positions of the card memory LPU data buffer so that data copying
 	// can be done from the global card memory to the SM shared memory
-	if (smLevel) {
+	if (gpuLevel || smLevel) {
 		programFile << doubleIndent << "if (warpId == 0 && threadId == 0) {\n";	
 	} else {
 		programFile << doubleIndent << "if (threadId == 0) {\n";
@@ -721,24 +658,29 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 
 	// declare some auxiliary metadata to be used during interpreting GPU card memory buffers
 	programFile << tripleIndent << "// auxiliary variables for reading data buffers\n";
-	programFile << tripleIndent << "__shared__ int lpuIndex" << storageSuffix << stmtSeparator;
-	programFile << tripleIndent << "__shared__ int partIndex" << storageSuffix << stmtSeparator;
-	programFile << tripleIndent << "__shared__ int partStartPos" << storageSuffix << stmtSeparator;
-	programFile << tripleIndent << "__shared__ int partDimRangeStart" << storageSuffix << stmtSeparator;
-	programFile << tripleIndent << "__shared__ int partRangeDepth" << storageSuffix << stmtSeparator;
+	programFile << tripleIndent << "__shared__ int lpuIndex";
+	programFile << gpuCons->storageSuffix << stmtSeparator;
+	programFile << tripleIndent << "__shared__ int partIndex";
+	programFile << gpuCons->storageSuffix << stmtSeparator;
+	programFile << tripleIndent << "__shared__ int partStartPos";
+	programFile << gpuCons->storageSuffix << stmtSeparator;
+	programFile << tripleIndent << "__shared__ int partDimRangeStart";
+	programFile << gpuCons->storageSuffix << stmtSeparator;
+	programFile << tripleIndent << "__shared__ int partRangeDepth";
+	programFile << gpuCons->storageSuffix << stmtSeparator;
 	programFile << std::endl;
 
 	// determine the current LPU's index for accessing data buffers
-	programFile << tripleIndent << "lpuIndex " << storageIndex;
+	programFile << tripleIndent << "lpuIndex " << gpuCons->storageIndex;
 	programFile << " = launchMetadata.entries[";
 	if (contextType == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
-		programFile << distrIndex << "].batchStartIndex " << paramIndent;
+		programFile << gpuCons->distrIndex << "].batchStartIndex " << paramIndent;
 		programFile << tripleIndent << " + space" << contextLpsName << "LinearId "; 
-		programFile << "- launchMetadata.entries[" << distrIndex << "].batchRangeMin";
-		programFile << stmtSeparator;
+		programFile << "- launchMetadata.entries[" << gpuCons->distrIndex;
+		programFile << "].batchRangeMin" << stmtSeparator;
 	} else {
 		programFile << "0].batchStartIndex" << paramIndent;
-		programFile << tripleIndent << " + space" << contextLpsName << " LinearId "; 
+		programFile << tripleIndent << " + space" << contextLpsName << "LinearId "; 
 		programFile << "- launchMetadata.entries[0].batchRangeMin" << stmtSeparator;
 	}
 
@@ -753,45 +695,47 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 
 		programFile << std::endl << tripleIndent;
 		programFile << "// retrieving variable '" << varName << "' information\n";
-		programFile << tripleIndent << "partIndex" << storageIndex << " = " << varName;
-		programFile << "Buffers.partIndexBuffer[lpuIndex" << storageIndex << "]" << stmtSeparator;
-		programFile << tripleIndent << "partStartPos" << storageIndex << " = " << varName;
-		programFile << "Buffers.partBeginningBuffer[partIndex" << storageIndex << "]";
+		programFile << tripleIndent << "partIndex" << gpuCons->storageIndex << " = " << varName;
+		programFile << "Buffers.partIndexBuffer[lpuIndex";
+		programFile << gpuCons->storageIndex << "]" << stmtSeparator;
+		programFile << tripleIndent << "partStartPos";
+		programFile << gpuCons->storageIndex << " = " << varName;
+		programFile << "Buffers.partBeginningBuffer[partIndex" << gpuCons->storageIndex << "]";
 		programFile << stmtSeparator;
-		programFile << tripleIndent << varName << "_global" << storageIndex << " = ";
+		programFile << tripleIndent << varName << "_global" << gpuCons->storageIndex << " = ";
 		programFile << "(" << elemType->getCType() << "*) ";
-		programFile << "(" << varName << "Buffers.dataBuffer + partStartPos" << storageIndex << ")";
-		programFile << stmtSeparator;
-		programFile << tripleIndent << "partRangeDepth" << storageIndex << " = (" << varName;
+		programFile << "(" << varName << "Buffers.dataBuffer + partStartPos";
+		programFile << gpuCons->storageIndex << ")" << stmtSeparator;
+		programFile << tripleIndent << "partRangeDepth" << gpuCons->storageIndex << " = (" << varName;
 		programFile << "Buffers.partRangeDepth + 1) * " << dimensions << " * 2" << stmtSeparator;
-		programFile << tripleIndent << "partDimRangeStart" << storageIndex << " = ";
-		programFile << "partRangeDepth" << storageIndex << " * partIndex" << storageIndex;
-		programFile << stmtSeparator;
+		programFile << tripleIndent << "partDimRangeStart" << gpuCons->storageIndex << " = ";
+		programFile << "partRangeDepth" << gpuCons->storageIndex;
+		programFile << " * partIndex" << gpuCons->storageIndex << stmtSeparator;
 
 		programFile << std::endl;
 		for (int j = 0; j < dimensions; j++) {
-			programFile << tripleIndent << varName << "SRanges" << storageIndex;
+			programFile << tripleIndent << varName << "SGRanges" << gpuCons->storageIndex;
 			programFile << "[" << j << "].range.min = ";
 			programFile << varName << "Space" << contextLpsName;
-			programFile << "PRanges" << storageIndex << "[" << j << "].range.min";
+			programFile << "PRanges" << gpuCons->storageIndex << "[" << j << "].range.min";
 			programFile << "\n" << tripleIndent << doubleIndent;
 			programFile << " = " << varName << "Buffers.partRangeBuffer[";
-			programFile << "partDimRangeStart" << storageIndex << " + ";
-			programFile << 2 * j << "]" << storageIndex << stmtSeparator;
-			programFile << tripleIndent << varName << "SRanges" << storageIndex;
+			programFile << "partDimRangeStart" << gpuCons->storageIndex << " + ";
+			programFile << 2 * j << "]" << gpuCons->storageIndex << stmtSeparator;
+			programFile << tripleIndent << varName << "SGRanges" << gpuCons->storageIndex;
 			programFile << "[" << j << "].range.max = ";
 			programFile << varName << "Space" << contextLpsName;
-			programFile << "PRanges" << storageIndex << "[" << j << "].range.max";
+			programFile << "PRanges" << gpuCons->storageIndex << "[" << j << "].range.max";
 			programFile << "\n" << tripleIndent << doubleIndent;
 			programFile << " = " << varName << "Buffers.partRangeBuffer[";
-			programFile << "partDimRangeStart" << storageIndex << " + ";
-			programFile << 2 * j + 1 << "]" << storageIndex << stmtSeparator;
+			programFile << "partDimRangeStart" << gpuCons->storageIndex << " + ";
+			programFile << 2 * j + 1 << "]" << gpuCons->storageIndex << stmtSeparator;
 		}
 	}	
 
 	// end of global memory buffer processing loop
 	programFile << doubleIndent << "}\n";
-	if (smLevel) {
+	if (gpuLevel || smLevel) {
 		programFile << doubleIndent << "__syncthreads()" << stmtSeparator;
 	} 
 	
@@ -800,6 +744,8 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	/**************************************************************************************************************
 					copy data parts from GPU card memory to SM memory
 	***************************************************************************************************************/
+
+/*
 	
 	decorator::writeCommentHeader(2, &programFile, "card to shared memory data reading start");
 
@@ -830,22 +776,23 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	
 	decorator::writeCommentHeader(2, &programFile, "data reading done");
 	programFile << std::endl;
+*/
 	
 	/**************************************************************************************************************
 					    Generate CUDA Code for the Sub-Flow
 	***************************************************************************************************************/
-
+/*
 	List<FlowStage*> *kernelStages = kernelDef->getStageList();
 	for (int i = 0; i < kernelStages->NumElements(); i++) {
 		FlowStage *stage = kernelStages->Nth(i);
 		stage->generateGpuKernelCode(programFile, 2, 
 				contextLps, contextLps, accessedArrays, gpuPpsLevel);
 	}
-
+*/
 	/**************************************************************************************************************
 					synchronizing GPU card memory with SM's updates
 	***************************************************************************************************************/
-        
+/*        
 	decorator::writeCommentHeader(2, &programFile, "shared memory to card memory data sync start");
 	List<const char*> *modifiedArrays 
 			= string_utils::intersectLists(getModifiedVariableList(), arrayNames);
@@ -871,7 +818,7 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		}
 	}
 	decorator::writeCommentHeader(2, &programFile, "data synchronization done");
-
+*/
 	// end of outer most LPU iteration loop	
 	programFile << indent << "}\n\n";
 	programFile << indent << "} // scope ends for distribution of staged-in LPUs\n";
@@ -1269,4 +1216,99 @@ Space *GpuExecutionContext::getInnermostSMLpsForVarCopy(const char *varName,
 		selectedLps = parentLps;
 	}
 	return selectedLps;
+}
+
+void GpuExecutionContext::generateStagedInLpuDistributionLoop(std::ofstream &programFile, PCubeSModel *pcubesModel) {
+	
+	int gpuPpsLevel = pcubesModel->getGpuTransitionSpaceId();
+        int contextPps = contextLps->getPpsId();
+        const char *contextLpsName = contextLps->getName();
+        bool gpuLevel = (contextPps == gpuPpsLevel);
+        bool smLevel = (contextPps == gpuPpsLevel - 1);
+        bool warpLevel = (contextPps == gpuPpsLevel - 2);
+        GpuCodeConstants *gpuCons = NULL;
+        if (gpuLevel) gpuCons = GpuCodeConstants::getConstantsForGpuLevel();
+        else if (smLevel) gpuCons = GpuCodeConstants::getConstantsForSmLevel();
+        else gpuCons = GpuCodeConstants::getConstantsForWarpLevel();
+        int lpsDimension = contextLps->getDimensionCount();
+
+
+	/**************************************************************************************************************
+					Distribution of LPUs of an un-partitioned LPS
+	***************************************************************************************************************/
+	
+	if (lpsDimension == 0) {
+		programFile << indent << "for (int space" << contextLpsName; 
+		programFile << "LinearId = launchMetadata.entries[0]";
+		programFile << ".batchRangeMin + " << gpuCons->distrIndex << "; ";
+		programFile << paramIndent << indent << "space" << contextLpsName;
+		programFile << "LinearId <= launchMetadata.entries[0].batchRangeMax; ";
+		programFile << "space" << contextLpsName << "LinearId += " << gpuCons->jumpExpr << ") {\n";
+		return;
+	}	
+	
+	/**************************************************************************************************************
+				      LPU Counter Initialization for an Partitioned LPS
+	***************************************************************************************************************/
+
+	// first determine the LPU counts along different dimensions
+	if (contextType == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
+		programFile << indent << "__shared__ int space" << contextLpsName << "LpuCount";
+		programFile << gpuCons->storageSuffix << "[" << lpsDimension << "]" << stmtSeparator;
+		if (gpuLevel || smLevel) {
+			programFile << indent << "if (warpId == 0 && threadId == 0) {\n";
+		} else {
+			programFile << indent << "if (threadId == 0) {\n";
+		}
+		for (int i = 0; i < lpsDimension; i++) {
+			programFile << doubleIndent << "space" << contextLpsName << "LpuCount";
+			programFile << gpuCons->storageIndex << "[";
+			programFile << i << "] = launchMetadata.entries[" << gpuCons->distrIndex << "].";
+			programFile << "lpuCount" << i + 1 << stmtSeparator;
+		}
+		programFile << indent << "}\n";
+		programFile << indent << "__syncthreads()" << stmtSeparator << std::endl;
+	} else {
+		programFile << indent << "__shared__ int space" << contextLpsName << "LpuCount";
+		programFile << "[" << lpsDimension << "]" << stmtSeparator;
+		programFile << indent << "if (warpId == 0 && threadId == 0) {\n";
+		for (int i = 0; i < lpsDimension; i++) {
+			programFile << doubleIndent << "space" << contextLpsName << "LpuCount";
+			programFile << "[" << i << "] = launchMetadata.entries[0].";
+			programFile << "lpuCount" << i + 1 << stmtSeparator;
+		}
+		programFile << indent << "}\n";
+		programFile << indent << "__syncthreads()" << stmtSeparator << std::endl;
+	}
+
+	/**************************************************************************************************************
+					 Distribution of LPUs of a partitioned LPS
+	***************************************************************************************************************/
+
+	// when the context is location sensitive make the PPU iterate over their respective batch ranges
+	if (contextType == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) {
+
+		programFile << indent << "for (int space" << contextLpsName;
+		programFile << "LinearId = launchMetadata.entries[" << gpuCons->distrIndex << "]";
+		programFile << ".batchRangeMin; " << paramIndent << indent;
+		programFile << "space" << contextLpsName;
+		programFile << "LinearId <= launchMetadata.entries[" << gpuCons->distrIndex << "].batchRangeMax; ";
+		programFile << "space" << contextLpsName;
+		programFile << "LinearId++) {\n\n";
+		
+		// if the batch range for the current PPU starts with an invalid identifier then the PPU does not
+		// participate in any computation
+		programFile << doubleIndent  << "// exiting if the batch range is invalid\n";
+		programFile << doubleIndent << "if (space";
+		programFile << contextLpsName << "LinearId == INVALID_ID) break" << stmtSeparator;
+	
+	// otherwise let the PPUs stride over the single range of LPUs
+	} else {
+		programFile << indent << "for (int space" << contextLpsName; 
+                programFile << "LinearId = launchMetadata.entries[0]";
+                programFile << ".batchRangeMin + " << gpuCons->distrIndex << "; ";
+                programFile << paramIndent << indent << "space" << contextLpsName;
+                programFile << "LinearId <= launchMetadata.entries[0].batchRangeMax; ";
+                programFile << "space" << contextLpsName << "LinearId += " << gpuCons->jumpExpr << ") {\n";
+	}	
 }

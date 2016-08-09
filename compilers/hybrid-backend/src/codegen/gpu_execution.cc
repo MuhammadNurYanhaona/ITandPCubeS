@@ -217,6 +217,14 @@ void generateSuperLpuConfigStruct(Space *gpuContextLps, std::ofstream &headerFil
 	const char *lpsName = gpuContextLps->getName();
 	headerFile << "\n" << "class Space" << lpsName << "AncestorLpuConfigs" << " {\n";
 	headerFile << "  public:\n";
+
+	// Note that there is no need for the linear ID of the LPU in this metadata structure. Nonetheless, we add
+	// this property here and in the initializer function update it as the C++ compiler removes the initializer
+	// function if there is no statement inside it. Then the CUDA compiler throw an incomplete type failure for
+	// the entire structure
+	headerFile << indent << "// a placeholder variable to avoid empty initializer function\n";
+	headerFile << indent << "int lpuId" << stmtSeparator << std::endl; 
+
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {
 		const char *arrayName = accessedArrays->Nth(i);
 		ArrayDataStructure *array = (ArrayDataStructure *) gpuContextLps->getLocalStructure(arrayName);
@@ -263,11 +271,18 @@ void generateSuperLpuConfigStructFn(Space *gpuContextLps, const char *initials, 
 
 	// generate function body
 	programFile << "{\n\n";
-
+	
 	// first cast the generic LPU to appropriate type
 	programFile << indent << "Space" << lpsName << "_LPU *typedLpu = (Space" << lpsName << "_LPU*)";
 	programFile << " lpu" << stmtSeparator;
 	
+	// If this function is optimized out by the C++ compiler because of lack of any assignments, the CUDA compiler
+	// subsequently throws and incomplete type exception. So this statement is put here. 
+	programFile << std::endl << indent;
+	programFile << "// a placeholder statement to avoid the function to be optimized out\n";
+	programFile << indent << "lpuId = typedLpu->id";
+	programFile << stmtSeparator << std::endl; 
+
 	// process the individual arrays in sequence
 	List<const char*> *accessedArrays = gpuContextLps->getLocallyUsedArrayNames();
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {

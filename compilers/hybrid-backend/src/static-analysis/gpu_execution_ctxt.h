@@ -234,6 +234,12 @@ class GpuExecutionContext {
 	// less frequently. 
 	Space *getInnermostSMLpsForVarCopy(const char *varName, 
 			int smPpsId, Space *earliestLpsNeedingVar);
+
+	
+	// This function is extracted from the generateGpuKernel function to generate the loop to distribute the top
+	// level GPU LPUs. We have this separate function as the implementation of LPU distribution logic is quite long
+	// and was cluttering the original function.
+	void generateStagedInLpuDistributionLoop(std::ofstream &programFile, PCubeSModel *pcubesModel);
 };
 
 #endif
