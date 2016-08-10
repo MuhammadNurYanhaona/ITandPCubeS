@@ -8,8 +8,7 @@
 
 __device__ int block_size_part_count(GpuDimension *dimension, int ppuCount, int size) {
 	int length = dimension->range.max - dimension->range.min + 1;
-	int count = length / size;
-	return (count < 1) ? 1 : count; 
+	return (length + size - 1) / size;
 }
 
 __device__ void block_size_part_range(GpuDimension *resultDimension, 
