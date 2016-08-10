@@ -1060,7 +1060,7 @@ void CompositeStage::generateCardToSmDataStageIns(std::ofstream &stream,
                         stream << indentStr << indent << varName << "SRanges" << destCons->storageIndex;
                         stream << "[" << j << "] = " << varName << "Space" << lpsName;
                         stream << "PRanges" << destCons->storageIndex;
-			stream << "[" << j << "].getNormalizedDimension()" << stmtSeparator;
+			stream << "[" << j << "]" << stmtSeparator;
                 }
 
 		// close the conditional block
