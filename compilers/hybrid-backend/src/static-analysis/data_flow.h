@@ -20,6 +20,7 @@ class StageSyncDependencies;
 class SyncRequirement;
 class CommunicationCharacteristics;
 class GpuExecutionContext;
+class GpuVarLocalitySpec;
 
 /* An important point to remember about synchronization related enums and classes in this headers is that they corresponds 
    to situations where there is a need for definite data movements along with signaling the fact that an update has taken 
@@ -176,9 +177,8 @@ class FlowStage {
 	// mapped to the GPU
 	virtual void generateGpuKernelCode(std::ofstream &stream, 
 			int indentation, 
-			Space *gpuContextLps,
+			GpuExecutionContext *gpuContext,
 			Space *containerSpace, 	
-			List<const char*> *accessedArrays,
 			int topmostGpuPps) {}
 
 	// For code generation for the back-end multi-core compiler we need to know if a flow stage should be enter-
@@ -306,9 +306,8 @@ class ExecutionStage : public FlowStage {
 	void setLpsExecutionFlags();
 	void generateGpuKernelCode(std::ofstream &stream, 
 			int indentation, 
-			Space *gpuContextLps,
+			GpuExecutionContext *gpuContext,
 			Space *containerSpace, 	
-			List<const char*> *accessedArrays,
 			int topmostGpuPps);
 	
 	// If index reordering partition functions have been used for some array then retrieving the storage index 
@@ -376,7 +375,6 @@ class CompositeStage : public FlowStage {
 	// compiler's manipulation of the intermediate representation. 
 	bool isEmpty();
 
-	
 	// this recursively goes down within the composite stage and returns the highest index of any stage nested
 	// in it
 	int getHighestNestedStageIndex();
@@ -429,10 +427,22 @@ class CompositeStage : public FlowStage {
 	// override the GPU kernel generation method inherited from the Flow-Stage class
 	virtual void generateGpuKernelCode(std::ofstream &stream, 
 			int indentation, 
-			Space *gpuContextLps,
-			Space *containerSpace, 
-			List<const char*> *accessedArrays, 
+			GpuExecutionContext *gpuContext,
+			Space *containerSpace, 	
 			int topmostGpuPps);
+
+	// these are two supporting function handling LPU data parts stage in and out to be used by the generateGpu-
+	// KernelCode function
+	void generateCardToSmDataStageIns(std::ofstream &stream, 
+			const char *indentStr, 
+			GpuExecutionContext *gpuContext,
+                        int topmostGpuPps,
+			List<GpuVarLocalitySpec*> *allocInstrList);
+	void generateSmToCardDataStageOuts(std::ofstream &stream, 
+			const char *indentStr, 
+			GpuExecutionContext *gpuContext,
+                        int topmostGpuPps,
+			List<GpuVarLocalitySpec*> *updateInstrList);
 	
 	// Until we incorporate the backend support for dynamic LPSes, there is no need to generate codes for sync 
 	// stages; therefore, we filter them out during nested stages grouping.

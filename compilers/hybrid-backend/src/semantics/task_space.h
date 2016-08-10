@@ -407,7 +407,6 @@ class Space {
 	void genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream, 
 			const char *indentStr,
 			List<const char*> *accessibleArrays, 
-			int topmostGpuPps,
 			bool perWarpCountInfo);
 
 	// This helper routine is used to construct updated partition dimension information for relevant arrays 

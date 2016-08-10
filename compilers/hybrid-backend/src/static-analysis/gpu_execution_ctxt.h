@@ -144,6 +144,10 @@ class GpuExecutionContext {
 	List<const char*> *getEpochDependentVariableList() { return epochDependentVarAccesses; }
 	List<const char*> *getEpochIndependentVariableList();
 
+	// data allocation instructions retrieval functions
+	List<GpuVarLocalitySpec*> *filterVarAllocInstrsForLps(Space *lps);
+	List<GpuVarLocalitySpec*> *filterModifiedVarAllocInstrsForLps(Space *lps);
+
 	// this routine generates CUDA kernels and surrounding offloading functions for task sub-flow of the execution 
 	// context
 	void generateKernelConfigs(PCubeSModel *pcubesModel);
@@ -167,6 +171,22 @@ class GpuExecutionContext {
 	// As the name suggests, this function returns the list of compute stages that are part of the sub-flow this
 	// GPU execution context encompases.
 	List<ExecutionStage*> *getComputeStagesOfFlowContext();
+
+	// This is a helper routine that is used during GPU kernel generation, to copy GPU card memory data in and out
+	// of the shared memory of the SMs. The primary concern here is to distribute threads and warps in a way that
+	// reduces non-coalesced global memory accesses. In the future we should incorporate concerns such as shared
+	// memory bank conflicts avoidance and improving parallelism in the data copying logic.
+	// The function returns an indent string to be appended before any statement placed inside the generated loops.  
+	const char *generateDataCopyingLoopHeaders(std::ofstream &stream, 
+			ArrayDataStructure *array, 
+			int indentLevel, bool warpLevel);
+	// this function is used to generate a single element transfer instruction between the GPU card memory and the
+	// shared memory of an SM for an array. The transfer-direction parameter indicates what memory should be read
+	// and what should be written (1 = read from card and write to SM; otherwise, do vice versa).
+	void generateElementTransferStmt(std::ofstream &stream, 
+			ArrayDataStructure *array, 
+			const char *indentPrefix, 
+			bool warpLevel, int transferDirection);
 
 	void describe(int indent);
   private:
@@ -201,22 +221,6 @@ class GpuExecutionContext {
 	void wrapOffloadingCodeInLargerContext(std::ofstream &stream, int indentation, 
 			List<Space*> *transitLpsList, 
 			int index, const char *offloadingCode);	
-
-	// This is a helper routine that is used during GPU kernel generation, to copy GPU card memory data in and out
-	// of the shared memory of the SMs. The primary concern here is to distribute threads and warps in a way that
-	// reduces non-coalesced global memory accesses. In the future we should incorporate concerns such as shared
-	// memory bank conflicts avoidance and improving parallelism in the data copying logic.
-	// The function returns an indent string to be appended before any statement placed inside the generated loops.  
-	const char *generateDataCopyingLoopHeaders(std::ofstream &stream, 
-			ArrayDataStructure *array, 
-			int indentLevel, bool warpLevel);
-	// this function is used to generate a single element transfer instruction between the GPU card memory and the
-	// shared memory of an SM for an array. The transfer-direction parameter indicates what memory should be read
-	// and what should be written (1 = read from card and write to SM; otherwise, do vice versa).
-	void generateElementTransferStmt(std::ofstream &stream, 
-			ArrayDataStructure *array, 
-			const char *indentPrefix, 
-			bool warpLevel, int transferDirection);
 
 	// this is a supporting function needed to determine inside GPU data locality specification for a variable
 	Space *getEarliestLpsNeedingVar(const char *varName, 

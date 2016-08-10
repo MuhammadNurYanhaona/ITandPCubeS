@@ -835,12 +835,17 @@ void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream,
 	}	
 }
 
-void CompositeStage::generateGpuKernelCode(std::ofstream &stream, 
+void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		int indentLevel,
-		Space *gpuContextLps, 
-		Space *containerSpace, 
-		List<const char*> *accessedArrays, 
+		GpuExecutionContext *gpuContext,
+		Space *containerSpace,
 		int topmostGpuPps) {
+
+        Space *gpuContextLps = gpuContext->getContextLps();
+        List<const char*> *arrayNames = gpuContextLps->getLocallyUsedArrayNames();
+        List<const char*> *accessedArrays
+                        = string_utils::intersectLists(gpuContext->getVariableAccessList(), arrayNames);
+	
 	
 	std::ostringstream indentStr, nextIndent;
 	for (int i = 0; i < indentLevel; i++) indentStr << indent;
@@ -859,7 +864,7 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		const char *bodyIndent = strdup(nextIndent.str().c_str());
 		bool warpLevelCount = (topmostGpuPps - containerSpace->getPpsId()) == 2;
 		space->genLpuCountInfoForGpuKernelExpansion(stream,
-				bodyIndent, accessedArrays, topmostGpuPps, warpLevelCount);
+				bodyIndent, accessedArrays, warpLevelCount);
 		nextIndent << '\t';
 
 		std::string distrIndex;
@@ -915,8 +920,8 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		if (smLevel) {
 			stream << nextIndent.str();
 			stream << "// sync to ensure all warps are in the same stage\n"; 
-			stream << stmtSeparator;
 			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
+			stream << std::endl;
 		}
 		
 		// create a, possibly, multidimensional ID from the linear ID for the current LPU
@@ -949,14 +954,15 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 				strdup(nextIndent.str().c_str()), 
 				accessedArrays, topmostGpuPps, 
 				warpLevelCount, !smLevel);
+	}
 
-		
-		// if this is an SM or GPU level composite stage then do a syncthreads to ensure all warps 
-		// received the updated LPU IDs and array partition dimension information
-		if (smLevel) {
-			stream << nextIndent.str() << "// synchronizing metadata updates\n";
-			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
-		}
+	// Check if any card memory to SM memory data stage-in should take place during the entrance to the 
+	// underlying LPS. If YES then invoke the helper routine to do the stage-in
+	List<GpuVarLocalitySpec*> *allocInstrList = gpuContext->filterVarAllocInstrsForLps(space);
+	if (allocInstrList->NumElements() > 0) {
+		generateCardToSmDataStageIns(stream, 
+				strdup(nextIndent.str().c_str()),
+				gpuContext, topmostGpuPps, allocInstrList);
 	}
 
 	// recursively generate code for the stages inside the current stage
@@ -978,8 +984,16 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		if (syncStage != NULL) continue;
 
 		int nextIndentLevel = (containerSpace != space) ? indentLevel + 1 : indentLevel;
-		stage->generateGpuKernelCode(stream, nextIndentLevel, 
-				gpuContextLps, space, accessedArrays, topmostGpuPps); 
+		stage->generateGpuKernelCode(stream, nextIndentLevel, gpuContext, space, topmostGpuPps); 
+	}
+
+	// Check if any staged-in data has been updated in the nested code. If YES then the update needs to be
+	// staged-out from SM to the GPU card memory
+	List<GpuVarLocalitySpec*> *updateInstrList = gpuContext->filterModifiedVarAllocInstrsForLps(space);
+	if (updateInstrList->NumElements() > 0) {
+		generateSmToCardDataStageOuts(stream, 
+				strdup(nextIndent.str().c_str()),
+				gpuContext, topmostGpuPps, updateInstrList);
 	}
 	
 	if (containerSpace != space) {
@@ -993,6 +1007,169 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		decorator::writeCommentHeader(indentLevel, &stream, exitHeader.str().c_str());
 		stream << std::endl;
 	}
+}
+
+void CompositeStage::generateCardToSmDataStageIns(std::ofstream &stream,
+                        const char *indentStr,
+			GpuExecutionContext *gpuContext, 
+			int topmostGpuPps, 
+			List<GpuVarLocalitySpec*> *allocInstrList) {
+
+	decorator::writeCommentHeader(&stream, "card to shared memory data stage-in start", indentStr);
+
+	// determine what suffixes to be used for the card memory variables
+	Space *gpuContextLps = gpuContext->getContextLps();
+	GpuCodeConstants *srcCons = NULL;
+	if (topmostGpuPps - gpuContextLps->getPpsId() == 2) {
+		srcCons = GpuCodeConstants::getConstantsForWarpLevel();
+	} else srcCons = GpuCodeConstants::getConstantsForSmLevel();
+
+	// determine what suffixes to be used to the SM local variables
+	GpuCodeConstants *destCons = NULL;
+	bool warpLevel = false;
+        if (allocInstrList->Nth(0)->doesReqPerWarpInstances()) {
+		destCons = GpuCodeConstants::getConstantsForWarpLevel();
+		warpLevel = true;
+	} else destCons = GpuCodeConstants::getConstantsForSmLevel();
+	
+	const char *lpsName = space->getName();
+	int myPpsId = space->getPpsId();
+	for (int i = 0; i < allocInstrList->NumElements(); i++) {
+
+		GpuVarLocalitySpec *instr = allocInstrList->Nth(i);
+		const char *varName = instr->getVarName();
+		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(varName);
+                int dimensions = array->getDimensionality();
+                ArrayType *arrayType = (ArrayType*) array->getType();
+                Type *elemType = arrayType->getTerminalElementType();
+		
+		// declare shared memory metadata variable(s) for holding storage dimensions of the array
+		stream << std::endl << indentStr << "// staging in '" << varName << "'\n";
+		stream << indentStr << "__shared__ GpuDimension " << varName << "SRanges";
+                stream << destCons->storageSuffix << "[" << dimensions << "]" << stmtSeparator;
+
+		// start a conditional block so that only on thread does 
+		if (warpLevel) {
+                        stream << indentStr << "if (threadId == 0) {\n";
+                } else {
+                        stream << indentStr << "if (warpId == 0 && threadId == 0) {\n";
+                }
+
+		// populate the storage dimension information from the partition dimension information
+		for (int j = 0; j < dimensions; j++) {
+                        stream << indentStr << indent << varName << "SRanges" << destCons->storageIndex;
+                        stream << "[" << j << "] = " << varName << "Space" << lpsName;
+                        stream << "PRanges" << destCons->storageIndex;
+			stream << "[" << j << "].getNormalizedDimension()" << stmtSeparator;
+                }
+
+		// close the conditional block
+		if (warpLevel) {
+			stream << indentStr << "}\n";
+                } else {
+                        stream << indentStr << "}\n";
+			stream << indentStr << "__syncthreads()" << stmtSeparator;
+                }
+		
+		// if the current LPS is mapped to the GPU level then just assigning the global reference 
+		// to the local reference will do as the data cannot be copied into the SM
+		if (topmostGpuPps == myPpsId) {
+			stream << indentStr << varName << destCons->storageIndex;
+			stream << " = " << varName << "_global" << srcCons->storageIndex;
+			stream << stmtSeparator;
+			continue;
+		}
+
+		// generate the for loops surrounding the data transfer instruction
+		int indentLevel = strlen(indentStr);
+		const char *innerIndentStr = gpuContext->generateDataCopyingLoopHeaders(stream, 
+				array, indentLevel, warpLevel);
+
+		// issue a data transfer instruction
+                gpuContext->generateElementTransferStmt(stream, array, innerIndentStr, warpLevel, 1);
+		
+		// close the for loops
+                for (int j = dimensions; j > 0; j--) {
+                        stream << indentStr;
+                        for (int k = 1; k < j; k++) stream << indent;
+                        stream << "}\n";
+                }
+	}
+		
+	if (!warpLevel) {
+		stream << std::endl;
+		stream << indentStr << "// synchronizing threads to ensure staging in is complete\n";
+		stream << indentStr << "__syncthreads()" << stmtSeparator;
+	}
+	
+	decorator::writeCommentHeader(&stream, "card to shared memory data stage-in end", indentStr);
+}
+
+void CompositeStage::generateSmToCardDataStageOuts(std::ofstream &stream,
+		const char *indentStr,
+		GpuExecutionContext *gpuContext,
+		int topmostGpuPps,
+		List<GpuVarLocalitySpec*> *updateInstrList) {
+	
+	decorator::writeCommentHeader(&stream, "shared memory to card data stage-out start", indentStr);
+
+	// determine what suffixes to be used to the SM local variables
+	GpuCodeConstants *srcCons = NULL;
+	bool warpLevel = false;
+        if (updateInstrList->Nth(0)->doesReqPerWarpInstances()) {
+		srcCons = GpuCodeConstants::getConstantsForWarpLevel();
+		warpLevel = true;
+	} else srcCons = GpuCodeConstants::getConstantsForSmLevel();
+
+	// determine what suffixes to be used for the card memory variables
+	Space *gpuContextLps = gpuContext->getContextLps();
+	GpuCodeConstants *desCons = NULL;
+	if (topmostGpuPps - gpuContextLps->getPpsId() == 2) {
+		desCons = GpuCodeConstants::getConstantsForWarpLevel();
+	} else desCons = GpuCodeConstants::getConstantsForSmLevel();
+	
+	if (!warpLevel) {
+		stream << std::endl;
+		stream << indentStr << "// synchronizing threads to ensure that none is still reading data\n";
+		stream << indentStr << "__syncthreads()" << stmtSeparator;
+	}
+
+	const char *lpsName = space->getName();
+	int myPpsId = space->getPpsId();
+	for (int i = 0; i < updateInstrList->NumElements(); i++) {
+		
+		GpuVarLocalitySpec *instr = updateInstrList->Nth(i);
+		const char *varName = instr->getVarName();
+		ArrayDataStructure *array = (ArrayDataStructure*) space->getLocalStructure(varName);
+                int dimensions = array->getDimensionality();
+                ArrayType *arrayType = (ArrayType*) array->getType();
+                Type *elemType = arrayType->getTerminalElementType();
+
+		stream << std::endl << indentStr << "// staging out '" << varName << "'\n";
+		
+		// generate the for loops surrounding the data transfer instruction
+		int indentLevel = strlen(indentStr);
+		const char *innerIndentStr = gpuContext->generateDataCopyingLoopHeaders(stream, 
+				array, indentLevel, warpLevel);
+
+		// issue a data transfer instruction
+                gpuContext->generateElementTransferStmt(stream, array, innerIndentStr, warpLevel, 2);
+		
+		// close the for loops
+                for (int j = dimensions; j > 0; j--) {
+                        stream << indentStr;
+                        for (int k = 1; k < j; k++) stream << indent;
+                        stream << "}\n";
+                }
+	}
+		
+	if (!warpLevel) {
+		stream << std::endl;
+		stream << indentStr << "// synchronizing threads to ensure staging out is complete\n";
+		stream << indentStr << "__syncthreads()" << stmtSeparator;
+	}
+	
+	decorator::writeCommentHeader(&stream, "shared memory to card data stage-out end", indentStr);
 }
 
 // A composite stage is a group entry if it has flow stages of multiple LPSes inside or any stage inside it

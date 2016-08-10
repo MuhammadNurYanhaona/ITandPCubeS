@@ -313,6 +313,40 @@ List<const char*> *GpuExecutionContext::getEpochIndependentVariableList() {
 	return string_utils::subtractList(allVarAccesses, epochDependentVarAccesses);
 }
 
+List<GpuVarLocalitySpec*> *GpuExecutionContext::filterVarAllocInstrsForLps(Space *lps) {
+	
+	List<GpuVarLocalitySpec*> *filteredInstrs = new List<GpuVarLocalitySpec*>;
+	for (int i = 0; i < varAllocInstrList->NumElements(); i++) {
+		GpuVarLocalitySpec *instr = varAllocInstrList->Nth(i);
+		if (instr->getAllocatingLps() == lps) {
+			filteredInstrs->Append(instr);
+		}
+	}
+	return filteredInstrs;
+}
+
+List<GpuVarLocalitySpec*> *GpuExecutionContext::filterModifiedVarAllocInstrsForLps(Space *lps) {
+	
+	List<GpuVarLocalitySpec*> *allocFilter = filterVarAllocInstrsForLps(lps);
+	List<GpuVarLocalitySpec*> *modificationFilter = new List<GpuVarLocalitySpec*>;
+	List<const char*> *modifiedVars = getModifiedVariableList();	
+
+	for (int i = 0; i < allocFilter->NumElements(); i++) {
+		
+		GpuVarLocalitySpec *instr = allocFilter->Nth(i);
+
+		// if the data update has been done at the GPU card memory directly then there is no need for
+		// a separate synchronization of local SM update to global memory
+		if (!instr->isSmLocalCopySupported()) continue;
+
+		if (string_utils::contains(modifiedVars, instr->getVarName())) {
+			modificationFilter->Append(instr);
+		}
+	}
+
+	return modificationFilter;
+}
+
 void GpuExecutionContext::generateKernelConfigs(PCubeSModel *pcubesModel) {
 	
 	int gpuLevel = pcubesModel->getGpuTransitionSpaceId();
@@ -423,6 +457,23 @@ void GpuExecutionContext::analyzeVarAllocReqs(PartitionHierarchy *lpsHierarchy) 
 				varLocSpec = new GpuVarLocalitySpec(varName, allocLps, true, true);
 			}
 			varAllocInstrList->Append(varLocSpec);
+		}
+	}
+
+	// We haven't figured out the logic for copying data from GPU card memory data part to SM memory smaller data
+	// part when there was some index reordering in-between the 2 LPSes holding those two parts. So for now we 
+	// exit with an error if such reordering is detected.
+	for (int i = 0; i < varAllocInstrList->NumElements(); i++) {
+		GpuVarLocalitySpec *instr = varAllocInstrList->Nth(i);
+		Space *allocLps = instr->getAllocatingLps();
+		const char *varName = instr->getVarName();	
+		ArrayDataStructure *smStruct = (ArrayDataStructure*) allocLps->getStructure(varName);
+		if (smStruct->isReordered(contextLps)) {
+			std::cout << "At this moment the compiler cannot handle the case where the array indices\n"; 
+			std::cout << "are reordered between the topmost LPS mapped to the GPU and the LPS mapped\n";
+			std::cout << "inside SMs. Array '" << varName << "' has its index reordered in-between\n";
+			std::cout << "Space " << contextLps->getName() << " and Space " << allocLps->getName() << "\n";
+			std::exit(EXIT_FAILURE);
 		}
 	}
 }
@@ -742,83 +793,41 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	decorator::writeCommentHeader(2, &programFile, "kernel argument buffers processing end");
 	
 	/**************************************************************************************************************
-					copy data parts from GPU card memory to SM memory
+					      Card to SM Memory Data Stage In
 	***************************************************************************************************************/
-
-/*
 	
-	decorator::writeCommentHeader(2, &programFile, "card to shared memory data reading start");
+	List<GpuVarLocalitySpec*> *allocInstrList = filterVarAllocInstrsForLps(contextLps);
+        if (allocInstrList->NumElements() > 0) {
+		const char *stageInIndent = "\t\t";
+		CompositeStage *dummyStage = new CompositeStage(0, contextLps, NULL);
+                dummyStage->generateCardToSmDataStageIns(programFile, 
+				stageInIndent, this, 
+				gpuPpsLevel, allocInstrList);
+        }
 
-	for (int i = 0; i < accessedArrays->NumElements(); i++) {
-		
-		const char *varName = accessedArrays->Nth(i);
-                ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(varName);
-		int dimensions = array->getDimensionality();
-		programFile << std::endl << doubleIndent;
-		programFile << "// copying variable '" << varName << "' part(s)\n";
-		
-		// generate the for loops surrounding the data transfer instruction
-		const char *indentStr = generateDataCopyingLoopHeaders(programFile, array, 2, !smLevel);
-
-		// issue a data transfer instruction
-		generateElementTransferStmt(programFile, array, indentStr, !smLevel, 1);	
-
-		// close the for loops
-		for (int j = dimensions; j > 0; j--) {
-			programFile << doubleIndent;
-			for (int k = 1; k < j; k++) programFile << indent;
-			programFile << "}\n";
-		}
-	}
-	if (smLevel) {
-		programFile << doubleIndent << "__syncthreads()" << stmtSeparator;
-	}
-	
-	decorator::writeCommentHeader(2, &programFile, "data reading done");
-	programFile << std::endl;
-*/
-	
 	/**************************************************************************************************************
 					    Generate CUDA Code for the Sub-Flow
 	***************************************************************************************************************/
-/*
+
 	List<FlowStage*> *kernelStages = kernelDef->getStageList();
 	for (int i = 0; i < kernelStages->NumElements(); i++) {
 		FlowStage *stage = kernelStages->Nth(i);
-		stage->generateGpuKernelCode(programFile, 2, 
-				contextLps, contextLps, accessedArrays, gpuPpsLevel);
+		stage->generateGpuKernelCode(programFile, 2, this, contextLps, gpuPpsLevel);
 	}
-*/
+
 	/**************************************************************************************************************
-					synchronizing GPU card memory with SM's updates
+					      SM Memory to Card Data Stage Out
 	***************************************************************************************************************/
-/*        
-	decorator::writeCommentHeader(2, &programFile, "shared memory to card memory data sync start");
-	List<const char*> *modifiedArrays 
-			= string_utils::intersectLists(getModifiedVariableList(), arrayNames);
-	for (int i = 0; i < modifiedArrays->NumElements(); i++) {
-		
-		const char *varName = modifiedArrays->Nth(i);
-                ArrayDataStructure *array = (ArrayDataStructure*) contextLps->getLocalStructure(varName);
-		int dimensions = array->getDimensionality();
-		programFile << std::endl << doubleIndent;
-		programFile << "// synchronizing variable '" << varName << "' part(s)\n";
-		
-		// generate the for loops surrounding the data transfer instruction
-		const char *indentStr = generateDataCopyingLoopHeaders(programFile, array, 2, !smLevel);
+	
+	List<GpuVarLocalitySpec*> *updateInstrList = filterModifiedVarAllocInstrsForLps(contextLps);
+        if (updateInstrList->NumElements() > 0) {
+		const char *stageOutIndent = "\t\t";
+		CompositeStage *dummyStage = new CompositeStage(0, contextLps, NULL);
+                dummyStage->generateSmToCardDataStageOuts(programFile,
+                                stageOutIndent, this,
+                                gpuPpsLevel, updateInstrList);
+        }
 
-		// issue a data transfer instruction
-		generateElementTransferStmt(programFile, array, indentStr, !smLevel, 2);	
-
-		// close the for loops
-		for (int j = dimensions; j > 0; j--) {
-			programFile << doubleIndent;
-			for (int k = 1; k < j; k++) programFile << indent;
-			programFile << "}\n";
-		}
-	}
-	decorator::writeCommentHeader(2, &programFile, "data synchronization done");
-*/
 	// end of outer most LPU iteration loop	
 	programFile << indent << "}\n\n";
 	programFile << indent << "} // scope ends for distribution of staged-in LPUs\n";
@@ -1097,16 +1106,23 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 	int dimensions = array->getDimensionality();
 	
 	std::stringstream sender, receiver;
+	std::stringstream sendRange, recvRange;
 	if (transferDirection == 1) {
 		sender << varName << "_global";
+		sendRange << varName << "SGRanges";	
 		receiver << varName;
+		recvRange << varName << "SRanges";
 	} else {
 		sender << varName;
+		sendRange << varName << "SRanges";
 		receiver << varName << "_global";
+		recvRange << varName << "SGRanges";
 	}
 	if (warpLevel) {
 		sender << "[warpId]";
+		sendRange << "[warpId]";
 		receiver << "[warpId]";
+		recvRange << "[warpId]";
 	}
 	
 	stream << indentPrefix << receiver.str() << "[";
@@ -1114,12 +1130,12 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 		if (i > 0) {
 			stream << paramIndent << indentPrefix << " + ";
 		}
-		stream << "(d_" << i << " - " << varName << "SRanges[" << i << "].range.min)";
+		stream << "(d_" << i << " - " << recvRange.str() << "[" << i << "].range.min)";
 		if (i < dimensions - 1) {
 			for (int j = i + 1; j < dimensions; j++) {
 				stream << paramIndent << indentPrefix << " * ";
-				stream << "(" << varName << "SRanges[" << j << "].range.max - ";
-				stream << varName << "SRanges[" << j << "].range.min + 1)";
+				stream << "(" << recvRange.str() << "[" << j << "].range.max - ";
+				stream << recvRange.str() << "[" << j << "].range.min + 1)";
 			}
 		}	
 	}
@@ -1129,12 +1145,12 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 		if (i > 0) {
 			stream << paramIndent << indentPrefix << " + ";	
 		}
-		stream << "(d_" << i << " - " << varName << "SRanges[" << i << "].range.min)";
+		stream << "(d_" << i << " - " << sendRange.str() << "[" << i << "].range.min)";
 		if (i < dimensions - 1) {
 			for (int j = i + 1; j < dimensions; j++) {
 				stream << paramIndent << indentPrefix << " * ";
-				stream << "(" << varName << "SRanges[" << j << "].range.max - ";
-				stream << varName << "SRanges[" << j << "].range.min + 1)";
+				stream << "(" << sendRange.str() << "[" << j << "].range.max - ";
+				stream << sendRange.str() << "[" << j << "].range.min + 1)";
 			}
 		}	
 	}

@@ -281,7 +281,7 @@ void generateSuperLpuConfigStructFn(Space *gpuContextLps, const char *initials, 
 	programFile << std::endl << indent;
 	programFile << "// a placeholder statement to avoid the function to be optimized out\n";
 	programFile << indent << "lpuId = typedLpu->id";
-	programFile << stmtSeparator << std::endl; 
+	programFile << stmtSeparator; 
 
 	// process the individual arrays in sequence
 	List<const char*> *accessedArrays = gpuContextLps->getLocallyUsedArrayNames();

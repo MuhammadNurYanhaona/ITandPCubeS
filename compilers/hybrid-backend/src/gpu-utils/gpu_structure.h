@@ -19,7 +19,10 @@ class GpuDimension {
   public:
 	GpuRange range;
   public:
-	__device__ int getLength() { return range.max - range.min + 1; }	
+	__device__ int getLength() { return range.max - range.min + 1; }
+
+	// returns a new dimension range equivalent to the current but the minimum is shifted to zero
+	__device__ GpuDimension getNormalizedDimension();	
 }; 
 
 // This class holds hierarchical partition information for an array dimension. This structure is mainly

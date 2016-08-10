@@ -3,6 +3,15 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
+//-------------------------------------------------------- GPU Dimension -------------------------------------------------------
+
+__device__ GpuDimension GpuDimension::getNormalizedDimension() {
+	GpuDimension normDim;
+	normDim.range.min = 0;
+	normDim.range.max = range.max - range.min;
+	return normDim;
+}
+
 //------------------------------------------------------ GPU Part Dimension ----------------------------------------------------
 
 __device__ bool GpuDimPartConfig::isIncluded(int index) {

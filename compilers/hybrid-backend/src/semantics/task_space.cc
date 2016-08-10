@@ -690,7 +690,6 @@ bool Space::allocateStructure(const char *structureName) {
 void Space::genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream, 
 		const char *indentStr,
 		List<const char*> *accessibleArrays,
-		int topmostGpuPps, 
 		bool perWarpCountInfo) {
 
 	// for warp level mapping, there must be one count variable per warp; so this set up the variable suffix
@@ -760,8 +759,9 @@ void Space::genLpuCountInfoForGpuKernelExpansion(std::ofstream &stream,
 		
 		// the second default argument is the PPU count for the current space
 		stream << paramIndent << indentStr << indent;
-		if (topmostGpuPps == ppsId) stream << "1";
-		else if (topmostGpuPps - ppsId == 1) stream << "SM_COUNT";
+		int parentPpsId = parent->getPpsId();
+		if (parentPpsId == ppsId) stream << "1";
+		else if (parentPpsId - ppsId == 1) stream << "SM_COUNT";
 		else stream << "WARP_COUNT";
 
 		// the remaining parameters depend on the configuration of the partition function itself; but if
@@ -825,11 +825,19 @@ void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 		int arrayDimensions = array->getDimensionality();
 
 		// determine the parent array dimension that this LPU will be dividing; notice the catch with the sub-
-		// partitioned LPSes
-		Space *parentLps = array->getSource()->getSpace();
-		Space *parentSubpartition = parentLps->getSubpartition();
-		if (parentSubpartition != NULL && parentSubpartition != this) {
-			parentLps = parentSubpartition;
+		// partitioned LPSes and the flag we maintain if the array is available into the subpartition through
+		// its parent LPS but has not been sub-divided further
+		Space *parentLps = NULL;
+		bool parentArrayAccess = false;
+		if (array->getSpace() == this) {
+			parentLps = array->getSource()->getSpace();
+			Space *parentSubpartition = parentLps->getSubpartition();
+			if (parentSubpartition != NULL && parentSubpartition != this) {
+				parentLps = parentSubpartition;
+			}
+		} else {
+			parentLps = array->getSpace();
+			parentArrayAccess = true;
 		}
 		const char *parentArrayLpsName = parentLps->getName();
 
@@ -861,7 +869,7 @@ void Space::genArrayDimInfoForGpuKernelExpansion(std::ofstream &stream,
 			// if the array is not partitioned along a particular dimension then its part dimension ranges 
 			// can be directly copied down from its source
 			// again note that dimension numbering starts from 1 not from 0
-			if (!array->isPartitionedAlongDimension(j + 1)) {
+			if (parentArrayAccess || !array->isPartitionedAlongDimension(j + 1)) {
 				stream << indentStr << indent << dimRangeVar.str();
 				stream << "[" << j << "] = " << parentDimRangeVar.str();
 				stream << "[" << j << "]" << stmtSeparator;

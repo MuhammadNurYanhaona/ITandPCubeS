@@ -2,6 +2,7 @@
 #include "data_access.h"
 #include "sync_stat.h"
 #include "task_env_stat.h"
+#include "gpu_execution_ctxt.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
@@ -802,12 +803,16 @@ void ExecutionStage::setLpsExecutionFlags() {
 	space->flagToExecuteCode();
 }
 
-void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,        
-		int indentation,
-		Space *gpuContextLps,
-		Space *containerSpace,
-		List<const char*> *accessedArrays,
-		int topmostGpuPps) {
+void ExecutionStage::generateGpuKernelCode(std::ofstream &stream,
+                        int indentation,
+                        GpuExecutionContext *gpuContext,
+                        Space *containerSpace,
+                        int topmostGpuPps) {
+
+	Space *gpuContextLps = gpuContext->getContextLps();
+        List<const char*> *arrayNames = gpuContextLps->getLocallyUsedArrayNames();
+        List<const char*> *accessedArrays
+                        = string_utils::intersectLists(gpuContext->getVariableAccessList(), arrayNames);
 
 	std::ostringstream indentStr;
 	for (int i = 0; i < indentation; i++) indentStr << indent;
