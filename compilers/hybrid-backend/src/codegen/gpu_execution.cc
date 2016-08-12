@@ -79,7 +79,7 @@ void generateBatchConfigurationConstants(const char *headerFileName, PCubeSModel
 	// count is ideal for doing proper load balancing
 	int smCount = pcubesModel->getSMCount();
 	int warpCount = pcubesModel->getWarpCount();
-	int batchMultiplier = 100;
+	int batchMultiplier = 1000;
 	headerFile << "const int SM_BATCH_SIZE_THRESHOLD = ";
 	headerFile << smCount * batchMultiplier << stmtSeparator;
 	headerFile << "const int WARP_BATCH_SIZE_THRESHOLD = ";
