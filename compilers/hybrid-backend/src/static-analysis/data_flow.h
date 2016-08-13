@@ -443,6 +443,12 @@ class CompositeStage : public FlowStage {
 			GpuExecutionContext *gpuContext,
                         int topmostGpuPps,
 			List<GpuVarLocalitySpec*> *updateInstrList);
+
+	// this function generates a multidimensional LPU ID from a linear LPU ID inside a GPU kernel
+	void genMultidimensionalLpuIdGenerator(std::ofstream &stream,
+			const char *indentStr,
+			bool warpLevelLpuId, 
+			bool warpLevelLpuCount);
 	
 	// Until we incorporate the backend support for dynamic LPSes, there is no need to generate codes for sync 
 	// stages; therefore, we filter them out during nested stages grouping.

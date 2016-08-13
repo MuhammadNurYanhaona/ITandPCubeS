@@ -925,29 +925,8 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		}
 		
 		// create a, possibly, multidimensional ID from the linear ID for the current LPU
-		stream << nextIndent.str() << "// generating LPU ID from linear ID\n";
-		stream << nextIndent.str() << "__shared__ int space";
-		stream << lpsName << "LpuId" << idSuffix << "[" << dimensionCount << "]" << stmtSeparator;
-		if (smLevel) {
-			stream << nextIndent.str() << "if (warpId == 0 && threadId == 0) {\n";
-		} else {
-			stream << nextIndent.str() << "if (threadId == 0) {\n";
-		}
-		stream << nextIndent.str() << indent << "__shared__ int space";
-		stream << lpsName << "LpuIdRemainder" << idSuffix << stmtSeparator;
-		stream << nextIndent.str() << indent;
-		stream << "space" << lpsName << "LpuIdRemainder" << idIndex << " = ";
-		stream << indexVar.str() << stmtSeparator;
-		for (int i = dimensionCount - 1; i >= 0; i--) {
-			stream << nextIndent.str() << indent << "space" << lpsName << "LpuId" << idIndex;
-			stream << "[" << i << "] = space" << lpsName << "LpuIdRemainder" << idIndex; 
-			stream << " \% space" << lpsName << "LpuCount" << countIndex;
-			stream << "[" << i << "]" << stmtSeparator;
-			stream << nextIndent.str() << indent << "space" << lpsName << "LpuIdRemainder";
-			stream << idIndex << " /= " << "space" << lpsName << "LpuCount" << countIndex;
-			stream << "[" << i << "]" << stmtSeparator;
-		}
-		stream << indentStr.str() << indent << "}\n";
+		genMultidimensionalLpuIdGenerator(stream, strdup(nextIndent.str().c_str()),
+                		!smLevel, warpLevelCount);
 
 		// determine new partition dimension ranges for the arrays in the newly entered LPS 
 		space->genArrayDimInfoForGpuKernelExpansion(stream, 
@@ -1170,6 +1149,67 @@ void CompositeStage::generateSmToCardDataStageOuts(std::ofstream &stream,
 	}
 	
 	decorator::writeCommentHeader(&stream, "shared memory to card data stage-out end", indentStr);
+}
+
+void CompositeStage::genMultidimensionalLpuIdGenerator(std::ofstream &stream,
+		const char *indentStr,
+		bool warpLevelLpuId, 
+		bool warpLevelLpuCount) {
+		
+	const char *lpsName = space->getName();
+	std::ostringstream indexVar;
+	indexVar << "space" << lpsName << "LinearId";
+	
+	std::string idSuffix = std::string("");
+	std::string idIndex = std::string("");
+	std::string countIndex = std::string("");
+	if (warpLevelLpuId){
+		idSuffix = std::string("[WARP_COUNT]");
+		idIndex = std::string("[warpId]");
+	}
+	if (warpLevelLpuCount) {
+		countIndex = std::string("[warpId]");
+	}
+
+	stream << indentStr << "// generating LPU ID from linear ID\n";
+	stream << indentStr << "__shared__ int space";
+	int dimensionCount = space->getDimensionCount();
+
+	// for unpartitioned LPSes, create a dummy ID and return
+	if (dimensionCount == 0) {
+		stream << lpsName << "LpuId" << idSuffix << "[1]" << stmtSeparator;
+		if (warpLevelLpuId) {
+			stream << indentStr << "if (threadId == 0) ";
+		} else {
+			stream << indentStr << "if (warpId == 0 && threadId == 0) ";
+		}	
+		stream << "space" << lpsName << "LpuId" << idIndex << "[0] = 0" << stmtSeparator;
+		return;
+	}
+
+	stream << lpsName << "LpuId" << idSuffix << "[" << dimensionCount << "]" << stmtSeparator;
+	if (!warpLevelLpuId) {
+		stream << indentStr << "if (warpId == 0 && threadId == 0) {\n";
+	} else {
+		stream << indentStr << "if (threadId == 0) {\n";
+	}
+
+	// For partitioned LPSes, construct the multidimensional ID by repeatedly subdividing the linear ID
+	stream << indentStr << indent << "__shared__ int space";
+	stream << lpsName << "LpuIdRemainder" << idSuffix << stmtSeparator;
+	stream << indentStr << indent;
+	stream << "space" << lpsName << "LpuIdRemainder" << idIndex << " = ";
+	stream << indexVar.str() << stmtSeparator;
+	for (int i = dimensionCount - 1; i >= 0; i--) {
+		stream << indentStr << indent << "space" << lpsName << "LpuId" << idIndex;
+		stream << "[" << i << "] = space" << lpsName << "LpuIdRemainder" << idIndex;
+		stream << " \% space" << lpsName << "LpuCount" << countIndex;
+		stream << "[" << i << "]" << stmtSeparator;
+		stream << indentStr << indent << "space" << lpsName << "LpuIdRemainder";
+		stream << idIndex << " /= " << "space" << lpsName << "LpuCount" << countIndex;
+		stream << "[" << i << "]" << stmtSeparator;
+	}
+	stream << indentStr << "}\n";	
 }
 
 // A composite stage is a group entry if it has flow stages of multiple LPSes inside or any stage inside it

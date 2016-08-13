@@ -691,6 +691,12 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 		programFile << std::endl;
 	}
 
+	// generate a, possibly, multidimensional ID for the topmost LPU
+	CompositeStage *dummyStageForIdGen = new CompositeStage(0, contextLps, NULL);
+	bool warpLevelLpuCount = (contextType == LOCATION_SENSITIVE_LPU_DISTR_CONTEXT) && warpLevel;
+	dummyStageForIdGen->genMultidimensionalLpuIdGenerator(programFile, 
+			doubleIndent, warpLevel, warpLevelLpuCount);
+	
 	/**************************************************************************************************************
 			  data part reference and metadata initialization from GPU card memory
 	***************************************************************************************************************/
