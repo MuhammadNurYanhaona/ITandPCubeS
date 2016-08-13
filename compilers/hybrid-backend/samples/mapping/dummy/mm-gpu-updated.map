@@ -1,7 +1,7 @@
 "Matrix Multiply" {
 	// syntax LPS ':' PPS
 	Model: Hybrid-Model	
-	Space Root: 	4	// CPU
+	Space Root: 	5	// Node
 	Space R:	3	// GPU
 	Space A: 	2	// SM
 	Space B:	1	// Warp
