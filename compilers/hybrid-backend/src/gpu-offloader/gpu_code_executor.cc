@@ -33,6 +33,12 @@ void OffloadStats::describe(std::ofstream &logFile) {
 GpuCodeExecutor::GpuCodeExecutor(LpuBatchController *lpuBatchController, int distinctPpuCount) {
 	this->lpuBatchController = lpuBatchController;
 	this->distinctPpuCount = distinctPpuCount;
+	this->offloadStats = NULL;
+}
+
+void GpuCodeExecutor::describeOffloadStats() {
+	*logFile << "A Gpu Executor's offloading statistics------------------------\n";
+	offloadStats->describe(*logFile); 
 }
 
 void GpuCodeExecutor::submitNextLpu(LPU *lpu, int ppuGroupIndex) {
@@ -91,7 +97,9 @@ void GpuCodeExecutor::submitNextLpus(std::vector<LPU*> *lpuVector) {
 }
 
 void GpuCodeExecutor::initialize() {
-	this->offloadStats = new OffloadStats();
+	if (this->offloadStats == NULL) {
+		this->offloadStats = new OffloadStats();
+	}
 	lpuBatchRangeVector = new std::vector<Range>;
 	lpuBatchRangeVector->reserve(distinctPpuCount);
 	resetCurrentBatchLpuRanges();

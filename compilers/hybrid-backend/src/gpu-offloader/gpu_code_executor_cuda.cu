@@ -54,7 +54,6 @@ void GpuCodeExecutor::execute() {
 
 void GpuCodeExecutor::cleanup() { 
 	cudaDeviceReset(); 
-	offloadStats->describe(*logFile);
 	delete lpuCountVector;
 	delete lpuBatchRangeVector;
 }

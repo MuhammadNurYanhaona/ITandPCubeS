@@ -479,7 +479,17 @@ void generateHybridExecutionCode(std::ofstream &programFile, TaskGenerator *task
 	programFile << "&threadLocals" << paramSeparator << "partition" << paramSeparator;
 	programFile << "batchPpuState" << paramSeparator << "logFile)" << stmtSeparator;
 
-	programFile << std::endl << std::endl << indent;
+
+	// print statistics of the GPU offloaders
+	programFile << std::endl << indent << "// printing offloading statistics\n";
+	programFile << indent << "GpuCodeExecutor *gpuExecutor = NULL" << stmtSeparator;
+        programFile << indent << "Iterator<GpuCodeExecutor*> gpuExecIterator = ";
+	programFile << "batchPpuState->getGpuCodeExecutors()->GetIterator()" << stmtSeparator;
+        programFile << indent << "while ((gpuExecutor = gpuExecIterator.GetNextValue()) != NULL) {\n";
+        programFile << doubleIndent << "gpuExecutor->describeOffloadStats()" << stmtSeparator;
+        programFile << indent << "}\n";
+
+	programFile << std::endl << indent;
 	programFile << "// ------------------ Host + GPU Execution Code Ends\n";
 }
 
@@ -501,6 +511,9 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
 
 	// do MPI initialization
 	stream << indent << "MPI_Init(&argc, &argv)" << stmtSeparator << std::endl;
+
+	// initialize a random number generator in case it would be needed later
+	stream << indent << "srand(time(NULL))" << stmtSeparator << std::endl;
 
 	// create a program environment variable to coordinate environmental exchanges among tasks
 	stream << indent << "// program environment management structure\n";
@@ -565,6 +578,12 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         // display the running time on console
         stream << indent << "std::cout << \"Parallel Execution Time: \" << runningTime <<";
         stream << " \" Seconds\" << std::endl" << stmtSeparator;
+
+	// invoke an MPI barrier to ensure that all segements came to the finish line properly
+	stream << std::endl;
+	stream << indent << "MPI_Barrier(MPI_COMM_WORLD)" << stmtSeparator;
+	stream << std::endl;
+	
 	// release MPI resources
 	stream << indent << "MPI_Finalize()" << stmtSeparator;
 	// then exit the function

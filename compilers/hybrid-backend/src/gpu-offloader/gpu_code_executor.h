@@ -68,6 +68,7 @@ class GpuCodeExecutor {
 	GpuCodeExecutor(LpuBatchController *lpuBatchController, int distinctPpuCount);
 	void setLpuCountVector(std::vector<int*> *lpuCountVector) { this->lpuCountVector = lpuCountVector; }
 	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
+	void describeOffloadStats();
 	
 	// function to add a new LPU for batch execution in the GPU
 	void submitNextLpu(LPU *lpu, int ppuGroupIndex);

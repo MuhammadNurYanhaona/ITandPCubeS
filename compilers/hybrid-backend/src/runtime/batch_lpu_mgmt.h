@@ -80,8 +80,10 @@ class BatchPpuState {
 			List<ThreadState*> *ppuStateList, 
 			std::vector<int> *groupLeaderPpuCounts);
 	~BatchPpuState();
+
 	std::vector<ThreadState*> *getPpuStates() { return ppuStates; }
 	void setGpuCodeExecutors(Hashtable<GpuCodeExecutor*> *executors) { gpuCodeExecutors = executors; }
+	Hashtable<GpuCodeExecutor*> *getGpuCodeExecutors() { return gpuCodeExecutors; }
 	GpuCodeExecutor *getGpuExecutorForContext(const char *contextId) { 
 		return gpuCodeExecutors->Lookup(contextId); 
 	}
@@ -128,6 +130,9 @@ class BatchPpuState {
 	static void covertLpuVectorToList(List<LPU*> *destinationList, std::vector<LPU*> *lpuVector);
  
 	void enableLogging(std::ofstream *logFile);
+
+	void printOffloadingStatistics();
+
 	static void extractLpuIdsFromLpuVector(std::vector<int> *idVector, std::vector<LPU*> *lpuVector);
   private:
 	// This function is used to initialize the indexes of the PPU controllers that will generate LPUs for a new LPS 
