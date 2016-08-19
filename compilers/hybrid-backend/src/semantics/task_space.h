@@ -143,8 +143,8 @@ class DataStructure {
 	List<DataStructure*> *dependents;
 	Space *space;
 
-	// a variable used for static analysis to make decision about the memory allocation requirement for the
-	// data structure under concern
+	// a variable used for static analysis to make decision about the memory allocation requirement for the data 
+	// structure under concern
 	LPSVarUsageStat *usageStat;
 
 	// This variable is only useful for subpartitioned data structures. If it true, it signifies that
@@ -159,6 +159,11 @@ class DataStructure {
 	// the this data structure reference should point to. These pointers are then used to set up variables in
 	// LPUs properly    
 	Space *allocator;
+
+	// When true, this special flag indicates that no new data parts need to be maintained in the host for this
+	// data structure for computation done on it inside GPUs -- data parts of the host can be used directly in
+	// GPU CUDA kernel.	
+	bool excludedFromGpuAllocation;
 
 	// denotes the maximum number of versions to be maintained for this data structure if it is epoch dependent
 	// note that version count starts from 0 not 1
@@ -178,6 +183,8 @@ class DataStructure {
 	LPSVarUsageStat *getUsageStat() { return usageStat; }
 	void setAllocator(Space *allocator) { this->allocator = allocator; }
 	Space *getAllocator() { return allocator; }
+	void excludeFromGpuAllocation() { this->excludedFromGpuAllocation = true; }
+	bool isExcludedFromGpuAllocation() { return excludedFromGpuAllocation; }
 	
 	// returns current structure if it has been marked allocated or gets the closest source reference that is
 	// marked allocated  

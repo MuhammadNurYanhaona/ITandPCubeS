@@ -108,9 +108,17 @@ class PartitionSpec : public Node {
 	SubpartitionSpec *subpartition;
 	List<Identifier*> *variableList;
   public:
-	PartitionSpec(char spaceId, int dimensionality, List<DataConfigurationSpec*> *specList,
-		bool dynamic, SpaceLinkage *parentLink, SubpartitionSpec *subpartition, yyltype loc);
-	PartitionSpec(char spaceId, List<Identifier*> *variableList, yyltype loc);
+	PartitionSpec(char spaceId, 
+			int dimensionality, 
+			List<DataConfigurationSpec*> *specList,
+			bool dynamic, 
+			SpaceLinkage *parentLink, 
+			SubpartitionSpec *subpartition, 
+			yyltype loc);
+	PartitionSpec(char spaceId, 
+			List<Identifier*> *variableList, 
+			SpaceLinkage *parentLink, 
+			yyltype loc);
 	const char *GetPrintNameForNode() { return "Space Configuration"; }
         void PrintChildren(int indentLevel);
 	SpaceLinkage *getSpaceLinkage() { return parentLink; }

@@ -26,8 +26,14 @@ class GpuCodeConstants {
 	// this represents the expression to be added to the initialization expression of for loops that 
 	// distribute top level LPUs copied into the GPU card memory from the host
         std::string distrIndex;
-	// this represents the expression to be used to increment for loop indices
+	// this represents the expression to be added to the initialization expression of the for loops that
+	// are generated inside GPU kernel to distribute LPUs
+	std::string localDistrIndex;
+	// this represents the expression to be used to increment for loop indices for staged in LPUs
         std::string jumpExpr;
+	// this represents the expression to be used to increment for loop indices for LPUs generated inside
+	// the kernel
+        std::string localJumpExpr;
   public:
 	static GpuCodeConstants *getConstantsForGpuLevel();  
 	static GpuCodeConstants *getConstantsForSmLevel();  

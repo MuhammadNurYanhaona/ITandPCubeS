@@ -147,6 +147,7 @@ DataStructure::DataStructure(VariableDef *definition) {
 	this->nonStorable = false;
 	this->usageStat = new LPSVarUsageStat;
 	this->allocator = NULL;
+	this->excludedFromGpuAllocation = false;
 	this->versionCount = 0;
 }
 
@@ -159,6 +160,7 @@ DataStructure::DataStructure(DataStructure *source) {
 	this->nonStorable = false;
 	this->usageStat = new LPSVarUsageStat;
 	this->allocator = NULL;
+	this->excludedFromGpuAllocation = false;
 	this->versionCount = 0;
 }
 
@@ -1150,8 +1152,10 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 		topmostLpsMappedToGpu = true;
 	}
 
-	// if the current LPS is the topmost LPS in its hierarchy that has been been mapped inside the GPU then we flag 
-	// all data structures specified in its partition configuration for allocation
+	// If the current LPS is the topmost LPS in its hierarchy that has been been mapped inside the GPU then we flag all
+	// data structures specified in its partition configuration for allocation. There is one exception to this rule. If
+	// the last host level allocation the data structure has need been partitioned again even after reaching the first
+	// GPU level LPS then data parts of the host allocation can be directly copied into the GPU memory.
 	if (topmostLpsMappedToGpu) {
 		
 		// an special case for allocation occurs when the topmost GPU LPS is sub-partitioned; then we allocate the
@@ -1166,15 +1170,40 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 
 		List<const char*> *topmostLpsVars = string_utils::subtractList(variableList, subpartitionedVarList);
 		for (int i = 0; i < topmostLpsVars->NumElements(); i++) {
+
 			DataStructure *variable = lps->getLocalStructure(topmostLpsVars->Nth(i));
-			variable->setAllocator(lps);
-                        variable->getUsageStat()->flagAllocated();
-			
+
 			// flag the variable as been accessed in this LPS to ensure that the LPU generation routine does
 			// not ignore putting in proper data part reference into the LPU if it has not been accessed here.
 			if (!variable->getUsageStat()->isAccessed()) {
 				variable->getUsageStat()->addAccess();
 			} 
+			// check if the variable has been allocated before in any ancestor LPS
+                        DataStructure *lastAllocation = variable->getClosestAllocation();
+			
+			// check if the data structure has been partitioned after the last host level allocation
+			bool partitionedAfter = false;
+			if (lastAllocation == NULL) {
+				partitionedAfter = true;
+			} else {
+				ArrayDataStructure *array = (ArrayDataStructure *) variable;
+				while (array != lastAllocation) {
+					if (array->isPartitioned()) {
+						partitionedAfter = true;
+						break;
+					}
+					array = (ArrayDataStructure *) variable->getSource();
+				}
+			} 
+			
+			// if the variable has not been partitioned after the last allocation then exclude it from GPU
+			// allocation; otherwise, set the allocation marker
+			if (!partitionedAfter) {
+				lastAllocation->excludeFromGpuAllocation();
+			} else {
+				variable->setAllocator(lps);
+                        	variable->getUsageStat()->flagAllocated();
+			}	
 		}
 
 		for (int i = 0; i < subpartitionedVarList->NumElements(); i++) {
@@ -1203,10 +1232,13 @@ void PartitionHierarchy::performAllocAnalysisOnLpsMappedToGpu(Space *lps, int gp
 			const char *varName = variable->getName();
 			DataStructure *lastAllocation = variable->getClosestAllocation();
 			if (lastAllocation != NULL) {
-				Space *allocatingSpace = lastAllocation->getSpace();
-				if (allocatingSpace != ancestorGpuLps 
-						&& allocatingSpace != ancestorSubpartition) {
-					ReportError::UnsupportedGpuPartitionConfiguration(varName, ancestorLpsName);
+				if (!lastAllocation->isExcludedFromGpuAllocation()) {	
+					Space *allocatingSpace = lastAllocation->getSpace();
+					if (allocatingSpace != ancestorGpuLps 
+							&& allocatingSpace != ancestorSubpartition) {
+						ReportError::UnsupportedGpuPartitionConfiguration(
+								varName, ancestorLpsName);
+					}
 				}
 			} else {
 				ReportError::UnsupportedGpuPartitionConfiguration(varName, ancestorLpsName);

@@ -1,7 +1,7 @@
 Program (args) { 
 	lufEnv = new TaskEnvironment(name: "Block LU Factorization")
         bind_input(lufEnv, "a", args.input_file)
-        execute("Block LU Factorization"; lufEnv; Partition: args.b, args.k, args.l, args.m, args.n)
+        execute("Block LU Factorization"; lufEnv; Partition: args.b, args.m, args.n)
         bind_output(lufEnv, "u", args.output_file_1)
         bind_output(lufEnv, "l", args.output_file_2)
         bind_output(lufEnv, "p", args.output_file_3)
@@ -113,7 +113,7 @@ Task "Block LU Factorization":
 			Repeat: from "Saxpy" foreach Space D sub-partition
 		}
 		Repeat: from "Compute L and U Block" for r in a.dimension1.range step block_size 		
-	Partition(b, k, l, m, n):
+	Partition(b, m, n):
 		Space A <un-partitioned> { 
 			a, p, l_column, l_row, p_column, l_block, u_block 
 		}
@@ -121,10 +121,8 @@ Task "Block LU Factorization":
 			a<dim2>, u<dim1>, u_block<dim1>, l<dim1>, l_column: block_stride(b)
 			l_row, p_column, l_block: replicated 
 		}
-		Space C <2D> divides Space B partitions {
-			u: block_count(k, l) 
-			u_block: block_count(k), replicated
-			l_block: replicated, block_count(l)
+		Space C <un-partitioned> divides Space B partitions {
+			u, u_block, l_block
 		}
 		Space D <2D> divides Space C partitions {
 			u: block_size(b, b)

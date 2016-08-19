@@ -353,10 +353,8 @@ void generateLpuConstructionFunction(std::ofstream &headerFile,
 		// Here we make another adjustment for the hybrid model by putting the part ID reference into the LPU
 		// if the current LPS is the allocator of the data part. This is needed as the GPU LPU offloader works
 		// in batches and keep tracks of unique data parts for a batch of LPU by data parts IDs.
-		if (!allocatedElsewhere) {
-			programFile << doubleIndent << "lpu->" << varName << "PartId = ";
-			programFile << varName << "Part->getMetadata()->getIdList()" << stmtSeparator;
-		}
+		programFile << doubleIndent << "lpu->" << varName << "PartId = ";
+		programFile << varName << "Part->getMetadata()->getIdList()" << stmtSeparator;
 
 		programFile << indent << "}\n";
 	}

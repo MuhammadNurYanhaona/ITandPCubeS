@@ -851,7 +851,15 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 	for (int i = 0; i < indentLevel; i++) indentStr << indent;
 	nextIndent << indentStr.str();
 
+	bool gpuLevel = (topmostGpuPps == space->getPpsId());
 	bool smLevel = (topmostGpuPps - space->getPpsId() == 1);
+	bool warpLevel = (topmostGpuPps - space->getPpsId() == 2);
+
+	GpuCodeConstants *gpuCons = NULL;
+	if (gpuLevel) gpuCons = GpuCodeConstants::getConstantsForGpuLevel();
+	else if (smLevel) gpuCons = GpuCodeConstants::getConstantsForSmLevel();
+	else gpuCons = GpuCodeConstants::getConstantsForWarpLevel();
+
 	const char *lpsName = space->getName();
 
 	if (containerSpace != space) {
@@ -861,37 +869,26 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		decorator::writeCommentHeader(indentLevel, &stream, entryHeader.str().c_str());
 		stream << std::endl;
 
-		const char *bodyIndent = strdup(nextIndent.str().c_str());
-		bool warpLevelCount = (topmostGpuPps - containerSpace->getPpsId()) == 2;
-		space->genLpuCountInfoForGpuKernelExpansion(stream,
-				bodyIndent, accessedArrays, warpLevelCount);
-		nextIndent << '\t';
-
-		std::string distrIndex;
-		std::string distrIncr;
-		std::string idSuffix = std::string("");
-		std::string idIndex = std::string("");
-		if (smLevel) {
-			distrIndex = std::string("smId");
-			distrIncr = std::string("SM_COUNT");
-		} else {
-			distrIndex = std::string("warpId");
-			distrIncr = std::string("WARP_COUNT");
-			idSuffix = std::string("[WARP_COUNT]");
-			idIndex = std::string("[warpId]");
-		}
-		std::string countIndex = std::string("");
-		if (warpLevelCount) {
-			countIndex = std::string("[warpId]");
-		}
-
+		// determine LPU count for the current LPS then generate an expr for holding total number of 
+		// LPUs that will be needed to distribute LPUs among the PPUs 
 		std::ostringstream rangeLimitExpr;
-		int dimensionCount = space->getDimensionCount();
-		for (int i = 0; i < dimensionCount; i++) {
-			if (i > 0) rangeLimitExpr << " * ";
-			rangeLimitExpr << "space" << lpsName << "LpuCount[" << i << "]";
+		int dimensionCount = space->getDimensionCount();		
+		bool warpLevelCount = (topmostGpuPps - containerSpace->getPpsId()) == 2;
+		if (dimensionCount > 0) {	
+			const char *bodyIndent = strdup(nextIndent.str().c_str());
+			space->genLpuCountInfoForGpuKernelExpansion(stream,
+					bodyIndent, accessedArrays, warpLevelCount);
+
+			for (int i = 0; i < dimensionCount; i++) {
+				if (i > 0) rangeLimitExpr << " * ";
+				rangeLimitExpr << "space" << lpsName << "LpuCount[" << i << "]";
+			}
+		} else {
+			rangeLimitExpr << "1";
+
 		}
-		
+		nextIndent << '\t';
+	
 		std::ostringstream indexVar;
 		indexVar << "space" << lpsName << "LinearId";
 
@@ -901,10 +898,10 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		if (gpuLpuDistrFlag == Gpu_Lpu_Distr_Stage) {
 			stream << "// distributing LPUs of Space " << lpsName << "\n";
 			stream << indentStr.str() << "for (int " << indexVar.str()  << " = ";
-			stream << distrIndex << ";" << paramIndent << indentStr.str();
+			stream << gpuCons->localDistrIndex << ";" << paramIndent << indentStr.str();
 			stream << indexVar.str() << " < " << rangeLimitExpr.str() << ";";
 			stream << paramIndent << indentStr.str();
-			stream << indexVar.str() << " += " << distrIncr << ") {\n\n"; 	
+			stream << indexVar.str() << " += " << gpuCons->localJumpExpr << ") {\n\n"; 	
 		//otherwise let each PPU go over the entire list of LPUs
 		} else {
 			stream << "// iterating over LPUs of Space " << lpsName << "\n";
@@ -917,7 +914,7 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 		
 		// if this is an SM or GPU level composite stage then do a syncthreads to ensure all warps 
 		// are on the same iteration of the for loop
-		if (smLevel) {
+		if (gpuLevel || smLevel) {
 			stream << nextIndent.str();
 			stream << "// sync to ensure all warps are in the same stage\n"; 
 			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;
@@ -947,9 +944,9 @@ void CompositeStage::generateGpuKernelCode(std::ofstream &stream,
 	// recursively generate code for the stages inside the current stage
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		
-		// for SM level operation, blindly do a syncthreads after execution of each nested stage lest 
-		// there might be some data dependencies among stages that we might miss
-		if (i > 0 && smLevel) {
+		// for SM/GPU level operation, blindly do a syncthreads after execution of each nested stage 
+		// lest there might be some data dependencies among stages that we might miss
+		if (i > 0 && (gpuLevel || smLevel)) {
 			stream << nextIndent.str();
 			stream << "// synchronize between nested stages execution\n" << stmtSeparator;
 			stream << nextIndent.str() << "__syncthreads()" << stmtSeparator;

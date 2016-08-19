@@ -82,7 +82,7 @@ PartitionSpec::PartitionSpec(char si, int d, List<DataConfigurationSpec*> *sl, b
 	variableList = NULL;	
 }
 
-PartitionSpec::PartitionSpec(char s, List<Identifier*> *v, yyltype loc) : Node(loc) {
+PartitionSpec::PartitionSpec(char s, List<Identifier*> *v, SpaceLinkage *pl, yyltype loc) : Node(loc) {
 	Assert(v != NULL);
 	spaceId = s;
 	variableList = v;
@@ -92,7 +92,7 @@ PartitionSpec::PartitionSpec(char s, List<Identifier*> *v, yyltype loc) : Node(l
 	dimensionality = 0;
 	specList = NULL;
 	dynamic = false;
-	parentLink = NULL;
+	parentLink = pl;
 	subpartition = NULL;
 }
 

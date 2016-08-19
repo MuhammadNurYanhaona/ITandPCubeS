@@ -285,7 +285,7 @@ partition_specs	: partition_spec 				{ ($$ = new List<PartitionSpec*>)->Append($
 partition_spec  : T_Space Space_ID '<' Dimensionality '>'
 		  dynamic divides '{' main_dist sub_dist '}'	{ $$ = new PartitionSpec($2, $4, $9, $6, $7, $10, @1); }		
 		| T_Space Space_ID '<' Unpartitioned '>' 
-		  '{' names '}'					{ $$ = new PartitionSpec($2, $7, @1); };
+		  divides '{' names '}'				{ $$ = new PartitionSpec($2, $8, $6, @1); };
 dynamic		: 						{ $$ = false; }
 		| '<' Dynamic '>'				{ $$ = true; };
 divides		: 						{ $$ = NULL; }	
