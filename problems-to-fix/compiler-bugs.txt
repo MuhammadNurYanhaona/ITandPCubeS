@@ -2,7 +2,7 @@ NOTE: Update the last-update-date below each time you make a change in this docu
       when the errors were relevant. Further, if you know that a problem has been fixed already but has
       still been listed here, remove the problem from the list.
 
-Last Update Date: Aug 15, 2016
+Last Update Date: Aug 23, 2016
 
 
 1. In some machines, compilation fails for correct IT sample programs showing wierd errors related to
@@ -32,4 +32,8 @@ Last Update Date: Aug 15, 2016
    This is an incorrect behavior that can cause the hybrid compiler to generate incorrect CUDA kernels.
    Rather, the last partition should have the fewest elements when the dimension is not evenly divisible.
 7. Currently the multicore compiler does not support data structures that have multiple epoch versions.
-8. Currently the multicore compiler does not support data structure partitions that have padding in them.  	   
+8. Currently the multicore compiler does not support data structure partitions that have padding in them.
+9. Support for intermediate unpartitioned LPSes in a task's LPS hierarchy is implemented in the hybrid
+   compiler only. To make the feature available in the remaining compilers, it should be enough to copy 
+   paste code blocks from the hybrid compiler.
+    	   
