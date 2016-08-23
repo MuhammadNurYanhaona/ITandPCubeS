@@ -682,6 +682,13 @@ void GpuExecutionContext::generateGpuKernel(CompositeStage *kernelDef,
 	programFile << indent << "{ // scope starts for distribution of staged-in LPUs\n\n";
 	generateStagedInLpuDistributionLoop(programFile, pcubesModel);
 
+	// if the lpu range the current SM is supposed to process is invalid, then the code should exit without
+	// doing anything
+	programFile << std::endl << doubleIndent << "// exiting if the batch range is invalid\n";
+	programFile << doubleIndent << "if(space" << contextLpsName << "LinearId == -1) ";
+	programFile << "break" << stmtSeparator;
+	
+
 	// GPU or SM level LPU iterations will always be preceeded by a syncthreads to ensure that all warps have
 	// completed previous LPU processing
 	if (gpuLevel || smLevel) {

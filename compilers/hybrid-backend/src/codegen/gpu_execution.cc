@@ -168,10 +168,11 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
 	programFile << indent << "for (unsigned int i = 0; i < lpuCounts->size(); i++) {\n";
 	programFile << doubleIndent << "int *lpuCount = lpuCounts->at(i)" << stmtSeparator;
 	
-	// if the count is NULL then there is no LPUs for the receiver PPU and all fields should be invalid in
-	// the metadata structure entry for it
+	// if the count is NULL and the batch range is invalid then there is no LPUs for the receiver PPU and all 
+	// fields should be invalid in the metadata structure entry for it
 	int lpsDimensionality = gpuContextLps->getDimensionCount();
-	programFile << doubleIndent << "if (lpuCount == NULL) {\n";
+	programFile << doubleIndent << "Range lpuRange = lpuBatchRanges->at(i)" << stmtSeparator;
+	programFile << doubleIndent << "if (lpuCount == NULL && lpuRange.min == INVALID_ID) {\n";
 	for (int i = 0; i < lpsDimensionality; i++) {
 		programFile << tripleIndent << "metadata.entries[i].lpuCount" << i + 1;
 		programFile << " = INVALID_ID" << stmtSeparator;
@@ -189,7 +190,6 @@ void generateKernelLaunchMatadataStructFn(Space *gpuContextLps,
 		programFile << tripleIndent << "metadata.entries[i].lpuCount" << i + 1;
 		programFile << " = lpuCount[" << i << "]" << stmtSeparator;
 	}
-	programFile << tripleIndent << "Range lpuRange = lpuBatchRanges->at(i)" << stmtSeparator;
 	programFile << tripleIndent << "metadata.entries[i].batchRangeMin = lpuRange.min" << stmtSeparator;	
 	programFile << tripleIndent << "metadata.entries[i].batchRangeMax = lpuRange.max" << stmtSeparator;
 	programFile << tripleIndent << "metadata.entries[i].batchStartIndex = currentBatchStartIndex";
