@@ -73,6 +73,11 @@ int main(int argc, const char *argv[]) {
         std::ostringstream coordProgramStr;
         coordProgramStr << buildDir << buildSubDir << "/coordinator.cc";
         const char *coordProgram = strdup(coordProgramStr.str().c_str());
+	// set up the output text file for any external library linking during native code
+	// compilation process
+        std::ostringstream linkageListerStr;
+        linkageListerStr << buildDir << buildSubDir << "/external_links.txt";
+        const char *linkageListerFile = strdup(linkageListerStr.str().c_str());
 	//***********************************************************************************
 
 
@@ -122,6 +127,9 @@ int main(int argc, const char *argv[]) {
 	// multi-task management and a the main function corresponds to the coordinator 
 	// program definition
 	processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
+	// generate a text file that lists the external libraries to be linked with the 
+	// program for successful compilation and execution of external code blocks
+	ProgramDef::program->generateExternLibraryLinkInfo(linkageListerFile);	
 	//***********************************************************************************
 }
 

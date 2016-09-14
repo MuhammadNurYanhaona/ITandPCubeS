@@ -21,7 +21,7 @@
 #include <stdio.h>
 
 void initializeOutputFiles(const char *headerFileName, 
-		const char *programFileName, const char *initials) {
+		const char *programFileName, const char *initials, TaskDef *taskDef) {
 
 	std::string line;
         std::ifstream commIncludeFile("config/default-includes.txt");
@@ -57,6 +57,35 @@ void initializeOutputFiles(const char *headerFileName,
 	} else {
 		std::cout << "Unable to open common include file";
 		std::exit(EXIT_FAILURE);
+	}
+
+	// Since we are generating C++ code any external code block written in C and C++ can be directly
+	// placed within the generated code but we have to include the proper header files in the generated
+	// program to make this scheme work. So here we are including those headers.
+	IncludesAndLinksMap *externConfig = taskDef->getExternBlocksHeadersAndLibraries();
+	List<const char*> *headerIncludes = new List<const char*>;
+        if (externConfig->hasExternBlocksForLanguage("C++")) {
+                LanguageIncludesAndLinks *cPlusHeaderAndLinks
+                                = externConfig->getIncludesAndLinksForLanguage("C++");
+		string_utils::combineLists(headerIncludes, cPlusHeaderAndLinks->getHeaderIncludes());	
+        }
+	if (externConfig->hasExternBlocksForLanguage("C")) {
+		LanguageIncludesAndLinks *cHeaderAndLinks
+                                = externConfig->getIncludesAndLinksForLanguage("C");
+                string_utils::combineLists(headerIncludes, cHeaderAndLinks->getHeaderIncludes());
+	}
+	if (headerIncludes->NumElements() > 0) {
+		programFile << "// header files needed to execute external code blocks\n";
+		for (int i = 0; i < headerIncludes->NumElements(); i++) {
+			programFile << "#include ";
+			const char *headerFile = headerIncludes->Nth(i);
+			if (headerFile[0] == '"') {
+				programFile << headerFile << '\n';
+			} else {
+				programFile << '<' << headerFile << '>' << '\n';
+			}
+		}
+		programFile << '\n';
 	}
 
 	headerFile << "namespace " << string_utils::toLower(initials) << " {\n\n";

@@ -20,6 +20,7 @@ class FlowStage;
 class CompositeStage;
 class VariableAccess;
 class TaskEnvStat;
+class IncludesAndLinksMap;
 
 enum LinkageType { TypeCreate, TypeLink, TypeCreateIfNotLinked };
 
@@ -321,6 +322,10 @@ class TaskDef : public Definition {
 	// data structures and the stale/fresh status of their different LPS allocations at the end of the 
 	// task execution. 
 	TaskEnvStat *getAfterExecutionEnvStat();
+	// As the name suggests, this function retrieves the header files to be included during compilation
+	// and libraries to linked during code generation for successful execution of all extern code bloks
+	// used within an IT task.
+	IncludesAndLinksMap *getExternBlocksHeadersAndLibraries();
 	void print();
 
 	//-----------------------------------------------------------------helper functions for back-end compilers

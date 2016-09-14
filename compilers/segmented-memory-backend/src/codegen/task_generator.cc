@@ -35,6 +35,7 @@
 #include "../syntax/ast_type.h"
 #include "../static-analysis/task_global.h"
 #include "../static-analysis/sync_stat.h"
+#include "../static-analysis/extern_config.h"
 #include "../semantics/task_space.h"
 
 TaskGenerator::TaskGenerator(TaskDef *taskDef,
@@ -84,7 +85,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	std::cout << "Translating task: " << taskDef->getName();
 	std::cout << "\n-----------------------------------------------------------------\n";
 
-	initializeOutputFiles(headerFile, programFile, initials);
+	initializeOutputFiles(headerFile, programFile, initials, taskDef);
 
 	// interpret mapping configuration
         PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();

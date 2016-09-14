@@ -50,6 +50,18 @@ comment_line      ("//"[^\n]*\n)
 
 {SINGLE_COMMENT}       { /* skip to end of line for // comment */ }
 
+"${"[^\$]+"}$"							{
+								adjustLineAndColumnNo(yytext, '{'); 
+								char *startPtr = strchr(yytext,'{') + 1;
+								char *endPtr = strrchr(yytext, '}');
+								int charCount = endPtr - startPtr;
+								char *codeBody = (char *) malloc(charCount + 1);
+								strncpy(codeBody, startPtr, charCount);
+								codeBody[charCount] = '\0'; 
+								yylval.stringConstant = codeBody;
+								return Native_Code;
+								}
+
 <CODE,PROGRAM>[[:space:]]*"{"([[:space:]]|{comment_line})*	adjustLineAndColumnNo(yytext, '{'); return '{';
 <CODE,PROGRAM>[[:space:]]*"}"					adjustLineAndColumnNo(yytext, '}'); return '}';	
 <CODE,PROGRAM>\\[ \t]*\n					resetLine();
@@ -62,6 +74,11 @@ comment_line      ("//"[^\n]*\n)
 <PROGRAM>execute						return Execute;
 <PROGRAM>new							return New;
 <CODE>at							return At;
+
+@Extern			return Extern;
+@Language		return Language;
+@Includes		return Header_Includes;
+@Libraries		return Library_Links;
 
 Program			return Program;
 Tuple			return Tuple;

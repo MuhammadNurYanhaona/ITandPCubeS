@@ -15,6 +15,7 @@
 #include "../static-analysis/data_flow.h"
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/task_env_stat.h"
+#include "../static-analysis/extern_config.h"
 
 #include <sstream>
 
@@ -257,6 +258,12 @@ TaskEnvStat *TaskDef::getAfterExecutionEnvStat() {
 	TaskEnvStat *taskStat = new TaskEnvStat(envAccessList, rootLps);
 	compute->getComputation()->prepareTaskEnvStat(taskStat);
 	return taskStat;
+}
+
+IncludesAndLinksMap *TaskDef::getExternBlocksHeadersAndLibraries() {
+	IncludesAndLinksMap *configMap = new IncludesAndLinksMap();
+	compute->getComputation()->retriveExternCodeBlocksConfigs(configMap);
+	return configMap;
 }
 
 void TaskDef::print() {

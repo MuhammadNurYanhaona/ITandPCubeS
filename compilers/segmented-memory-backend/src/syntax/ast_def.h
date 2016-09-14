@@ -63,6 +63,12 @@ class ProgramDef : public Definition {
 	CoordinatorDef *getProgramController();
 	bool isIsolatedTaskProgram(); 
 	Scope *getScope();
+	
+	//--------------------------------------------------- helper methods for code generation
+	// This writes the names of external libraries that should be linked for successful
+	// compilation and execution of external code blocks present in an IT program. The
+	// library names are written in text file with one line per language type. 
+	void generateExternLibraryLinkInfo(const char *linkDescriptionFile);
 };
 
 class TupleDef : public Definition {

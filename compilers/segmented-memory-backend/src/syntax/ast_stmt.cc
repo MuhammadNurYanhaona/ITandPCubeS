@@ -9,6 +9,7 @@
 #include "../utils/hashtable.h"
 #include "errors.h"
 #include "../static-analysis/loop_index.h"
+#include "../static-analysis/extern_config.h"
 #include "../codegen/name_transformer.h"
 
 #include <iostream>
@@ -65,6 +66,10 @@ void LoopStmt::checkSemantics(Scope *excutionScope, bool ignoreTypeFailures) {
 			}
 		}
 	}
+}
+
+void LoopStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+	body->retrieveExternHeaderAndLibraries(includesAndLinksMap);
 }
 
 void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLevel) { 
@@ -314,6 +319,13 @@ void StmtBlock::analyseEpochDependencies(Space *space) {
 		stmt->analyseEpochDependencies(space);
 	}	
 }
+
+void StmtBlock::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+	for (int i = 0; i < stmts->NumElements(); i++) {
+		Stmt *stmt = stmts->Nth(i);
+		stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);
+	}
+}
 	
 //-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
@@ -385,6 +397,10 @@ void ConditionalStmt::analyseEpochDependencies(Space *space) {
 	stmt->analyseEpochDependencies(space);
 }
 
+void ConditionalStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+	stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);
+}
+
 IfStmt::IfStmt(List<ConditionalStmt*> *ib, yyltype loc) : Stmt(loc) {
 	Assert(ib != NULL);
 	ifBlocks = ib;
@@ -432,6 +448,13 @@ void IfStmt::analyseEpochDependencies(Space *space) {
 	for (int i = 0; i < ifBlocks->NumElements(); i++) {
 		ConditionalStmt *stmt = ifBlocks->Nth(i);
 		stmt->analyseEpochDependencies(space);
+	}
+}
+
+void IfStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+		ConditionalStmt *stmt = ifBlocks->Nth(i);
+		stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);	
 	}
 }
 
@@ -954,6 +977,10 @@ void WhileStmt::analyseEpochDependencies(Space *space) {
 	condition->setEpochVersions(space, 0);
 }
 
+void WhileStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+	body->retrieveExternHeaderAndLibraries(includesAndLinksMap);
+}
+
 void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 	for (int i = 0; i < indentLevel; i++) stream << '\t';
 	stream << "do {\n";
@@ -966,4 +993,49 @@ void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
 		stream << "true";
 	}
 	stream << ");\n";
+}
+
+//---------------------------------------------------------- External Code Block -------------------------------------------------------/
+
+ExternCodeBlock::ExternCodeBlock(const char *language,
+                        List<const char*> *headerIncludes,
+                        List<const char*> *libraryLinks,
+                        const char *codeBlock, yyltype loc) : Stmt(loc) {
+
+	Assert(language != NULL && codeBlock != NULL);
+	this->language = language;
+	this->headerIncludes = headerIncludes;
+	this->libraryLinks = libraryLinks;
+	this->codeBlock = codeBlock;
+}
+
+void ExternCodeBlock::PrintChildren(int indentLevel) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) {
+		indent << '\t';
+	}
+	std::cout << indent.str() << "Language: " << language << "\n";
+	if (headerIncludes != NULL) {
+		std::cout << indent.str() << "Included Headers:\n";
+		for (int i = 0; i < headerIncludes->NumElements(); i++) {
+			std::cout << indent.str() << '\t' << headerIncludes->Nth(i) << "\n";
+		}
+	}
+	if (libraryLinks != NULL) {
+		std::cout << indent.str() << "Linked Libraries:\n";
+		for (int i = 0; i < libraryLinks->NumElements(); i++) {
+			std::cout << indent.str() << '\t' << libraryLinks->Nth(i) << "\n";
+		}
+	}
+	std::cout << indent.str() << "Code Block:" << codeBlock << "\n";
+}
+
+void ExternCodeBlock::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+	includesAndLinksMap->addIncludesAndLinksForLanguage(language, 
+			headerIncludes, libraryLinks);
+}
+
+void ExternCodeBlock::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	// this requires considerable thinking
+	std::cout << "is this the problem?\n";
 }

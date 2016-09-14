@@ -9,6 +9,7 @@
 #include "../semantics/scope.h"
 #include "../utils/hashtable.h"
 #include "task_env_stat.h"
+#include "extern_config.h"
 
 #include <iostream>
 #include <fstream>
@@ -213,6 +214,11 @@ class FlowStage {
 	virtual List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
 	// This function uses the same recursive process, but it returns detail communication information 
 	virtual List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
+
+	// This function is used to recursively determine all external header file inclusions and library linkages
+	// for external code blocks present in the class. This header files and library links are applied during
+	// compilation and linkage of the generated code.	
+	virtual void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {}
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis. These 
@@ -266,6 +272,9 @@ class ExecutionStage : public FlowStage {
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	bool isGroupEntry();
 	void setLpsExecutionFlags();
+	void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
+		code->retrieveExternHeaderAndLibraries(externConfigMap);
+	}
 };
 
 /*	Composite stage construct is similar to a meta compute stage of the abstract syntax tree. It is much 
@@ -309,6 +318,7 @@ class CompositeStage : public FlowStage {
 	virtual void prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
+	void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap);
 	
 	// this recursively goes down within the composite stage and returns the highest index of any stage nested
 	// in it

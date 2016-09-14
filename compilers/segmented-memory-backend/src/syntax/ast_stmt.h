@@ -13,7 +13,8 @@ class Expr;
 class LogicalExpr;
 class ReductionExpr;
 class Space;
-class IndexScope;	
+class IndexScope;
+class IncludesAndLinksMap;	
 
 class Stmt : public Node {
   public:
@@ -50,6 +51,9 @@ class Stmt : public Node {
 	// this sets up the proper epoch versions to all variables used in expressions that
 	// are parts of this statement 
 	virtual void analyseEpochDependencies(Space *space) {}
+	// this function is used to recursively determine all the header file includes and library
+	// links for different extern code blocks present in an IT-task
+	virtual void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {}
 
 	//-------------------------------------------------------------------------Code Generation Routines
 	// back end code generation routine; subclasses should provide appropriate 
@@ -76,6 +80,7 @@ class StmtBlock : public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -99,6 +104,7 @@ class ConditionalStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space);
@@ -122,6 +128,7 @@ class IfStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -194,6 +201,7 @@ class LoopStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines
 	virtual List<const char*> *getIndexNames() = 0;
 	virtual void analyseEpochDependencies(Space *space) { body->analyseEpochDependencies(space); }
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	// a helper routine for code generation that declares variables in the scope
@@ -311,7 +319,31 @@ class WhileStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 	
+	//-------------------------------------------------------------------------Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+};
+
+class ExternCodeBlock: public Stmt {
+  protected:
+	const char *language;
+	List<const char*> *headerIncludes;
+	List<const char*> *libraryLinks;
+	const char *codeBlock;
+  public:
+	ExternCodeBlock(const char *language, 
+			List<const char*> *headerIncludes, 
+			List<const char*> *libraryLinks, 
+			const char *codeBlock, yyltype loc);
+	
+	//-------------------------------------------------------------------------Syntex Analysis Routines	
+	const char *GetPrintNameForNode() { return "ExternalCodeBlock"; }
+    	void PrintChildren(int indentLevel);
+	
+	//-------------------------------------------------------------------------Static Analysis Routines	
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
