@@ -35,7 +35,7 @@ Task "Extern Testing Task":
                                         double timeEnd = (end.tv_sec + end.tv_usec / 1000000.0);
 					double runningTime = timeEnd - timeStart;
 
-					int threadId = pthread_self();
+					unsigned int threadId = pthread_self();
 					int processId;
 					MPI_Comm_rank(MPI_COMM_WORLD, &processId);
 					printf("Process %d, thread %d, took %f time\n", processId, threadId, runningTime);
