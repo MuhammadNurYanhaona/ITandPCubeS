@@ -19,25 +19,8 @@ Task "Matrix Multiply":
 		// The underlying computation for block matrix multiplication is the same
 		// of that of simple matrix multiplication algorithm	
 		"Block multiply matrices" (Space A) {
-			@Extern {
-				@Language "C++"
-				@Includes { iostream, "stdio.h" }
-				@Libraries { fopenmp, lcudart }
-				${
-					printf("Hello world!\n");
-					std::cout << "Hi I am Yan\n";
-				}$
-			}	 
 			do { c[i][j] = c[i][j] + a[i][k] * b[k][j]
 			} for i, j in c; k in a
-			@Extern {
-				@Language "C"
-				@Includes {"stdlib.h", "stdio.h"}
-				@Libraries {pthread}
-				${
-					printf("Just testing external code blocks\n");
-				}$
-			}
 		}
 		Repeat: from "Block multiply matrices" foreach Space A sub-partition
 	Partition (k, l, q):

@@ -114,6 +114,9 @@ int main(int argc, const char *argv[]) {
 	List<TaskDef*> *taskList = ProgramDef::program->getTasks();
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		TaskDef *taskDef = taskList->Nth(i);
+		// update the static reference to get to the task definition from anywhere 
+		// during code generation  
+		TaskDef::currentTask = taskDef;
 		// do static analysis of the task to determine what data structure has been 
 		// accessed in what LPS before code generation starts
 		taskDef->getComputation()->calculateLPSUsageStatistics();

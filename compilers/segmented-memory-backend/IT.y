@@ -189,7 +189,6 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <partSpecList>	partition_specs
 %type <partition>	partition
 %type <strList>		header_includes includes extern_links library_links
-%type <stringConstant>  include library_link
 
 /*----------------------------------------------------- Grammer Rules ------------------------------------------------------------*/     
 %%
@@ -470,20 +469,16 @@ extern_block	: Extern '{'
 		  Language String new_lines
 		  header_includes extern_links	
 		  Native_Code '}'				{ $$ = new ExternCodeBlock($4, $6, $7, $8, @1); };
-header_includes : 						{ $$ = NULL; }
-		| Header_Includes '{' includes '}' new_lines	{ $$ = $3; };
-includes	: include					{ ($$ = new List<const char*>)->Append($1); }
-		| includes ',' include				{ ($$ = $1)->Append($3); };
-include		: String 
-		| Variable_Name
-		| Type_Name					;
-extern_links	:						{ $$ = NULL; }
-		| Library_Links '{' library_links '}' new_lines { $$ = $3; };
-library_links	:						{ ($$ = new List<const char*>); }
-		| library_link					{ ($$ = new List<const char*>)->Append($1); }
-		| library_links ',' library_link		{ ($$ = $1)->Append($3); };
-library_link	: Variable_Name
-		| Type_Name;					;	
+header_includes : 						{ $$ = NULL; EndFreeString(); }
+		| Header_Includes { BeginFreeString(); } 
+		  '{' includes '}' new_lines			{ $$ = $4; EndFreeString(); };
+includes	: String					{ ($$ = new List<const char*>)->Append($1); }
+		| includes ',' String				{ ($$ = $1)->Append($3); };
+extern_links	:						{ $$ = NULL; EndFreeString(); }
+		| Library_Links { BeginFreeString(); } 
+		  '{' library_links '}' new_lines 		{ $$ = $4; EndFreeString(); };
+library_links	: String					{ ($$ = new List<const char*>)->Append($1); }
+		| library_links ',' String			{ ($$ = $1)->Append($3); };
 		
 %%
 

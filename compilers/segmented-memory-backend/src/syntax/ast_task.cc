@@ -21,6 +21,8 @@
 
 //------------------------------------------------------- Task Definition ---------------------------------------------------------/
 
+TaskDef *TaskDef::currentTask = NULL;
+
 TaskDef::TaskDef(Identifier *i, 
 		DefineSection *d, 
 		EnvironmentConfig *e, 

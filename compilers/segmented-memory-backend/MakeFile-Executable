@@ -58,6 +58,7 @@ build: $(OBJS)
 
 clean:
 	rm -rfv  build/$(BUILD_SUBDIR)
+	rm -f bin/it-program.o
 
 	
 

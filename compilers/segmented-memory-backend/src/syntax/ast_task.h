@@ -288,6 +288,10 @@ class TaskDef : public Definition {
 	TupleDef *envTuple;
 	TupleDef *partitionTuple; 
   public:
+	// This static reference to a task-definition is used to get to the task from anywhere during the
+	// backend code generation process.
+	static TaskDef *currentTask;
+
         TaskDef(Identifier *id, DefineSection *define, EnvironmentConfig *environment, 
 		InitializeInstr *initialize, ComputeSection *compute, PartitionSection *partition);
         

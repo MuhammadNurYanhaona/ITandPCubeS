@@ -1,0 +1,46 @@
+Program (args) { 
+        extEnv = new TaskEnvironment(name: "Extern Testing Task")
+	bind_input(extEnv, "a", args.input_file)
+        execute("Extern Testing Task"; extEnv)
+}
+
+Task "Extern Testing Task":
+	Define:
+		a: 2D Array of Real double-precision
+		total: Real double-precision
+	Environment:
+		a: link
+	Compute:
+		"Compute Time Spent" (Space A) {
+			timeStart = 0.000000
+			@Extern {
+				@Language "C++"
+				@Includes { sys/time.h }
+				${
+					struct timeval start;
+        				gettimeofday(&start, NULL);
+					timeStart = (start.tv_sec + start.tv_usec / 1000000.0);
+				}$
+			}	 
+			do { 
+				total  = reduce("sum", a[i][j])
+			} for i, j in a
+			@Extern {
+				@Language "C"
+				@Includes { sys/time.h, "stdio.h", pthread.h, mpi.h }
+				@Libraries {pthread}
+				${
+					struct timeval end;
+                                        gettimeofday(&end, NULL);
+                                        double timeEnd = (end.tv_sec + end.tv_usec / 1000000.0);
+					double runningTime = timeEnd - timeStart;
+
+					int threadId = pthread_self();
+					int processId;
+					MPI_Comm_rank(MPI_COMM_WORLD, &processId);
+					printf("Process %d, thread %d, took %f time\n", processId, threadId, runningTime);
+				}$
+			}
+		}
+	Partition:
+		Space A <un-partitioned> { a }
