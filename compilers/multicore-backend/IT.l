@@ -28,14 +28,14 @@ static void DoBeforeEachAction();
 
 /*----------------------------------------Declarations----------------------------------------------*/
 /* States
- * ------
- * A little wrinkle on states is the COPY exclusive state which
- * I added to first match each line and copy it ot the list of lines
- * read before re-processing it. This allows us to print the entire
- * line later to provide context on errors.
+ * CODE: is for the code section of a task
+ * PROGRAM: is for the coordinator function of the program
+ * FREE_STRING: is for header and libraries of extern code blocks
+ * COPY: is for copying the content of a line 	
  */
 %s CODE 
 %s PROGRAM
+%s FREE_STRING
 %x COPY
 %option stack
 %option noyywrap
@@ -50,10 +50,33 @@ comment_line      ("//"[^\n]*\n)
 
 {SINGLE_COMMENT}       { /* skip to end of line for // comment */ }
 
+@Extern								return Extern;
+@Language							return Language;
+@Includes							return Header_Includes;
+@Libraries							return Library_Links;
+
+<FREE_STRING>[^,\n[:space:]}{]+					{
+								yylval.stringConstant = (char *) malloc(strlen(yytext) + 1);
+								strcpy(yylval.stringConstant, yytext);
+								return String;
+								}
+
+"${"[^\$]+"}$"							{
+								adjustLineAndColumnNo(yytext, '{'); 
+								char *startPtr = strchr(yytext,'{') + 1;
+								char *endPtr = strrchr(yytext, '}');
+								int charCount = endPtr - startPtr;
+								char *codeBody = (char *) malloc(charCount + 1);
+								strncpy(codeBody, startPtr, charCount);
+								codeBody[charCount] = '\0'; 
+								yylval.stringConstant = codeBody;
+								return Native_Code;
+								}
+
 <CODE,PROGRAM>[[:space:]]*"{"([[:space:]]|{comment_line})*	adjustLineAndColumnNo(yytext, '{'); return '{';
 <CODE,PROGRAM>[[:space:]]*"}"					adjustLineAndColumnNo(yytext, '}'); return '}';	
 <CODE,PROGRAM>\\[ \t]*\n					resetLine();
-<CODE,PROGRAM>\n						resetLine(); return New_Line;
+<CODE,PROGRAM,FREE_STRING>\n					resetLine(); return New_Line;
 [\n]								resetLine();
 [ ]+                   						;		
 [\t]                						curColNum += TAB_SIZE - curColNum % TAB_SIZE + 1;
@@ -249,17 +272,19 @@ const char *GetLineNumbered(int num) {
    return savedLines.Nth(num-1);
 }
 
-/* Functions: BeginCode() and EndCode()
+/* code section specific parsing functions
  * ------------------------------------
- * We use newlines as expression seperators inside the code sections. In
- * rest of the source newlines are not important. This two functions are
- * provided so that the parser can set and reset the CODE state so that the
- * lexar recognizes newlines only when required.
+ * We use newlines as expression seperators inside the code sections. In rest of the source newlines are not 
+ * important. Furthermore, any string is valid for external headers and libraries but not for other sections
+ * of the program.  These functions are provided so that the parser can set up the context for lexical 
+ * analyis properly for different sections of the program.
  */
 void BeginCode() {BEGIN(CODE);}
 void EndCode() {BEGIN(INITIAL);} 	
 void BeginProgram() {BEGIN(PROGRAM);}
-void EndProgram() {BEGIN(INITIAL);} 	
+void EndProgram() {BEGIN(INITIAL);}
+void BeginFreeString() { BEGIN(FREE_STRING); }
+void EndFreeString() { BEGIN(CODE); } 	
 
 static void resetLine() {
 	curColNum = 1; curLineNum++;

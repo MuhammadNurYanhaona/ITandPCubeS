@@ -37,16 +37,20 @@ RFLAG = -pthread
 # Link with standard c library, math library, and lex library
 LIBS = -lc -lm -pthread
 
+# C++ library links for external code blocks
+EXTERN_LIBS = $(shell grep 'C++ =\|C =' build/$(BUILD_SUBDIR)/external_links.txt  | cut -f2 -d "=" | tr '\n' ' ')
+
 # Rules for various parts of the target
 
 .cc.o: $*.cc
 	$(CC) $(CFLAGS) $(RFLAG) -c -o $@ $*.cc
 
 build: $(OBJS)
-	$(LD) -o $(EXECUTABLE) $(OBJS) $(LIBS)
+	$(LD) -o $(EXECUTABLE) $(OBJS) $(LIBS) $(EXTERN_LIBS)
 
 clean:
 	rm -rfv  build/$(BUILD_SUBDIR)
+	rm -f bin/it-program.o
 
 	
 

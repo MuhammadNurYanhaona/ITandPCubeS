@@ -8,6 +8,7 @@
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../utils/hashtable.h"
+#include "extern_config.h"
 
 #include <iostream>
 #include <fstream>
@@ -169,6 +170,11 @@ class FlowStage {
 	// this function is used to determine what reader of a data modified by the current stage should notify it
 	// about completion of read so that this stage can execute again if need may be.
 	virtual void setReactivatorFlagsForSyncReqs();
+
+	// This function is used to recursively determine all external header file inclusions and library linkages
+        // for external code blocks present in the class. This header files and library links are applied during
+        // compilation and linkage of the generated code.       
+        virtual void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {}
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis.
@@ -200,6 +206,9 @@ class ExecutionStage : public FlowStage {
 	void setCode(List<Stmt*> *stmtList);
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
+	void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
+                code->retrieveExternHeaderAndLibraries(externConfigMap);
+        }
 
 	// helper method for generating back-end code
 	void translateCode(std::ofstream &stream);
@@ -233,6 +242,7 @@ class CompositeStage : public FlowStage {
 	void reorganizeDynamicStages();
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
+	void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap);
 
 	// this recursively goes down within the composite stage and returns the highest index of any stage nested
         // in it

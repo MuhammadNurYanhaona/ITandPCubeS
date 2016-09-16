@@ -564,6 +564,13 @@ void CompositeStage::analyzeSynchronizationNeeds() {
 	}
 }
 
+void CompositeStage::retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->retriveExternCodeBlocksConfigs(externConfigMap);
+        }
+}
+
 int CompositeStage::getHighestNestedStageIndex() {
         int stageCount = stageList->NumElements();
         FlowStage *lastStage = stageList->Nth(stageCount - 1);

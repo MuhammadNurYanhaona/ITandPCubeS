@@ -19,6 +19,8 @@
 
 //------------------------------------------- Task ----------------------------------------------/
 
+TaskDef *TaskDef::currentTask = NULL;
+
 TaskDef::TaskDef(Identifier *i, DefineSection *d, EnvironmentConfig *e, 
                 InitializeInstr *init, ComputeSection *c, PartitionSection *p): Definition(*i->GetLocation()) {
         Assert(i != NULL && d != NULL && e != NULL && c != NULL && p != NULL);
@@ -205,6 +207,12 @@ void TaskDef::analyseCode() {
 	// finally determine which sync stage for a synchronization  will reset the synchronization
 	// primitives so that they can be reused (e.g., for latter iterations)
 	compute->getComputation()->setReactivatorFlagsForSyncReqs();
+}
+
+IncludesAndLinksMap *TaskDef::getExternBlocksHeadersAndLibraries() {
+        IncludesAndLinksMap *configMap = new IncludesAndLinksMap();
+        compute->getComputation()->retriveExternCodeBlocksConfigs(configMap);
+        return configMap;
 }
 
 void TaskDef::print() {

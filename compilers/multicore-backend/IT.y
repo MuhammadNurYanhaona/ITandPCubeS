@@ -51,11 +51,12 @@ void yyerror(const char *msg); // standard error-handling routine
 	ConditionalStmt			*condStmt;
 	List<ConditionalStmt*>		*condStmtList;
 	IndexRangeCondition		*rangeCond;
+	SLoopAttribute                  *sloopAttr;
 	List<IndexRangeCondition*>	*rangeCondList;
-	SLoopAttribute			*sloopAttr;
 	Identifier			*id;
 	List<Identifier*>		*idList;
 	List<int>			*intList;
+	List<const char*>		*strList;
 	EpochValue			*epoch;
 	OptionalInvocationParams	*invokeArgs;
 	List<OptionalInvocationParams*>	*invokeArgsList;
@@ -101,6 +102,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %token T_Space
 %token Activate For If Repeat Else From In Step Foreach Range Local Index
 %token C_Sub_Partition While Do Sequence To Of
+%token Extern Language Header_Includes Library_Links
 %token Link Create Link_or_Create
 %token Dynamic P_Sub_Partition Ordered Unordered Replicated Padding Relative_To 
 %token Divides Sub_Partitions Partitions Unpartitioned Ascends Descends
@@ -111,7 +113,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %token <floatConstant> Real_Single 
 %token <doubleConstant> Real_Double 
 %token <booleanConstant> Boolean
-%token <stringConstant> Type_Name Variable_Name String
+%token <stringConstant> Type_Name Variable_Name String Native_Code
 
 %left ','
 %right '=' 
@@ -142,7 +144,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <varList>		element_defs element_def definitions definition define input output
 %type <idList>		names arguments
 %type <expr>		expr field constant array_index function_call task_invocation create_obj 
-%type <expr>		step_expr restrictions repeat_loop activation_command
+%type <expr>		step_expr restrictions repeat_loop activation_command arg
 %type <exprList>	args
 %type <objInitArg>	obj_arg
 %type <objInitArgList>	obj_args	
@@ -152,13 +154,13 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <epoch>		epoch
 %type <invokeArgs>	optional_sec
 %type <invokeArgsList> 	optional_secs
-%type <stmt>		stmt parallel_loop sequencial_loop if_else_block
+%type <stmt>		stmt parallel_loop sequencial_loop if_else_block extern_block
 %type <stmtList>	stmt_block code meta_code function_body
 %type <condStmtList>	else_block
 %type <condStmt>	else else_if
 %type <rangeCond>	index_range
 %type <rangeCondList>	index_ranges
-%type <sloopAttr>	sloop_attr
+%type <sloopAttr>       sloop_attr
 %type <fnHeader>	in_out
 %type <initInstr>	initialize
 %type <linkageType>	mode
@@ -186,6 +188,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <partSpec>	partition_spec
 %type <partSpecList>	partition_specs
 %type <partition>	partition
+%type <strList>		header_includes includes extern_links library_links
 
 /*----------------------------------------------------- Grammer Rules ------------------------------------------------------------*/     
 %%
@@ -338,12 +341,13 @@ stmt_block	: stmt						{ ($$ = new List<Stmt*>)->Append($1); }
 new_lines	: New_Line | New_Line new_lines			; 
 stmt		: parallel_loop 
 		| sequencial_loop
-		| if_else_block					
+		| if_else_block
+		| extern_block					 	 				
 		| expr						{ $$ = $1; };
-sequencial_loop	: Do In Sequence '{' stmt_block '}'
-		For id In sloop_attr				{ $$ = new SLoopStmt($8, $10, new StmtBlock($5), @1); };
-sloop_attr	: field step_expr				{ $$ = new SLoopAttribute($1, $2, NULL); }
-		| field O_AND expr				{ $$ = new SLoopAttribute($1, NULL, $3); };
+sequencial_loop : Do In Sequence '{' stmt_block '}'
+                For id In sloop_attr                            { $$ = new SLoopStmt($8, $10, new StmtBlock($5), @1); };
+sloop_attr      : field step_expr                               { $$ = new SLoopAttribute($1, $2, NULL); }
+                | field O_AND expr                              { $$ = new SLoopAttribute($1, NULL, $3); };
 parallel_loop	: Do '{' stmt_block '}' For index_ranges	{ $$ = new PLoopStmt($6, new StmtBlock($3), @1); }
 		| Do '{' stmt_block '}' While expr		{ $$ = new WhileStmt($6, new StmtBlock($3), @1); };
 index_ranges	: index_range					{ ($$ = new List<IndexRangeCondition*>)->Append($1); }	
@@ -373,9 +377,9 @@ expr		: expr '+' expr					{ $$ = new ArithmaticExpr($1, ADD, $3, @2); }
 		| expr O_LSH expr				{ $$ = new ArithmaticExpr($1, LEFT_SHIFT, $3, @2); }
 		| expr O_RSH expr				{ $$ = new ArithmaticExpr($1, RIGHT_SHIFT, $3, @2); }
 		| expr O_POWER expr				{ $$ = new ArithmaticExpr($1, POWER, $3, @2); }
-		| expr '&' expr					{ $$ = new ArithmaticExpr($1, BITWISE_AND, $3, @2); }
-		| expr '^' expr					{ $$ = new ArithmaticExpr($1, BITWISE_XOR, $3, @2); }
-		| expr '|' expr					{ $$ = new ArithmaticExpr($1, BITWISE_OR, $3, @2); }
+                | expr '&' expr                                 { $$ = new ArithmaticExpr($1, BITWISE_AND, $3, @2); }
+                | expr '^' expr                                 { $$ = new ArithmaticExpr($1, BITWISE_XOR, $3, @2); }
+                | expr '|' expr                                 { $$ = new ArithmaticExpr($1, BITWISE_OR, $3, @2); }
 		| expr '<' expr					{ $$ = new LogicalExpr($1, LT, $3, @2); }
 		| expr '>' expr					{ $$ = new LogicalExpr($1, GT, $3, @2); }
 		| expr O_OR expr				{ $$ = new LogicalExpr($1, OR, $3, @2); }
@@ -416,10 +420,11 @@ function_call	: Variable_Name '(' args ')'			{
 										$$ = new FunctionCall(id, $3, Join(@1, @4));
 								  	} 
 								};
+arg		: String					{ $$ = new StringConstant(@1, $1); }
+		| expr						{ $$ = $1; };
 args		:						{ $$ = new List<Expr*>;} 
-		| String 					{ ($$ = new List<Expr*>)->Append(new StringConstant(@1, $1)); }
-		| expr 						{ ($$ = new List<Expr*>)->Append($1); }
-		| args ',' expr					{ ($$ = $1)->Append($3); };		
+		| arg 						{ ($$ = new List<Expr*>)->Append($1); }
+		| args ',' arg					{ ($$ = $1)->Append($3); };		
 epoch		: Variable_Name					{ $$ = new EpochValue(new Identifier(@1, $1), 0); } 
 		| Variable_Name '-' Integer			{ $$ = new EpochValue(new Identifier(@1, $1), $3); }; 
 id		: Variable_Name 				{ $$ = new Identifier(@1, $1); }
@@ -459,6 +464,21 @@ input		: S_Arguments ':' definitions			{ $$ = $3; };
 output		: S_Results ':' definitions			{ $$ = $3; };
 function_body	: S_Compute ':' code				{ $$ = $3; };				 
 					
+/* ----------------------------------------------- External Code Block ------------------------------------------------------ */
+extern_block	: Extern '{'
+		  Language String new_lines
+		  header_includes extern_links	
+		  Native_Code '}'				{ $$ = new ExternCodeBlock($4, $6, $7, $8, @1); };
+header_includes : 						{ $$ = NULL; EndFreeString(); }
+		| Header_Includes { BeginFreeString(); } 
+		  '{' includes '}' new_lines			{ $$ = $4; EndFreeString(); };
+includes	: String					{ ($$ = new List<const char*>)->Append($1); }
+		| includes ',' String				{ ($$ = $1)->Append($3); };
+extern_links	:						{ $$ = NULL; EndFreeString(); }
+		| Library_Links { BeginFreeString(); } 
+		  '{' library_links '}' new_lines 		{ $$ = $4; EndFreeString(); };
+library_links	: String					{ ($$ = new List<const char*>)->Append($1); }
+		| library_links ',' String			{ ($$ = $1)->Append($3); };
 		
 %%
 

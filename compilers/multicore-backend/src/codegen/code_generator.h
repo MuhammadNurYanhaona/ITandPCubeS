@@ -13,7 +13,8 @@ class EnvironmentLink;
 
 /* function definition to import common header files in generated code and write the namespace */
 void initializeOutputFiles(const char *headerFile, 
-		const char *programFile, const char *initials);
+		const char *programFile, 
+		const char *initials, TaskDef *taskDef);
 
 /* function definition for generating constants for total number of threads and threads per core  */
 void generateThreadCountConstants(const char *outputFile, 

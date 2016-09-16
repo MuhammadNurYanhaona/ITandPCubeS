@@ -55,6 +55,8 @@ namespace string_utils {
         // in <attribute> format
         List<const char*> *readAttributes(std::string &str);
 
+	// compute the union of two lists and assign the result to the first list
+        void combineLists(List<const char*> *list1, List<const char*> *list2);
 }
 
 #endif

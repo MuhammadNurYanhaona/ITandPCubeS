@@ -19,6 +19,7 @@ class MetaComputeStage;
 class FlowStage;
 class CompositeStage;
 class VariableAccess;
+class IncludesAndLinksMap;
 
 enum LinkageType { TypeCreate, TypeLink, TypeCreateIfNotLinked };
 
@@ -285,6 +286,10 @@ class TaskDef : public Definition {
 	TupleDef *envTuple;
 	TupleDef *partitionTuple; 
   public:
+	// This static reference to a task-definition is used to get to the task from anywhere during the
+        // backend code generation process.
+        static TaskDef *currentTask;
+
         TaskDef(Identifier *id, DefineSection *define, EnvironmentConfig *environment, 
 		InitializeInstr *initialize, ComputeSection *compute, PartitionSection *partition);
         
@@ -311,6 +316,10 @@ class TaskDef : public Definition {
 	// recursive compute+data flow form that is easier to handle for later phases of the compiler.
 	void analyseCode();
 	void print();
+	// As the name suggests, this function retrieves the header files to be included during compilation
+        // and libraries to linked during code generation for successful execution of all extern code bloks
+        // used within an IT task.
+        IncludesAndLinksMap *getExternBlocksHeadersAndLibraries();
 
 	// helper functions for back-end compilers
 	const char *getName() { return id->getName(); }

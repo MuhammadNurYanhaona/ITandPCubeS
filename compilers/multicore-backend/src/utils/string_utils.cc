@@ -187,3 +187,12 @@ List<const char*> *string_utils::readAttributes(std::string &str) {
         return attrList;
 }
 
+void string_utils::combineLists(List<const char*> *list1, List<const char*> *list2) {
+        for (int i = 0; i < list2->NumElements(); i++) {
+                const char *str = list2->Nth(i);
+                if (!string_utils::contains(list1, str)) {
+                        list1->Append(str);
+                }
+        }
+}
+

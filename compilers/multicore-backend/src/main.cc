@@ -73,6 +73,11 @@ int main(int argc, const char *argv[]) {
 	std::ostringstream coordProgramStr;
 	coordProgramStr << buildDir << buildSubDir << "/coordinator.cc";
 	const char *coordProgram = strdup(coordProgramStr.str().c_str());
+	// set up the output text file for any external library linking during native code
+        // compilation process
+        std::ostringstream linkageListerStr;
+        linkageListerStr << buildDir << buildSubDir << "/external_links.txt";
+        const char *linkageListerFile = strdup(linkageListerStr.str().c_str());
 	//***********************************************************************************
 
 
@@ -109,6 +114,9 @@ int main(int argc, const char *argv[]) {
 	TaskGenerator *firstTaskGenerator= NULL;
 	for (int i = 0; i < taskList->NumElements(); i++) {
 		TaskDef *taskDef = taskList->Nth(i);
+		// update the static reference to get to the task definition from anywhere 
+                // during code generation  
+                TaskDef::currentTask = taskDef;
 		// do static analysis of the task to determine what data structure has been 
 		// accessed in what LPS before code generation starts
 		taskDef->getComputation()->calculateLPSUsageStatistics();
@@ -129,5 +137,6 @@ int main(int argc, const char *argv[]) {
 	} else {
 		processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
 	}
+	ProgramDef::program->generateExternLibraryLinkInfo(linkageListerFile);
 }
 

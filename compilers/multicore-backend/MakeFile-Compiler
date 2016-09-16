@@ -26,6 +26,8 @@ YACC = bison
 #--------------------------------------------------------------------------------------------------
 # Set up the necessary flags for the tools
 #--------------------------------------------------------------------------------------------------
+# settings for debug mode code generation
+#CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
 # settings for optimized code generation
 CFLAGS = -O3
 
