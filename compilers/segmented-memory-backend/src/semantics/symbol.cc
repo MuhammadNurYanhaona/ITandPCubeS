@@ -7,7 +7,7 @@
 #include "string"
 #include "../utils/hashtable.h"
 
-//------------------------------------------ Symbol -----------------------------------------/
+//------------------------------------------------------------- Symbol -----------------------------------------------------------/
 
 Symbol::Symbol(const char *name, Node *node) {
         this->name = name;
@@ -21,16 +21,18 @@ void Symbol::describe(int indent) {
 	}
 }
 
-//------------------------------------- Variabel Symbol -------------------------------------/
+//--------------------------------------------------------- Variabel Symbol -----------------------------------------------------/
 
 VariableSymbol::VariableSymbol(VariableDef *def) : Symbol(def->getId()->getName(), def) {
 	id = def->getId();
 	type = def->getType();
+	reduction = false;
 }
 
 VariableSymbol::VariableSymbol(Identifier *id, Type *type, Node *node) : Symbol(id->getName(), node) {
 	this->id = id;
 	this->type = type;
+	reduction = false;
 }
 
 void VariableSymbol::describe(int indent) {
@@ -38,7 +40,7 @@ void VariableSymbol::describe(int indent) {
 	printf("Variable %s: %s\n", name, type->getName());
 }
 
-//---------------------------------------- Tuple Symbol -------------------------------------/
+//---------------------------------------------------------- Tuple Symbol ------------------------------------------------------/
 
 TupleSymbol::TupleSymbol(Identifier *id, TupleDef *def, List<Type*> *elementTypes) 
 		: Symbol(id->getName(), def) {
@@ -52,7 +54,7 @@ void TupleSymbol::describe(int indent) {
 
 TupleDef *TupleSymbol::getTupleDef() { return (TupleDef*) node; }
 
-//------------------------------------- Function Symbol -------------------------------------/
+//-------------------------------------------------------- Function Symbol -----------------------------------------------------/
 
 FunctionSymbol::FunctionSymbol(FunctionDef *def, TupleDef *returnType, List<Type*> *argumentTypes) 
 		: Symbol(def->getId()->getName(), def) {
@@ -65,7 +67,7 @@ void FunctionSymbol::describe(int indent) {
 	printf("Function %s:\n", name);
 }
 
-//--------------------------------------- Task Symbol ---------------------------------------/
+//---------------------------------------------------------- Task Symbol -------------------------------------------------------/
 
 void TaskSymbol::describe(int indent) {
 	Symbol::describe(indent);

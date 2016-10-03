@@ -9,12 +9,18 @@
 
 #include <sstream>
 
+enum ReductionOperator {        SUM, PRODUCT, MAX, MIN, AVG, MAX_ENTRY, MIN_ENTRY,      // numeric reductions
+                                LAND, LOR,                                              // logical reductions    
+                                BAND, BOR };                                            // bitwise reductions
+
 class Expr;
 class LogicalExpr;
 class ReductionExpr;
 class Space;
 class IndexScope;
-class IncludesAndLinksMap;	
+class IncludesAndLinksMap;
+class ReductionMetadata;
+class PartitionHierarchy;	
 
 class Stmt : public Node {
   public:
@@ -54,6 +60,10 @@ class Stmt : public Node {
 	// this function is used to recursively determine all the header file includes and library
 	// links for different extern code blocks present in an IT-task
 	virtual void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {}
+	// this function is used for discovering all reduction statements within a compute stage
+	virtual void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, 
+			Space *executingLps) {}
 
 	//-------------------------------------------------------------------------Code Generation Routines
 	// back end code generation routine; subclasses should provide appropriate 
@@ -81,6 +91,8 @@ class StmtBlock : public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
 	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, Space *executingLps); 
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -105,6 +117,8 @@ class ConditionalStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
 	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, Space *executingLps); 
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space);
@@ -129,6 +143,8 @@ class IfStmt: public Stmt {
 			TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
 	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, Space *executingLps); 
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -160,6 +176,8 @@ class IndexRangeCondition: public Node {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, Space *executingLps); 
 
 	//-------------------------------------------------------------------------Code Generation Routines
 	LogicalExpr *getRestrictions();
@@ -202,6 +220,8 @@ class LoopStmt: public Stmt {
 	virtual List<const char*> *getIndexNames() = 0;
 	virtual void analyseEpochDependencies(Space *space) { body->analyseEpochDependencies(space); }
 	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, Space *executingLps);
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	// a helper routine for code generation that declares variables in the scope
@@ -320,6 +340,8 @@ class WhileStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
 	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, Space *executingLps); 
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
@@ -344,6 +366,40 @@ class ExternCodeBlock: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 
+	//-------------------------------------------------------------------------Code Generation Routines
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+};
+
+// This class is for the new parallel reduction to be carried on by LPUs of descendant LPS whose 
+// result will be one reduced value for an ancestor LPS LPU.
+class ReductionStmt : public Stmt {
+  protected:
+	// The ID/Name of the LPS that is the root of a reduction; for each LPU in the LPS 
+	// designated by the ID there will be one reduction result
+        char spaceId;
+        // The task-global scalar variable that will have the result of the reduction
+        Identifier *resultVar;
+	// The reduction operation
+        ReductionOperator op;
+        // The array/vector expression that to be reduced 
+        Expr *right;
+  public:
+	ReductionStmt(char spaceId, Identifier *left, char *opName, Expr *right, yyltype loc);
+	
+	//-------------------------------------------------------------------------Syntex Analysis Routines	
+        const char *GetPrintNameForNode() { return "ReductionStatement"; }
+        void PrintChildren(int indentLevel);	
+	
+	//-----------------------------------------------------------------------Semantic Analysis Routines	
+	void performTypeInference(Scope *executionScope);
+	void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
+	
+	//-------------------------------------------------------------------------Static Analysis Routines	
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	void analyseEpochDependencies(Space *space);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
+			PartitionHierarchy *lpsHierarchy, Space *executingLps); 
+	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };

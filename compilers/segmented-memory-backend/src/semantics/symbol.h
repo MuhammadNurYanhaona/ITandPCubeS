@@ -67,12 +67,17 @@ class VariableSymbol : public Symbol {
   protected:
 	Identifier *id;
 	Type *type;
+
+	// this indicates if the symbol is the result variable for some reduction operation
+	bool reduction;
   public:
 	VariableSymbol(VariableDef *def);
         VariableSymbol(const char *name, Type *type) : Symbol(name, type) { this->type = type; }
 	VariableSymbol(Identifier *id, Type *type, Node *node);	
 	void setType(Type *type) { this->type = type; }
-	Type *getType() { return type; }	
+	Type *getType() { return type; }
+	void flagAsReduction() { reduction = true; }	
+	bool isReduction() { return reduction; }
         void describe(int indent);
 };
 

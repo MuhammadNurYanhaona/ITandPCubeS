@@ -20,6 +20,7 @@ class ReportError
   	static void TypeInferenceError(Identifier *id, bool suppressFailure);
   	static void UndeclaredTypeError(Identifier *variable, Type *type, const char *prefix, bool suppressFailure);
 	static void ConflictingDefinition(Identifier *id, bool suppressFailure);
+	static void NotReductionType(Identifier *id, bool suppressFailure);
 	static void InferredAndActualTypeMismatch(yyltype *loc, Type *inferred, Type *actual, bool suppressFailure);
 	static void UnknownExpressionType(Expr *expr, bool suppressFailure);
 	static void UnsupportedOperand(Expr *expr, Type *type, const char *operation, bool suppressFailure);

@@ -107,6 +107,7 @@ Index			return T_Index;
 Range			return T_Range;
 Array			return T_Array;
 List			return T_List;
+Reduction		return Reduction;
 
 [0-9]+D			{
 				int length = strlen(yytext);

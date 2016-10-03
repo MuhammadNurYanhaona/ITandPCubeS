@@ -33,9 +33,16 @@ class VariableDef : public Definition {
   protected:
         Identifier *id;
         Type *type;
+
+	// This indicates if the current variable is meant to be used as the result of some reduction
+	// operation. If YES then the storage and access of this variables need a different treatment
+	// from other task-global variables.  
+	bool reduction;
   public:
         VariableDef(Identifier *id, Type *type);
         VariableDef(Identifier *id);
+	void flagAsReduction() { this->reduction = true; }
+	bool isReduction() { return reduction; }
 	const char *GetPrintNameForNode() { return "Variable"; } 
 	static List<VariableDef*> *DecomposeDefs(List<Identifier*> *idList, Type *type);
         void PrintChildren(int indentLevel);

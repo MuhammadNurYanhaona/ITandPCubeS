@@ -21,12 +21,14 @@ VariableDef::VariableDef(Identifier *i, Type *t) : Definition(*i->GetLocation())
 	id = i; type = t;
 	id->SetParent(this);
 	type->SetParent(this);
+	reduction = false;
 }
 
 VariableDef::VariableDef(Identifier *i) : Definition(*i->GetLocation()) {
 	Assert(i != NULL);
 	id = i; type = NULL;
 	id->SetParent(this);
+	reduction = false;
 }
 
 void VariableDef::PrintChildren(int indentLevel) {

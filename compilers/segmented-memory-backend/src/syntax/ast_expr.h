@@ -13,11 +13,11 @@
 
 #include <sstream>
 
-enum ArithmaticOperator {      ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS, 
-                               LEFT_SHIFT, RIGHT_SHIFT, POWER, 
-                               BITWISE_AND, BITWISE_XOR, BITWISE_OR};
-enum LogicalOperator {         AND, OR, NOT, EQ, NE, GT, LT, GTE, LTE };
-enum ReductionOperator {       SUM, PRODUCT, MAX, MIN, AVG, MAX_ENTRY, MIN_ENTRY };
+enum ArithmaticOperator {      	ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS, 
+                               	LEFT_SHIFT, RIGHT_SHIFT, POWER, 
+                               	BITWISE_AND, BITWISE_XOR, BITWISE_OR};
+
+enum LogicalOperator {		AND, OR, NOT, EQ, NE, GT, LT, GTE, LTE };
 
 class TaskDef;
 class FieldAccess;
@@ -257,6 +257,7 @@ class LogicalExpr : public Expr {
 			bool normalizedToMinOfRange, bool lowerBound);
 };
 
+// This is the class for old sequential reductions on upper LPSes that we have been supporting since the beginning.
 class ReductionExpr : public Expr {
   protected:
 	ReductionOperator op;
@@ -265,7 +266,7 @@ class ReductionExpr : public Expr {
 	LoopStmt *reductionLoop;
   public:
 	ReductionExpr(char *opName, Expr *right, yyltype loc);
-	const char *GetPrintNameForNode() { return "ReductionExpr"; }
+	const char *GetPrintNameForNode() { return "SequentialReductionExpr"; }
     	void PrintChildren(int indentLevel);
 
 	//--------------------------------------------------------------------------------------for semantic analysis	    	

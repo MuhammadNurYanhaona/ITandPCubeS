@@ -234,6 +234,13 @@ void CompositeStage::performEpochUsageAnalysis() {
 	}
 }
 
+void CompositeStage::populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+		stage->populateReductionMetadata(lpsHierarchy);
+	}
+}
+
 void CompositeStage::reorganizeDynamicStages() {
 	
 	int currentStageIndex = 0;

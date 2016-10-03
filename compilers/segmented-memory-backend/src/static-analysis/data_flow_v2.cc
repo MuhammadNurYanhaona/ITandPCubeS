@@ -36,6 +36,7 @@ FlowStage::FlowStage(int index, Space *space, Expr *executeCond) {
 	syncDependencies = new StageSyncDependencies(this);
 	this->parent = NULL;
 	this->epochDependentVarList = new List<const char*>;
+	this->nestedReductions = new List<ReductionMetadata*>;
 }
 
 void FlowStage::mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap) {
@@ -548,6 +549,10 @@ void ExecutionStage::setCode(List<Stmt*> *stmtList) {
 void ExecutionStage::performEpochUsageAnalysis() {
 	FlowStage::CurrentFlowStage = this;
 	code->analyseEpochDependencies(space);
+}
+
+void ExecutionStage::populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {
+	code->extractReductionInfo(nestedReductions, lpsHierarchy, space);
 }
 
 void ExecutionStage::print(int indent) {

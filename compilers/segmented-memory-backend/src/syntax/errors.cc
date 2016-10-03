@@ -76,6 +76,11 @@ void ReportError::ConflictingDefinition(Identifier *id, bool suppressFailure) {
 			"'%s' already declared in this scope", id->getName());
 }
 
+void ReportError::NotReductionType(Identifier *id, bool suppressFailure) {
+	OptionalErrorReport(id->GetLocation(), suppressFailure,
+			"'%s' is not a task-global Reduction variable", id->getName());
+}
+
 void ReportError::InferredAndActualTypeMismatch(yyltype *loc, Type *inferred, 
 		Type *actual, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure,

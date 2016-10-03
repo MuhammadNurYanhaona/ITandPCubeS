@@ -53,6 +53,32 @@ enum SyncMode { Load, Load_And_Configure, Ghost_Region_Update, Restore };
 */
 enum RepeatCycleType { Subpartition_Repeat, Conditional_Repeat };
 
+/*	If a Execution-Stage has a reduction operation then some setup and tear down of auxiliary variables need to be
+	done by the surrounding Compound-Stage before and after of the former stage. Furthermore, any synchronization
+	and/or communication also needs to be applied by the Compound-Stage. This class holds information regarding a
+	reduction that are extracted by analyzing the Execution-Stages so that the aforementioned actions can be taken
+	properly.  
+*/
+class ReductionMetadata {
+  protected:
+	const char *resultVar;
+	ReductionOperator opCode;
+	Space *reductionRootLps;
+	Space *reductionExecutorLps;
+  public:
+	ReductionMetadata(const char *resultVar, 
+			ReductionOperator opCode, 
+			Space *reductionRootLps, 
+			Space *reductionExecutorLps) {
+		this->resultVar = resultVar;
+		this->opCode = opCode;
+		this->reductionRootLps = reductionRootLps;
+		this->reductionExecutorLps = reductionExecutorLps;
+	}
+	const char *getResultVar() { return resultVar; }
+	ReductionOperator getOpCode() { return opCode; }		
+};
+
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
 	easier to reason with for later part of the compiler. 
@@ -81,6 +107,11 @@ class FlowStage {
 	// this flow stage. This information is later used to advance appropriate data structures' epoch version after
 	// the execution of the flow stage.
 	List<const char*> *epochDependentVarList;
+
+	// This list is useful primarily to Composite-Stages for doing resources setup and tear down for any reduction
+	// found in nested execution stages. Regardless, the list has been placed in the generic Flow-Stage class to
+	// populate the list by recursively traversing Execution-Stages inside those Composite Stages.
+	List<ReductionMetadata*> *nestedReductions;
   public:
 	// a static reference to be used, if needed, during analysis the content of a flow stage to find out the stage
 	// confining the locus of analysis; currently this has been used for epoch dependency analysis only
@@ -219,6 +250,17 @@ class FlowStage {
 	// for external code blocks present in the class. This header files and library links are applied during
 	// compilation and linkage of the generated code.	
 	virtual void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {}
+
+	// These three auxiliary functions are needed to all process parallel reductions found in the computation
+	// flow of a task. The first function 'populateReductionMetadata' investigates the statements of Execution
+	// stages and discover any reductions in them. The second function 'setupReductionBoundaryStages()' breaks
+	// the computation flow of the task so that each Execution-Stage with a reduction is within an explicit
+	// Composite Stage boundary that runs in the LPS that is the root of the reduction. The third and the last
+	// function 'extractAllReductionInfo' lists all reductions of a task so that proper memory management 
+	// decisions can be made regarding the reduction result variables. 
+	virtual void populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {}
+	virtual void setupReductionBoundaryStages() {}
+	virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {}
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis. These 
@@ -265,6 +307,7 @@ class ExecutionStage : public FlowStage {
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
 	void performEpochUsageAnalysis();
+	void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
 	void print(int indent);
 
 	// helper method for generating back-end code
@@ -313,6 +356,7 @@ class CompositeStage : public FlowStage {
 	virtual void print(int indent);
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	virtual void performEpochUsageAnalysis();
+	void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
 	void reorganizeDynamicStages();
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
 	virtual void prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);

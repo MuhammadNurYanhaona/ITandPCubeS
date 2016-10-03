@@ -20,7 +20,7 @@
 #include <sstream>
 #include <cstdlib>
 
-//----------------------------------------------- Reduction Expression ------------------------------------------------/
+//--------------------------------------------------- Old Sequential Reduction Expression ------------------------------------------------/
 
 ReductionExpr::ReductionExpr(char *o, Expr *r, yyltype loc) : Expr(loc) {
 	Assert(r != NULL && o != NULL);
@@ -264,4 +264,3 @@ void ReductionExpr::finalizeReduction(std::ostringstream &stream, int indentLeve
 		stream << indent.str() << "Avg = Avg / Count" << stmtSeparator;
 	}
 }
-

@@ -75,6 +75,11 @@ void LoopStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAnd
 	body->retrieveExternHeaderAndLibraries(includesAndLinksMap);
 }
 
+void LoopStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+		PartitionHierarchy *lpsHierarchy, Space *executingLps) {
+	body->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
+}
+
 void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLevel) { 
 	scope->declareVariables(stream, indentLevel);	
 }
@@ -329,6 +334,15 @@ void StmtBlock::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAn
 		stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);
 	}
 }
+
+void StmtBlock::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+		PartitionHierarchy *lpsHierarchy, 
+		Space *executingLps) {
+	for (int i = 0; i < stmts->NumElements(); i++) {
+                Stmt *stmt = stmts->Nth(i);
+		stmt->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
+	}
+}
 	
 //-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
@@ -404,6 +418,12 @@ void ConditionalStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *incl
 	stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);
 }
 
+void ConditionalStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+		PartitionHierarchy *lpsHierarchy, 
+		Space *executingLps) {
+	stmt->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
+}
+
 IfStmt::IfStmt(List<ConditionalStmt*> *ib, yyltype loc) : Stmt(loc) {
 	Assert(ib != NULL);
 	ifBlocks = ib;
@@ -458,6 +478,15 @@ void IfStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLi
 	for (int i = 0; i < ifBlocks->NumElements(); i++) {
 		ConditionalStmt *stmt = ifBlocks->Nth(i);
 		stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);	
+	}
+}
+
+void IfStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+		PartitionHierarchy *lpsHierarchy, 
+		Space *executingLps) {
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+		stmt->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
 	}
 }
 
@@ -984,6 +1013,12 @@ void WhileStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAn
 	body->retrieveExternHeaderAndLibraries(includesAndLinksMap);
 }
 
+void WhileStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+		PartitionHierarchy *lpsHierarchy, 
+		Space *executingLps) {
+	body->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
+}
+
 void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 	for (int i = 0; i < indentLevel; i++) stream << '\t';
 	stream << "do {\n";
@@ -1111,4 +1146,119 @@ void ExternCodeBlock::generateCode(std::ostringstream &stream, int indentLevel, 
 
 	// end the scope for the external code block
 	stream << earlyIndents << "} // ending scope for the external code block\n\n";
+}
+
+//--------------------------------------------------------- Reduction Statement --------------------------------------------------------/
+
+ReductionStmt::ReductionStmt(char s, Identifier *l, char *o, Expr *r, yyltype loc) : Stmt(loc) {
+
+        Assert(l != NULL && r != NULL && o != NULL);
+
+        spaceId = s;
+        resultVar = l;
+        resultVar->SetParent(this);
+
+        if (strcmp(o, "sum") == 0) op = SUM;
+        else if (strcmp(o, "product") == 0) op = PRODUCT;
+        else if (strcmp(o, "max") == 0) op = MAX;
+        else if (strcmp(o, "maxEntry") == 0) op = MAX_ENTRY;
+        else if (strcmp(o, "min") == 0) op = MIN;
+        else if (strcmp(o, "minEntry") == 0) op = MIN_ENTRY;
+        else if (strcmp(o, "avg") == 0) op = AVG;
+        else if (strcmp(o, "land") == 0) op = LAND;
+        else if (strcmp(o, "lor") == 0) op = LOR;
+        else if (strcmp(o, "band") == 0) op = BAND;
+        else if (strcmp(o, "bor") == 0) op = BOR;
+        else {
+                std::cout << "Currently the compiler does not support user defined reduction functions";
+                Assert(0 == 1);
+        }
+
+        right = r;
+        right->SetParent(this);
+}
+
+void ReductionStmt::PrintChildren(int indentLevel) {
+	resultVar->Print(indentLevel + 1);
+        PrintLabel(indentLevel + 1, "Operator");
+        switch (op) {
+                case SUM: printf("Sum"); break;
+                case PRODUCT: printf("Product"); break;
+                case MAX: printf("Maximum"); break;
+                case MIN: printf("Minimum"); break;
+                case AVG: printf("Average"); break;
+                case MIN_ENTRY: printf("Minimum Entry"); break;
+                case MAX_ENTRY: printf("Maximum Entry"); break;
+                case LOR: printf("Logical OR"); break;
+                case LAND: printf("Logical AND"); break;
+                case BOR: printf("Bitwise OR"); break;
+                case BAND: printf("Bitwise AND"); break;
+        }
+        right->Print(indentLevel + 1);
+}
+
+void ReductionStmt::performTypeInference(Scope *executionScope) {
+
+	if (op == MIN_ENTRY || op == MAX_ENTRY) {
+                right->inferType(executionScope, Type::intType);
+        } else if (op == LOR || op == LAND) {
+                right->inferType(executionScope, Type::boolType);
+        } else {
+		Symbol *symbol = executionScope->lookup(resultVar->getName());
+		VariableSymbol *varSym = dynamic_cast<VariableSymbol*>(symbol);
+		if (symbol == NULL || varSym == NULL) {
+			Type *resultType = varSym->getType();
+			right->inferType(executionScope, resultType);
+		}
+	}	
+}
+
+void ReductionStmt::checkSemantics(Scope *executionScope, bool ignoreTypeFailures) {
+	
+	Symbol *symbol = executionScope->lookup(resultVar->getName());
+        VariableSymbol *varSym = dynamic_cast<VariableSymbol*>(symbol);
+        if (symbol == NULL || varSym == NULL) {
+                ReportError::UndefinedSymbol(resultVar, ignoreTypeFailures);
+        } else {
+                if (!varSym->isReduction()) {
+                        ReportError::NotReductionType(resultVar, ignoreTypeFailures);
+                }
+        }
+	right->checkSemantics(executionScope, ignoreTypeFailures);
+}
+
+Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+	
+	Hashtable<VariableAccess*> *table = Stmt::getAccessedGlobalVariables(NULL);
+	
+	const char *resultName = resultVar->getName();
+        VariableAccess *accessLog = new VariableAccess(resultName);
+        accessLog->markContentAccess();
+        accessLog->getContentAccessFlags()->flagAsReduced();
+        table->Enter(resultName, accessLog, true);
+	
+	mergeAccessedVariables(table, right->getAccessedGlobalVariables(globalReferences));
+
+	return table;
+	
+}
+        
+void ReductionStmt::analyseEpochDependencies(Space *space) {
+	right->analyseEpochDependencies(space);
+}
+
+void ReductionStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+		PartitionHierarchy *lpsHierarchy, 
+		Space *executingLps) {
+
+	Space *reductionRootLps = lpsHierarchy->getSpace(spaceId);
+	ReductionMetadata *metadata = new ReductionMetadata(resultVar->getName(), 
+			op, reductionRootLps, executingLps);
+	infoSet->Append(metadata);	
+}
+
+void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	std::ostringstream indents;
+	for (int i = 0; i < indentLevel; i++) indents << indent;
+	stream << indents.str() << "// this is a reduction statement\n";
 }

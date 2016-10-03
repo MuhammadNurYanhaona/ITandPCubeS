@@ -98,7 +98,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %token Program Tuple Task Function New Execute
 %token S_Define S_Environment S_Initialize S_Compute S_Partition S_Arguments S_Results
 %token T_Integer T_Character T_Real T_Boolean T_Epoch T_Index T_Range T_Array T_List
-%token Single Double Format
+%token Single Double Format Reduction
 %token T_Space
 %token Activate For If Repeat Else From In Step Foreach Range Local Index
 %token C_Sub_Partition While Do Sequence To Of
@@ -148,13 +148,13 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <exprList>	args
 %type <objInitArg>	obj_arg
 %type <objInitArgList>	obj_args	
-%type <type>		type scalar_type static_array static_type dynamic_type list dynamic_array
+%type <type>		numeric_type scalar_type static_array static_type dynamic_type list dynamic_array
 %type <intList>		static_dims
 %type <id>		id section
 %type <epoch>		epoch
 %type <invokeArgs>	optional_sec
 %type <invokeArgsList> 	optional_secs
-%type <stmt>		stmt parallel_loop sequencial_loop if_else_block extern_block
+%type <stmt>		stmt parallel_loop sequencial_loop if_else_block extern_block reduction
 %type <stmtList>	stmt_block code meta_code function_body
 %type <condStmtList>	else_block
 %type <condStmt>	else else_if
@@ -209,14 +209,15 @@ element_def	: names ':' static_type				{ $$ = VariableDef::DecomposeDefs($1, $3)
 names		: Variable_Name					{ ($$ = new List<Identifier*>)->Append(new Identifier(@1, $1)); }
 		| names ',' Variable_Name			{ ($$ = $1)->Append(new Identifier(@3, $3)); };
 static_type	: scalar_type | static_array			;
-scalar_type	: T_Integer					{ $$ = Type::intType; }
-		| T_Real Single					{ $$ = Type::floatType; }
-		| T_Real Double					{ $$ = Type::doubleType; }
-		| T_Character					{ $$ = Type::charType; }
-		| T_Boolean					{ $$ = Type::boolType; }
+scalar_type	: numeric_type					{ $$ = $1; }
 		| T_Epoch					{ $$ = Type::epochType; }
 		| T_Range					{ $$ = Type::rangeType; }
 		| Type_Name					{ $$ = new NamedType(new Identifier(@1, $1)); };
+numeric_type	: T_Integer					{ $$ = Type::intType; }
+		| T_Real Single					{ $$ = Type::floatType; }
+		| T_Real Double					{ $$ = Type::doubleType; }
+		| T_Character					{ $$ = Type::charType; }
+		| T_Boolean					{ $$ = Type::boolType; };
 static_array	: T_Array static_dims 
 		  Of scalar_type				{ StaticArrayType *sa = new StaticArrayType(@1, $4, $2->NumElements());
 								  sa->setLengths($2); 
@@ -235,8 +236,12 @@ task 		: Task String ':' define environment
 define		: S_Define ':' definitions			{ $$ = $3; };
 definitions	: definition					{ ($$ = new List<VariableDef*>)->AppendAll($1); }
 		| definitions definition			{ ($$ = $1)->AppendAll($2); };
-definition	: names ':' type				{ $$ = VariableDef::DecomposeDefs($1, $3); };
-type		: static_type | dynamic_type			;
+definition	: names ':' dynamic_type			{ $$ = VariableDef::DecomposeDefs($1, $3); }
+		| names ':' static_type				{ $$ = VariableDef::DecomposeDefs($1, $3); }
+		| names ':' numeric_type Reduction		{ $$ = VariableDef::DecomposeDefs($1, $3);
+								  for (int i = 0; i < $$->NumElements(); i++) { 
+								  	$$->Nth(i)->flagAsReduction();
+								  } };
 dynamic_type	: list | dynamic_array				;
 list		: T_List Of static_type				{ $$ = new ListType(@1, $3); };
 dynamic_array	: Dimensionality T_Array Of 
@@ -342,8 +347,12 @@ new_lines	: New_Line | New_Line new_lines			;
 stmt		: parallel_loop 
 		| sequencial_loop
 		| if_else_block
-		| extern_block					 	 				
+		| extern_block
+		| reduction					 	 				
 		| expr						{ $$ = $1; };
+reduction	: T_Space Space_ID 
+                        ':' Variable_Name '=' 
+                        REDUCE '(' String ',' expr ')'          { $$ = new ReductionStmt($2, new Identifier(@4, $4), $8, $10, Join(@1, @11)); }	
 sequencial_loop : Do In Sequence '{' stmt_block '}'
                 For id In sloop_attr                            { $$ = new SLoopStmt($8, $10, new StmtBlock($5), @1); };
 sloop_attr      : field step_expr                               { $$ = new SLoopAttribute($1, $2, NULL); }

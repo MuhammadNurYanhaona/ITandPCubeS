@@ -67,6 +67,9 @@ void TaskDef::attachScope(Scope *parentScope) {
                 VariableDef *var = varList->Nth(i);
                 VariableSymbol *varSym = new VariableSymbol(var);
                 scope->insert_symbol(varSym);
+		if (var->isReduction()) {
+			varSym->flagAsReduction();
+		}
         }
 
 	// create the environment scope and at the same time a tuple for it
