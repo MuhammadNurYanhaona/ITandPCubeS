@@ -214,6 +214,12 @@ void ReportError::ReductionOutsideForLoop(yyltype *loc, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, "Reduction expression must be within an encompassing loop statement");
 }
 
+void ReportError::ReductionRangeInvalid(yyltype *loc, const char *rdRootLps, const char *rdBoundaryLps, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, 
+			"The root LPS of the reduction, Space %s, is situated above the encircling LPS, Space %s", 
+			rdRootLps, rdBoundaryLps);
+}
+
 void ReportError::NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, "'%s' is not an environment type", type->getName());
 }

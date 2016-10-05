@@ -45,6 +45,7 @@ class ReportError
 	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	
 	static void CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure);	
 	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);
+	static void ReductionRangeInvalid(yyltype *loc, const char *rdRootLps, const char *rdBoundaryLps, bool suppressFailure);
 	static void NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure);
 	static void NotAConstant(yyltype *loc, const char *constType, bool suppressFailure);
 	

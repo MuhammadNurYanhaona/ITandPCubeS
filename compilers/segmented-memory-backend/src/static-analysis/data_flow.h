@@ -5,6 +5,7 @@
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
 #include "../syntax/ast_task.h"
+#include "../syntax/location.h"
 #include "../semantics/task_space.h"
 #include "../semantics/scope.h"
 #include "../utils/hashtable.h"
@@ -65,18 +66,25 @@ class ReductionMetadata {
 	ReductionOperator opCode;
 	Space *reductionRootLps;
 	Space *reductionExecutorLps;
+	
+	// this attribute is only needed for error reporting on invalid reduction operations
+	yyltype *location;
   public:
 	ReductionMetadata(const char *resultVar, 
 			ReductionOperator opCode, 
 			Space *reductionRootLps, 
-			Space *reductionExecutorLps) {
+			Space *reductionExecutorLps, yyltype *location) {
 		this->resultVar = resultVar;
 		this->opCode = opCode;
 		this->reductionRootLps = reductionRootLps;
 		this->reductionExecutorLps = reductionExecutorLps;
+		this->location = location;
 	}
 	const char *getResultVar() { return resultVar; }
-	ReductionOperator getOpCode() { return opCode; }		
+	ReductionOperator getOpCode() { return opCode; }
+	Space *getReductionRootLps() { return reductionRootLps; }
+	Space *getReductionExecutorLps() { return reductionExecutorLps; }
+	yyltype *getLocation() { return location; }		
 };
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
@@ -133,6 +141,8 @@ class FlowStage {
 	List<const char*> *getEpochDependentVarList() { return epochDependentVarList; }
 	Hashtable<VariableAccess*> *getAccessMap() { return accessMap; }
 	void setAccessMap(Hashtable<VariableAccess*> *accessMap) { this->accessMap = accessMap; }
+	bool hasNestedReductions() { return (nestedReductions != NULL && nestedReductions->NumElements() > 0); }
+	List<ReductionMetadata*> *getNestedReductions() { return nestedReductions; }
 	void mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap);
 	void addAccessInfo(VariableAccess *accessLog);
 	Hashtable<VariableAccess*> *getAccessLogsForSpaceInIndexLimit(Space *space, 
@@ -251,16 +261,13 @@ class FlowStage {
 	// compilation and linkage of the generated code.	
 	virtual void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {}
 
-	// These three auxiliary functions are needed to all process parallel reductions found in the computation
+	// These two auxiliary functions are needed to all process parallel reductions found in the computation
 	// flow of a task. The first function 'populateReductionMetadata' investigates the statements of Execution
-	// stages and discover any reductions in them. The second function 'setupReductionBoundaryStages()' breaks
-	// the computation flow of the task so that each Execution-Stage with a reduction is within an explicit
-	// Composite Stage boundary that runs in the LPS that is the root of the reduction. The third and the last
-	// function 'extractAllReductionInfo' lists all reductions of a task so that proper memory management 
-	// decisions can be made regarding the reduction result variables. 
+	// stages and discover any reductions in them. The second function 'extractAllReductionInfo' lists all 
+	// reductions of a task so that proper memory management decisions can be made regarding the reduction result 
+	// variables. 
 	virtual void populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {}
-	virtual void setupReductionBoundaryStages() {}
-	virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {}
+	virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis. These 
@@ -339,9 +346,16 @@ class ExecutionStage : public FlowStage {
 class CompositeStage : public FlowStage {
   protected:
 	List<FlowStage*> *stageList;
+	
+	// A TRUE value for this boolean flag indicates that the current composite stage is a compiler introduced
+	// reduction boundary stage. If that is the case, execution of its nested stages should be surrounded by 
+	// result variable and execution resource setup at the beginning and parallel reduction execution at the end. 
+	bool reductionBoundary;
   public:
 	CompositeStage(int index, Space *space, Expr *executeCond);
 	virtual ~CompositeStage() {}
+	void flagAsReductionBoundary() { reductionBoundary = true; }
+	bool isReductionBoundary() { return reductionBoundary; }
 	void addStageAtBeginning(FlowStage *stage);
 	void addStageAtEnd(FlowStage *stage);
 	void insertStageAt(int index, FlowStage *stage);
@@ -357,6 +371,7 @@ class CompositeStage : public FlowStage {
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	virtual void performEpochUsageAnalysis();
 	void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
+	void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);
 	void reorganizeDynamicStages();
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
 	virtual void prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);
@@ -385,6 +400,15 @@ class CompositeStage : public FlowStage {
 	// synchronization needs of nested stages along with their synchronization dependencies are set properly.
 	// So this is the last method to envoke in the process of resolving synchronization.
 	void analyzeSynchronizationNeedsForComposites();
+
+	// This function breaks the computation flow of the task so that each Execution-Stage with a reduction is 
+	// within an explicit Composite Stage boundary that runs in the LPS that is the root LPS of the reduction.
+	// The current implementation (Dated Oct 2016) of this function is not the ideal implementation. We needed
+	// a quick implementation to make some parallel reduction to work; therefore we have this. This assumes 
+	// that the original computation flow of the task does not have decorative composite stages. Furthermore,
+	// it does not do any validation to make sure that the result of a reduction wont be read before it is 
+	// ready. 
+	void setupReductionBoundaryStages(PartitionHierarchy *lpsHierarchy);
 	
 	void printSyncRequirements(int indentLevel);
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);

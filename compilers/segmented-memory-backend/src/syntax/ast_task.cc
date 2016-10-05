@@ -226,6 +226,13 @@ void TaskDef::analyseCode() {
 	for (int i = 0; i < syncStagesForStaleLpses->NumElements(); i++) {
 		computation->addStageAtEnd(syncStagesForStaleLpses->Nth(i));
 	}
+
+	//------------------------------------------------------------- Flow Expansion for Reductions
+	// generate metadata about reduction statements found in the computation 
+	computation->populateReductionMetadata(hierarchy);
+	// augment the computation fow with new reduction boundary stages to carry out 
+	// initialization and termination of reduction
+	computation->setupReductionBoundaryStages(hierarchy);
 	
 	//------------------------------------------------------------------ Data Dependency Analysis
 	// assign stages stage, group, and nesting indexes to aid latter analysis

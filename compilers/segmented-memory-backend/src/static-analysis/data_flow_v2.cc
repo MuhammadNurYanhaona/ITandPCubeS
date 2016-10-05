@@ -403,6 +403,12 @@ List<CommunicationCharacteristics*> *FlowStage::getCommCharacteristicsForSyncReq
 	return commCharList;
 }
 
+void FlowStage::extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {
+	if (nestedReductions != NULL) {
+		reductionInfos->AppendAll(nestedReductions);
+	}
+}
+
 //-------------------------------------------------- Sync Stage ---------------------------------------------------------/
 
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(0, space, NULL) {

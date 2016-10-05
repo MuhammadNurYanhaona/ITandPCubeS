@@ -4,6 +4,7 @@
 #include "ast_expr.h"
 #include "ast_def.h"
 #include "ast_task.h"
+#include "location.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
 #include "../semantics/task_space.h"
@@ -1253,7 +1254,7 @@ void ReductionStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
 
 	Space *reductionRootLps = lpsHierarchy->getSpace(spaceId);
 	ReductionMetadata *metadata = new ReductionMetadata(resultVar->getName(), 
-			op, reductionRootLps, executingLps);
+			op, reductionRootLps, executingLps, GetLocation());
 	infoSet->Append(metadata);	
 }
 
