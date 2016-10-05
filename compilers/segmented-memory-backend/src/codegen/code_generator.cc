@@ -547,7 +547,8 @@ void generateFnForThreadIdsAdjustment(const char *headerFileName,
 	programFile.close();
 }
 
-void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot) {
+void generateLpuDataStructures(const char *outputFile, 
+		MappingNode *mappingRoot, List<ReductionMetadata*> *reductionInfos) {
        
 	std::cout << "Generating data structures for LPUs\n";
  
@@ -601,12 +602,35 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 			programFile << array->getName() << "PartDims[" << array->getDimensionality() << "]";
 			programFile << stmtSeparator;	
 		}
+
+		// check what reduction result variables the LPU has access to
+		List<const char*> *reductionResults = new List<const char*>;
+		for (int i = 0; i < reductionInfos->NumElements(); i++) {
+			ReductionMetadata *reduction = reductionInfos->Nth(i);
+			Space *redRootLps = reduction->getReductionRootLps();
+			// a reduction result variable as accessible at and below of the LPS set as the root of reduciton
+			// range.
+			if (redRootLps == lps || lps->isParentSpace(redRootLps)) {
+				reductionResults->Append(reduction->getResultVar());
+			}
+		}
+
+		// create scalar pointer properties of appropriate types for the reduction results
+		for (int i = 0; i < reductionResults->NumElements(); i++) {
+			const char *varName = reductionResults->Nth(i);
+			DataStructure *varDef = lps->getStructure(varName);
+			Type *dataType = varDef->getType();
+			programFile << indent << dataType->getCppDeclaration(varName, true);
+			programFile << stmtSeparator;
+		}	
+		
 		// add a specific lpu_id static array with dimensionality equals to the dimensions of the LPS
 		if (lps->getDimensionCount() > 0) {
 			programFile << indent << "int lpuId[";
 			programFile << lps->getDimensionCount() << "]";
 			programFile << stmtSeparator;
 		}
+
 		// define a print function for the LPU
 		programFile << std::endl;
 		programFile << indent << "void print(std::ofstream &stream, int indent)" << stmtSeparator;	
@@ -616,7 +640,9 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 	programFile.close();
 }
 
-void generatePrintFnForLpuDataStructures(const char *initials, const char *outputFile, MappingNode *mappingRoot) {
+void generatePrintFnForLpuDataStructures(const char *initials, 
+		const char *outputFile, 
+		MappingNode *mappingRoot, List<ReductionMetadata*> *reductionInfos) {
 
 	std::cout << "Generating print functions for LPUs\n";
 	
@@ -660,7 +686,21 @@ void generatePrintFnForLpuDataStructures(const char *initials, const char *outpu
 				programFile  << "].print(stream, indentLevel + 1)";
 				programFile << stmtSeparator;
 			}
+			
 		}
+		for (int i = 0; i < reductionInfos->NumElements(); i++) {
+			ReductionMetadata *reduction = reductionInfos->Nth(i);
+			Space *redRootLps = reduction->getReductionRootLps();
+			if (redRootLps == lps || lps->isParentSpace(redRootLps)) {
+				programFile << indent << "for (int i = 0; i < indentLevel; i++) ";
+				programFile << "stream << '\\t'" << stmtSeparator;
+				const char *resultVar = reduction->getResultVar();
+				programFile << indent << "stream << \"" << resultVar << ": \"";
+				programFile << " << *" << resultVar << " << std::endl";
+				programFile << stmtSeparator;
+			}
+		}
+
 		programFile << indent << "stream.flush()" << stmtSeparator;
 		programFile << "}\n";
 	}

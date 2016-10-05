@@ -10,6 +10,7 @@ class Space;
 class MappingNode;
 class PPS_Definition;
 class EnvironmentLink;
+class ReductionMetadata;
 
 /* function definition to import common header files in generated code and write the namespace */
 void initializeOutputFiles(const char *headerFile, 
@@ -56,19 +57,22 @@ void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials
 		List<const char*> *externalLinks);
 
 /* function definition to generate data structures representing LPUs of different LPSes */
-void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot);
+void generateLpuDataStructures(const char *outputFile, 
+		MappingNode *mappingRoot, 
+		List<ReductionMetadata*> *reductionInfos);
 
 /* function definition to generate print functions for LPUs of different LPSes */
 void generatePrintFnForLpuDataStructures(const char *initials, 
-		const char *outputFile, MappingNode *mappingRoot);
+		const char *outputFile, MappingNode *mappingRoot, 
+		List<ReductionMetadata*> *reductionInfos);
 
 /* function definition to generate classes for all tuple definitions found in the source code */
 void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefList);
 
 /* function definition to generate classes for storing task global and thread local variables */
 void generateClassesForGlobalScalars(const char *filePath, 
-			List<TaskGlobalScalar*> *globalList,
-			Space *rootLps);
+		List<TaskGlobalScalar*> *globalList,
+		Space *rootLps);
 
 /* function definition to translate the initialize block of a task if exists */
 void generateInitializeFunction(const char *headerFile, 

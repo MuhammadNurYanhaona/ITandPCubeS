@@ -32,13 +32,17 @@ List<TaskGlobalScalar*> *TaskGlobalCalculator::calculateTaskGlobals(TaskDef *tas
 		ArrayType *array = dynamic_cast<ArrayType*>(type);
 		if (!(array == NULL)) continue;
 
+		// if the variable is a result variable for some reduction then it has per-LPU instances not
+		// a single shared instance for all LPUs
+		if (variable->isReduction()) continue;
+
 		// if the variable of epoch type then it is a locally storable scalar
 		if (Type::epochType == type) {
 			TaskGlobalScalar *scalar = new TaskGlobalScalar(variable->getName(), 
 					true, type);
 			globalScalars->Append(scalar);
-		// otherwise if it is used as a repeat loop index then again it is a
-		// locally stored variable
+
+		// otherwise if it is used as a repeat loop index then again it is a locally stored variable
 		} else {
 			const char *variableName = variable->getName();
 			bool matchFound = false;

@@ -121,12 +121,15 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         generateThreadCountConstants(headerFile, mappingConfig, pcubesConfig);
         
 	// generate data structures and functions for task environment management 
-	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
         List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
 			mappingConfig, taskDef->getEnvironmentLinks());
 	generateFnForMetadataAndEnvLinks(taskDef->getName(), 
 			initials, programFile, mappingConfig, envLinkList);
-        generateLpuDataStructures(headerFile, mappingConfig);
+	List<ReductionMetadata*> *reductionInfos = new List<ReductionMetadata*>;
+	taskDef->getComputation()->extractAllReductionInfo(reductionInfos);
+        generateLpuDataStructures(headerFile, mappingConfig, reductionInfos);
+	generatePrintFnForLpuDataStructures(initials, 
+			programFile, mappingConfig, reductionInfos);
 	List<TaskGlobalScalar*> *globalScalars 
 			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
 	generateClassesForGlobalScalars(headerFile, globalScalars, rootLps);
