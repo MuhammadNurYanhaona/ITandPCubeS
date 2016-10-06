@@ -233,6 +233,10 @@ void TaskDef::analyseCode() {
 	// augment the computation fow with new reduction boundary stages to carry out 
 	// initialization and termination of reduction
 	computation->setupReductionBoundaryStages(hierarchy);
+	// generate metadata about reduction statements again as the previous analysis 
+	// moved reduction annotations from compute stages to boundary stages, but both
+	// kind of stages need the annotations (for separate reasons) 
+	computation->populateReductionMetadata(hierarchy);
 	
 	//------------------------------------------------------------------ Data Dependency Analysis
 	// assign stages stage, group, and nesting indexes to aid latter analysis

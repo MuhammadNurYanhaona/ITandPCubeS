@@ -153,7 +153,8 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
         generateFnForThreadIdsAllocation(headerFile, 
 			programFile, initials, mappingConfig, pcubesConfig);
         generateFnForThreadIdsAdjustment(headerFile, programFile, initials, mappingConfig);
-        generateThreadStateImpl(headerFile, programFile, mappingConfig, partParamConfigMap);
+        generateThreadStateImpl(headerFile, programFile, 
+			mappingConfig, reductionInfos, partParamConfigMap);
 
 	// generate synchronization primitives and their initialization functions
 	syncManager = new SyncManager(taskDef, headerFile, programFile, initials);

@@ -580,6 +580,7 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 
 	std::string activateHd = 	"\n\t//---------------------- Activating Condition -------------------------------\n\n";
 	std::string localMdHd =  	"\n\t//-------------------- Local Copies of Metadata -----------------------------\n\n";
+	std::string redRstHd =  	"\n\t//------------------ Partial Results of Reductions  -------------------------\n\n";
 	std::string localVarDclHd = 	"\n\t//------------------- Local Variable Declarations ---------------------------\n\n";
 	std::string computeHd = 	"\n\t//----------------------- Computation Begins --------------------------------\n\n";
 	std::string returnHd =  	"\n\t//------------------------- Returning Flag ----------------------------------\n\n";
@@ -632,6 +633,18 @@ void ExecutionStage::translateCode(std::ofstream &stream) {
 		stream << ")) {\n";
 		stream << "\t\treturn FAILURE_RUN;\n";
 		stream << "\t}\n";	
+	}
+
+	// if the compute stage involves any reduction then extract the references of local partial results from
+	// the reduction result map
+	if (nestedReductions->NumElements() > 0) {
+		stream << redRstHd;
+		for (int i = 0; i < nestedReductions->NumElements(); i++) {
+			ReductionMetadata *reduction = nestedReductions->Nth(i);
+			const char *varName = reduction->getResultVar();
+			stream << "\t" << "reduction::Result *" << varName << " = ";
+			stream << "localReductionResultMap->Lookup(\"" << varName << "\");\n";
+		}
 	}
 
 	// declare any local variables found in the computation	
@@ -764,8 +777,9 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	stream << '\n' << nextIndent.str() << doubleIndent << "arrayMetadata" << paramSeparator;
 	stream << '\n' << nextIndent.str() << doubleIndent << "taskGlobals" << paramSeparator;
 	stream << '\n' << nextIndent.str() << doubleIndent << "threadLocals" << paramSeparator;
-	stream << "partition" << paramSeparator << '\n' << nextIndent.str();
-	stream << doubleIndent << "threadState->threadLog)" << stmtSeparator;
+	stream << '\n' << nextIndent.str() << doubleIndent << "reductionResultsMap" << paramSeparator;
+	stream << '\n' << nextIndent.str() << doubleIndent << "partition" << paramSeparator;
+	stream << '\n' << nextIndent.str() << doubleIndent << "threadState->threadLog)" << stmtSeparator;
 
 	// then update all synchronization counters that depend on the execution of this stage for their activation
 	List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();

@@ -244,7 +244,10 @@ void CompositeStage::populateReductionMetadata(PartitionHierarchy *lpsHierarchy)
 }
 
 void CompositeStage::extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {
-	FlowStage::extractAllReductionInfo(reductionInfos);
+	
+	// composite stages should not add their own lists of reduction metadata into the argument list as their
+	// own lists have been created by extracting metadata from nested execution stages.
+	
 	for (int i = 0; i < stageList->NumElements(); i++) {
                 FlowStage *stage = stageList->Nth(i);
 		stage->extractAllReductionInfo(reductionInfos);
