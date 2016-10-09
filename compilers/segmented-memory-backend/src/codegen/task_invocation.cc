@@ -339,6 +339,12 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
                 programFile << indent << "initializeSyncPrimitives()" << stmtSeparator;
         }
 
+	// check if the task has some reduction operations; if YES then initialize reduction primitives
+	if (taskGenerator->hasReductions()) {
+                programFile << std::endl << indent << "// initializing reduction primitives\n";
+                programFile << indent << "setupReductionPrimitives(logFile)" << stmtSeparator;
+	}
+
 	// get the list of external environment-links then invoke the task initializer function
 	List<EnvironmentLink*> *envLinks = taskDef->getEnvironmentLinks();
 	List<const char*> *externalEnvLinks = new List<const char*>;

@@ -65,6 +65,7 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 
 	mappingRoot = NULL;
 	segmentedPPS = 0;
+	involveReduction = false;
 }
 
 const char *TaskGenerator::getHeaderFileName(TaskDef *taskDef) {
@@ -128,6 +129,7 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 			initials, programFile, mappingConfig, envLinkList);
 	List<ReductionMetadata*> *reductionInfos = new List<ReductionMetadata*>;
 	taskDef->getComputation()->extractAllReductionInfo(reductionInfos);
+	this->involveReduction = (reductionInfos->NumElements() > 0); 
         generateLpuDataStructures(headerFile, mappingConfig, reductionInfos);
 	generatePrintFnForLpuDataStructures(initials, 
 			programFile, mappingConfig, reductionInfos);
@@ -183,10 +185,16 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	}
 
 	// gnerate reduction related data structures and their management functions
-	generateReductionPrimitiveClasses(headerFile,
-        		programFile, initials, mappingConfig, reductionInfos);
-	generateReductionPrimitiveDecls(headerFile, reductionInfos);
-	generateReductionPrimitiveInitFn(headerFile, programFile, initials, reductionInfos);
+	if (involveReduction) {
+		std::cout << "Generating reduction related data structures and functions\n";
+		generateReductionPrimitiveClasses(headerFile,
+				programFile, initials, mappingConfig, reductionInfos);
+		generateReductionPrimitiveDecls(headerFile, reductionInfos);
+		generateReductionPrimitiveInitFn(headerFile, 
+				programFile, initials, reductionInfos);
+		generateReductionPrimitiveMapCreateFnForThread(headerFile, 
+				programFile, initials, reductionInfos);
+	}
 
 	// generate environment management data structures and functions
 	generateTaskEnvironmentClass(taskDef, initials, headerFile, programFile);
@@ -211,7 +219,8 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 	// generate run function for threads
 	generateThreadRunFunction(taskDef, headerFile, 
 			programFile, initials, mappingConfig, 
-			syncManager->involvesSynchronization(), communicatorCount);
+			syncManager->involvesSynchronization(), 
+			involveReduction, communicatorCount);
 
 	// generate data structure and functions for Pthreads
 	generateArgStructForPthreadRunFn(taskDef->getName(), headerFile);

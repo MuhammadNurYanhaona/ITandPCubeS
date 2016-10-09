@@ -31,6 +31,7 @@ class TaskGenerator {
 	MappingNode *mappingRoot;
 	SyncManager *syncManager;
 	int segmentedPPS;
+	bool involveReduction;
   public:
 	TaskGenerator(TaskDef *taskDef, 
 		const char *outputDirectory, 
@@ -46,6 +47,7 @@ class TaskGenerator {
 	static const char *getNamespace(TaskDef *taskDef);
 	SyncManager *getSyncManager() { return syncManager; }
 	bool hasCommunicators();
+	bool hasReductions() { return involveReduction; }
 
 	// function to generate all data structures and methods that are relevant to this task 
 	// including a thread run function to run the task as a parallel program in multiple threads

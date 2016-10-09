@@ -233,7 +233,7 @@ void generateReductionPrimitiveClasses(const char *headerFileName,
 	
 	if (reductionInfos->NumElements() == 0) return;
 
-	std::cout << "Generating reduction primitives and their management functions" << std::endl;
+	std::cout << "\tGenerating reduction primitives and their management functions" << std::endl;
         std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
@@ -283,7 +283,7 @@ void generateReductionPrimitiveDecls(const char *headerFileName, List<ReductionM
 	
 	if (reductionInfos->NumElements() == 0) return;
 
-	std::cout << "Generating static pointers for reduction primitives\n" << std::endl;
+	std::cout << "\tGenerating static pointers for reduction primitives\n" << std::endl;
         std::ofstream headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         if (!headerFile.is_open()) {
@@ -313,7 +313,7 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 	
 	if (reductionInfos->NumElements() == 0) return;
 
-	std::cout << "Generating function for reduction primitive instance initialization" << std::endl;
+	std::cout << "\tGenerating function for reduction primitive instance initialization" << std::endl;
         std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
@@ -404,6 +404,71 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 		}
 	}
 	
+	programFile << "}\n";
+
+	headerFile.close();
+	programFile.close();	
+}
+
+void generateReductionPrimitiveMapCreateFnForThread(const char *headerFileName,
+                const char *programFileName,
+                const char *initials,
+                List<ReductionMetadata*> *reductionInfos) {
+
+	std::cout << "\tGenerating function for retrieving reduction primitives of a PPU controller" << std::endl;
+        std::ofstream programFile, headerFile;
+        headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
+        programFile.open (programFileName, std::ofstream::out | std::ofstream::app);
+        if (!programFile.is_open() || !headerFile.is_open()) {
+                std::cout << "Unable to open program or header file";
+                std::exit(EXIT_FAILURE);
+        }
+	
+	const char *subHeader = "Reduction Primitives Retriever";
+	decorator::writeSubsectionHeader(headerFile, subHeader);
+	decorator::writeSubsectionHeader(programFile, subHeader);
+	headerFile << std::endl;
+	programFile << std::endl;
+
+	// generate the function signature in both header and the program files
+	headerFile << "Hashtable<ReductionPrimitive*> *";
+	programFile << "Hashtable<ReductionPrimitive*> *";
+	programFile << initials << "::";
+	headerFile << "getReductionPrimitiveMap(ThreadIds *threadIds)" << stmtSeparator;
+	programFile << "getReductionPrimitiveMap(ThreadIds *threadIds) {\n\n";
+
+	// instantiate a reduction primitive map
+	programFile << indent << "Hashtable<ReductionPrimitive*> *rdPrimitiveMap = ";
+	programFile << "new Hashtable<ReductionPrimitive*>" << stmtSeparator;
+
+	// insert into the map one primitive for each reduction operation the PPU controller thread participate into
+	for (int i = 0; i < reductionInfos->NumElements(); i++) {
+		ReductionMetadata *reduction = reductionInfos->Nth(i);
+		const char *varName = reduction->getResultVar();
+		Space *reductionRootLps = reduction->getReductionRootLps();
+		const char *rdRootLpsName = reductionRootLps->getName();
+		Space *reductionExecLps = reduction->getReductionExecutorLps();
+	 	const char *rdExecLpsName = reductionExecLps->getName();
+
+		// if the PPU controller thread has a valid PPU ID in the reduction executor LPS only then it gets a
+		// reduction primitive
+		programFile << indent << "if(threadIds->ppuIds[Space_" << rdExecLpsName << "].id != INVALID_ID) ";
+		programFile << "{\n";
+		
+		// the reduction primitive assignment happens based on the group ID at the reduction root LPS level
+		programFile << doubleIndent << "int space" << rdRootLpsName << "Group = ";
+		programFile << "threadIds->ppuIds[Space_" << rdRootLpsName << "].groupId % ";
+		programFile << "Space_" << rdRootLpsName << "_Threads_Per_Segment";
+		programFile << stmtSeparator;
+
+		programFile << doubleIndent << "rdPrimitiveMap->Enter(\"" << varName << "\"" << paramSeparator;
+		programFile << varName << "Reducer[space" << rdRootLpsName << "Group])" << stmtSeparator;
+	
+		programFile << indent << "}\n";
+	}	
+	
+	// return the map
+	programFile << indent << "return rdPrimitiveMap" << stmtSeparator;
 	programFile << "}\n";
 
 	headerFile.close();

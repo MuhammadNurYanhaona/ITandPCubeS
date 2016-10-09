@@ -130,8 +130,11 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFileName,
 }
 
 void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
-                const char *programFileName, const char *initials, 
-		MappingNode *mappingRoot, bool involvesSynchronization, int communicatorCount) {
+                const char *programFileName, 
+		const char *initials, 
+		MappingNode *mappingRoot, 
+		bool involvesSynchronization,
+		bool involvesReduction, int communicatorCount) {
 
 	std::cout << "Generating the thread::run function for the task\n";
 	
@@ -198,10 +201,17 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	}
 
 	// initilize the map for holding partial results of reductions
-	programFile << "\n\t// initializing a map for holding local, partial results of reductions\n";
-	programFile << "\tthreadState->initializeReductionResultMap();\n";
-	programFile << "\tHashtable<reduction::Result*> *reductionResultsMap = ";
-	programFile << "threadState->getLocalReductionResultMap();\n";
+	if (involvesReduction) {
+		programFile << "\n\t// initializing a map for holding local, partial results of reductions\n";
+		programFile << "\tthreadState->initializeReductionResultMap();\n";
+		programFile << "\tHashtable<reduction::Result*> *reductionResultsMap = ";
+		programFile << "threadState->getLocalReductionResultMap();\n";
+	
+		programFile << "\n\t// retrieving the reduction primitives relevant to the current thread\n";
+		programFile << "\tThreadIds *threadIds = threadState->getThreadIds();\n";
+		programFile << "\tHashtable<ReductionPrimitive*> *rdPrimitiveMap = ";
+		programFile << "getReductionPrimitiveMap(threadIds);\n";
+	}
 
 	// create a local part-dimension object for probable array dimension based range or assignment expressions
 	programFile << "\n\t// create a local part-dimension object for later use\n";

@@ -52,6 +52,8 @@ void generateCrossSegmentReductionPrimitive(std::ofstream &headerFile,
 		ReductionMetadata *rdMetadata, 
 		Space *rootLps);
 
+/* this function invokes the above to functions to create appropriate reduction primitive subclass for all 
+   reduction operations found in the task */
 void generateReductionPrimitiveClasses(const char *headerFile,
                 const char *programFile,
                 const char *initials,
@@ -62,11 +64,20 @@ void generateReductionPrimitiveClasses(const char *headerFile,
 					Reduction Primitive Instantiation  
 ***********************************************************************************************************************/
 
+/* this function declares all arrays of static reduction primitives in the header file */
 void generateReductionPrimitiveDecls(const char *headerFile, List<ReductionMetadata*> *reductionInfos);
 
+/* this function generates a routine that initialize all static reduction primitives of a segment */
 void generateReductionPrimitiveInitFn(const char *headerFile, 
 		const char *programFile, 
 		const char *initials, 
 		List<ReductionMetadata*> *reductionInfos);
+
+/* this function generates a routine that a PPU controller thread can use to receive the reduction primitives 
+   relevant to it */
+void generateReductionPrimitiveMapCreateFnForThread(const char *headerFile,
+                const char *programFile,
+                const char *initials,
+                List<ReductionMetadata*> *reductionInfos);
 
 #endif
