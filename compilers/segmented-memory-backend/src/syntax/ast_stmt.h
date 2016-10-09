@@ -6,12 +6,9 @@
 #include "../semantics/scope.h"
 #include "../static-analysis/data_access.h"
 #include "../utils/hashtable.h"
+#include "../utils/common_constant.h"
 
 #include <sstream>
-
-enum ReductionOperator {        SUM, PRODUCT, MAX, MIN, AVG, MAX_ENTRY, MIN_ENTRY,      // numeric reductions
-                                LAND, LOR,                                              // logical reductions    
-                                BAND, BOR };                                            // bitwise reductions
 
 class Expr;
 class LogicalExpr;

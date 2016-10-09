@@ -8,16 +8,11 @@
 
 #include "../utils/list.h"
 #include "../utils/hashtable.h"
+#include "../utils/common_constant.h"
 #include "../semantics/scope.h"
 #include "../static-analysis/data_access.h"
 
 #include <sstream>
-
-enum ArithmaticOperator {      	ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS, 
-                               	LEFT_SHIFT, RIGHT_SHIFT, POWER, 
-                               	BITWISE_AND, BITWISE_XOR, BITWISE_OR};
-
-enum LogicalOperator {		AND, OR, NOT, EQ, NE, GT, LT, GTE, LTE };
 
 class TaskDef;
 class FieldAccess;

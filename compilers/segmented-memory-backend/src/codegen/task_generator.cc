@@ -20,6 +20,7 @@
 #include "memory_mgmt.h"
 #include "file_io.h"
 #include "communication.h"
+#include "reduction_primitive_mgmt.h"
 #include "environment_mgmt.h"
 
 #include "../utils/list.h"
@@ -180,6 +181,12 @@ void TaskGenerator::generate(List<PPS_Definition*> *pcubesConfig) {
 		generateCommunicationExcludeFn(headerFile, 
 				programFile, taskDef, commCharacterList);
 	}
+
+	// gnerate reduction related data structures and their management functions
+	generateReductionPrimitiveClasses(headerFile,
+        		programFile, initials, mappingConfig, reductionInfos);
+	generateReductionPrimitiveDecls(headerFile, reductionInfos);
+	generateReductionPrimitiveInitFn(headerFile, programFile, initials, reductionInfos);
 
 	// generate environment management data structures and functions
 	generateTaskEnvironmentClass(taskDef, initials, headerFile, programFile);
