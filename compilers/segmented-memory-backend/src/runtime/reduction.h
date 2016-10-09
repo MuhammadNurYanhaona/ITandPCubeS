@@ -87,6 +87,10 @@ class ReductionPrimitive : public ReductionBarrier {
 	ReductionPrimitive(int elementSize, 
 			ReductionOperator op, 
 			int localParticipants);
+
+	// Different reduction function requires different initial values for the partial result variable -- the
+	// result variable cannot be just set to all zeros. So subclasses should provide proper implementations.
+	virtual void resetPartialResult(reduction::Result *resultVar) = 0;
   protected:
 	void initFunction(reduction::Result *localPartialResult, void *target);
 	void entryFunction(reduction::Result *localPartialResult) {

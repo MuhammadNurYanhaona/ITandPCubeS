@@ -77,5 +77,6 @@
 // for reductions
 #include "../../src/runtime/reduction.h"
 #include "../../src/utils/common_constant.h"
+#include <limits.h>
 
 

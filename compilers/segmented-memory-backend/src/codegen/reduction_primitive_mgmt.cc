@@ -52,6 +52,84 @@ const char *getReductionOpString(ReductionOperator op) {
 	return NULL;
 }
 
+// I don't know how to make this ugly function definition any nicer; probably a better programmer will be able 
+// to refactor it.
+void generateResultResetFn(std::ofstream &programFile, 
+                const char *initials, const char *className, Type *resultType, ReductionOperator op) {
+
+	programFile << '\n' << "void " << initials << "::" << className << "::";	
+	programFile << "resetPartialResult(reduction::Result *resultVar) {\n";
+	if (op == SUM || op == PRODUCT || op == AVG) {
+		std::string value = std::string("0");
+		if (op == PRODUCT) value = std::string("1");
+		programFile << indent;
+		if (resultType == Type::charType) {
+			programFile << "resultVar->data.charValue = " << value << stmtSeparator;
+		} else if (resultType == Type::intType) {
+			programFile << "resultVar->data.intValue = " << value << stmtSeparator;
+		} else if (resultType == Type::floatType) {
+			programFile << "resultVar->data.floatValue = " << value << stmtSeparator;
+		} else if (resultType == Type::doubleType) {
+			programFile << "resultVar->data.doubleValue = " << value << stmtSeparator;
+		} else {
+			std::cout << "Sum/Product/Average reduction is not meaningful for type: ";
+			std::cout << resultType->getName() << "\n";
+			std::exit(EXIT_FAILURE);
+		}
+	} else if (op == MAX || op == MAX_ENTRY || op == MIN || op == MIN_ENTRY) {
+		std::string suffix = std::string("_MAX");
+		if (op == MAX || op == MAX_ENTRY) suffix = std::string("_MIN");
+		programFile << indent;
+		if (resultType == Type::charType) {
+			programFile << "resultVar->data.charValue = CHAR" << suffix << stmtSeparator;
+		} else if (resultType == Type::intType) {
+			programFile << "resultVar->data.intValue = INT" << suffix << stmtSeparator;
+		} else if (resultType == Type::floatType) {
+			programFile << "resultVar->data.floatValue = FLT" << suffix << stmtSeparator;
+		} else if (resultType == Type::doubleType) {
+			programFile << "resultVar->data.doubleValue = DBL" << suffix << stmtSeparator;
+		} else {
+			std::cout << "MIN/MAX or their ENTRY reduction is not meaningful for type: ";
+			std::cout << resultType->getName() << "\n";
+			std::exit(EXIT_FAILURE);
+		}
+	} else if (op == LAND) {
+		if (resultType == Type::boolType) {
+			programFile << indent << "resultVar->data.boolValue = true" << stmtSeparator;
+		} else {
+			std::cout << "Logical AND reduction is only meaningful for boolean types\n";
+			std::exit(EXIT_FAILURE);
+
+		}
+	} else if (op == LOR) {
+		if (resultType == Type::boolType) {
+			programFile << indent << "resultVar->data.boolValue = false" << stmtSeparator;
+		} else {
+			std::cout << "Logical OR reduction is only meaningful for boolean types\n";
+			std::exit(EXIT_FAILURE);
+		}
+	} else if (op == BAND) {
+		if (resultType == Type::charType) {
+			programFile << indent << "resultVar->data.charValue = CHAR_MAX" << stmtSeparator;
+		} else if (resultType == Type::intType) {
+			programFile << indent << "resultVar->data.intValue = INT_MAX" << stmtSeparator;
+		} else {
+			std::cout << "Bitwise reduction is supported for integer and character types only\n";
+			std::exit(EXIT_FAILURE);
+		}
+	} else if (op == BOR) {
+		if (resultType == Type::charType) {
+			programFile << indent << "resultVar->data.charValue = 0" << stmtSeparator;
+		} else if (resultType == Type::intType) {
+			programFile << indent << "resultVar->data.intValue = 0" << stmtSeparator;
+		} else {
+			std::cout << "Bitwise reduction is supported for integer and character types only\n";
+			std::exit(EXIT_FAILURE);
+		}
+	}
+	programFile << "}\n";
+}
+
 void generateUpdateCodeForMax(std::ofstream &programFile, Type *varType) {
 	
 	std::ostringstream propertyNameStr;
@@ -133,6 +211,7 @@ void generateIntraSegmentReductionPrimitive(std::ofstream &headerFile,
 	headerFile << "class " << className << " : public ReductionPrimitive {\n";
 	headerFile << "  public: \n";
 	headerFile << indent << className << "(int localParticipants)" << stmtSeparator;
+	headerFile << indent << "void resetPartialResult(reduction::Result *resultVar)" << stmtSeparator;
 	headerFile << "  protected: \n";
 	headerFile << indent << "void updateIntermediateResult(reduction::Result *localPartialResult)";
 	headerFile << stmtSeparator;
@@ -150,6 +229,9 @@ void generateIntraSegmentReductionPrimitive(std::ofstream &headerFile,
 	programFile << opStr << paramSeparator << "localParticipants)";
 	programFile << " {}\n"; 
 	
+	// generate the definition of the result reset function in the program file
+	generateResultResetFn(programFile, initials, className, varType, op);
+
 	// generate the definition of intermediate result update function in the program file
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::updateIntermediateResult(";
@@ -179,6 +261,7 @@ void generateCrossSegmentReductionPrimitive(std::ofstream &headerFile,
 	headerFile << "  public: \n";
 	headerFile << indent << className << "(int localParticipants" << paramSeparator;
 	headerFile << "SegmentGroup *segmentGroup)" << stmtSeparator;
+	headerFile << indent << "void resetPartialResult(reduction::Result *resultVar)" << stmtSeparator;
 	headerFile << "  protected: \n";
 	headerFile << indent << "void updateIntermediateResult(reduction::Result *localPartialResult)";
 	headerFile << stmtSeparator;
@@ -199,6 +282,9 @@ void generateCrossSegmentReductionPrimitive(std::ofstream &headerFile,
 	programFile << paramIndent << doubleIndent;
 	programFile << "localParticipants" << paramSeparator << "segmentGroup)";
 	programFile << " {}\n"; 
+
+	// generate the definition of the result reset function in the program file
+	generateResultResetFn(programFile, initials, className, varType, op);
 
 	// generate the definition of intermediate result update function in the program file
 	programFile << std::endl;

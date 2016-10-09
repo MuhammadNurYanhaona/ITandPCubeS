@@ -23,6 +23,16 @@ const char *getMpiReductionOp(ReductionOperator op);
 const char *getReductionOpString(ReductionOperator op);
 
 /**********************************************************************************************************************
+					Generator for Result Reset Function
+***********************************************************************************************************************/
+
+void generateResultResetFn(std::ofstream &programFile, 
+		const char *initials, 
+		const char *className, 
+		Type *resultType, 
+		ReductionOperator op);
+
+/**********************************************************************************************************************
 				Generators for Intermediate Result Update Functions' body
 ***********************************************************************************************************************/
 
