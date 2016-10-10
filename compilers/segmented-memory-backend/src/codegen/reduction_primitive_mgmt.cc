@@ -369,7 +369,7 @@ void generateReductionPrimitiveDecls(const char *headerFileName, List<ReductionM
 	
 	if (reductionInfos->NumElements() == 0) return;
 
-	std::cout << "\tGenerating static pointers for reduction primitives\n" << std::endl;
+	std::cout << "\tGenerating static pointers for reduction primitives" << std::endl;
         std::ofstream headerFile;
         headerFile.open (headerFileName, std::ofstream::out | std::ofstream::app);
         if (!headerFile.is_open()) {

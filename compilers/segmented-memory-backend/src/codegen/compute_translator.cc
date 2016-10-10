@@ -76,9 +76,12 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		paramStream << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
 		paramStream << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
 
-		// then add a parameter for the map of local, partial results of reductions
-		paramStream << paramSeparator << paramIndent;
-		paramStream << "Hashtable<reduction::Result*> *localReductionResultMap";
+		// then add a parameter for the map of local, partial results of reductions if the stage
+		// involves some reduction
+		if (currentStage->hasNestedReductions()) {
+			paramStream << paramSeparator << paramIndent;
+			paramStream << "Hashtable<reduction::Result*> *localReductionResultMap";
+		}
 
 		// then add a parameter for the partition arguments
 		paramStream << paramSeparator << paramIndent;

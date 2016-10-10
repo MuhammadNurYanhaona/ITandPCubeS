@@ -482,6 +482,12 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		stream << nextIndent.str() << "\tcontinue" << stmtSeparator;
 		stream << nextIndent.str() << "}\n";	
 	}
+
+	// if the current composite stage is boundary for some reduction operations then initialize partial results
+	// of reductions for the executing PPU controller thread
+	if (reductionBoundary) {
+		initializeReductionResults(stream, nextIndentation);
+	}
 	
 	// Iterate over groups of flow stages where each group executes within a single LPS. This scheme has the
 	// consequence of generating LPU only one time for all stages of a group then execute all of them before
@@ -597,6 +603,12 @@ void CompositeStage::generateInvocationCode(std::ofstream &stream, int indentati
 		// then we need to enable the reactivation signals
 		generateCodeForReactivatingDataModifiers(stream, nextIndentation, syncDependencies);
 		//-----------------------------------------------------------------------------------------------*/
+	}
+	
+	// if the current composite stage is boundary for some reduction operations then execute the final step of
+	// reduction
+	if (reductionBoundary) {
+		executeFinalStepOfReductions(stream, nextIndentation);
 	}
 
 	// close the while loop if applicable
@@ -1396,6 +1408,67 @@ void CompositeStage::genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &
 		stream << ")" << stmtSeparator;
 		stream << indent.str() << "}\n";
 	}
+}
+
+void CompositeStage::initializeReductionResults(std::ofstream &stream, int indentation) {
+	
+	std::ostringstream indents;
+	for (int i = 0; i < indentation; i++) indents << indent;
+
+	stream << std::endl;
+	stream << indents.str() << "// initializing thread-local reduction result variables\n";
+
+	for (int i = 0; i < nestedReductions->NumElements(); i++) {
+		ReductionMetadata *reduction = nestedReductions->Nth(i);
+		const char *resultVar = reduction->getResultVar();
+		Space *executingLps = reduction->getReductionExecutorLps();
+		const char *execLpsName = executingLps->getName();
+		stream << indents.str() << "if(threadState->isValidPpu(Space_" << execLpsName << ")) {\n";
+		stream << indents.str() << indent;
+		stream << "reduction::Result *" << resultVar << "Local = reductionResultsMap->";
+		stream << "Lookup(\"" << resultVar << "\")" << stmtSeparator;
+		stream << indents.str() << indent;
+		stream << "ReductionPrimitive *rdPrimitive = rdPrimitiveMap->Lookup(\"";
+		stream << resultVar << "\")" << stmtSeparator;
+		stream << indents.str() << indent << "rdPrimitive->resetPartialResult(";
+		stream << resultVar << "Local)" << stmtSeparator;	
+		stream << indents.str() << "}\n";
+	}
+
+	stream << std::endl;	
+}
+
+void CompositeStage::executeFinalStepOfReductions(std::ofstream &stream, int indentation) {
+	
+	std::ostringstream indents;
+	for (int i = 0; i < indentation; i++) indents << indent;
+
+	stream << std::endl;
+	stream << indents.str() << "// executing the final step of reductions\n";
+	
+	for (int i = 0; i < nestedReductions->NumElements(); i++) {
+		ReductionMetadata *reduction = nestedReductions->Nth(i);
+		if (!reduction->isSingleton()) {
+			std::cout << "The current compiler still cannot handle non task-global reductions\n";
+			std::exit(EXIT_FAILURE);
+		}
+		const char *resultVar = reduction->getResultVar();
+		Space *executingLps = reduction->getReductionExecutorLps();
+		const char *execLpsName = executingLps->getName();
+		stream << indents.str() << "if(threadState->isValidPpu(Space_" << execLpsName << ")) {\n";
+		stream << indents.str() << indent;
+		stream << "reduction::Result *localResult = reductionResultsMap->";
+		stream << "Lookup(\"" << resultVar << "\")" << stmtSeparator;
+		stream << indents.str() << indent;
+		stream << "void *target = &(taskGlobals->" << resultVar << ")" << stmtSeparator;
+		stream << indents.str() << indent;
+		stream << "ReductionPrimitive *rdPrimitive = rdPrimitiveMap->Lookup(\"";
+		stream << resultVar << "\")" << stmtSeparator;
+		stream << indents.str() << indent;
+		stream << "rdPrimitive->reduce(localResult" << paramSeparator << "target)" << stmtSeparator;
+		stream << indents.str() << "}\n";
+	}
+	stream << std::endl;
 }
 
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/

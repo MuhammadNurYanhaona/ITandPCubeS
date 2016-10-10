@@ -73,18 +73,18 @@ class ReductionMetadata {
 	ReductionMetadata(const char *resultVar, 
 			ReductionOperator opCode, 
 			Space *reductionRootLps, 
-			Space *reductionExecutorLps, yyltype *location) {
-		this->resultVar = resultVar;
-		this->opCode = opCode;
-		this->reductionRootLps = reductionRootLps;
-		this->reductionExecutorLps = reductionExecutorLps;
-		this->location = location;
-	}
+			Space *reductionExecutorLps, yyltype *location);
 	const char *getResultVar() { return resultVar; }
 	ReductionOperator getOpCode() { return opCode; }
 	Space *getReductionRootLps() { return reductionRootLps; }
 	Space *getReductionExecutorLps() { return reductionExecutorLps; }
-	yyltype *getLocation() { return location; }		
+	yyltype *getLocation() { return location; }
+
+	// A reduction is singleton when there is just a single global result instance of the reduction operation. 
+	// Result handling for such a reduction is much easier than that of a normal reduction. In the former case we
+	// can maintain a single task-global scalar property; while in the latter case, results instances need to be
+	// dynamically created and maintained for individual LPUs.
+	bool isSingleton();		
 };
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
@@ -482,7 +482,15 @@ class CompositeStage : public FlowStage {
 			List<SyncRequirement*> *syncRequirements);
 	void genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &stream, int indentation,
 			List<SyncRequirement*> *syncRequirements);
-	
+
+	// This function is used to prepare local partial reduction results of the executing PPU controller when the 
+	// current composite stage is a boundary for some reduction operations.
+	void initializeReductionResults(std::ofstream &stream, int indentation);
+	// After each PPU controller computed its partial result of a reduction, all cooperating PPU controllers
+	// combine their partial results to generate a final outcome using a shared reduction primitive. This step
+	// takes place in the boundary composite stage for the reduction. The following function produces the code 
+	// for that step.   
+	void executeFinalStepOfReductions(std::ofstream &stream, int indentation);	
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.

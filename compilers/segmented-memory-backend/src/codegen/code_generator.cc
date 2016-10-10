@@ -607,6 +607,10 @@ void generateLpuDataStructures(const char *outputFile,
 		List<const char*> *reductionResults = new List<const char*>;
 		for (int i = 0; i < reductionInfos->NumElements(); i++) {
 			ReductionMetadata *reduction = reductionInfos->Nth(i);
+			
+			// a property for each singleton reduction variable is maintained within the task-globals scalar
+			if (reduction->isSingleton()) continue;
+
 			Space *redRootLps = reduction->getReductionRootLps();
 			// a reduction result variable as accessible at and below of the LPS set as the root of reduciton
 			// range.
@@ -690,6 +694,10 @@ void generatePrintFnForLpuDataStructures(const char *initials,
 		}
 		for (int i = 0; i < reductionInfos->NumElements(); i++) {
 			ReductionMetadata *reduction = reductionInfos->Nth(i);
+			
+			// a property for each singleton reduction variable is maintained within the task-globals scalar
+			if (reduction->isSingleton()) continue;
+			
 			Space *redRootLps = reduction->getReductionRootLps();
 			if (redRootLps == lps || lps->isParentSpace(redRootLps)) {
 				programFile << indent << "for (int i = 0; i < indentLevel; i++) ";

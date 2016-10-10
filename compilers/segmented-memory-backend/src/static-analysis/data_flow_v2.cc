@@ -21,6 +21,25 @@
 #include <sstream>
 #include <cstdlib>
 
+//---------------------------------------------- Reduction Metadata ------------------------------------------------------/
+
+ReductionMetadata::ReductionMetadata(const char *resultVar,
+		ReductionOperator opCode,
+		Space *reductionRootLps,
+		Space *reductionExecutorLps, yyltype *location) {
+	this->resultVar = resultVar;
+	this->opCode = opCode;
+	this->reductionRootLps = reductionRootLps;
+	this->reductionExecutorLps = reductionExecutorLps;
+	this->location = location;
+}
+
+bool ReductionMetadata::isSingleton() {
+	if (reductionRootLps->getDimensionCount() > 0) return false;
+	Space *parentLps = reductionRootLps->getParent();
+	return (parentLps == NULL || parentLps->isRoot());
+}
+
 //-------------------------------------------------- Flow Stage ----------------------------------------------------------/
 
 FlowStage *FlowStage::CurrentFlowStage = NULL;
@@ -777,7 +796,9 @@ void ExecutionStage::generateInvocationCode(std::ofstream &stream, int indentati
 	stream << '\n' << nextIndent.str() << doubleIndent << "arrayMetadata" << paramSeparator;
 	stream << '\n' << nextIndent.str() << doubleIndent << "taskGlobals" << paramSeparator;
 	stream << '\n' << nextIndent.str() << doubleIndent << "threadLocals" << paramSeparator;
-	stream << '\n' << nextIndent.str() << doubleIndent << "reductionResultsMap" << paramSeparator;
+	if (this->hasNestedReductions()) {
+		stream << '\n' << nextIndent.str() << doubleIndent << "reductionResultsMap" << paramSeparator;
+	}
 	stream << '\n' << nextIndent.str() << doubleIndent << "partition" << paramSeparator;
 	stream << '\n' << nextIndent.str() << doubleIndent << "threadState->threadLog)" << stmtSeparator;
 
