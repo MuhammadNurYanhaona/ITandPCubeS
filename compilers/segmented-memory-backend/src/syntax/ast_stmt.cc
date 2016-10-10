@@ -1238,8 +1238,12 @@ Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobal
         accessLog->markContentAccess();
         accessLog->getContentAccessFlags()->flagAsReduced();
         table->Enter(resultName, accessLog, true);
-	
-	mergeAccessedVariables(table, right->getAccessedGlobalVariables(globalReferences));
+
+	const char *reducedVariable = right->getBaseVarName();
+	Hashtable<VariableAccess*> *rTable = right->getAccessedGlobalVariables(globalReferences);
+	accessLog = rTable->Lookup(reducedVariable);
+	accessLog->getContentAccessFlags()->flagAsRead();	
+	mergeAccessedVariables(table, rTable);
 
 	return table;
 	
