@@ -4,6 +4,7 @@
 #include <math.h>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include "reduction.h"
 
 //--------------------------------------------------- Reduction Result ---------------------------------------------------------
@@ -59,6 +60,7 @@ ReductionPrimitive::ReductionPrimitive(int elemntSize, ReductionOperator op, int
 	this->op = op;
 	this->intermediateResult = new reduction::Result();
 	this->target = NULL;
+	this->logFile = NULL;
 }
 
 void ReductionPrimitive::initFunction(reduction::Result *localPartialResult, void *target) { 

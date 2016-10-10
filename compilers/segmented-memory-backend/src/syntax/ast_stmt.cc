@@ -18,6 +18,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <cstdlib>
 
 //-------------------------------------------------------------- Statement -------------------------------------------------------------/
 
@@ -1259,7 +1260,72 @@ void ReductionStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
 }
 
 void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
+	
+	const char *resultName = resultVar->getName();
+	DataStructure *resultStruct = space->getStructure(resultName);
+	Type *resultType = resultStruct->getType();
+
+	// This naming strategy to find the appropriate property in the union holding reduction result is incomplete.
+	// Currently this is sufficient as we do not have the unsigned primitive types yet that have a space in their
+	// C type names. TODO we need to make change in the property naming convension when we will add those types
+	// in IT.
+	std::ostringstream resultPropertyStr;
+	resultPropertyStr << "data." << resultType->getCType() << "Value";
+	std::string resultProperty = resultPropertyStr.str();
+
 	std::ostringstream indents;
 	for (int i = 0; i < indentLevel; i++) indents << indent;
-	stream << indents.str() << "// this is a reduction statement\n";
+	
+	if (op == SUM) {
+		stream << indents.str() << resultName << "->" << resultProperty << " += ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+	} else if (op == PRODUCT) {
+		stream << indents.str() << resultName << "->" << resultProperty << " *= ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+	} else if (op == MAX) {
+		stream << indents.str() << "if (" << resultName << "->" << resultProperty;
+		stream << " < ";
+                right->translate(stream, indentLevel, 0, space);
+		stream << ") {\n";
+		stream << indents.str() << indent;
+		stream << resultName << "->" << resultProperty << " = ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+		stream << indents.str() << "}\n";	
+	} else if (op == MIN) {
+		stream << indents.str() << "if (" << resultName << "->" << resultProperty;
+		stream << " > ";
+                right->translate(stream, indentLevel, 0, space);
+		stream << ") {\n";
+		stream << indents.str() << indent;
+		stream << resultName << "->" << resultProperty << " = ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+		stream << indents.str() << "}\n";
+	} else if (op == LAND) {
+		stream << indents.str() << resultName << "->" << resultProperty << " = ";
+		stream << resultName << "->" << resultProperty << " && ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+	} else if (op == LOR) {
+		stream << indents.str() << resultName << "->" << resultProperty << " = ";
+		stream << resultName << "->" << resultProperty << " || ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+	} else if (op == BAND) {
+		stream << indents.str() << resultName << "->" << resultProperty << " = ";
+		stream << resultName << "->" << resultProperty << " & ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+	} else if (op == BOR) {
+		stream << indents.str() << resultName << "->" << resultProperty << " = ";
+		stream << resultName << "->" << resultProperty << " | ";
+                right->translate(stream, indentLevel, 0, space);
+                stream << stmtSeparator;
+	} else {
+		std::cout << "Average, Max-entry, and Min-entry reductions haven't been implemented yet";
+		std::exit(EXIT_FAILURE);
+	}
 }

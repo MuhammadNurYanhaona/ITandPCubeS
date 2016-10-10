@@ -474,7 +474,11 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 			programFile << "ReductionPrimitive_" << varName << "(";
 			programFile << paramIndent << indent;
 			programFile << "Space_" << rdExecLpsName << "_Threads_Per_Segment";
-			programFile << paramSeparator << "segmentGroup)" << stmtSeparator; 
+			programFile << paramSeparator << "segmentGroup)" << stmtSeparator;
+
+			// setup log file reference in the reduction primitive 
+			programFile << indent << varName << "Reducer[0]->setLogFile(&logFile)";
+			programFile << stmtSeparator;
 
 		// otherwise, one or more intra-segment reduction primtives will be needed for the groups of PPUs
 		// rooted at the PPS the LPS has been mapped to.
@@ -487,6 +491,10 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 			programFile << "Space_" << rdExecLpsName << "_Threads_Per_Segment";
 			programFile << ")" << stmtSeparator; 
 			programFile << indent << "}\n";
+
+			// setup log file reference in the reduction primitive 
+			programFile << indent << varName << "Reducer[i]->setLogFile(&logFile)";
+			programFile << stmtSeparator;
 		}
 	}
 	

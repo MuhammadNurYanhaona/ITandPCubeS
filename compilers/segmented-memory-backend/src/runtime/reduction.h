@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <math.h>
+#include <fstream>
 
 // forward declaration of the class that creates and holds MPI communicators
 class SegmentGroup;
@@ -83,10 +84,10 @@ class ReductionPrimitive : public ReductionBarrier {
 	int elementSize;
 	reduction::Result *intermediateResult;
 	ReductionOperator op;
+	std::ofstream *logFile;
   public:
-	ReductionPrimitive(int elementSize, 
-			ReductionOperator op, 
-			int localParticipants);
+	ReductionPrimitive(int elementSize, ReductionOperator op, int localParticipants);
+	void setLogFile(std::ofstream *logFile) { this->logFile = logFile; }
 
 	// Different reduction function requires different initial values for the partial result variable -- the
 	// result variable cannot be just set to all zeros. So subclasses should provide proper implementations.
