@@ -54,7 +54,7 @@ void ReductionBarrier::reduce(reduction::Result *localPartialResult, void *targe
 
 //-------------------------------------------------- Reduction Primitive -------------------------------------------------------
 
-ReductionPrimitive::ReductionPrimitive(int elemntSize, ReductionOperator op, int localParticipants) 
+ReductionPrimitive::ReductionPrimitive(int elementSize, ReductionOperator op, int localParticipants) 
 		: ReductionBarrier(localParticipants) {
 	this->elementSize = elementSize;
 	this->op = op;
