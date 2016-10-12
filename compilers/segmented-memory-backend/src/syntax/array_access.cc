@@ -229,7 +229,7 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, int indentLe
 	} else {
 		std::ostringstream indexStream;
 		index->translate(indexStream, 0, 0, space);
-		stream << '(';
+		stream << "((long) (";
 		// if the current dimension is reordered at any point then we need an elaborate original to transformed
 		// index conversion to be able to locate the storage address for the array index
 		ArrayDataStructure *structure = (ArrayDataStructure*) space->getLocalStructure(array);
@@ -240,10 +240,10 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, int indentLe
 			stream << indexStream.str();
 		}
                 stream << " - " << array << "StoreDims[" << dimension << "].range.min";
-		stream << ')';
+		stream << "))";
 		std::ostringstream xform;
                 for (int i = dimensionCount - 1; i > dimension; i--) {
-                        stream << " * " << array << "StoreDims[" << i << "].length";
+                        stream << " * ((long) (" << array << "StoreDims[" << i << "].length))";
                 }
 	}
 }

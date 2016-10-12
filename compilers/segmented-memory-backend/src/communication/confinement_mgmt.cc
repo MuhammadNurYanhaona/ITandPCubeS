@@ -306,8 +306,8 @@ void DataExchange::describe(int indentLevel, ostream &stream) {
 	drawDataDescription(exchangeDesc, stream, indentLevel + 1);
 }
 
-int DataExchange::getTotalElementsCount() {
-	int count = exchangeDesc->Nth(0)->getNumOfElements();
+long int DataExchange::getTotalElementsCount() {
+	long int count = exchangeDesc->Nth(0)->getNumOfElements();
 	for (int i = 1; i < exchangeDesc->NumElements(); i++) {
 		count += exchangeDesc->Nth(i)->getNumOfElements();
 	}
@@ -362,8 +362,8 @@ int DataExchange::compareTo(DataExchange *other, bool forReceive) {
 	else if (mySegmentTags.size() < othersSegmentTags.size()) return 1;
 
 	// if the exchanges are equivalent in both cases then prioritize the one that communicate more data
-	int myEntries = getTotalElementsCount();
-	int othersEntries = other->getTotalElementsCount();
+	long int myEntries = getTotalElementsCount();
+	long int othersEntries = other->getTotalElementsCount();
 	if (myEntries < othersEntries) return -1;
 	else if (myEntries > othersEntries) return 1;
 

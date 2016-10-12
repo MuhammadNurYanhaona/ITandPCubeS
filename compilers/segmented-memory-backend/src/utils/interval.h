@@ -114,7 +114,7 @@ class MultidimensionalIntervalSeq {
 	~MultidimensionalIntervalSeq();
 
 	// returns the total number of 1's included in this multidimensional interval sequence
-	int getNumOfElements();
+	long int getNumOfElements();
 	// function to initialize intervals of the current sequence all at once from a template interval vector
 	void copyIntervals(std::vector<IntervalSeq*> *templateVector);
 	// extends the intersection finding algorithm from above to the multidimensional sequences case
@@ -190,8 +190,8 @@ class SequenceIterator {
 	int dimensionality;
 	MultidimensionalIntervalSeq *sequence;
 	std::stack<IntervalState*> cursors;
-	int elementCount;
-	int currentElementNo;
+	long int elementCount;
+	long int currentElementNo;
   public:
 	SequenceIterator(MultidimensionalIntervalSeq *sequence);
 	~SequenceIterator();

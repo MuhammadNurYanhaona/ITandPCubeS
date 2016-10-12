@@ -38,7 +38,7 @@ class PartMetadata {
   public:
 	PartMetadata(int dimensionality, List<int*> *idList, Dimension *boundary, int *padding);
 	~PartMetadata();
-	int getSize();
+	long int getSize();
 	inline int getDimensions() { return dimensionality; }
 	inline List<int*> *getIdList() { return idList; }
 	inline Dimension *getBoundary() { return boundary; }

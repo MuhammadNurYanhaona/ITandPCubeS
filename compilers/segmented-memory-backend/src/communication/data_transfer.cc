@@ -50,7 +50,7 @@ int DataPartIndexList::write(char *sourceBuffer, int elementSize) {
 
 DataPartSwiftIndexList::DataPartSwiftIndexList(DataPart *dataPart) : DataPartIndexList() {
 	this->dataPart = dataPart;
-	partIndexes = new List<int>;
+	partIndexes = new List<long int>;
 } 
 
 DataPartSwiftIndexList::~DataPartSwiftIndexList() {
@@ -60,7 +60,7 @@ DataPartSwiftIndexList::~DataPartSwiftIndexList() {
 
 void DataPartSwiftIndexList::setupIndexArray() {
 	int indexCount = partIndexes->NumElements();
-	indexArray = new int[indexCount];
+	indexArray = new long int[indexCount];
 	for (int i = 0; i < indexCount; i++) {
 		indexArray[i] = partIndexes->Nth(i);
 	}
@@ -149,8 +149,8 @@ DataPartIndex DataPartSpec::getDataPartUpdateIndex(PartLocator *partLocator,
         PartMetadata *metadata = dataPart->getMetadata();
         Dimension *partDimensions = metadata->getBoundary();
 
-        int dataPointNo = 0;
-        int multiplier = 1;
+        long int dataPointNo = 0;
+        long int multiplier = 1;
         for (int i = partIndex->size() - 1; i >= 0; i--) {
 
                 int firstIndex = partDimensions[i].range.min;

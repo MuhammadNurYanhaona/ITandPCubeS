@@ -453,7 +453,7 @@ MultidimensionalIntervalSeq::~MultidimensionalIntervalSeq() {
 }
 
 int MultidimensionalIntervalSeq::getNumOfElements() {
-	int count = intervals[0]->getNumOfElements();
+	long int count = intervals[0]->getNumOfElements();
 	for (int i = 1; i < dimensionality; i++) {
 		count *= intervals[i]->getNumOfElements();
 	}

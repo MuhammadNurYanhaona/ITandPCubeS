@@ -113,7 +113,7 @@ void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
 	}
 
 	ExchangeIterator *iterator = getIterator();
-	int elementIndex = 0;
+	long int elementIndex = 0;
 	TransferLocationSpec *transferSpec = new TransferLocationSpec(elementSize);
 	while (iterator->hasMoreElements()) {
 		vector<int> *dataItemIndex = iterator->getNextElement();
@@ -167,7 +167,7 @@ void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBu
 	}
 
 	ExchangeIterator *iterator = getIterator();
-	int elementIndex = 0;
+	long int elementIndex = 0;
 	TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
 	while (iterator->hasMoreElements()) {
 		vector<int> *dataItemIndex = iterator->getNextElement();
@@ -186,9 +186,9 @@ void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBu
 //------------------------------------------------ Physical Communication Buffer -------------------------------------------------/
 
 PhysicalCommBuffer::PhysicalCommBuffer(DataExchange *e, SyncConfig *s) : CommBuffer(e, s) {
-	int bufferSize = elementCount * elementSize;
+	long int bufferSize = elementCount * elementSize;
 	data = new char[bufferSize];
-	for (int i = 0; i < bufferSize; i++) {
+	for (long int i = 0; i < bufferSize; i++) {
 		data[i] = 0;
 	}
 }
@@ -240,9 +240,9 @@ void PhysicalCommBuffer::transferData(TransferSpec *transferSpec,
 		transformVector->push_back(new XformedIndexInfo());
 	}
 	ExchangeIterator *iterator = getIterator();
-	int elementIndex = 0;
-	int transferRequests = 0;
-	int transferCount = 0;
+	long int elementIndex = 0;
+	long int transferRequests = 0;
+	long int transferCount = 0;
 	while (iterator->hasMoreElements()) {
 		vector<int> *dataItemIndex = iterator->getNextElement();
 		if (loggingEnabled) {
@@ -280,15 +280,15 @@ void PhysicalCommBuffer::transferData(TransferSpec *transferSpec,
 PreprocessedPhysicalCommBuffer::PreprocessedPhysicalCommBuffer(DataExchange *exchange,
 		SyncConfig *syncConfig) : PreprocessedCommBuffer(exchange, syncConfig) {
 	
-	int bufferSize = elementCount * elementSize;
+	long int bufferSize = elementCount * elementSize;
 	data = new char[bufferSize];
-	for (int i = 0; i < bufferSize; i++) {
+	for (long int i = 0; i < bufferSize; i++) {
 		data[i] = 0;
 	}
 }
 
 void PreprocessedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
 		char *readLocation = senderTransferMapping[i];
 		char *writeLocation = data + i * elementSize;
 		memcpy(writeLocation, readLocation, elementSize);
@@ -296,7 +296,7 @@ void PreprocessedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream 
 }
 
 void PreprocessedPhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream &logFile) {
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
 		char *readLocation = data + i * elementSize;
 		char *writeLocation = receiverTransferMapping[i];
 		memcpy(writeLocation, readLocation, elementSize);
@@ -308,16 +308,17 @@ void PreprocessedPhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream
 IndexMappedPhysicalCommBuffer::IndexMappedPhysicalCommBuffer(DataExchange *exchange, 
 		SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig) {
 	
-	int bufferSize = elementCount * elementSize;
+	long int bufferSize = elementCount * elementSize;
         data = new char[bufferSize];
-        for (int i = 0; i < bufferSize; i++) {
+        for (long int i = 0; i < bufferSize; i++) {
                 data[i] = 0;
         }
 }
 
 void IndexMappedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
+
 		
 		// Notice that data is read from only the first matched location in the operating memory data part
 		// storage. This is because, all locations matching a single entry in the communication buffer 
@@ -331,7 +332,7 @@ void IndexMappedPhysicalCommBuffer::readData(bool loggingEnabled, std::ostream &
         
 void IndexMappedPhysicalCommBuffer::writeData(bool loggingEnabled, std::ostream &logFile) {
 	
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
                 char *readLocation = data + i * elementSize;
 		List<DataPartIndex> *partIndexList = receiverTransferIndexMapping[i].getPartIndexList();
 
@@ -402,7 +403,7 @@ void SwiftIndexMappedPhysicalCommBuffer::setupSwiftIndexMapping(DataPartIndexLis
 
 	DataPartSwiftIndexList *currSwiftIndex = NULL;
 	DataPartIndexList *currEntry = new DataPartIndexList();	
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
 		currEntry->clone(&transferIndexMapping[i]);
 		List<DataPartIndex> *indexList = currEntry->getPartIndexList();
 		if (!allowMultPartIndexesForSameBufferIndex || indexList->NumElements() == 1) {
@@ -466,9 +467,9 @@ void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 			transformVector->push_back(new XformedIndexInfo());
 		}
 
-		int transferRequests = 0;
-		int readCount = 0;
-		int writeCount = 0;
+		long int transferRequests = 0;
+		long int readCount = 0;
+		long int writeCount = 0;
 
 		ExchangeIterator *iterator = getIterator();
 		while (iterator->hasMoreElements()) {
@@ -528,7 +529,7 @@ void VirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 //------------------------------------------- Pre-processed Virtual Communication Buffer -----------------------------------------/
 
 void PreprocessedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
 		char *readLocation = senderTransferMapping[i];
 		char *writeLocation = receiverTransferMapping[i];
 		memcpy(writeLocation, readLocation, elementSize);
@@ -539,7 +540,7 @@ void PreprocessedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &
 
 void IndexMappedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
 
 		// data is read from only one location as all matching locations should have the same content
 		List<DataPartIndex> *sourcePartIndexList = senderTransferIndexMapping[i].getPartIndexList();
@@ -560,9 +561,9 @@ SwiftIndexMappedVirtualCommBuffer::SwiftIndexMappedVirtualCommBuffer(
 		DataExchange *exchange, SyncConfig *syncConfig) 
 		: IndexMappedVirtualCommBuffer(exchange, syncConfig) {
 
-	int bufferSize = elementCount * elementSize;
+	long int bufferSize = elementCount * elementSize;
 	data = new char[bufferSize];
-	for (int i = 0; i < bufferSize; i++) {
+	for (long int i = 0; i < bufferSize; i++) {
 		data[i] = 0;
 	}
 
@@ -590,7 +591,7 @@ SwiftIndexMappedVirtualCommBuffer::~SwiftIndexMappedVirtualCommBuffer() {
 
 void SwiftIndexMappedVirtualCommBuffer::readData(bool loggingEnabled, std::ostream &logFile) {
 
-	int index = 0;
+	long int index = 0;
         for (int i = 0; i < senderSwiftIndexMapping->NumElements(); i++) {
                 DataPartIndexList *partIndexList = senderSwiftIndexMapping->Nth(i);
                 char *bufferIndex = data + index * elementSize;
@@ -611,7 +612,7 @@ void SwiftIndexMappedVirtualCommBuffer::generateSwiftIndexMappings() {
 	senderSwiftIndexMapping = new List<DataPartIndexList*>;
 	DataPartSwiftIndexList *currSwiftIndex = NULL;
 	DataPartIndexList *currSendEntry = new DataPartIndexList();	
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
 		currSendEntry->clone(&senderTransferIndexMapping[i]);
 		List<DataPartIndex> *indexList = currSendEntry->getPartIndexList();
 		DataPartIndex partIndex = indexList->Nth(0);
@@ -639,7 +640,7 @@ void SwiftIndexMappedVirtualCommBuffer::generateSwiftIndexMappings() {
 	currSwiftIndex = NULL;
 	DataPartIndexList *currRecvEntry = new DataPartIndexList();
 	List<DataPartIndex> *refIndexList = new List<DataPartIndex>;	
-	for (int i = 0; i < elementCount; i++) {
+	for (long int i = 0; i < elementCount; i++) {
 
 		currRecvEntry->clone(&receiverTransferIndexMapping[i]);
 		List<DataPartIndex> *recvIndexList = currRecvEntry->getPartIndexList();
@@ -649,7 +650,7 @@ void SwiftIndexMappedVirtualCommBuffer::generateSwiftIndexMappings() {
 		if (recvIndexList->NumElements() == 1) {
 			DataPartIndex partIndex = recvIndexList->Nth(0);
 			DataPart *dataPart = partIndex.getDataPart();
-			int index = partIndex.getIndex();
+			long int index = partIndex.getIndex();
 			if (currSwiftIndex == NULL) { 
 				currSwiftIndex = new DataPartSwiftIndexList(dataPart);
 				currSwiftIndex->addIndex(index);
@@ -679,11 +680,11 @@ void SwiftIndexMappedVirtualCommBuffer::generateSwiftIndexMappings() {
 				}	
 			}
 
-			// attempt to agment existing or start a new swift index mapping
+			// attempt to augment existing or start a new swift index mapping
 			if (refIndexList->NumElements() == 1) {
 				DataPartIndex partIndex = refIndexList->Nth(0);
 				DataPart *dataPart = partIndex.getDataPart();
-				int index = partIndex.getIndex();	
+				long int index = partIndex.getIndex();	
 				if (currSwiftIndex == NULL) { 
 					currSwiftIndex = new DataPartSwiftIndexList(dataPart);
 					currSwiftIndex->addIndex(index);

@@ -289,9 +289,9 @@ void TransferBuffer::processBuffer(std::ofstream &logFile) {
         }
 
 	ExchangeIterator iterator = ExchangeIterator(exchange);
-        int elementIndex = 0;
-        int transferRequests = 0;
-        int transferCount = 0;
+        long int elementIndex = 0;
+        long int transferRequests = 0;
+        long int transferCount = 0;
         while (iterator.hasMoreElements()) {
                 vector<int> *dataItemIndex = iterator.getNextElement();
                	partListSpec->initPartTraversalReference(dataItemIndex, transformVector);
@@ -303,7 +303,7 @@ void TransferBuffer::processBuffer(std::ofstream &logFile) {
         delete transformVector;
 }
 
-int TransferBuffer::getSize() {
+long int TransferBuffer::getSize() {
 	int elementSize = transferSpec->getStepSize();
         return exchange->getTotalElementsCount() * elementSize;
 }	
@@ -430,7 +430,7 @@ void BufferTransferrer::sendDataAsync(std::ofstream &logFile) {
 	for (int i = 0; i < bufferList->NumElements(); i++) {
 		TransferBuffer *buffer = bufferList->Nth(i);
 		buffer->preprocessBuffer(logFile);
-		int size = buffer->getSize();
+		long int size = buffer->getSize();
 		char *data = buffer->getData();
 		int receiver = buffer->getReceiver();
 		int tag = buffer->getBufferTag();
@@ -456,7 +456,7 @@ void BufferTransferrer::receiveDataAsync(std::ofstream &logFile) {
 
 	for (int i = 0; i < bufferList->NumElements(); i++) {
 		TransferBuffer *buffer = bufferList->Nth(i);
-		int size = buffer->getSize();
+		long int size = buffer->getSize();
 		char *data = buffer->getData();
 		int sender = buffer->getSender();
 		int tag = buffer->getBufferTag();

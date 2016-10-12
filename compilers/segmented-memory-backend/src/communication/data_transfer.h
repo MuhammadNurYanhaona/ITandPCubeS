@@ -35,13 +35,13 @@ enum TransferDirection { COMM_BUFFER_TO_DATA_PART, DATA_PART_TO_COMM_BUFFER };
 class DataPartIndex {
   protected:
 	DataPart *dataPart;
-	int index;
+	long int index;
   public:
 	DataPartIndex() {
 		this->dataPart = NULL;
 		this->index = -1;
 	}
-	DataPartIndex(DataPart *dataPart, int index) {
+	DataPartIndex(DataPart *dataPart, long int index) {
 		this->dataPart = dataPart;
 		this->index = index;	
 	}
@@ -51,7 +51,7 @@ class DataPartIndex {
 		return charData + index;
 	}
 	inline DataPart *getDataPart() { return dataPart; }
-	inline int getIndex() { return index; }
+	inline long int getIndex() { return index; }
 };
 
 /* This class is usefull when more than one location in a data part might need to be accessed (typically for writing 
@@ -86,14 +86,14 @@ class DataPartIndexList {
 class DataPartSwiftIndexList : public DataPartIndexList {
   private:
 	DataPart *dataPart;
-	List<int> *partIndexes;
+	List<long int> *partIndexes;
 	int sequenceLength;
-	int *indexArray;
+	long int *indexArray;
   public:
 	DataPartSwiftIndexList(DataPart *dataPart);
 	~DataPartSwiftIndexList();
 	DataPart *getDataPart() { return dataPart; }
-	void addIndex(int index) { partIndexes->Append(index); }
+	void addIndex(long int index) { partIndexes->Append(index); }
 	void setupIndexArray();
 	int read(char *destBuffer, int elementSize);
 	int write(char *sourceBuffer, int elementSize);

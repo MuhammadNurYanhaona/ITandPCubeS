@@ -186,7 +186,7 @@ class DataExchange {
 
 	// tells the total number of data points that need to be exchanged between the sender and receiver as part of
 	// this data exchange
-	int getTotalElementsCount();
+	long int getTotalElementsCount();
 
 	// This static function is to be used to determine if a candidate pair of sender-receiver participants of a
 	// confinement should indeed exchange data. If the outcome of this function is NULL then the two parties do
@@ -332,8 +332,8 @@ class Confinement {
  * */
 class ExchangeIterator {
   private:
-	int totalElementsCount;
-	int currentElement;
+	long int totalElementsCount;
+	long int currentElement;
 	List<MultidimensionalIntervalSeq*> *sequences;
 	int currentSequence;
 	SequenceIterator *iterator;
