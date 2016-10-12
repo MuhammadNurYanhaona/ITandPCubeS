@@ -55,7 +55,7 @@ void generatePartReaderForStructure(std::ofstream &headerFile, ArrayDataStructur
 	} else {
 		headerFile << " return partIndex" << stmtTerminator << " }\n";
 	}
-	headerFile << indent << "void readElement(List<int> *dataIndex, int storeIndex, void *partStore) {\n";
+	headerFile << indent << "void readElement(List<int> *dataIndex, long int storeIndex, void *partStore) {\n";
 	headerFile << doubleIndent << elementType->getCType();
 	headerFile << " *dataStore = (" << elementType->getCType() << "*) partStore" << stmtSeparator;
 	headerFile << doubleIndent << "dataStore[storeIndex] = stream->readElement(dataIndex)" << stmtSeparator;
@@ -120,7 +120,7 @@ void generatePartWriterForStructure(std::ofstream &headerFile, ArrayDataStructur
 	} else {
 		headerFile << " return partIndex" << stmtTerminator << " }\n";
 	}
-	headerFile << indent << "void writeElement(List<int> *dataIndex, int storeIndex, void *partStore) {\n";
+	headerFile << indent << "void writeElement(List<int> *dataIndex, long int storeIndex, void *partStore) {\n";
 	headerFile << doubleIndent << elementType->getCType();
 	headerFile << " *dataStore = (" << elementType->getCType() << "*) partStore" << stmtSeparator;
 	headerFile << doubleIndent << "stream->writeElement(dataStore[storeIndex]" <<  paramSeparator;

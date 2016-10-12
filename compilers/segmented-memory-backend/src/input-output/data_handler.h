@@ -77,7 +77,7 @@ class PartHandler {
 	// functions to be used to identify the memory for the part that will receive/send updates in the I/O process
 	void *getCurrentPartData() { return currentPart->getData(); }
 	// returns one dimensional update index for an element from its, possibly, multidimensional part index 
-	int getStorageIndex(List<int> *partIndex, Dimension *partDimension);
+	long int getStorageIndex(List<int> *partIndex, Dimension *partDimension);
 	// returns the data dimension in a list format
 	List<Dimension*> *getDimensionList();
 
@@ -89,7 +89,7 @@ class PartHandler {
 	virtual List<int> *getDataIndex(List<int> *partIndex) = 0;
 	
 	// this function is provided so that subclasses can use appropriate type while reading/writing data 
-	virtual void processElement(List<int> *dataIndex, int storeIndex, void *partStore) = 0;
+	virtual void processElement(List<int> *dataIndex, long int storeIndex, void *partStore) = 0;
 
 	// two functions to be used by subclasses to initialize and destroy any resource that may be created for the
 	// reading/writing process, e.g., opening and closing I/O streams.
@@ -111,10 +111,10 @@ class PartReader : public PartHandler {
 
 	// the process element method just call the virtual read element function; this conversion is done to make it
 	// explicit the reading process. Task specific subclasses should implement the readElement() function
-	void processElement(List<int> *dataIndex, int storeIndex, void *partStore) {
+	void processElement(List<int> *dataIndex, long int storeIndex, void *partStore) {
 		readElement(dataIndex, storeIndex, partStore);
 	}
-	virtual void readElement(List<int> *dataIndex, int storeIndex, void *partStore) = 0;	
+	virtual void readElement(List<int> *dataIndex, long int storeIndex, void *partStore) = 0;	
 };
 
 /* base class to be extended for the writing process */
@@ -142,10 +142,10 @@ class PartWriter : public PartHandler {
 
 	// like the PartReader, this class also override the processElement() method to make writing process explicit
 	// for task specific subclasses  
-	void processElement(List<int> *dataIndex, int storeIndex, void *partStore) {
+	void processElement(List<int> *dataIndex, long int storeIndex, void *partStore) {
 		writeElement(dataIndex, storeIndex, partStore);
 	}
-	virtual void writeElement(List<int> *dataIndex, int storeIndex, void *partStore) = 0;	
+	virtual void writeElement(List<int> *dataIndex, long int storeIndex, void *partStore) = 0;	
 };
 
 #endif
