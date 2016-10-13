@@ -12,7 +12,7 @@ namespace allocate {
 	// allocates a possibly multidimensional array containing arbitrary type of object as a
 	// single dimensional array
 	template <class type> type *allocateArray(int dimensionCount, Dimension *dimensions) {
-		int length = 1;
+		long int length = 1;
 		for (int i = 0; i < dimensionCount; i++) {
 			length *= dimensions[i].getLength();
 		}
@@ -23,11 +23,11 @@ namespace allocate {
 	// for non-primitive types default initial value may not be just zero
 	template <class type> void zeroFillArray(type zeroValue, type *array,
 			int dimensionCount, Dimension *dimensions) {
-		int length = 1;
+		long int length = 1;
 		for (int i = 0; i < dimensionCount; i++) {
 			length *= dimensions[i].getLength();
 		}
-		for (int i = 0; i < length; i++) {
+		for (long int i = 0; i < length; i++) {
 			array[i] = zeroValue;
 		}
 	}
@@ -35,12 +35,12 @@ namespace allocate {
 	// randomly initialize a possibly multidimensional array of primitive types
 	template <class type> void randomFillPrimitiveArray(type *array,
 			int dimensionCount, Dimension *dimensions) {
-		int length = 1;
+		long int length = 1;
 		for (int i = 0; i < dimensionCount; i++) {
 			length *= dimensions[i].getLength();
 		}
 		srand(time(NULL));
-		for (int i = 0; i < length; i++) {
+		for (long int i = 0; i < length; i++) {
 			array[i] = (type) ((rand() % 100) / 75.00f);
 		}
 	}

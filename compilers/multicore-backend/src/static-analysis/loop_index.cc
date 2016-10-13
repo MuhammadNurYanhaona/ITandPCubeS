@@ -62,21 +62,21 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
 	ArrayDataStructure *structure = (ArrayDataStructure*) space->getStructure(array);
 	int dimensionCount = structure->getDimensionality();
 	std::ostringstream xform;
-	xform << "(" << index;
+	xform << "((long) (" << index;
 	// TODO the following line is disabled to make code pleasing to look at for manual inspection. Once
 	// we are done with debugging, we have to enable it.
 	// xform << " - " << array << "PartDims[" << dimensionNo << "].getPositiveRange().min";
-	xform << ")";
+	xform << "))";
 	bool firstEntry = true;
 	for (int i = dimensionCount - 1; i > dimensionNo; i--) {
 		if (!firstEntry) {
 			xform << '\n' << indent.str() << "\t\t";
 		}
-		xform << " * " << array << "StoreDims[" << i << "].length";
+		xform << " * ((long) (" << array << "StoreDims[" << i << "].length))";
 		firstEntry = false;
 	}
 	stream << indent.str();
-	stream << "int " << index << array << dimensionNo;
+	stream << "long int " << index << array << dimensionNo;
 	stream << " = " << xform.str() << ";\n";
 }
 

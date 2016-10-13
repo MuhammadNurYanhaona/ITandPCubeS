@@ -44,7 +44,7 @@ namespace outprompt {
 			std::exit(EXIT_FAILURE);
 		}
 
-		int elementsCount = 1;
+		long int elementsCount = 1;
 		int lastDimLength = 0;
 		for (int i = 0; i < dimensionCount; i++) {
 			if (i > 0) file << " * ";
@@ -55,7 +55,7 @@ namespace outprompt {
 		file << '\n';
 
 		int outputOnALine = 0;
-		for (int i = 0; i < elementsCount; i++) {
+		for (long int i = 0; i < elementsCount; i++) {
 			file << array[i];
 			outputOnALine++;
 			if (outputOnALine < lastDimLength) {

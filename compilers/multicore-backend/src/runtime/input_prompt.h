@@ -67,13 +67,13 @@ namespace inprompt {
 		}
 
 		readArrayDimensionInfoFromFile(file, dimensionCount, dimensions);
-		int elementsCount = 1;
+		long int elementsCount = 1;
 		for (int i = 0; i < dimensionCount; i++) {
 			elementsCount *= dimensions[i].getLength();
 		}
 		type *array = new type[elementsCount];
 
-		int readCount = 0;
+		long int readCount = 0;
 		type nextElement;
 		while (file >> nextElement) {
 			array[readCount] = nextElement;

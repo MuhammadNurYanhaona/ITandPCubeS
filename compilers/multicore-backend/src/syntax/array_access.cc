@@ -214,16 +214,16 @@ void ArrayAccess::generate1DIndexAccess(std::ostringstream &stream, const char *
 		indexAccess->translateIndex(stream, array, dimension);
 	// Otherwise, there might be a need for translating the index
 	} else {
-		stream << '('; 
+		stream << "((long) ("; 
 		index->translate(stream, 0, 0, space);
 		// TODO The following line is commented out temporarily. It is needed for dimensions that start from
 		// nonzero index. We disable it so that code looks easy to reason with. We need to enable this later
 		// once we are done debugging.
                 //stream << " - " << array << "partDims[" << dimension << "].getPositiveRange().min";
-		stream << ')';
+		stream << "))";
 		std::ostringstream xform;
                 for (int i = dimensionCount - 1; i > dimension; i--) {
-                        stream << " * " << array << "StoreDims[" << i << "].length";
+                        stream << " * ((long) (" << array << "StoreDims[" << i << "].length))";
                 }
 	}
 }
