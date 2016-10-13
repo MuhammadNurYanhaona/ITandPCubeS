@@ -95,14 +95,14 @@ const char *NameTransformer::getArrayIndexStorageSuffix(const char *arrayName,
 
 	std::ostringstream indexSuffix;
 	indexSuffix << " - " << arrayName << "StoreDims[" << dimensionNo << "].range.min";
-	indexSuffix << ")";
+	indexSuffix << "))";
 
 	bool firstEntry = true;
 	for (int i = dimensionCount - 1; i > dimensionNo; i--) {
 		if (!firstEntry) {
 			indexSuffix << "\n" << indent.str();
 		}
-		indexSuffix << " * " << arrayName << "StoreDims[" << i << "].length";
+		indexSuffix << " * ((long) (" << arrayName << "StoreDims[" << i << "].length))";
 		firstEntry = false;
 	}
 
@@ -205,11 +205,11 @@ const char *HybridNameTransformer::getArrayIndexStorageSuffix(const char *arrayN
 	std::ostringstream indexSuffix;
 	indexSuffix << " - ";
 	indexSuffix << arrayName << "SRanges[" << dimensionNo << "].range.min";
-	indexSuffix << ")";
+	indexSuffix << "))";
 	for (int i = dimensionCount - 1; i > dimensionNo; i--) {
 		indexSuffix << '\n' << indentStr.str();
-		indexSuffix << " * (" << arrayName << "SRanges[" << i << "].range.max";
-		indexSuffix << " - " << arrayName << "SRanges[" << i << "].range.min + 1)";
+		indexSuffix << " * ((long) (" << arrayName << "SRanges[" << i << "].range.max";
+		indexSuffix << " - " << arrayName << "SRanges[" << i << "].range.min + 1))";
 	}
 
 	return strdup(indexSuffix.str().c_str());

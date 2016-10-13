@@ -212,7 +212,7 @@ void PartHandler::processPart(Dimension *partDimensions, int currentDimNo, List<
 		} else {
 			List<int> *dataIndex = getDataIndex(partialIndex);
 			if (!needToExcludePadding || currentPartInfo->isDataIndexInCorePart(dataIndex)) {
-				int storeIndex = getStorageIndex(partialIndex, partDimensions);
+				long int storeIndex = getStorageIndex(partialIndex, partDimensions);
 				processElement(dataIndex, storeIndex, partStore);
 			}
 		}
@@ -220,9 +220,9 @@ void PartHandler::processPart(Dimension *partDimensions, int currentDimNo, List<
 	}
 }
 
-int PartHandler::getStorageIndex(List<int> *partIndex, Dimension *partDimensions) {
-	int storeIndex = 0;
-	int multiplier = 1;
+long int PartHandler::getStorageIndex(List<int> *partIndex, Dimension *partDimensions) {
+	long int storeIndex = 0;
+	long int multiplier = 1;
 	for (int i = partIndex->NumElements() - 1; i >= 0; i--) {
 		int firstIndex = partDimensions[i].range.min;
 		int dimensionIndex = partIndex->Nth(i);

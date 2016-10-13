@@ -1,6 +1,5 @@
 #include "allocation.h"
 #include "part_tracking.h"
-#include "part_generation.h"
 #include "../utils/utility.h"
 #include "../utils/list.h"
 #include "../runtime/structure.h"
@@ -40,8 +39,8 @@ PartMetadata::~PartMetadata() {
 	delete idList;
 }
         
-int PartMetadata::getSize() {
-	int size = 1;
+long int PartMetadata::getSize() {
+	long int size = 1;
 	for (int i = 0; i < dimensionality; i++) {
 		size *= boundary[i].getLength();
 	}
@@ -96,14 +95,14 @@ DataPart::~DataPart() {
 
 void DataPart::allocate(int versionThreshold) {
 	
-	int size = metadata->getSize();
-	int allocationSize = elementSize * size;
+	long int size = metadata->getSize();
+	long int allocationSize = elementSize * size;
 
 	for (int i = versionThreshold; i < epochCount; i++) {
 		void *allocation = malloc(sizeof(char) * allocationSize);
 		Assert(allocation != NULL);
 		char *data = (char *) allocation;
-		for (int j = 0; j < allocationSize; j++) {
+		for (long int j = 0; j < allocationSize; j++) {
 			data[j] = 0;
 		}
 		dataVersions->push_back(allocation);
@@ -122,7 +121,7 @@ void *DataPart::getData(int epoch) {
 void DataPart::synchronizeAllVersions() {
 	
 	void *updatedData = dataVersions->at(epochHead);
-	int partSize = metadata->getSize() * elementSize;
+	long int partSize = metadata->getSize() * elementSize;
 	
 	int epoch = 1;
 	while (epoch < epochCount) {

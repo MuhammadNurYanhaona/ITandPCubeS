@@ -1143,12 +1143,12 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 		if (i > 0) {
 			stream << paramIndent << indentPrefix << " + ";
 		}
-		stream << "(d_" << i << " - " << recvRange.str() << "[" << i << "].range.min)";
+		stream << "((long) (d_" << i << " - " << recvRange.str() << "[" << i << "].range.min))";
 		if (i < dimensions - 1) {
 			for (int j = i + 1; j < dimensions; j++) {
 				stream << paramIndent << indentPrefix << " * ";
-				stream << "(" << recvRange.str() << "[" << j << "].range.max - ";
-				stream << recvRange.str() << "[" << j << "].range.min + 1)";
+				stream << "((long) (" << recvRange.str() << "[" << j << "].range.max - ";
+				stream << recvRange.str() << "[" << j << "].range.min + 1))";
 			}
 		}	
 	}
@@ -1158,12 +1158,12 @@ void GpuExecutionContext::generateElementTransferStmt(std::ofstream &stream,
 		if (i > 0) {
 			stream << paramIndent << indentPrefix << " + ";	
 		}
-		stream << "(d_" << i << " - " << sendRange.str() << "[" << i << "].range.min)";
+		stream << "((long) (d_" << i << " - " << sendRange.str() << "[" << i << "].range.min))";
 		if (i < dimensions - 1) {
 			for (int j = i + 1; j < dimensions; j++) {
 				stream << paramIndent << indentPrefix << " * ";
-				stream << "(" << sendRange.str() << "[" << j << "].range.max - ";
-				stream << sendRange.str() << "[" << j << "].range.min + 1)";
+				stream << "((long) (" << sendRange.str() << "[" << j << "].range.max - ";
+				stream << sendRange.str() << "[" << j << "].range.min + 1))";
 			}
 		}	
 	}

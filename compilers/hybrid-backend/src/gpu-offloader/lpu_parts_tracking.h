@@ -53,7 +53,7 @@ class LpuDataPart {
 	// this tells the size of each element inside the data part
 	int elementSize;
 	// this tells the total element count in the data part
-	int elementCount;
+	long int elementCount;
 	// this is the part Id of the storage unit (not the partition unit) that host the data for this LPU part
 	List<int*> *partId;
 	// read only data parts need not be retrieved back from the GPU at the end of the kernel executions
@@ -69,7 +69,7 @@ class LpuDataPart {
 	virtual void *getData() { return data; }
 	List<int*> *getId() { return partId; }
 	bool isMatchingId(List<int*> *candidateId);
-	virtual int getSize();
+	virtual long int getSize();
 	void flagReadOnly() { readOnly = true; }
 	bool isReadOnly() { return readOnly; }
 	int getDataDimensions() { return dimensionality; }
@@ -78,7 +78,7 @@ class LpuDataPart {
 	// these two functions are provided to simplify code generation for determining the size of the largest subpart that may 
 	// be copied into and out of the SM memory for a larger data part residing in the GPU card memory.
 	void copyDimLengths(int *dimLengthArray);
-	virtual int getSizeForSubpartsWithDimLengths(int *subpartLengthsArray);
+	virtual long int getSizeForSubpartsWithDimLengths(int *subpartLengthsArray);
 
 };
 
@@ -99,9 +99,9 @@ class VersionedLpuDataPart : public LpuDataPart {
 	short getVersionCount() { return versionCount; }
 	void *getDataVersion(int version);
 	void advanceEpochVersion();
-	int getSize() { return LpuDataPart::getSize() * versionCount; }
+	long int getSize() { return LpuDataPart::getSize() * versionCount; }
 	void describe(std::ofstream &stream, int indentLevel);
-	int getSizeForSubpartsWithDimLengths(int *subpartLengthsArray);
+	long int getSizeForSubpartsWithDimLengths(int *subpartLengthsArray);
 };
 
 /* In most likely cases, the memory capacity of the GPU will be far less than the memory capacity of the host machine. Therefore, 
@@ -118,7 +118,7 @@ class GpuMemoryConsumptionStat {
 	void addPartConsumption(LpuDataPart *part);
 	void reset() { currSpaceConsumption = 0l; }
 	bool isOverfilled() { return currSpaceConsumption > consumptionLimit; }
-	bool canHoldLpu(int lpuMemReq) { return currSpaceConsumption + lpuMemReq <= consumptionLimit; }
+	bool canHoldLpu(long int lpuMemReq) { return currSpaceConsumption + lpuMemReq <= consumptionLimit; }
 	
 	// this determines what parcentage of the set consumption limit has already being filled 
 	float getConsumptionLevel();	
@@ -164,7 +164,7 @@ class LpuDataPartTracker {
 	// To be able to allocate and assign parts of dynamic SM memory properly, we need to know the maximum memory requirement for
 	// a data part of individual variables used inside the GPU kernels. This property is used to keep track of the maximum memory 
 	// consumption per data part per variable 
-	Hashtable<int*> *maxDataPartSizes;	
+	Hashtable<long int*> *maxDataPartSizes;	
 
 	// a back pointer to the the lpu-batch-controller is maintained to get access to its part-size determining function
 	LpuBatchController *batchController;
@@ -178,7 +178,7 @@ class LpuDataPartTracker {
 		return partIndexMap->Lookup(varName); 
 	}
 	List<LpuDataPart*> *getDataPartList(const char *varName); 
-	int getMaxPartSize(const char *varName) { return *(maxDataPartSizes->Lookup(varName)); }
+	long int getMaxPartSize(const char *varName) { return *(maxDataPartSizes->Lookup(varName)); }
 	
         // An addition of a new LPU data part for a particular property may fail as that part may have been already included as part
         // of a previous LPU. The return value of this function indicates if the add operation was successful so that the caller can 
@@ -200,7 +200,7 @@ class GpuBufferReferences {
 	char *dataBuffer;
 	int *partIndexBuffer;
 	int *partRangeBuffer;
-	int *partBeginningBuffer;
+	long int *partBeginningBuffer;
 
 	// this non-pointer variable is needed to determine how to read information from the part-range-buffer
 	int partRangeDepth;
@@ -223,7 +223,7 @@ class VersionedGpuBufferReferences : public GpuBufferReferences {
  */
 class PropertyBufferManager {
   protected:
-	int bufferSize;
+	long int bufferSize;
 	int bufferEntryCount;
 	int bufferReferenceCount;
 	int partRangeDepth;
@@ -232,11 +232,11 @@ class PropertyBufferManager {
 	char *cpuBuffer;
 	int *cpuPartIndexBuffer;
 	int *cpuPartRangeBuffer;
-	int *cpuPartBeginningBuffer;
+	long int *cpuPartBeginningBuffer;
 
 	char *gpuBuffer;
 	int *gpuPartIndexBuffer;
-	int *gpuPartBeginningBuffer;
+	long int *gpuPartBeginningBuffer;
 	int *gpuPartRangeBuffer;
 
 	std::ofstream *logFile;
@@ -328,7 +328,7 @@ class LpuBatchController {
 	bool isEmptyBatch() { return currentBatchSize == 0; }
 	int getBatchLpuCountThreshold() { return batchLpuCountThreshold; }
 	int getCurrentBatchSize() { return currentBatchSize; }
-	int getMaxPartSizeForProperty( const char *varName) { return dataPartTracker->getMaxPartSize(varName); }
+	long int getMaxPartSizeForProperty( const char *varName) { return dataPartTracker->getMaxPartSize(varName); }
 	GpuBufferReferences *getGpuBufferReferences(const char *propertyName) { 
 		return bufferManager->getGpuBufferReferences(propertyName); 
 	}
@@ -340,9 +340,9 @@ class LpuBatchController {
 	// into the SMs's shared memory and what should be left on the GPU card memory and be accessed from there during kernel
 	// computation. This is a critical analysis as SM memory is at the range of 100 times fater than the card memory but not
 	// all data structures can be fit into it.
-	virtual int calculateLpuMemoryRequirement(LPU *lpu) = 0;
+	virtual long int calculateLpuMemoryRequirement(LPU *lpu) = 0;
 	virtual void addLpuToTheCurrentBatch(LPU *lpu, int ppuIndex) { currentBatchSize++; }
-	virtual int calculateSmMemReqForDataPart(const char *varName, LpuDataPart *dataPart) {
+	virtual long int calculateSmMemReqForDataPart(const char *varName, LpuDataPart *dataPart) {
 		return dataPart->getSize();
 	}
 };

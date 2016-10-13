@@ -135,7 +135,7 @@ class TransferBuffer {
 	char *getData() { return data; }
 	void postProcessBuffer(std::ofstream &logFile);
 	int compareTo(TransferBuffer *other);
-	int getSize();
+	long int getSize();
   private:
 	void processBuffer(std::ofstream &logFile);
 };

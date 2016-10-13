@@ -47,7 +47,7 @@ void ReplicationSyncCommunicator::sendData() {
         }
 
 	CommBuffer *buffer = commBufferList->Nth(0);
-	int bufferSize = buffer->getBufferSize();
+	long int bufferSize = buffer->getBufferSize();
 	char *data = buffer->getData();
 
 	status = MPI_Bcast(data, bufferSize, MPI_CHAR, myRank, mpiComm);
@@ -87,7 +87,7 @@ void ReplicationSyncCommunicator::receiveData() {
                 cout << "Segment " << localSegmentTag << ": none is making the broadcast\n";
 	} else {
 		CommBuffer *buffer = commBufferList->Nth(0);
-		int bufferSize = buffer->getBufferSize();
+		long int bufferSize = buffer->getBufferSize();
 		char *data = buffer->getData();
 
 		status = MPI_Bcast(data, bufferSize, MPI_CHAR, broadcaster, mpiComm);
@@ -174,7 +174,7 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	MPI_Request *recvRequests = new MPI_Request[remoteRecvs];
 	for (int i = 0; i < remoteRecvs ; i++) {
 		CommBuffer *buffer = remoteReceiveBuffers->Nth(i);
-		int bufferSize = buffer->getBufferSize();
+		long int bufferSize = buffer->getBufferSize();
 		char *data = buffer->getData();
 		DataExchange *exchange = buffer->getExchange();
 		Participant *sender = exchange->getSender();
@@ -197,7 +197,7 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	MPI_Request *sendRequests = new MPI_Request[remoteSends];
 	for (int i = 0; i < remoteSends; i++) {
 		CommBuffer *buffer = remoteSendBuffers->Nth(i);
-		int bufferSize = buffer->getBufferSize();
+		long int bufferSize = buffer->getBufferSize();
 		char *data = buffer->getData();
 		DataExchange *exchange = buffer->getExchange();
 		Participant *receiver = exchange->getReceiver();
@@ -343,7 +343,7 @@ void UpSyncCommunicator::sendData() {
 		sendBuffer->writeData(false, *logFile);
 	} else {
 		char *data = sendBuffer->getData();
-		int bufferSize = sendBuffer->getBufferSize();
+		long int bufferSize = sendBuffer->getBufferSize();
 		MPI_Comm mpiComm = segmentGroup->getCommunicator();
 		int participants = segmentGroup->getParticipantsCount();
 		int receiverSegment = exchange->getReceiver()->getSegmentTags()[0];
@@ -381,7 +381,7 @@ void UpSyncCommunicator::receiveData() {
 		// in the send-receive mode there is just one communication buffer in the receiver
 		CommBuffer *buffer = commBufferList->Nth(0);
 		char *data = buffer->getData();
-		int bufferSize = buffer->getBufferSize();
+		long int bufferSize = buffer->getBufferSize();
 		int status = MPI_Recv(data, bufferSize, MPI_CHAR, MPI_ANY_SOURCE, 0, mpiComm, MPI_STATUS_IGNORE);
                 if (status != MPI_SUCCESS) {
                         cout << "Segment " << localSegmentTag << "could not receive up-sync update from unknown source\n";
@@ -411,7 +411,7 @@ void UpSyncCommunicator::allocateAndLinkGatherBuffer() {
 	// local communication buffers need not be updated
 	delete localList;
 	
-	int gatherBufferSize = 0;
+	long int gatherBufferSize = 0;
 	for (int i = 0; i < remoteList->NumElements(); i++) {
 		gatherBufferSize += remoteList->Nth(i)->getBufferSize();
 	}
@@ -427,7 +427,7 @@ void UpSyncCommunicator::allocateAndLinkGatherBuffer() {
 		receiveCounts[i] = 0;
 	}
 
-	int currentIndex = 0;
+	long int currentIndex = 0;
 	for (int i = 0; i < remoteList->NumElements(); i++) {
 		CommBuffer *buffer = remoteList->Nth(i);
 		buffer->setData(gatherBuffer + currentIndex);
@@ -436,7 +436,7 @@ void UpSyncCommunicator::allocateAndLinkGatherBuffer() {
 		int senderSegment = buffer->getExchange()->getSender()->getSegmentTags()[0];
 		int senderRank = segmentGroup->getRank(senderSegment);
 		displacements[senderRank] = currentIndex;
-		int bufferSize = buffer->getBufferSize();
+		long int bufferSize = buffer->getBufferSize();
 		receiveCounts[senderRank] = bufferSize;
 		currentIndex += bufferSize;
 	}
@@ -539,12 +539,14 @@ void DownSyncCommunicator::sendData() {
 
 	if (commMode == BROADCAST) {
 
-		// do the broadcast only when the there are other segments waiting for the update 
+		// in the broadcast transfer mode there is just one buffer content to communicate
 		CommBuffer *buffer = commBufferList->Nth(0);
-		DataExchange *exchange = buffer->getExchange();	
-		if (!exchange->isIntraSegmentExchange(localSegmentTag)) {	
+
+		// issue the MPI broadcast only when there are some other segments waiting to receive the data
+		DataExchange *exchange = buffer->getExchange();
+		if (!exchange->isIntraSegmentExchange(localSegmentTag)) {
 			char *data = buffer->getData();
-			int bufferSize = buffer->getBufferSize();
+			long int bufferSize = buffer->getBufferSize();
 			int status = MPI_Bcast(data, bufferSize, MPI_CHAR, myRank, mpiComm);
 			if (status != MPI_SUCCESS) {
 				cout << "Segment " << localSegmentTag;
@@ -553,7 +555,7 @@ void DownSyncCommunicator::sendData() {
 			}
 		}
 
-		// always update own operating memory data as the sender will bypass the receive call on the communicator
+		// need to update own operating memory data as the sender will bypass the receive call on the communicator
 		buffer->writeData(false, *logFile);
 	} else {		
 		// need to update its own receiving buffer in the scatter mode separately; interchange for others are included
@@ -582,7 +584,7 @@ void DownSyncCommunicator::receiveData() {
 	// is just one sender
 	CommBuffer *buffer = commBufferList->Nth(0);
 	char *data = buffer->getData();
-	int bufferSize = buffer->getBufferSize();
+	long int bufferSize = buffer->getBufferSize();
 	
 	int senderTag = buffer->getExchange()->getSender()->getSegmentTags()[0];
 	int sender = segmentGroup->getRank(senderTag);
@@ -621,7 +623,7 @@ void DownSyncCommunicator::allocateAndLinkScatterBuffer() {
 	// local communication buffers need not be updated to be connected with the accumulator scatter send buffer
 	delete localList;
 
-	int scatterBufferSize = 0;
+	long int scatterBufferSize = 0;
 	for (int i = 0; i < remoteList->NumElements(); i++) {
 		scatterBufferSize += remoteList->Nth(i)->getBufferSize();
 	}
@@ -637,11 +639,11 @@ void DownSyncCommunicator::allocateAndLinkScatterBuffer() {
 		sendCounts[i] = 0;
 	}
 	
-	int currentIndex = 0;
+	long int currentIndex = 0;
 	for (int i = 0; i < remoteList->NumElements(); i++) {
 		CommBuffer *buffer = remoteList->Nth(i);
 		buffer->setData(scatterBuffer + currentIndex);
-		int bufferSize = buffer->getBufferSize();
+		long int bufferSize = buffer->getBufferSize();
 		
 		// in the replicated mode a single buffer may be shared by multiple receiver segments; such segments
 		// should have the same displacement index
@@ -809,7 +811,7 @@ void CrossSyncCommunicator::sendData() {
 
 			int receiver =segmentGroup->getRank(segmentTag);
 			char *data = buffer->getData();
-			int bufferSize = buffer->getBufferSize();
+			long int bufferSize = buffer->getBufferSize();
 			int status = MPI_Isend(data, bufferSize, MPI_CHAR, 
 					receiver, bufferTag, mpiComm, &sendRequests[requestIndex]);
 			if (status != MPI_SUCCESS) {
@@ -897,7 +899,7 @@ MPI_Request *CrossSyncCommunicator::issueAsyncReceives(List<CommBuffer*> *remote
 	for (int i = 0; i < remoteReceiveBuffers->NumElements(); i++) {
 		CommBuffer *buffer = remoteReceiveBuffers->Nth(i);
 		int bufferTag = buffer->getBufferTag();
-		int bufferSize = buffer->getBufferSize();
+		long int bufferSize = buffer->getBufferSize();
 		char *data = buffer->getData();
 		int status = MPI_Irecv(data, bufferSize, MPI_CHAR, MPI_ANY_SOURCE, bufferTag, mpiComm, &receiveRequests[i]);
                 if (status != MPI_SUCCESS) {

@@ -128,8 +128,8 @@ bool ListReferenceAttributes::isSuperFold(List<MultidimensionalIntervalSeq*> *fi
 	if (first == NULL && second != NULL) return false;
 	else if (second == NULL) return true;
 
-	int elementsCount = 0;
-	int coveredElements = 0;
+	long int elementsCount = 0;
+	long int coveredElements = 0;
 
 	for (int i = 0; i < second->NumElements(); i++) {
 		MultidimensionalIntervalSeq *otherSeq = second->Nth(i);	

@@ -79,6 +79,7 @@ build: $(C_OBJS) gpuCode.obj
 clean:
 	rm -rfv  build/$(BUILD_SUBDIR)
 	rm -f gpuCode.obj
+	rm -f bin/it-program.o
 
 	
 

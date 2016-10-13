@@ -387,7 +387,7 @@ void generateMaxPartSizeMetadataStruct(GpuExecutionContext *gpuContext, std::ofs
 			gpuContext->getVariableAccessList(), arrayNames);
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {
 		const char *varName = accessedArrays->Nth(i);
-		headerFile << indent << "int " << varName << "MaxPartSize" << stmtSeparator;
+		headerFile << indent << "long int " << varName << "MaxPartSize" << stmtSeparator;
 	}
 
 	headerFile << "}" << stmtSeparator;
@@ -467,10 +467,10 @@ void generateLpuBatchControllerForLps(GpuExecutionContext *gpuContext,
 	headerFile << "  public:\n";
 	headerFile << indent << className;
 	headerFile << "(Hashtable<DataPartitionConfig*> *partConfigMap)" << stmtSeparator;
-	headerFile << indent << "int calculateLpuMemoryRequirement(LPU *lpu)" << stmtSeparator;
+	headerFile << indent << "long int calculateLpuMemoryRequirement(LPU *lpu)" << stmtSeparator;
 	headerFile << indent << "void addLpuToTheCurrentBatch(LPU *lpu" << paramSeparator;
 	headerFile << "int ppuIndex)" << stmtSeparator;
-	headerFile << indent << "int calculateSmMemReqForDataPart(";
+	headerFile << indent << "long int calculateSmMemReqForDataPart(";
 	headerFile << "const char *varName" << paramSeparator;
 	headerFile << "LpuDataPart *dataPart)" << stmtSeparator;
 	headerFile << "}" << stmtSeparator;
@@ -707,7 +707,7 @@ void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext,
 	std::string className = classNameStr.str();
 
 	programFile << std::endl;
-	programFile << "int " << initials << "::" << className;
+	programFile << "long int " << initials << "::" << className;
 	programFile << "::calculateLpuMemoryRequirement(LPU *lpu) {\n\n";
 
 	// get the LPS specific LPU reference
@@ -716,7 +716,7 @@ void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext,
 	programFile << "_LPU *typedLpu = (Space" << lpsName << "_LPU*) lpu" << stmtSeparator;
 
 	// initialize the size tracker variable
-	programFile << indent << "int size = 0" << stmtSeparator;
+	programFile << indent << "long int size = 0" << stmtSeparator;
 
 	// iterate over the arrays to be used in the GPU computation
 	for (int i = 0; i < accessedArrays->NumElements(); i++) {
@@ -736,12 +736,13 @@ void generateLpuBatchControllerMemchecker(GpuExecutionContext *gpuContext,
 		Type *elementType = arrayType->getTerminalElementType();
 
 		// calculate the amount of additional GPU memory this part will consume
-		programFile << doubleIndent << "int partSize = ";
+		programFile << doubleIndent << "long int partSize = ";
 		for (int j = 0; j < dimensionality; j++) {
 			if (j > 0) {
 				programFile << paramIndent << doubleIndent << "* ";
 			}
-			programFile << "typedLpu->" << varName << "PartDims[" << j << "].storage.getLength()";
+			programFile << "((long) (typedLpu->" << varName << "PartDims[" << j;
+			programFile << "].storage.getLength()))";
 		}
 		programFile << paramIndent << doubleIndent << "* sizeof(" << elementType->getCType() << ")";
 		if (string_utils::contains(epochDependArrays, varName)) {
@@ -776,7 +777,7 @@ void generateLpuBatchControllerSmMemReqFinder(GpuExecutionContext *gpuContext,
 
 	// write the function signature
         programFile << std::endl;
-        programFile << "int " << initials << "::" << className;
+        programFile << "long int " << initials << "::" << className;
         programFile << "::calculateSmMemReqForDataPart(";
 	programFile << "const char *varName" << paramSeparator;
 	programFile << "LpuDataPart *dataPart) {\n\n";

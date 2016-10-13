@@ -63,7 +63,7 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
 	ArrayDataStructure *structure = (ArrayDataStructure*) space->getStructure(array);
 	int dimensionCount = structure->getDimensionality();
 	std::ostringstream xform;
-	xform << "(" << index;
+	xform << "((long) (" << index;
 	if (structure->isDimensionReordered(dimensionNo + 1, space->getRoot())) {
 		xform << "Xformed";
 	}
@@ -73,7 +73,7 @@ void IndexArrayAssociation::generateTransform(std::ostringstream &stream, int in
                                 dimensionNo, dimensionCount, indentLevel);
 	xform << indexSuffix;
 	stream << indent.str();
-	stream << "int " << index << array << dimensionNo;
+	stream << "long int " << index << array << dimensionNo;
 	stream << " = " << xform.str() << ";\n";
 }
 

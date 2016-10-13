@@ -59,7 +59,7 @@ class CommBuffer {
 	// data dimension information is needed to access data items from specific indexes on a data-part
 	int dataDimensions;
 	// the number of data items this communication buffer exchanges
-	int elementCount;
+	long int elementCount;
 	// size of individual data items needed for determining communication buffer size and accessing elements
 	int elementSize;
 	// identifier for the current segment
@@ -85,8 +85,8 @@ class CommBuffer {
 	CommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	virtual ~CommBuffer() {}
 	DataExchange *getExchange() { return dataExchange; }
-	int getBufferSize() { return elementCount * elementSize; }
-	int getElementCount() { return elementCount; }
+	long int getBufferSize() { return elementCount * elementSize; }
+	long int getElementCount() { return elementCount; }
 	int compareTo(CommBuffer *other, bool forReceive);
 	int getBufferTag() { return bufferTag; }
 	void describe(std::ostream &stream, int indentation);

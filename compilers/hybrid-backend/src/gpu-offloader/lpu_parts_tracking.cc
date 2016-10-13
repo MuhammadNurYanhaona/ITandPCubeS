@@ -90,7 +90,7 @@ bool LpuDataPart::isMatchingId(List<int*> *candidateId) {
 	return true;
 }
 
-int LpuDataPart::getSize() {
+long int LpuDataPart::getSize() {
 	return elementCount * elementSize;
 }
 
@@ -112,8 +112,8 @@ void LpuDataPart::copyDimLengths(int *dimLengthArray) {
 	}
 }
         
-int LpuDataPart::getSizeForSubpartsWithDimLengths(int *subpartLengthsArray) {
-	int subpartElemCount = 1;
+long int LpuDataPart::getSizeForSubpartsWithDimLengths(int *subpartLengthsArray) {
+	long int subpartElemCount = 1;
 	for (int i = 0; i < dimensionality; i++) {
 		subpartElemCount *= subpartLengthsArray[i];
 	}
@@ -149,8 +149,8 @@ void VersionedLpuDataPart::describe(std::ofstream &stream, int indentLevel) {
 	stream << indent.str() << "Version Count: " << versionCount << "\n";
 }
 
-int VersionedLpuDataPart::getSizeForSubpartsWithDimLengths(int *subpartLengthsArray) {
-	int versionSize = LpuDataPart::getSizeForSubpartsWithDimLengths(subpartLengthsArray);
+long int VersionedLpuDataPart::getSizeForSubpartsWithDimLengths(int *subpartLengthsArray) {
+	long int versionSize = LpuDataPart::getSizeForSubpartsWithDimLengths(subpartLengthsArray);
 	return versionSize * versionCount;
 }
 
@@ -162,7 +162,7 @@ GpuMemoryConsumptionStat::GpuMemoryConsumptionStat(long consumptionLimit) {
 }
 
 void GpuMemoryConsumptionStat::addPartConsumption(LpuDataPart *part) {
-	int partSize = part->getSize();
+	long int partSize = part->getSize();
 	currSpaceConsumption += partSize;
 }
 
@@ -226,7 +226,7 @@ LpuDataPartTracker::LpuDataPartTracker(int distinctPpuCount, LpuBatchController 
 	this->distinctPpuCount = distinctPpuCount;
 	partIndexMap = new Hashtable<std::vector<List<int>*>*>;
 	dataPartListerMap = new Hashtable<LpuDataPartLister*>;
-	maxDataPartSizes = new Hashtable<int*>;
+	maxDataPartSizes = new Hashtable<long int*>;
 	this->logFile = NULL;
 	this->batchController = batchController;
 }
@@ -246,7 +246,7 @@ void LpuDataPartTracker::initialize(List<const char*> *varNames) {
 		
 		dataPartListerMap->Enter(varName, new LpuDataPartLister);
 		
-		int *maxPartSize = new int[1];
+		long int *maxPartSize = new long int[1];
 		*maxPartSize = 0;
 		maxDataPartSizes->Enter(varName, maxPartSize);
 	}
@@ -273,8 +273,8 @@ bool LpuDataPartTracker::addDataPart(LpuDataPart *dataPart, const char *varName,
 		int storageIndex = dataPartLister->addDataPart(dataPart);
 		partIndexList->Append(storageIndex);	
 
-		int *maxPartSize = maxDataPartSizes->Lookup(varName);
-		int partSize = batchController->calculateSmMemReqForDataPart(varName, dataPart);
+		long int *maxPartSize = maxDataPartSizes->Lookup(varName);
+		long int partSize = batchController->calculateSmMemReqForDataPart(varName, dataPart);
 		if (*maxPartSize < partSize) {
 			*maxPartSize = partSize;
 		}
@@ -306,8 +306,8 @@ void LpuDataPartTracker::clear() {
 		partLister->clear();
 	}
 
-	int *maxPartSize = NULL;
-	Iterator<int*> partSizeIterator = maxDataPartSizes->GetIterator();
+	long int *maxPartSize = NULL;
+	Iterator<long int*> partSizeIterator = maxDataPartSizes->GetIterator();
 	while ((maxPartSize = partSizeIterator.GetNextValue()) != NULL) {
 		*maxPartSize = 0;
 	}
@@ -345,7 +345,7 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	}
 
 	cpuBuffer = (char *) malloc(bufferSize * sizeof(char));
-	cpuPartBeginningBuffer = (int *) malloc(bufferEntryCount * sizeof(int));
+	cpuPartBeginningBuffer = (long int *) malloc(bufferEntryCount * sizeof(long int));
 
 	PartDimRanges *dimRanges = dataPartsList->Nth(0)->getPartDimRanges();
 	partRangeDepth = dimRanges->getDepth();
@@ -353,11 +353,11 @@ void PropertyBufferManager::prepareCpuBuffers(List<LpuDataPart*> *dataPartsList,
 	partRangeBufferSize = bufferEntryCount * dimRangeInfoSize;
 	cpuPartRangeBuffer = (int *) malloc(partRangeBufferSize * sizeof(int));
 
-	int currentIndex = 0;
+	long int currentIndex = 0;
 	for (int i = 0; i < dataPartsList->NumElements(); i++) {
 		
 		LpuDataPart *dataPart = dataPartsList->Nth(i);
-		int size = dataPart->getSize();
+		long int size = dataPart->getSize();
 		char *dataStart = cpuBuffer + currentIndex;
 		copyDataIntoBuffer(dataPart, dataStart);
 		
@@ -397,7 +397,7 @@ GpuBufferReferences *PropertyBufferManager::getGpuBufferReferences() {
 
 void PropertyBufferManager::copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer) {
 	void *data = dataPart->getData();
-	int size = dataPart->getSize();
+	long int size = dataPart->getSize();
 	memcpy(dataBuffer, data, size);
 }
 
@@ -437,7 +437,7 @@ GpuBufferReferences *VersionedPropertyBufferManager::getGpuBufferReferences() {
 void VersionedPropertyBufferManager::copyDataIntoBuffer(LpuDataPart *dataPart, char *dataBuffer) {
 	VersionedLpuDataPart *versionedPart = (VersionedLpuDataPart *) dataPart;
 	int versionCount = versionedPart->getVersionCount();
-	int sizePerVersion = versionedPart->getSize() / versionCount;
+	long int sizePerVersion = versionedPart->getSize() / versionCount;
 	for (int i = 0; i < versionCount; i++) {
 		void *data = versionedPart->getDataVersion(i);
 		char *dataStart = dataBuffer + i * sizePerVersion;
@@ -545,7 +545,7 @@ void LpuBatchController::setLogFile(std::ofstream *logFile) {
 } 
 
 bool LpuBatchController::canHoldLpu(LPU *lpu) {
-	int moreMemoryNeeded = calculateLpuMemoryRequirement(lpu);
+	long int moreMemoryNeeded = calculateLpuMemoryRequirement(lpu);
 	return gpuMemStat->canHoldLpu(moreMemoryNeeded);
 }
 

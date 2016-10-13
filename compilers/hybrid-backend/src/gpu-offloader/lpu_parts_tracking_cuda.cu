@@ -25,9 +25,10 @@ void PropertyBufferManager::prepareGpuBuffers() {
 	check_error(cudaMemcpyAsync(gpuPartRangeBuffer, cpuPartRangeBuffer, 
 			partRangeBufferSize * sizeof(int), cudaMemcpyHostToDevice, 0), *logFile);
 	
-	check_error(cudaMalloc((void **) &gpuPartBeginningBuffer, bufferEntryCount * sizeof(int)), *logFile);
+	check_error(cudaMalloc((void **) &gpuPartBeginningBuffer, 
+			bufferEntryCount * sizeof(long int)), *logFile);
 	check_error(cudaMemcpyAsync(gpuPartBeginningBuffer, cpuPartBeginningBuffer, 
-			bufferEntryCount * sizeof(int), cudaMemcpyHostToDevice, 0), *logFile);
+			bufferEntryCount * sizeof(long int), cudaMemcpyHostToDevice, 0), *logFile);
 }
 
 void PropertyBufferManager::syncDataPartsFromBuffer(List<LpuDataPart*> *dataPartsList) {
