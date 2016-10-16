@@ -1,0 +1,12 @@
+"Vector Addition" {
+	Space A: 	1	// hyperthreads
+}
+
+"Vector Dot Product" {
+	Space A:	4	// nodes
+	Space B:	1	// hyperthreads
+}
+
+"CSR Matrix Vector Multiply" {
+	Space A:	2	// cores
+}

@@ -1239,14 +1239,30 @@ Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobal
         accessLog->getContentAccessFlags()->flagAsReduced();
         table->Enter(resultName, accessLog, true);
 
-	const char *reducedVariable = right->getBaseVarName();
 	Hashtable<VariableAccess*> *rTable = right->getAccessedGlobalVariables(globalReferences);
-	accessLog = rTable->Lookup(reducedVariable);
-	accessLog->getContentAccessFlags()->flagAsRead();	
-	mergeAccessedVariables(table, rTable);
+	List<FieldAccess*> *rightFieldAccesses = right->getTerminalFieldAccesses();
+	for (int i = 0; i < rightFieldAccesses->NumElements(); i++) {
+		FieldAccess *field = rightFieldAccesses->Nth(i);
+		const char *varName = field->getField()->getName();
+		accessLog = rTable->Lookup(varName);
 
+		// if the field is not a task-global variable then we can ignore it 
+		if (accessLog == NULL) continue;
+
+		Type *fieldType = field->getType();
+		ArrayType *array = dynamic_cast<ArrayType*>(fieldType);
+		
+		// if the field is not an array then its access flags are already set properly
+		if (array == NULL) continue;
+
+		// if the content of the array has been accessed then it should be flagged as read
+		if (accessLog->isContentAccessed()) {
+			accessLog->getContentAccessFlags()->flagAsRead();	
+		}
+	}
+
+	mergeAccessedVariables(table, rTable);
 	return table;
-	
 }
         
 void ReductionStmt::analyseEpochDependencies(Space *space) {
