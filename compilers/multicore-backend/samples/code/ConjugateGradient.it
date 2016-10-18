@@ -39,7 +39,7 @@ Program (args) {
 
 		// determine the dot product of r_i to itself as the residual norm
 		dpEnv.u = dpEnv.v = r_i
-		execute("Vector Dot Product"; dpEnv)
+		execute("Vector Dot Product"; dpEnv; Partition: args.b)
 		norm = dpEnv.product
 		
 		// determine A * r_i
@@ -48,7 +48,7 @@ Program (args) {
 
 		// determine dot product of r_i to A * r_i
 		dpEnv.v = mvmEnv.w
-		execute("Vector Dot Product"; dpEnv)
+		execute("Vector Dot Product"; dpEnv; Partition: args.b)
 
 		// determine the next step size alpha_i as (r_i.r_i) / (r_i.(A * r_i))
 		alpha_i = norm / dpEnv.product
@@ -88,15 +88,32 @@ Task "Vector Addition":
 
 Task "Vector Dot Product":
 	Define:
-		u, v: 1D Array of Real double-precision
+		u, v, w: 1D Array of Real double-precision
 		product: Real double-precision	
 	Environment:
 		u, v: link
 		product: create
+	Initialize:
+		w.dimension1.range.min = 0
+		partition_count = (u.dimension1.length + partition.b - 1) / partition.b
+		w.dimension1.range.max = partition_count - 1
 	Compute:
-		"" (Space A) { do { product = reduce("sum", u[i]*v[i]) } for i in u }
-	Partition: 
-		Space A <un-partitioned> {u, v}
+		"Generate Partial Products" (Space B) {
+			do { 
+				w[w.local.dimension1.range.min] = reduce("sum", u[i]*v[i]) 
+			} for i in u
+		}
+		"Generate Final Product" (Space A) { 
+			do { 
+				product = reduce("sum", w[i]) 
+			} for i in w 
+		}
+	Partition(b): 
+		Space A <un-partitioned> { u, v, w }
+		Space B <1D> divides Space A partitions {
+			u, v: block_size(b)
+			w: block_size(1)
+		}
 
 Task "CSR Matrix Vector Multiply":
 	Define:

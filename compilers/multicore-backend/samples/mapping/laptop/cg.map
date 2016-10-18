@@ -4,6 +4,7 @@
 
 "Vector Dot Product" {
         Space A: 3      // CPU
+	Space B: 1	// hyperthreads
 }
 
 "CSR Matrix Vector Multiply" {
