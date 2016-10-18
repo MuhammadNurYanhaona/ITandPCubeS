@@ -382,7 +382,6 @@ void ProgramEnvironment::cleanupPossiblyEmptyVersionManager(char *dataItemKey) {
 	int versionCount = manager->getVersionCount();
 	if (versionCount == 0) {
 		envObjects->Remove(dataItemKey, manager);
-		delete manager;
 	}
 }
 
