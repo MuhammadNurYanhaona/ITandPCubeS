@@ -2,7 +2,7 @@ NOTE: Update the last-update-date below each time you make a change in this docu
       when the errors were relevant. Further, if you know that a problem has been fixed already but has
       still been listed here, remove the problem from the list.
 
-Last Update Date: Aug 23, 2016
+Last Update Date: Oct 18, 2016
 
 
 1. In some machines, compilation fails for correct IT sample programs showing wierd errors related to
@@ -21,12 +21,12 @@ Last Update Date: Aug 23, 2016
 4. Sometimes having a newline or not before/after curly braces cause syntax error. This problem used
    to occur quite frequently before. Although I haven't observed it lately, the error might be still 
    there. Some grammar rules need to be corrected.
-5. If, a code has reduction inside an multi-index IT parallel loop, the reduction is supposed to take
-   place either once or many times depending on the nature of reduction statement. The current compilers
-   however, always assume the reduction should happen once. This is an error in the interpretation that
-   we need to fix. To intensify the problem, the compiler generated variables to aid in the reduction 
-   are not placed in properly. So reductions placed inside multi-index loops are translated as incorrect
-   C++ code snippets.
+5. If, a code has a sequential reduction inside an multi-index IT parallel loop, the reduction is 
+   supposed to take place either once or many times depending on the nature of reduction statement. The 
+   current compilers however, always assume the reduction should happen once. This is an error in the 
+   interpretation that we need to fix. To intensify the problem, the compiler generated variables to aid 
+   in the reduction are not placed in properly. So reductions placed inside multi-index loops are 
+   translated as incorrect C++ code snippets.
 6. The implementation of the block_count partition function is assigning the extra elements to the last
    partition when the underlying dimension being partitioned is not evenly divisible by the part count.
    This is an incorrect behavior that can cause the hybrid compiler to generate incorrect CUDA kernels.
@@ -36,4 +36,16 @@ Last Update Date: Aug 23, 2016
 9. Support for intermediate unpartitioned LPSes in a task's LPS hierarchy is implemented in the hybrid
    compiler only. To make the feature available in the remaining compilers, it should be enough to copy 
    paste code blocks from the hybrid compiler.
+10. The environment management code for segmented memory and hybrid compilers do not allow a local 
+   reference to an environment variable of some task to be maintained if the original reference within
+   the task environment is updated by a subsequent invocation. I don't remember if this was a concious
+   decision on our part to not do reference count update on the environmental data structures for local
+   references within the coordinator function. This issue is making it harder to express programs like
+   Conjugate Gradient in IT that involves a lot of assigning data structures from one task environment
+   to another task environment. It would be nice if we could assign the data structure references from
+   the source task to some local variables and assign those variables to the subsequent task later 
+   even if the source task executes again in the interim and gets rid of its previous data structure
+   references.
+11. Environment management module has hardly gone through any testing. There might be bugs in several
+   places that we have to check for and fix.  
     	   

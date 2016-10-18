@@ -1,19 +1,20 @@
 Program (args) {
 	// creating environment objects for component tasks
-        vaEnv = new TaskEnvironment(name: "Vector Addition")
+        vaEnv1 = new TaskEnvironment(name: "Vector Addition")
+        vaEnv2 = new TaskEnvironment(name: "Vector Addition")
         dpEnv = new TaskEnvironment(name: "Vector Dot Product")        
-        mvmEnv = new TaskEnvironment(name: "CSR Matrix Vector Multiply")
+        mvmEnv1 = new TaskEnvironment(name: "CSR Matrix Vector Multiply")
+        mvmEnv2 = new TaskEnvironment(name: "CSR Matrix Vector Multiply")
         
         // make the argument sparse matrix stored in compressed row format from files to be read during first-time 
         // execution of the matrix-vector multiply task
-        bind_input(mvmEnv, "columns", args.arg_matrix_cols)
-        bind_input(mvmEnv, "rows", args.arg_matrix_rows)
-        bind_input(mvmEnv, "values", args.arg_matrix_values)
+        bind_input(mvmEnv1, "columns", args.arg_matrix_cols)
+        bind_input(mvmEnv1, "rows", args.arg_matrix_rows)
+        bind_input(mvmEnv1, "values", args.arg_matrix_values)
 
-        // similarly bind the prediction and known vectors to the tasks' environment that
-        // use them initially   
-        bind_input(vaEnv, "u", args.known_vector)
-        bind_input(mvmEnv, "v", args.prediction_vector)
+        // bind the prediction (x_0) and the known vector (b)  to the tasks' environment that use them initially   
+        bind_input(vaEnv1, "u", args.known_vector)
+        bind_input(mvmEnv1, "v", args.prediction_vector)
 
         // run the conjugate gradient logic
         // note that here iteration should continue until the estimate for solution vector converges to its actual 
@@ -22,50 +23,54 @@ Program (args) {
         // less than 1
         iteration = 0
         maxIterations = args.maxIterations
-	        do {    
+	do {    
                 // calculate A * x_i
-                execute("CSR Matrix Vector Multiply"; mvmEnv; Partition: args.r)
+                execute("CSR Matrix Vector Multiply"; mvmEnv1; Partition: args.r)
                 
                 // determine the current residual error as r_i = b - A * x_i
-                vaEnv.alpha = 1
-                vaEnv.v = mvmEnv.w
-                vaEnv.beta = -1
-                execute("Vector Addition"; vaEnv; Partition: args.b)
-                r_i = vaEnv.w
+                vaEnv1.alpha = 1
+                vaEnv1.v = mvmEnv1.w
+                vaEnv1.beta = -1
+                execute("Vector Addition"; vaEnv1; Partition: args.b)
 
                 // determine the dot product of r_i to itself as the residual norm
-                dpEnv.u = dpEnv.v = r_i
+                dpEnv.u = dpEnv.v = vaEnv1.w
                 execute("Vector Dot Product"; dpEnv; Partition: args.b)
                 norm = dpEnv.product
+
+		// in the first iteration setup duplicate environmental references for the sparse matrix components
+		if (iteration == 0) {
+			mvmEnv2.columns = mvmEnv1.columns
+			mvmEnv2.rows = mvmEnv1.rows
+			mvmEnv2.values = mvmEnv1.values
+		} 
                 
                 // determine A * r_i
-                mvmEnv.v = r_i
-                execute("CSR Matrix Vector Multiply"; mvmEnv; Partition: args.r)
+                mvmEnv2.v = vaEnv1.w
+                execute("CSR Matrix Vector Multiply"; mvmEnv2; Partition: args.r)
 
                 // determine dot product of r_i to A * r_i
-                dpEnv.v = mvmEnv.w
+                dpEnv.v = mvmEnv2.w
                 execute("Vector Dot Product"; dpEnv; Partition: args.b)
 
                 // determine the next step size alpha_i as (r_i.r_i) / (r_i.(A * r_i))
                 alpha_i = norm / dpEnv.product
 
                 // calculate the next estimate x_i = x_i + alpha_i * r_i
-                vaEnv.u = x_i
-                vaEnv.alpha = 1
-                vaEnv.v = r_i
-                vaEnv.beta = alpha_i            
-                execute("Vector Addition"; vaEnv; Partition: args.b)
+                vaEnv2.u = mvmEnv1.v
+                vaEnv2.alpha = 1
+                vaEnv2.v = vaEnv1.w
+                vaEnv2.beta = alpha_i            
+                execute("Vector Addition"; vaEnv2; Partition: args.b)
 
-                // prepare for the next iteration
-                x_i = vaEnv.w
-                mvmEnv.v = x_i
-                vaEnv.u = b     
+                // prepare x_i for the next iteration
+                mvmEnv1.v = vaEnv2.w
                 iteration = iteration + 1
 
         } while iteration < maxIterations and norm > args.precision
 
         // store the final solution vector in an output file
-        bind_output(vaEnv, "w", args.solution_vector)
+        bind_output(vaEnv2, "w", args.solution_vector)
 }
 
 Task "Vector Addition":
