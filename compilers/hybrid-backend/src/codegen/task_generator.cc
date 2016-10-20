@@ -314,7 +314,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 				headerFile, programFile, cudaProgramFile);
 
 		generateBatchComputeFunction(taskDef, 
-				headerFile, programFile, initials, communicatorCount);
+				headerFile, programFile, initials, 
+				involveReduction, communicatorCount);
 	}
 
 	closeNameSpace(headerFile);

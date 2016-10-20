@@ -1,0 +1,6 @@
+"Monte Carlo Area Estimation" {
+	Model: Hybrid-Model
+	Space A: 5	// Node
+	Space B: 4	// CPU
+	Space C: 1	// Warp	
+}

@@ -36,7 +36,8 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFile,
    execution mode (batch execution mode is used when the task has been mapped to
    the hybrid PCubeSModel of the target platform) */
 void generateBatchComputeFunction(TaskDef *taskDef, const char *headerFile,
-		const char *programFile, const char *initials,
-		int communicatorCount);	
+		const char *programFile, 
+		const char *initials,
+		bool involvesReduction, int communicatorCount);	
 
 #endif

@@ -388,6 +388,12 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 		programFile << indent << "logFile.flush()" << stmtSeparator << std::endl;
 	}
 
+	// check if the task has some reduction operations; if YES then initialize reduction primitives
+        if (taskGenerator->hasReductions()) {
+                programFile << std::endl << indent << "// initializing reduction primitives\n";
+                programFile << indent << "setupReductionPrimitives(logFile)" << stmtSeparator;
+        }
+
 	// depending on what PCubeS Model has been chosen for executing this task, invokes the proper sub-routine to
 	// generate execution code
 	if (taskDef->usingHybridModel()) {
@@ -451,12 +457,6 @@ void generateHostOnlyExecutionCode(std::ofstream &programFile, TaskGenerator *ta
         if (syncManager->involvesSynchronization()) {
                 programFile << std::endl << indent << "// initializing sync primitives\n";
                 programFile << indent << "initializeSyncPrimitives()" << stmtSeparator;
-        }
-
-	// check if the task has some reduction operations; if YES then initialize reduction primitives
-        if (taskGenerator->hasReductions()) {
-                programFile << std::endl << indent << "// initializing reduction primitives\n";
-                programFile << indent << "setupReductionPrimitives(logFile)" << stmtSeparator;
         }
 
 	// start threads and wait for them to finish execution of the task 

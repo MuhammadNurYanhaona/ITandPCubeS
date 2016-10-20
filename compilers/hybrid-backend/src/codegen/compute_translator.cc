@@ -246,7 +246,9 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 }
 
 void generateBatchComputeFunction(TaskDef *taskDef, const char *headerFileName,
-                const char *programFileName, const char *initials, int communicatorCount) {
+                const char *programFileName, 
+		const char *initials, 
+		bool involvesReduction, int communicatorCount) {
 	
 	std::cout << "Generating the computation flow implmenter function for the task\n";
 	
@@ -322,6 +324,19 @@ void generateBatchComputeFunction(TaskDef *taskDef, const char *headerFileName,
                 for (int i = 0; i < communicatorCount; i++) {
                         programFile << "\tint commCounter" << i << " = 0;\n";
                 }
+        }
+
+	// initilize the map for holding partial results of reductions
+        if (involvesReduction) {
+                programFile << "\n\t// initializing a map for holding local, partial results of reductions\n";
+                programFile << "\tthreadState->initializeReductionResultMap();\n";
+                programFile << "\tHashtable<reduction::Result*> *reductionResultsMap = ";
+                programFile << "threadState->getLocalReductionResultMap();\n";
+
+                programFile << "\n\t// retrieving the reduction primitives relevant to the current thread\n";
+                programFile << "\tThreadIds *threadIds = threadState->getThreadIds();\n";
+                programFile << "\tHashtable<ReductionPrimitive*> *rdPrimitiveMap = ";
+                programFile << "getReductionPrimitiveMap(threadIds);\n";
         }
 
         // create a local part-dimension object for probable array dimension based range or assignment expressions

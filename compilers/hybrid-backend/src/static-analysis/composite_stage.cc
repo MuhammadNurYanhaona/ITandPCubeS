@@ -503,6 +503,12 @@ void CompositeStage::genInvocationCodeForHost(std::ofstream &stream,
 		stream << nextIndent.str() << "\tcontinue" << stmtSeparator;
 		stream << nextIndent.str() << "}\n";	
 	}
+
+	// if the current composite stage is boundary for some reduction operations then initialize partial results
+        // of reductions for the executing PPU controller thread
+        if (reductionBoundary) {
+                initializeReductionResults(stream, nextIndentation);
+        }
 	
 	// Iterate over groups of flow stages where each group executes within a single LPS. This scheme has the
 	// consequence of generating LPU only one time for all stages of a group then execute all of them before
@@ -739,6 +745,8 @@ void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream,
 
 	// if the current composite stage is boundary for some reduction operations then initialize partial results
         // of reductions for the executing PPU controller thread
+	// Note the current reduction execution logic works only if the composite stage is on an LPS mapped to some
+	// host or above PPS.
         if (reductionBoundary) {
                 initializeReductionResults(stream, nextIndentation);
         }
@@ -849,6 +857,14 @@ void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream,
 		// communicate any update of shared data	
 		generateDataSendsForGroup(stream, nextIndentation, commSignals); 
 	}
+	
+	// if the current composite stage is boundary for some reduction operations then execute the final step of
+        // reduction
+	// Note the current reduction execution logic works only if the composite stage is on an LPS mapped to some
+	// host or above PPS.
+        if (reductionBoundary) {
+                executeFinalStepOfReductions(stream, nextIndentation);
+        }
 	
 	// close the while loop if applicable
 	if (space != containerSpace) {
