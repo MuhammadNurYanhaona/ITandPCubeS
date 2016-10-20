@@ -21,7 +21,7 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
                 const char *initialsUpper,
                 std::ofstream &headerFile,
                 std::ofstream &programFile, 
-		int currentFnNo) {
+		int currentFnNo, int topmostGpuPps) {
 
 	// set the context for code translation to task
 	codecntx::enterTaskContext();
@@ -33,21 +33,16 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		List<FlowStage*> *stageList = compositeStage->getStageList();
 		for (int i = 0; i < stageList->NumElements(); i++) {
 			FlowStage *stage = stageList->Nth(i);
-			nextFnNo = parseComputation(stage, initialsLower, initialsUpper, 
-					headerFile, programFile, nextFnNo);
+			nextFnNo = parseComputation(stage, 
+					initialsLower, initialsUpper, 
+					headerFile, programFile, 
+					nextFnNo, topmostGpuPps);
 		}
 		return nextFnNo;
 	} else {
 		// if this is a sync stage then there is nothing to do here
 		ExecutionStage *execStage = dynamic_cast<ExecutionStage*>(currentStage);
 		if (execStage == NULL) return currentFnNo;
-
-		headerFile << std::endl;
-		programFile << std::endl;
-			
-		// each function returns an integer indicating if a successful invocation has taken place
-		headerFile << "int ";
-		programFile << "int " << initialsLower << "::";
 
 		// if no name is given by the user to this stage then give it a name
 		if (strlen(execStage->getName()) == 0) {
@@ -62,6 +57,20 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 			newName = string_utils::toLower(newName);
 			execStage->setName(newName);
 		}
+		
+		// if the execution stage is supposed to execute inside the GPU then no function for it is
+		// needed in the host level.
+		Space *executingLps = execStage->getSpace();
+		int ppsIdOfLps = executingLps->getPpsId();
+		if (ppsIdOfLps <= topmostGpuPps) return currentFnNo;
+
+		headerFile << std::endl;
+		programFile << std::endl;
+			
+		// each function returns an integer indicating if a successful invocation has taken place
+		headerFile << "int ";
+		programFile << "int " << initialsLower << "::";
+
 		headerFile << execStage->getName() << "(";
 		programFile << execStage->getName() << "(";
 
@@ -119,6 +128,13 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFileName,
                 std::exit(EXIT_FAILURE);
         }
 
+	int topmostGpuPps = -1;
+	PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
+	if (lpsHierarchy->isMappedToHybridModel()) {
+		PCubeSModel *pcubesModel = lpsHierarchy->getPCubeSModel();
+		topmostGpuPps = pcubesModel->getGpuTransitionSpaceId();
+	}
+
 	const char *header = "functions for compute stages";
 	decorator::writeSectionHeader(headerFile, header);
 	decorator::writeSectionHeader(programFile, header);
@@ -126,7 +142,7 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFileName,
 	CompositeStage *computation = taskDef->getComputation();
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
 	parseComputation(computation, initials, 
-			upperInitials, headerFile, programFile, 0);	
+			upperInitials, headerFile, programFile, 0, topmostGpuPps);	
 
 	headerFile.close();
         programFile.close();

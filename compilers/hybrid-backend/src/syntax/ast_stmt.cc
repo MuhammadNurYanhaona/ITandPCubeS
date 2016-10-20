@@ -1130,8 +1130,8 @@ void ExternCodeBlock::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *incl
 // with the appropriate compiler for the language of the extern block. Afterwords, we will just link the
 // object files as we do now.
 void ExternCodeBlock::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
-
-        TaskDef *taskDef = TaskDef::currentTask;
+        
+	TaskDef *taskDef = TaskDef::currentTask;
         List<TaskGlobalScalar*> *globalScalars = TaskGlobalCalculator::calculateTaskGlobals(taskDef);
         Space *rootLps = space->getRoot();
 
@@ -1159,6 +1159,11 @@ void ExternCodeBlock::generateCode(std::ostringstream &stream, int indentLevel, 
                         stream << "taskGlobals->" << varName << stmtSeparator;
                 }
         }
+
+	// We need to discuss before enabling this properties in the hybrid compiler; if the stage
+	// holding the extern code block is executing inside the GPU then creating too many variables
+	// for the extern code block may result in register spills within the GPU SMs.	
+	/*--------------------------------------------------------------------------------------------- 
         // if the LPS is partitioned into LPU then extract the ID from the LPU and make it directly
         // accessible within the external block
         if (space->getDimensionCount() > 0) {
@@ -1184,7 +1189,7 @@ void ExternCodeBlock::generateCode(std::ostringstream &stream, int indentLevel, 
                         stream << indents << arrayName << "_dimension[" << j << "] = arrayMetadata->";
                         stream << arrayName << "Dims[" << j << "]" << stmtSeparator;
                 }
-        }
+        } ------------------------------------------------------------------------------------------*/
 
         // jumping into the external code block within a further nested block
         stream << '\n' << indents << "{ // external code block starts\n";

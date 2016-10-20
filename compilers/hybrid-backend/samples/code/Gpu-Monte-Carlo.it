@@ -2,7 +2,7 @@ Program (args) {
         mcEnv = new TaskEnvironment(name: "Monte Carlo Area Estimation")
         execute("Monte Carlo Area Estimation"; mcEnv; 					\
 		Initialize: args.cell_length, args.grid_dim, args.points_per_cell; 	\
-		Partition: args.b)
+		Partition: args.b1, args.b2)
 }
 
 Tuple Rectangle:
@@ -25,7 +25,7 @@ Task "Monte Carlo Area Estimation":
 		cell_size = cell_length * cell_length
 	Compute:
 		// calculate the cell boundaries based on cell dimension length and position in the grid
-		"Setup Grid Cells" (Space C) {
+		"Setup Grid Cells" (Space B) {
 			do { 
 				grid[i][j].left = cell_length * i
 				grid[i][j].right = cell_length * (i + 1) - 1
@@ -33,42 +33,41 @@ Task "Monte Carlo Area Estimation":
 				grid[i][j].top = cell_length * ( j + 1) - 1
 			} for i, j in grid
 		}
-		"Estimate Area in Grid Cells" (Space C) {
+		"Estimate Area in Grid Cells" (Space D) {
 			
-			// initialize the random number generator
-			@Extern {
-				@Language "C++"
-				@Includes { time.h, cstdlib }
-				${
-					srand(time(NULL));
-				}$
-			}
 			// iterate parallely over the grid cells of an LPU
 			do {
 				cell = grid[i][j]
 				internal_points = 0
 
-				// has points_per_cell number of point placement trails 
-				trial = 0
-				do {
-					// generate a point within the cell boundary and calculate
-					// its position relative to the shape
-					@Extern {
-						@Language "C++"
-						@Includes { math.h, cstdlib }
-						${
-							int x = rand() % cell_length + cell.left;
-							int y = rand() % cell_length + cell.bottom;
+				@Extern {
+					@Language "CUDA"
+					@Includes { curand.h, curand_kernel.h, math.h }
+					${
+						curandState_t state;
+						int threadIndex = threadIdx.x + blockIdx.x * blockDim.x;
+						curand_init(clock64(), threadIndex, 0, &state);
+
+						// has points_per_cell number of point placement trails 
+						for (int trial = 0; trial < points_per_cell; trial++) {
+							
+							// generate a point within the cell boundary and calculate
+							// its position relative to the shape
+							int x = ((int) curand_uniform(&state)) 
+									% cell_length + cell.left;
+							int y = ((int) curand_uniform(&state)) 
+									% cell_length + cell.bottom;
 							
 							// tested polynomial is 10 sin x^2 + 50 cos y^3
-							double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
+							double x_2 = x * x;
+							double y_3 = y * y * y;
+							double result = 10 * sin(x_2) + 50 * cos(y_3);
 							if (result <= 0.0) {
 								internal_points++; 
 							}
-						}$
-					}
-					trial = trial + 1
-				} while (trial < points_per_cell)
+						}
+					}$
+				}
 				
 				// estimate the part of the polynomial within the grid cell
 				sub_area_estimates[i][j] = cell_size * internal_points / points_per_cell
@@ -89,11 +88,14 @@ Task "Monte Carlo Area Estimation":
 				}$
 			}
 		}
-	Partition(b):
+	Partition(b1, b2):
 		Space A <un-partitioned> { grid }
 		Space B <2D> divides Space A partitions {
-			grid, sub_area_estimates: block_size(b, b)
+			grid, sub_area_estimates: block_size(b1, b1)
 		}
-		Space C <1D> divides Space B partitions {
+		Space C <2D> divides Space B partitions {
+			grid, sub_area_estimates: block_size(b2, b2)
+		}
+		Space D <1D> divides Space C partitions {
 			grid<dim1>, sub_area_estimates<dim1>: block_size(1)
 		} 

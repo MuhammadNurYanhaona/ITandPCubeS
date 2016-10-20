@@ -2,5 +2,6 @@
 	Model: Hybrid-Model
 	Space A: 5	// Node
 	Space B: 4	// CPU
-	Space C: 1	// Warp	
+	Space C: 2	// SM
+	Space D: 1	// Warp	
 }

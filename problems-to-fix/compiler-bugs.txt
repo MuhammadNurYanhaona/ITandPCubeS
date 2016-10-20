@@ -2,7 +2,7 @@ NOTE: Update the last-update-date below each time you make a change in this docu
       when the errors were relevant. Further, if you know that a problem has been fixed already but has
       still been listed here, remove the problem from the list.
 
-Last Update Date: Oct 18, 2016
+Last Update Date: Oct 20, 2016
 
 
 1. In some machines, compilation fails for correct IT sample programs showing wierd errors related to
@@ -47,5 +47,9 @@ Last Update Date: Oct 18, 2016
    even if the source task executes again in the interim and gets rid of its previous data structure
    references.
 11. Environment management module has hardly gone through any testing. There might be bugs in several
-   places that we have to check for and fix.  
+   places that we have to check for and fix.
+12. variables are not properly named in several places in the GPU offloading kernels when the first
+   LPS being mapped inside GPU is mapped to warps -- not to SMs. This leads to compilation error of
+   kernel. Fixing this issue should be very easy. We discovered the problem when we are in the middle
+   of solving many other issues. So we left the issue for the future.     
     	   

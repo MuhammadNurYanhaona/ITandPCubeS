@@ -44,20 +44,15 @@ void initializeCudaProgramFile(const char *initials,
                 std::exit(EXIT_FAILURE);
         }
 
-	// Since we are generating C++ code any external code block written in C and C++ can be directly
-        // placed within the generated code but we have to include the proper header files in the generated
+	// Since we are generating CUDA code any external code block written in CUDA can be directly placed 
+	// within the generated CUDA kernel code but we have to include the proper header files in the generated
         // program to make this scheme work. So here we are including those headers.
         IncludesAndLinksMap *externConfig = taskDef->getExternBlocksHeadersAndLibraries();
         List<const char*> *headerIncludes = new List<const char*>;
-        if (externConfig->hasExternBlocksForLanguage("C++")) {
-                LanguageIncludesAndLinks *cPlusHeaderAndLinks
-                                 = externConfig->getIncludesAndLinksForLanguage("C++");
-                string_utils::combineLists(headerIncludes, cPlusHeaderAndLinks->getHeaderIncludes());
-        }
-        if (externConfig->hasExternBlocksForLanguage("C")) {
-                LanguageIncludesAndLinks *cHeaderAndLinks
-                                 = externConfig->getIncludesAndLinksForLanguage("C");
-                string_utils::combineLists(headerIncludes, cHeaderAndLinks->getHeaderIncludes());
+        if (externConfig->hasExternBlocksForLanguage("CUDA")) {
+                LanguageIncludesAndLinks *cudaHeaderAndLinks
+                                 = externConfig->getIncludesAndLinksForLanguage("CUDA");
+                headerIncludes = cudaHeaderAndLinks->getHeaderIncludes();
         }
         if (headerIncludes->NumElements() > 0) {
                 programFile << "// header files needed to execute external code blocks\n";

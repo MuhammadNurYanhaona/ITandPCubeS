@@ -1059,8 +1059,8 @@ const char *GpuExecutionContext::generateDataCopyingLoopHeaders(std::ofstream &s
 		stream << indentStr.str() << "for (int d" << "_" << i << " = ";
 		stream << varName << "SRanges[warpId][" << i << "].range.min + threadId; ";
 		stream << paramIndent << indentStr.str();
-		stream << "d_" << i << " <= SRanges[warpId][" << i << "].range.max; d_";
-		stream << i << " += WAPR_SIZE) {\n";
+		stream << "d_" << i << " <= " << varName << "SRanges[warpId][" << i << "].range.max;";
+		stream << " d_" << i << " += WARP_SIZE) {\n";
 		indentStr << indent;	
 
 		return strdup(indentStr.str().c_str());

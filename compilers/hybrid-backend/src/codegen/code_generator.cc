@@ -892,7 +892,12 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 	// include the PartDimension class from compiler library to store metadata information for environment
 	// references
 	headerFile << "#include \"../../src/runtime/structure.h\"\n\n"; 
-	
+
+	// include cuda runtime libraries so that CUDA annotations like __host__ and __device__ are understood 
+	// by the compilers properly
+	headerFile << "#include <cuda.h>\n";	
+	headerFile << "#include <cuda_runtime.h>\n\n";	
+
 	// first have a list of forward declarations for all tuples to avoid having errors during 
 	// compilation of individual classes
 	for (int i = 0; i < tupleDefList->NumElements(); i++) {
@@ -931,7 +936,7 @@ void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefLis
 
 		}
 		// create a constructor for the class
-		headerFile << "\t" << tupleDef->getId()->getName() << "()";
+		headerFile << "\t __host__ __device__ " << tupleDef->getId()->getName() << "()";
 		if (tupleDef->isEnvironment()) {
 			headerFile << " : EnvironmentBase()";
 		} 

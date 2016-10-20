@@ -19,7 +19,7 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		const char *initialsUpper, 
 		std::ofstream &headerFile,
 		std::ofstream &programFile, 
-		int currentFnNo);
+		int currentFnNo, int topmostGpuPps);
 void generateFnsForComputation(TaskDef *taskDef, const char *headerFile, 
 		const char *programFile, const char *initials);
 

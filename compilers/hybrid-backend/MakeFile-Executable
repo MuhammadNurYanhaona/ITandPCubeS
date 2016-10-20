@@ -62,7 +62,7 @@ RFLAG = -pthread
 LIBS = -lc -lm -pthread -lcudart
 
 # C++ library links for external code blocks
-EXTERN_LIBS = $(shell grep 'C++ =\|C =' build/$(BUILD_SUBDIR)/external_links.txt  | cut -f2 -d "=" | tr '\n' ' ')
+EXTERN_LIBS = $(shell grep 'C++ =\|C = \|CUDA =' build/$(BUILD_SUBDIR)/external_links.txt  | cut -f2 -d "=" | tr '\n' ' ')
 
 # Rules for various parts of the target
 
