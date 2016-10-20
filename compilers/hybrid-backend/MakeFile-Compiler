@@ -27,9 +27,9 @@ YACC = bison
 # Set up the necessary flags for the tools
 #--------------------------------------------------------------------------------------------------
 # settings for optimized code generation
-#CFLAGS = -O3
+CFLAGS = -O3
 # settings for debugging and developement
-CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
+#CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
 
 # We need flag to enable the POSIX thread library during compiling generated code
 RFLAG = -pthread
