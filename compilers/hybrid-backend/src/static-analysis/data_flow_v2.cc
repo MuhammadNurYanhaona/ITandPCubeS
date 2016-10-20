@@ -248,9 +248,6 @@ void FlowStage::calculateLPSUsageStatistics() {
 
 void FlowStage::analyzeSynchronizationNeeds() {
 
-	std::cout << "Doing Analysis on stage: " << getName() << "\n";
-	std::cout.flush();
-	
 	List<DependencyArc*> *outgoingArcList = dataDependencies->getOutgoingArcs();
 	synchronizationReqs = new StageSyncReqs(this);
 	for (int i = 0; i < outgoingArcList->NumElements(); i++) {
