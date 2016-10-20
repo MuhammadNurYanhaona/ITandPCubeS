@@ -2,7 +2,7 @@ Program (args) {
         mcEnv = new TaskEnvironment(name: "Monte Carlo Area Estimation")
         execute("Monte Carlo Area Estimation"; mcEnv; 					\
 		Initialize: args.cell_length, args.grid_dim, args.points_per_cell; 	\
-		Partition: args.b1, args.b2)
+		Partition: args.count, args.size)
 }
 
 Tuple Rectangle:
@@ -88,13 +88,13 @@ Task "Monte Carlo Area Estimation":
 				}$
 			}
 		}
-	Partition(b1, b2):
+	Partition(count, size):
 		Space A <un-partitioned> { grid }
-		Space B <2D> divides Space A partitions {
-			grid, sub_area_estimates: block_size(b1, b1)
+		Space B <1D> divides Space A partitions {
+			grid<dim1>, sub_area_estimates<dim1>: block_count(count)
 		}
 		Space C <2D> divides Space B partitions {
-			grid, sub_area_estimates: block_size(b2, b2)
+			grid, sub_area_estimates: block_size(size, size)
 		}
 		Space D <1D> divides Space C partitions {
 			grid<dim1>, sub_area_estimates<dim1>: block_size(1)
