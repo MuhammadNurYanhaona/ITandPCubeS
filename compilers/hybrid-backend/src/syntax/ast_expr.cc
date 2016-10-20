@@ -4,6 +4,7 @@
 #include "ast_type.h"
 
 #include "../utils/list.h"
+#include "../utils/common_constant.h"
 #include "string.h"
 #include "../semantics/symbol.h"
 #include "../semantics/task_space.h"

@@ -46,6 +46,8 @@ class ReportError
 	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);
 	static void NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure);
 	static void NotAConstant(yyltype *loc, const char *constType, bool suppressFailure);
+	static void NotReductionType(Identifier *id, bool suppressFailure);
+	static void ReductionRangeInvalid(yyltype *loc, const char *rdRootLps, const char *rdBoundaryLps, bool suppressFailure);
 	
 	// Errors with computation stage to space mappings
 	static void SpaceNotFound(yyltype *loc, char spaceName); 

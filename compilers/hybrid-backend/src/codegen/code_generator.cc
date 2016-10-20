@@ -21,7 +21,7 @@
 #include <stdio.h>
 
 void initializeOutputFiles(const char *headerFileName, 
-		const char *programFileName, const char *initials) {
+		const char *programFileName, const char *initials, TaskDef *taskDef) {
 
 	std::ofstream programFile, headerFile;
         headerFile.open (headerFileName, std::ofstream::out);
@@ -68,6 +68,34 @@ void initializeOutputFiles(const char *headerFileName,
 		std::exit(EXIT_FAILURE);
 	}
 
+        // Since we are generating C++ code any external code block written in C and C++ can be directly
+        // placed within the generated code but we have to include the proper header files in the generated
+        // program to make this scheme work. So here we are including those headers.
+        IncludesAndLinksMap *externConfig = taskDef->getExternBlocksHeadersAndLibraries();
+        List<const char*> *headerIncludes = new List<const char*>;
+        if (externConfig->hasExternBlocksForLanguage("C++")) {
+        	LanguageIncludesAndLinks *cPlusHeaderAndLinks
+                                 = externConfig->getIncludesAndLinksForLanguage("C++");
+                string_utils::combineLists(headerIncludes, cPlusHeaderAndLinks->getHeaderIncludes());   
+        }
+        if (externConfig->hasExternBlocksForLanguage("C")) {
+                LanguageIncludesAndLinks *cHeaderAndLinks
+                		 = externConfig->getIncludesAndLinksForLanguage("C");
+                string_utils::combineLists(headerIncludes, cHeaderAndLinks->getHeaderIncludes());
+        }
+        if (headerIncludes->NumElements() > 0) {
+                programFile << "// header files needed to execute external code blocks\n";
+                for (int i = 0; i < headerIncludes->NumElements(); i++) {
+                        programFile << "#include ";
+                        const char *headerFile = headerIncludes->Nth(i);
+                        if (headerFile[0] == '"') {
+                                programFile << headerFile << '\n';
+                        } else {
+                                programFile << '<' << headerFile << '>' << '\n';
+                        }
+                }
+        	programFile << '\n';
+        }
 
 	headerFile << "namespace " << string_utils::toLower(initials) << " {\n\n";
 	programFile << "using namespace " << string_utils::toLower(initials) << ";\n\n";
@@ -542,7 +570,7 @@ void generateFnForThreadIdsAdjustment(const char *headerFileName,
 	programFile.close();
 }
 
-void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot) {
+void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot, List<ReductionMetadata*> *reductionInfos) {
        
 	std::cout << "Generating data structures for LPUs\n";
  
@@ -602,12 +630,39 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 			programFile << array->getName() << "PartDims[" << array->getDimensionality() << "]";
 			programFile << stmtSeparator;
 		}
+
+                // check what reduction result variables the LPU has access to
+                List<const char*> *reductionResults = new List<const char*>;
+                for (int i = 0; i < reductionInfos->NumElements(); i++) {
+                        ReductionMetadata *reduction = reductionInfos->Nth(i);
+			
+			// a property for each singleton reduction variable is maintained within the task-globals scalar
+                        if (reduction->isSingleton()) continue;
+
+                        Space *redRootLps = reduction->getReductionRootLps();
+                        // a reduction result variable as accessible at and below of the LPS set as the root of reduciton
+                        // range.
+                        if (redRootLps == lps || lps->isParentSpace(redRootLps)) {
+                                reductionResults->Append(reduction->getResultVar());
+                        }
+                }
+ 
+                // create scalar pointer properties of appropriate types for the reduction results
+                for (int i = 0; i < reductionResults->NumElements(); i++) {
+                        const char *varName = reductionResults->Nth(i);
+                        DataStructure *varDef = lps->getStructure(varName);
+                        Type *dataType = varDef->getType();
+                        programFile << indent << dataType->getCppDeclaration(varName, true);
+                        programFile << stmtSeparator;
+                }       
+		
 		// add a specific lpu_id static array with dimensionality equals to the dimensions of the LPS
 		if (lps->getDimensionCount() > 0) {
 			programFile << indent << "int lpuId[";
 			programFile << lps->getDimensionCount() << "]";
 			programFile << stmtSeparator;
 		}
+
 		// define a print function for the LPU
 		programFile << std::endl;
 		programFile << indent << "void print(std::ofstream &stream, int indent)" << stmtSeparator;	
@@ -617,7 +672,9 @@ void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot)
 	programFile.close();
 }
 
-void generatePrintFnForLpuDataStructures(const char *initials, const char *outputFile, MappingNode *mappingRoot) {
+void generatePrintFnForLpuDataStructures(const char *initials, 
+		const char *outputFile, 
+		MappingNode *mappingRoot, List<ReductionMetadata*> *reductionInfos) {
 
 	std::cout << "Generating print functions for LPUs\n";
 	
@@ -662,6 +719,23 @@ void generatePrintFnForLpuDataStructures(const char *initials, const char *outpu
 				programFile << stmtSeparator;
 			}
 		}
+		for (int i = 0; i < reductionInfos->NumElements(); i++) {
+                       ReductionMetadata *reduction = reductionInfos->Nth(i);
+
+                       // a property for each singleton reduction variable is maintained within the task-globals scalar
+                       if (reduction->isSingleton()) continue;
+
+                       Space *redRootLps = reduction->getReductionRootLps();
+                       if (redRootLps == lps || lps->isParentSpace(redRootLps)) {
+                               programFile << indent << "for (int i = 0; i < indentLevel; i++) ";
+                               programFile << "stream << '\\t'" << stmtSeparator;
+                               const char *resultVar = reduction->getResultVar();
+                               programFile << indent << "stream << \"" << resultVar << ": \"";
+                               programFile << " << *" << resultVar << " << std::endl";
+                               programFile << stmtSeparator;
+                       }
+                }
+
 		programFile << indent << "stream.flush()" << stmtSeparator;
 		programFile << "}\n";
 	}

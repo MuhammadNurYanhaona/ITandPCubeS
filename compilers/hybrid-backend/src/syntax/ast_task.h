@@ -20,6 +20,7 @@ class FlowStage;
 class CompositeStage;
 class VariableAccess;
 class TaskEnvStat;
+class IncludesAndLinksMap;
 class GpuExecutionContext;
 
 enum LinkageType { TypeCreate, TypeLink, TypeCreateIfNotLinked };
@@ -288,6 +289,10 @@ class TaskDef : public Definition {
 	TupleDef *envTuple;
 	TupleDef *partitionTuple; 
   public:
+	// This static reference to a task-definition is used to get to the task from anywhere during the
+        // backend code generation process.
+        static TaskDef *currentTask;
+
         TaskDef(Identifier *id, DefineSection *define, EnvironmentConfig *environment, 
 		InitializeInstr *initialize, ComputeSection *compute, PartitionSection *partition);
         
@@ -322,6 +327,10 @@ class TaskDef : public Definition {
 	// data structures and the stale/fresh status of their different LPS allocations at the end of the 
 	// task execution. 
 	TaskEnvStat *getAfterExecutionEnvStat();
+	// As the name suggests, this function retrieves the header files to be included during compilation
+        // and libraries to linked during code generation for successful execution of all extern code bloks
+        // used within an IT task.
+        IncludesAndLinksMap *getExternBlocksHeadersAndLibraries();
 	// When the task is mapped to the hybrid PCubeS model of the target execution platform, parts of
 	// code that are intended to be execution inside the GPU should be handled differently from the
 	// remaining parts that execute in the host. This function retrieves the sub-flows and generates

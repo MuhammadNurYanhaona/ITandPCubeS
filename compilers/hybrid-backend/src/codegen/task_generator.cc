@@ -20,6 +20,7 @@
 #include "memory_mgmt.h"
 #include "file_io.h"
 #include "communication.h"
+#include "reduction_primitive_mgmt.h"
 #include "environment_mgmt.h"
 #include "gpu_execution.h"
 
@@ -36,6 +37,7 @@
 #include "../syntax/ast_type.h"
 #include "../static-analysis/task_global.h"
 #include "../static-analysis/sync_stat.h"
+#include "../static-analysis/extern_config.h"
 #include "../static-analysis/gpu_execution_ctxt.h"
 #include "../semantics/task_space.h"
 
@@ -71,6 +73,7 @@ TaskGenerator::TaskGenerator(TaskDef *taskDef,
 	mappingRoot = NULL;
 	segmentedPPS = 0;
 	syncManager = NULL;
+	involveReduction = false;
 }
 
 const char *TaskGenerator::getHeaderFileName(TaskDef *taskDef) {
@@ -92,7 +95,7 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	std::cout << "Translating task: " << taskDef->getName();
 	std::cout << "\n-----------------------------------------------------------------\n";
 
-	initializeOutputFiles(headerFile, programFile, initials);
+	initializeOutputFiles(headerFile, programFile, initials, taskDef);
 
 	// interpret mapping configuration
         PartitionHierarchy *lpsHierarchy = taskDef->getPartitionHierarchy();
@@ -167,7 +170,7 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// up a separate program file to hold the GPU/CUDA related code
 	} else {
 		generateBatchConfigurationConstants(headerFile, pcubesModel);
-		initializeCudaProgramFile(initials, headerFile, cudaProgramFile);
+		initializeCudaProgramFile(initials, headerFile, cudaProgramFile, taskDef);
 	}
 
 	// generate constansts needed for various reasons
@@ -176,15 +179,19 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
         generateThreadCountConstants(headerFile, mappingConfig, pcubesModel);
 
 	// generate data structures and functions for task environment management 
-	generatePrintFnForLpuDataStructures(initials, programFile, mappingConfig);
-        List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile, 
-			mappingConfig, taskDef->getEnvironmentLinks());
-	generateFnForMetadataAndEnvLinks(taskDef->getName(), 
-			initials, programFile, mappingConfig, envLinkList);
-        generateLpuDataStructures(headerFile, mappingConfig);
-	List<TaskGlobalScalar*> *globalScalars 
-			= TaskGlobalCalculator::calculateTaskGlobals(taskDef);
-	generateClassesForGlobalScalars(headerFile, globalScalars, rootLps);
+	List<const char*> *envLinkList = generateArrayMetadataAndEnvLinks(headerFile,
+                        mappingConfig, taskDef->getEnvironmentLinks());
+        generateFnForMetadataAndEnvLinks(taskDef->getName(),
+                        initials, programFile, mappingConfig, envLinkList);
+        List<ReductionMetadata*> *reductionInfos = new List<ReductionMetadata*>;
+        taskDef->getComputation()->extractAllReductionInfo(reductionInfos);
+        this->involveReduction = (reductionInfos->NumElements() > 0);
+        generateLpuDataStructures(headerFile, mappingConfig, reductionInfos);
+        generatePrintFnForLpuDataStructures(initials,
+                        programFile, mappingConfig, reductionInfos);
+        List<TaskGlobalScalar*> *globalScalars
+                        = TaskGlobalCalculator::calculateTaskGlobals(taskDef);
+        generateClassesForGlobalScalars(headerFile, globalScalars, rootLps);
 
 	// generate functions related to memory management
 	const char *upperInitials = string_utils::getInitials(taskDef->getName());
@@ -206,7 +213,8 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
         generateFnForThreadIdsAllocation(headerFile, 
 			programFile, initials, mappingConfig, pcubesConfig);
         generateFnForThreadIdsAdjustment(headerFile, programFile, initials, mappingConfig);
-        generateThreadStateImpl(headerFile, programFile, mappingConfig, partParamConfigMap);
+	generateThreadStateImpl(headerFile, programFile,
+                        mappingConfig, reductionInfos, partParamConfigMap);
 
 	// generate setup functions for hybrid execution management if hybrid model being used
 	if (hybridMapping) {
@@ -243,6 +251,18 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 				programFile, taskDef, commCharacterList);
 	}
 
+	// gnerate reduction related data structures and their management functions
+        if (involveReduction) {
+                std::cout << "Generating reduction related data structures and functions\n";
+                generateReductionPrimitiveClasses(headerFile,
+                                programFile, initials, mappingConfig, reductionInfos);
+                generateReductionPrimitiveDecls(headerFile, reductionInfos);
+                generateReductionPrimitiveInitFn(headerFile,
+                                programFile, initials, reductionInfos);
+                generateReductionPrimitiveMapCreateFnForThread(headerFile,
+                                programFile, initials, reductionInfos);
+        }
+
 	// generate environment management data structures and functions
 	generateTaskEnvironmentClass(taskDef, initials, headerFile, programFile);
 	generateFnToInitEnvLinksFromEnvironment(taskDef, initials, headerFile, programFile);
@@ -271,9 +291,10 @@ void TaskGenerator::generate(List<PCubeSModel*> *pcubesModels) {
 	// generate pthreads execution and management related functions for the host only task's LPS mapping
 	if (!hybridMapping) {
 		// generate run function for threads
-		generateThreadRunFunction(taskDef, headerFile, 
-				programFile, initials, mappingConfig, 
-				syncManager->involvesSynchronization(), communicatorCount);
+		generateThreadRunFunction(taskDef, headerFile,
+				programFile, initials, mappingConfig,
+				syncManager->involvesSynchronization(),
+				involveReduction, communicatorCount);
 
 		// generate data structure and functions for Pthreads
 		generateArgStructForPthreadRunFn(taskDef->getName(), headerFile);

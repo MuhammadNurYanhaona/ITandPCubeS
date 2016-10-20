@@ -25,9 +25,12 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFile,
 
 /* function definition for generating the thread::run function */
 void generateThreadRunFunction(TaskDef *taskDef, const char *headerFile,
-		const char *programFile, const char *initials,
-		MappingNode *mappingRoot, bool involvesSynchronization, 
-		int communicatorCount);	
+                const char *programFile,
+                const char *initials,
+                MappingNode *mappingRoot,
+                bool involvesSynchronization,
+                bool involvesReduction,
+                int communicatorCount);
 
 /* function definition for generating the computation flow executor in the batch
    execution mode (batch execution mode is used when the task has been mapped to

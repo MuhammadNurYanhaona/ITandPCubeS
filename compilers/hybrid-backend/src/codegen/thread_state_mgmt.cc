@@ -317,9 +317,43 @@ void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mapp
 	programFile << std::endl << functionHeader.str() << " " << functionBody.str();
 }
 
-void generateThreadStateImpl(const char *headerFileName, 
-		const char *programFileName, 
-		MappingNode *mappingRoot, 
+void generateReductionResultMapCreateFn(std::ofstream &programFile,
+                MappingNode *mappingRoot,
+                List<ReductionMetadata*> *reductionInfos) {
+
+        std::cout << "\tGenerating function for initializing the map of reduction results" << std::endl;
+        Space *rootLps = mappingRoot->mappingConfig->LPS;
+
+        const char *header = "Reduction Result Map Creator Function";
+        decorator::writeSubsectionHeader(programFile, header);
+
+        // specify the function signature matching the virtual function in Thread-State class
+        std::ostringstream functionHeader;
+        functionHeader << "void ThreadStateImpl::initializeReductionResultMap()";
+
+        std::ostringstream functionBody;
+        functionBody << "{\n";
+
+        // create the map
+        functionBody << indent << "localReductionResultMap = new Hashtable<reduction::Result*>" << stmtSeparator;
+
+        for (int i = 0; i < reductionInfos->NumElements(); i++) {
+                ReductionMetadata *reduction = reductionInfos->Nth(i);
+                const char *varName = reduction->getResultVar();
+                functionBody << indent << "localReductionResultMap->Enter(";
+                functionBody << "\"" << varName << "\"" << paramSeparator;
+                functionBody << "new reduction::Result())" << stmtSeparator;
+        }
+
+        functionBody << "}\n";
+
+        programFile << std::endl << functionHeader.str() << " " << functionBody.str();
+}
+
+void generateThreadStateImpl(const char *headerFileName,
+                const char *programFileName,
+                MappingNode *mappingRoot,
+                List<ReductionMetadata*> *reductionInfos,
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig) {
 
 	std::cout << "Generating task spacific Thread State implementation task" << std::endl;	
@@ -364,6 +398,8 @@ void generateThreadStateImpl(const char *headerFileName,
 	generateComputeLpuCountRoutine(programFile, mappingRoot, countFunctionsArgsConfig);
 	// then call the compute-Next-LPU function generator method for class specific implementation
 	generateComputeNextLpuRoutine(programFile, mappingRoot);
+	// generate the function to initialize of a map of reduction result variables
+        generateReductionResultMapCreateFn(programFile, mappingRoot, reductionInfos);
 	//-------------------------------------------------------------------------------------------------------
  
 	programFile.close();

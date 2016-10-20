@@ -56,4 +56,12 @@
 // for synchronization
 #include "../../src/runtime/sync.h"
 
+// for reductions
+#include "../../src/runtime/reduction.h"
+#include "../../src/utils/common_constant.h"
+
+// for minimum and maximum values of numeric types
+#include <limits.h>
+#include <float.h>
+
 class Communicator;

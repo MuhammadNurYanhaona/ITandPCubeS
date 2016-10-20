@@ -217,6 +217,17 @@ void ReportError::NotAConstant(yyltype *loc, const char *constType, bool suppres
 	OptionalErrorReport(loc, suppressFailure, "Expression should be a constant of type '%s'", constType);
 }
 
+void ReportError::NotReductionType(Identifier *id, bool suppressFailure) {
+        OptionalErrorReport(id->GetLocation(), suppressFailure,
+        		"'%s' is not a task-global Reduction variable", id->getName());
+}
+
+void ReportError::ReductionRangeInvalid(yyltype *loc, const char *rdRootLps, const char *rdBoundaryLps, bool suppressFailure) {
+        OptionalErrorReport(loc, suppressFailure, 
+                        "The root LPS of the reduction, Space %s, is situated above the encircling LPS, Space %s", 
+                        rdRootLps, rdBoundaryLps);
+}
+
 void ReportError::SpaceNotFound(yyltype *loc, char spaceName) {
 	Formatted(loc, "No space with name '%c' found in the Partition section", spaceName);
 } 

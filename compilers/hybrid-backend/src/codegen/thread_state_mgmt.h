@@ -16,6 +16,7 @@ class PCubeSModel;
 class PPS_Definition;
 class EnvironmentLink;
 class PartitionParameterConfig;
+class ReductionMetadata;
 
 /* function definition for generating the routine that encodes the LPS hierarchy as parent pointer
    indexes in an array. This array is needed to quickly identify the ancestor LPUs when computing
@@ -42,9 +43,17 @@ void generateComputeLpuCountRoutine(std::ofstream &programFile, MappingNode *map
 /* function definition to generate task specific implementation of compute-next-LPU routine */
 void generateComputeNextLpuRoutine(std::ofstream &programFile, MappingNode *mappingRoot);
 
+/* function definition to generate a task specific implementation of the initializer of the map 
+   of reduction result variables that keep track of a PPU's partial result for individual reductions.  
+*/
+void generateReductionResultMapCreateFn(std::ofstream &programFile, 
+               	MappingNode *mappingRoot, 
+               	List<ReductionMetadata*> *reductionInfos);
+
 /* function definition for generating the task specific implementation of Thread-State class */
 void generateThreadStateImpl(const char *headerFileName, const char *programFileName, 
 		MappingNode *mappingRoot,
+		List<ReductionMetadata*> *reductionInfos,
                 Hashtable<List<PartitionParameterConfig*>*> *countFunctionsArgsConfig);
 
 /* When a task is mapped to the hybrid PCubeS model of the hardware, LPUs are generated in batches  

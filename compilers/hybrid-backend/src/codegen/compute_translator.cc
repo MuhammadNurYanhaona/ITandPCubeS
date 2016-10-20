@@ -65,31 +65,36 @@ int parseComputation(FlowStage *currentStage, const char *initialsLower,
 		headerFile << execStage->getName() << "(";
 		programFile << execStage->getName() << "(";
 
-		// get the LPS where this function should execute to generate the LPU argument
-		Space *space = execStage->getSpace();
-		headerFile << "Space" << space->getName() << "_LPU *lpu";
-		programFile << "Space" << space->getName() << "_LPU *lpu";
-		
-		// then add the default arrayMetadata, task-global and thread-local arguments
-		headerFile << paramSeparator << paramIndent << "ArrayMetadata *arrayMetadata";
-		programFile << paramSeparator << paramIndent << "ArrayMetadata *arrayMetadata";
-		headerFile << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
-		programFile << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
-		headerFile << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
-		programFile << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
+		std::ostringstream paramStream;
 
-		// then add a parameter for the partition arguments
-		headerFile << paramSeparator << initialsUpper << "Partition partition";
-		programFile << paramSeparator << initialsUpper << "Partition partition";
+                // get the LPS where this function should execute to generate the LPU argument
+                Space *space = execStage->getSpace();
+                paramStream << "Space" << space->getName() << "_LPU *lpu";
 
-		// finally, add an output file stream for logging steps of the computation stage if needed
-		headerFile << paramSeparator << paramIndent << "std::ofstream &logFile";
-		programFile << paramSeparator << paramIndent << "std::ofstream &logFile";
+                // then add the default arrayMetadata, task-global and thread-local arguments
+                paramStream << paramSeparator << paramIndent << "ArrayMetadata *arrayMetadata";
+                paramStream << paramSeparator << paramIndent << "TaskGlobals *taskGlobals";
+                paramStream << paramSeparator << paramIndent << "ThreadLocals *threadLocals";
 
+                // then add a parameter for the map of local, partial results of reductions if the stage
+                // involves some reduction
+                if (currentStage->hasNestedReductions()) {
+                        paramStream << paramSeparator << paramIndent;
+                        paramStream << "Hashtable<reduction::Result*> *localReductionResultMap";
+                }
 
-		// finish function declaration
-		headerFile << ");\n\n";
-		programFile << ") {\n";
+                // then add a parameter for the partition arguments
+                paramStream << paramSeparator << paramIndent;
+                paramStream << initialsUpper << "Partition partition";
+
+                // finally, add an output file stream for logging steps of the computation stage if needed
+                paramStream << paramSeparator << paramIndent << "std::ofstream &logFile";
+
+                // finish function declaration
+                headerFile << paramStream.str();
+                programFile << paramStream.str();
+                headerFile << ");\n\n";
+                programFile << ") {\n";
 
 		// then invoke the translate code function in the stage to generate C++ equivalent of 
 		// the code content
@@ -128,8 +133,11 @@ void generateFnsForComputation(TaskDef *taskDef, const char *headerFileName,
 }
 
 void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
-                const char *programFileName, const char *initials, 
-		MappingNode *mappingRoot, bool involvesSynchronization, int communicatorCount) {
+                const char *programFileName,
+                const char *initials,
+                MappingNode *mappingRoot,
+                bool involvesSynchronization,
+                bool involvesReduction, int communicatorCount) {
 
 	std::cout << "Generating the thread::run function for the task\n";
 	
@@ -194,6 +202,19 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 			programFile << "\tint commCounter" << i << " = 0;\n";
 		}
 	}
+
+	// initilize the map for holding partial results of reductions
+        if (involvesReduction) {
+                programFile << "\n\t// initializing a map for holding local, partial results of reductions\n";
+                programFile << "\tthreadState->initializeReductionResultMap();\n";
+                programFile << "\tHashtable<reduction::Result*> *reductionResultsMap = ";
+                programFile << "threadState->getLocalReductionResultMap();\n";
+
+                programFile << "\n\t// retrieving the reduction primitives relevant to the current thread\n";
+                programFile << "\tThreadIds *threadIds = threadState->getThreadIds();\n";
+                programFile << "\tHashtable<ReductionPrimitive*> *rdPrimitiveMap = ";
+                programFile << "getReductionPrimitiveMap(threadIds);\n";
+        }
 
 	// create a local part-dimension object for probable array dimension based range or assignment expressions
 	programFile << "\n\t// create a local part-dimension object for later use\n";

@@ -15,12 +15,15 @@
 #include "../static-analysis/data_flow.h"
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/task_env_stat.h"
+#include "../static-analysis/extern_config.h"
 #include "../static-analysis/gpu_execution_ctxt.h"
 #include "../codegen/space_mapping.h"
 
 #include <sstream>
 
 //------------------------------------------------------- Task Definition ---------------------------------------------------------/
+
+TaskDef *TaskDef::currentTask = NULL;
 
 TaskDef::TaskDef(Identifier *i, 
 		DefineSection *d, 
@@ -66,6 +69,9 @@ void TaskDef::attachScope(Scope *parentScope) {
                 VariableDef *var = varList->Nth(i);
                 VariableSymbol *varSym = new VariableSymbol(var);
                 scope->insert_symbol(varSym);
+		if (var->isReduction()) {
+                        varSym->flagAsReduction();
+                }
         }
 
 	// create the environment scope and at the same time a tuple for it
@@ -222,6 +228,17 @@ void TaskDef::analyseCode() {
 	for (int i = 0; i < syncStagesForStaleLpses->NumElements(); i++) {
 		computation->addStageAtEnd(syncStagesForStaleLpses->Nth(i));
 	}
+
+	//------------------------------------------------------------- Flow Expansion for Reductions
+        // generate metadata about reduction statements found in the computation 
+        computation->populateReductionMetadata(hierarchy);
+        // augment the computation fow with new reduction boundary stages to carry out 
+        // initialization and termination of reduction
+        computation->setupReductionBoundaryStages(hierarchy);
+        // generate metadata about reduction statements again as the previous analysis 
+        // moved reduction annotations from compute stages to boundary stages, but both
+        // kind of stages need the annotations (for separate reasons) 
+        computation->populateReductionMetadata(hierarchy);
 	
 	//------------------------------------------------------------------ Data Dependency Analysis
 	// identify the loops inside the task's computation block that can be vectorized
@@ -276,6 +293,12 @@ List<GpuExecutionContext*> *TaskDef::getGpuExecutionContexts() {
 bool TaskDef::usingHybridModel() {
 	PartitionHierarchy *lpsHierarchy = getPartitionHierarchy();
 	return lpsHierarchy->isMappedToHybridModel();
+}
+
+IncludesAndLinksMap *TaskDef::getExternBlocksHeadersAndLibraries() {
+        IncludesAndLinksMap *configMap = new IncludesAndLinksMap();
+        compute->getComputation()->retriveExternCodeBlocksConfigs(configMap);
+        return configMap;
 }
 
 void TaskDef::print() {

@@ -4,6 +4,7 @@
 #include "task_env_stat.h"
 #include "gpu_execution_ctxt.h"
 #include "../syntax/ast.h"
+#include "../syntax/errors.h"
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
 #include "../syntax/ast_task.h"
@@ -27,7 +28,8 @@
 
 CompositeStage::CompositeStage(int index, Space *space, Expr *executeCond) : FlowStage(index, space, executeCond) {
 	stageList = new List<FlowStage*>;
-	gpuLpuDistrFlag = Not_Gpu_Stage;	
+	gpuLpuDistrFlag = Not_Gpu_Stage;
+	reductionBoundary = false;	
 }
 
 void CompositeStage::addStageAtBeginning(FlowStage *stage) {
@@ -238,6 +240,24 @@ void CompositeStage::performEpochUsageAnalysis() {
 		List<const char*> *stageEpochList = stage->getEpochDependentVarList();
 		string_utils::combineLists(epochDependentVarList, stageEpochList);
 	}
+}
+
+void CompositeStage::populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->populateReductionMetadata(lpsHierarchy);
+        }
+}
+
+void CompositeStage::extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {
+
+        // composite stages should not add their own lists of reduction metadata into the argument list as their
+        // own lists have been created by extracting metadata from nested execution stages.
+
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->extractAllReductionInfo(reductionInfos);
+        }
 }
 
 void CompositeStage::flagVectorizableLoops() {
@@ -600,6 +620,12 @@ void CompositeStage::genInvocationCodeForHost(std::ofstream &stream,
 		//-----------------------------------------------------------------------------------------------*/
 	}
 
+	// if the current composite stage is boundary for some reduction operations then execute the final step of
+        // reduction
+        if (reductionBoundary) {
+                executeFinalStepOfReductions(stream, nextIndentation);
+        }
+
 	// close the while loop if applicable
 	if (space != containerSpace) {
 		const char *spaceName = space->getName();
@@ -710,6 +736,12 @@ void CompositeStage::genInvocationCodeForHybrid(std::ofstream &stream,
 		stream << nextIndent.str() << "\tcontinue" << stmtSeparator;
 		stream << nextIndent.str() << "}\n";	
 	}
+
+	// if the current composite stage is boundary for some reduction operations then initialize partial results
+        // of reductions for the executing PPU controller thread
+        if (reductionBoundary) {
+                initializeReductionResults(stream, nextIndentation);
+        }
 	
 	// Iterate over groups of flow stages where each group executes within a single LPS.
 	List<List<FlowStage*>*> *stageGroups = getConsecutiveNonLPSCrossingStages();
@@ -1241,6 +1273,13 @@ void CompositeStage::analyzeSynchronizationNeeds() {
 	}
 }
 
+void CompositeStage::retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->retriveExternCodeBlocksConfigs(externConfigMap);
+        }
+}
+
 bool CompositeStage::isEmpty() {
 	for (int i = 0; i < stageList->NumElements(); i++) {
 		FlowStage *stage = stageList->Nth(i);
@@ -1309,6 +1348,75 @@ void CompositeStage::analyzeSynchronizationNeedsForComposites() {
 			}
 		}
 	}
+}
+
+void CompositeStage::setupReductionBoundaryStages(PartitionHierarchy *lpsHierarchy) {
+
+        int nestedStageCount = stageList->NumElements();
+        for (int i = 0; i < nestedStageCount; i++) {
+                FlowStage *stage = stageList->Nth(i);
+
+                // if the nested stage is a composite stage then recursively invoke the function inside that to expand
+                // the subflow it contains
+                CompositeStage *subflow = dynamic_cast<CompositeStage*>(stage);
+                if (subflow != NULL) {
+                        subflow->setupReductionBoundaryStages(lpsHierarchy);
+                        continue;
+                }
+
+                // if the nested stage is not an execution stage or does not have any reduction then no modification
+                // is needed
+                ExecutionStage *computation = dynamic_cast<ExecutionStage*>(stage);
+                if (computation == NULL || !computation->hasNestedReductions()) {
+                        continue;
+                }
+
+                // find the topmost LPS where the root of some reduction range is located
+                List<ReductionMetadata*> *reductions = computation->getNestedReductions();
+                Space *topmostReductionLps = computation->getSpace();
+                for (int j = 0; j < reductions->NumElements(); j++) {
+
+                        ReductionMetadata *metadata = reductions->Nth(j);
+                        Space *candidateLps = metadata->getReductionRootLps();
+
+                        // make sure that the reduction operation's root LPS has not been incorrectly placed to some LPS
+                        // above the LPS the subflow represented by the current composite stage is supposed to execute
+                        Space *commonAncestor = lpsHierarchy->getCommonAncestor(candidateLps, topmostReductionLps);
+                        if (commonAncestor != this->space && !commonAncestor->isParentSpace(this->space)) {
+                                ReportError::ReductionRangeInvalid(metadata->getLocation(),
+                                                candidateLps->getName(), space->getName(), false);
+                        }
+
+                        if (topmostReductionLps->isParentSpace(candidateLps)) {
+                                topmostReductionLps = candidateLps;
+                        }
+                }
+
+                // setup a new reduction boundary composite stage on the topmost reduction root LPS and move the compu-
+                // tation inside it
+                CompositeStage *reductionBoundary = new CompositeStage(-1, topmostReductionLps, NULL);
+                reductionBoundary->setName("Reduction Boundary");
+                reductionBoundary->flagAsReductionBoundary();
+                this->removeStageAt(i);
+                reductionBoundary->addStageAtBeginning(computation);
+                this->insertStageAt(i, reductionBoundary);
+
+                // move reduction annotations having root at topmostReductionLps from the computation to the reduction 
+                // boundary stage as the letter will do variable setup and final reduction.
+                List<ReductionMetadata*> *boundaryList = reductionBoundary->getNestedReductions();
+                int j = 0;
+                while (j < reductions->NumElements()) {
+                        ReductionMetadata *metadata = reductions->Nth(j);
+                        Space *reductionRootLps = metadata->getReductionRootLps();
+                        if (reductionRootLps == topmostReductionLps) {
+                                boundaryList->Append(metadata);
+                                reductions->RemoveAt(j);
+                        } else j++;
+                }
+
+                // recursively call the function in the boundary stage to expand reductions with lower root LPSes.
+                reductionBoundary->setupReductionBoundaryStages(lpsHierarchy);
+        }
 }
 
 void CompositeStage::deriveSynchronizationDependencies() {
@@ -2046,6 +2154,67 @@ void CompositeStage::genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &
 		stream << ")" << stmtSeparator;
 		stream << indent.str() << "}\n";
 	}
+}
+
+void CompositeStage::initializeReductionResults(std::ofstream &stream, int indentation) {
+
+        std::ostringstream indents;
+        for (int i = 0; i < indentation; i++) indents << indent;
+
+        stream << std::endl;
+        stream << indents.str() << "// initializing thread-local reduction result variables\n";
+
+        for (int i = 0; i < nestedReductions->NumElements(); i++) {
+                ReductionMetadata *reduction = nestedReductions->Nth(i);
+                const char *resultVar = reduction->getResultVar();
+                Space *executingLps = reduction->getReductionExecutorLps();
+                const char *execLpsName = executingLps->getName();
+                stream << indents.str() << "if(threadState->isValidPpu(Space_" << execLpsName << ")) {\n";
+                stream << indents.str() << indent;
+                stream << "reduction::Result *" << resultVar << "Local = reductionResultsMap->";
+                stream << "Lookup(\"" << resultVar << "\")" << stmtSeparator;
+                stream << indents.str() << indent;
+                stream << "ReductionPrimitive *rdPrimitive = rdPrimitiveMap->Lookup(\"";
+                stream << resultVar << "\")" << stmtSeparator;
+                stream << indents.str() << indent << "rdPrimitive->resetPartialResult(";
+                stream << resultVar << "Local)" << stmtSeparator;
+                stream << indents.str() << "}\n";
+        }
+
+        stream << std::endl;
+}
+
+void CompositeStage::executeFinalStepOfReductions(std::ofstream &stream, int indentation) {
+
+        std::ostringstream indents;
+        for (int i = 0; i < indentation; i++) indents << indent;
+
+        stream << std::endl;
+        stream << indents.str() << "// executing the final step of reductions\n";
+
+        for (int i = 0; i < nestedReductions->NumElements(); i++) {
+                ReductionMetadata *reduction = nestedReductions->Nth(i);
+                if (!reduction->isSingleton()) {
+                        std::cout << "The current compiler still cannot handle non task-global reductions\n";
+                        std::exit(EXIT_FAILURE);
+                }
+                const char *resultVar = reduction->getResultVar();
+                Space *executingLps = reduction->getReductionExecutorLps();
+                const char *execLpsName = executingLps->getName();
+                stream << indents.str() << "if(threadState->isValidPpu(Space_" << execLpsName << ")) {\n";
+                stream << indents.str() << indent;
+                stream << "reduction::Result *localResult = reductionResultsMap->";
+                stream << "Lookup(\"" << resultVar << "\")" << stmtSeparator;
+                stream << indents.str() << indent;
+                stream << "void *target = &(taskGlobals->" << resultVar << ")" << stmtSeparator;
+                stream << indents.str() << indent;
+                stream << "ReductionPrimitive *rdPrimitive = rdPrimitiveMap->Lookup(\"";
+                stream << resultVar << "\")" << stmtSeparator;
+                stream << indents.str() << indent;
+                stream << "rdPrimitive->reduce(localResult" << paramSeparator << "target)" << stmtSeparator;
+                stream << indents.str() << "}\n";
+        }
+        stream << std::endl;
 }
 
 //------------------------------------------------- Repeat Cycle ------------------------------------------------------/

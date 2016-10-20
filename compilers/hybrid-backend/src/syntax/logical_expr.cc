@@ -10,6 +10,7 @@
 #include "errors.h"
 
 #include "../utils/hashtable.h"
+#include "../utils/common_constant.h"
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/loop_index.h"
 #include "../codegen/name_transformer.h"

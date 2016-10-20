@@ -11,10 +11,12 @@ class MappingNode;
 class PCubeSModel;
 class PPS_Definition;
 class EnvironmentLink;
+class ReductionMetadata;
 
 /* function definition to import common header files in generated code and write the namespace */
 void initializeOutputFiles(const char *headerFile, 
-		const char *programFile, const char *initials);
+		const char *programFile, 
+		const char *initials, TaskDef *taskDef);
 
 /* function definition for generating constants for total number of threads, threads per core,
    threads per segment, processors per hardware unit, etc.  */
@@ -42,7 +44,6 @@ void generateFnForThreadIdsAdjustment(const char *headerFile,
 		const char *initials, 
 		MappingNode *mappingRoot); 
 
-
 /* function definition for generating array metadata and environment links structures for a task */
 List<const char*> *generateArrayMetadataAndEnvLinks(const char *outputFile, 
 		MappingNode *mappingRoot,
@@ -56,11 +57,15 @@ void generateFnForMetadataAndEnvLinks(const char *taskName, const char *initials
 		List<const char*> *externalLinks);
 
 /* function definition to generate data structures representing LPUs of different LPSes */
-void generateLpuDataStructures(const char *outputFile, MappingNode *mappingRoot);
+void generateLpuDataStructures(const char *outputFile, 
+	MappingNode *mappingRoot, 
+	List<ReductionMetadata*> *reductionInfos);
 
 /* function definition to generate print functions for LPUs of different LPSes */
 void generatePrintFnForLpuDataStructures(const char *initials, 
-		const char *outputFile, MappingNode *mappingRoot);
+		const char *outputFile, 
+		MappingNode *mappingRoot, 
+		List<ReductionMetadata*> *reductionInfos);
 
 /* function definition to generate classes for all tuple definitions found in the source code */
 void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefList);

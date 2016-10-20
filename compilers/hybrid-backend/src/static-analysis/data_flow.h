@@ -2,6 +2,7 @@
 #define _H_data_flow
 
 #include "../syntax/ast.h"
+#include "../syntax/location.h"
 #include "../syntax/ast_expr.h"
 #include "../syntax/ast_stmt.h"
 #include "../syntax/ast_task.h"
@@ -9,6 +10,7 @@
 #include "../semantics/scope.h"
 #include "../utils/hashtable.h"
 #include "task_env_stat.h"
+#include "extern_config.h"
 
 #include <iostream>
 #include <fstream>
@@ -66,6 +68,39 @@ enum CodeGenerationMode { Hybrid_Code_Generation, Host_Only_Code_Ceneration };
  */
 enum GpuLpuDistributionFlag { Not_Gpu_Stage, Gpu_Lpu_Distr_Stage, Gpu_Lpu_Nondistr_Stage };
 
+/*      If a Execution-Stage has a reduction operation then some setup and tear down of auxiliary variables need to be
+        done by the surrounding Compound-Stage before and after of the former stage. Furthermore, any synchronization
+        and/or communication also needs to be applied by the Compound-Stage. This class holds information regarding a
+        reduction that are extracted by analyzing the Execution-Stages so that the aforementioned actions can be taken
+        properly.  
+*/
+class ReductionMetadata {
+  protected:
+        const char *resultVar;
+        ReductionOperator opCode;
+        Space *reductionRootLps;
+        Space *reductionExecutorLps;
+
+        // this attribute is only needed for error reporting on invalid reduction operations
+        yyltype *location;
+  public:
+        ReductionMetadata(const char *resultVar,
+                        ReductionOperator opCode,
+                        Space *reductionRootLps,
+                        Space *reductionExecutorLps, yyltype *location);
+        const char *getResultVar() { return resultVar; }
+        ReductionOperator getOpCode() { return opCode; }
+        Space *getReductionRootLps() { return reductionRootLps; }
+        Space *getReductionExecutorLps() { return reductionExecutorLps; }
+        yyltype *getLocation() { return location; }
+
+        // A reduction is singleton when there is just a single global result instance of the reduction operation. 
+        // Result handling for such a reduction is much easier than that of a normal reduction. In the former case we
+        // can maintain a single task-global scalar property; while in the latter case, results instances need to be
+        // dynamically created and maintained for individual LPUs.
+        bool isSingleton();
+};
+
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
 	easier to reason with for later part of the compiler. 
@@ -95,6 +130,11 @@ class FlowStage {
 	// the execution of the flow stage.
 	List<const char*> *epochDependentVarList;
 
+	// This list is useful primarily to Composite-Stages for doing resources setup and tear down for any reduction
+        // found in nested execution stages. Regardless, the list has been placed in the generic Flow-Stage class to
+        // populate the list by recursively traversing Execution-Stages inside those Composite Stages.
+        List<ReductionMetadata*> *nestedReductions;
+
 	// This flag variable indicates if the current flow stage signals an entry to inside GPU code execution
 	bool gpuEntryPoint;
   public:
@@ -122,6 +162,8 @@ class FlowStage {
 	List<const char*> *getEpochDependentVarList() { return epochDependentVarList; }
 	Hashtable<VariableAccess*> *getAccessMap() { return accessMap; }
 	void setAccessMap(Hashtable<VariableAccess*> *accessMap) { this->accessMap = accessMap; }
+	bool hasNestedReductions() { return (nestedReductions != NULL && nestedReductions->NumElements() > 0); }
+        List<ReductionMetadata*> *getNestedReductions() { return nestedReductions; }
 	void flagAsGpuEntryPoint() { gpuEntryPoint = true; }
 	bool isGpuEntryPoint() { return gpuEntryPoint; }
 	void mergeAccessMapTo(Hashtable<VariableAccess*> *destinationMap);
@@ -250,6 +292,19 @@ class FlowStage {
 	virtual List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
 	// This function uses the same recursive process, but it returns detail communication information 
 	virtual List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
+
+	// This function is used to recursively determine all external header file inclusions and library linkages
+        // for external code blocks present in the class. This header files and library links are applied during
+        // compilation and linkage of the generated code.       
+        virtual void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {}
+
+	// These two auxiliary functions are needed to all process parallel reductions found in the computation
+        // flow of a task. The first function 'populateReductionMetadata' investigates the statements of Execution
+        // stages and discover any reductions in them. The second function 'extractAllReductionInfo' lists all 
+        // reductions of a task so that proper memory management decisions can be made regarding the reduction result 
+        // variables. 
+        virtual void populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {}
+        virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);
 };
 
 /*	Sync stages are automatically added to the user specified execution flow graph during static analysis. These 
@@ -296,6 +351,7 @@ class ExecutionStage : public FlowStage {
 	void setScope(Scope *scope) { this->scope = scope; }
 	Scope *getScope() { return scope; }
 	void performEpochUsageAnalysis();
+	void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
 	void flagVectorizableLoops() { code->flagInnermostParallelForLoops(); }
 	void print(int indent);
 
@@ -304,6 +360,10 @@ class ExecutionStage : public FlowStage {
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 	bool isGroupEntry();
 	void setLpsExecutionFlags();
+	void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
+                code->retrieveExternHeaderAndLibraries(externConfigMap);
+        }
+
 	void generateGpuKernelCode(std::ofstream &stream, 
 			int indentation, 
 			GpuExecutionContext *gpuContext,
@@ -346,9 +406,16 @@ class CompositeStage : public FlowStage {
   protected:
 	List<FlowStage*> *stageList;
 	GpuLpuDistributionFlag gpuLpuDistrFlag;
+	
+        // A TRUE value for this boolean flag indicates that the current composite stage is a compiler introduced
+        // reduction boundary stage. If that is the case, execution of its nested stages should be surrounded by 
+        // result variable and execution resource setup at the beginning and parallel reduction execution at the end. 
+        bool reductionBoundary;
   public:
 	CompositeStage(int index, Space *space, Expr *executeCond);
 	virtual ~CompositeStage() {}
+	void flagAsReductionBoundary() { reductionBoundary = true; }
+        bool isReductionBoundary() { return reductionBoundary; }
 	void addStageAtBeginning(FlowStage *stage);
 	void addStageAtEnd(FlowStage *stage);
 	void insertStageAt(int index, FlowStage *stage);
@@ -363,12 +430,15 @@ class CompositeStage : public FlowStage {
 	virtual void print(int indent);
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	virtual void performEpochUsageAnalysis();
+	void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
+	void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);
 	void flagVectorizableLoops();
 	void reorganizeDynamicStages();
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
 	virtual void prepareTaskEnvStat(TaskEnvStat *taskStat, Hashtable<VariableAccess*> *accessMap = NULL);
 	virtual void calculateLPSUsageStatistics();
 	void analyzeSynchronizationNeeds();
+	void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap);
 	
 	// This tells if a composite stage has any actual computation as opposed being composed of just sync stages.
 	// An empty composite stage is unlikely to be present in the source code but may arise generated due to 
@@ -396,6 +466,15 @@ class CompositeStage : public FlowStage {
 	// synchronization needs of nested stages along with their synchronization dependencies are set properly.
 	// So this is the last method to envoke in the process of resolving synchronization.
 	void analyzeSynchronizationNeedsForComposites();
+
+	// This function breaks the computation flow of the task so that each Execution-Stage with a reduction is 
+        // within an explicit Composite Stage boundary that runs in the LPS that is the root LPS of the reduction.
+        // The current implementation (Dated Oct 2016) of this function is not the ideal implementation. We needed
+        // a quick implementation to make some parallel reduction to work; therefore we have this. This assumes 
+        // that the original computation flow of the task does not have decorative composite stages. Furthermore,
+        // it does not do any validation to make sure that the result of a reduction wont be read before it is 
+        // ready. 
+        void setupReductionBoundaryStages(PartitionHierarchy *lpsHierarchy);
 	
 	void printSyncRequirements(int indentLevel);
 	virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
@@ -524,6 +603,14 @@ class CompositeStage : public FlowStage {
 	void genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &stream, int indentation,
 			List<SyncRequirement*> *syncRequirements);
 	
+	// This function is used to prepare local partial reduction results of the executing PPU controller when the 
+        // current composite stage is a boundary for some reduction operations.
+        void initializeReductionResults(std::ofstream &stream, int indentation);
+        // After each PPU controller computed its partial result of a reduction, all cooperating PPU controllers
+        // combine their partial results to generate a final outcome using a shared reduction primitive. This step
+        // takes place in the boundary composite stage for the reduction. The following function produces the code 
+        // for that step.   
+        void executeFinalStepOfReductions(std::ofstream &stream, int indentation);
 };
 
 /*	A repeat cycle is a composite stage iterated one or more times under the control of a repeat instruction.

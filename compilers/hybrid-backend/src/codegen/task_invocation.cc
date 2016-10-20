@@ -453,6 +453,12 @@ void generateHostOnlyExecutionCode(std::ofstream &programFile, TaskGenerator *ta
                 programFile << indent << "initializeSyncPrimitives()" << stmtSeparator;
         }
 
+	// check if the task has some reduction operations; if YES then initialize reduction primitives
+        if (taskGenerator->hasReductions()) {
+                programFile << std::endl << indent << "// initializing reduction primitives\n";
+                programFile << indent << "setupReductionPrimitives(logFile)" << stmtSeparator;
+        }
+
 	// start threads and wait for them to finish execution of the task 
         taskGenerator->startThreads(programFile);
 

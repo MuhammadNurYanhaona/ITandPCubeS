@@ -173,8 +173,6 @@ class IndexRangeCondition: public Node {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
-	void extractReductionInfo(List<ReductionMetadata*> *infoSet, 
-			PartitionHierarchy *lpsHierarchy, Space *executingLps); 
 
 	//-------------------------------------------------------------------------Code Generation Routines
 	LogicalExpr *getRestrictions();

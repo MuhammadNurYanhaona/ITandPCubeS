@@ -10,6 +10,7 @@
 #include "errors.h"
 
 #include "../utils/hashtable.h"
+#include "../utils/common_constant.h"
 #include "../static-analysis/data_access.h"
 #include "../static-analysis/loop_index.h"
 #include "../static-analysis/array_assignment.h"
@@ -20,7 +21,7 @@
 #include <sstream>
 #include <cstdlib>
 
-//----------------------------------------------- Reduction Expression ------------------------------------------------/
+//----------------------------------------------- Sequential Reduction Expression ------------------------------------------------/
 
 ReductionExpr::ReductionExpr(char *o, Expr *r, yyltype loc) : Expr(loc) {
 	Assert(r != NULL && o != NULL);

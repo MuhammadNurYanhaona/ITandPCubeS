@@ -2,6 +2,7 @@
 #define _H_lpu_management
 
 #include "structure.h"
+#include "reduction.h"
 #include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"
@@ -140,6 +141,9 @@ class ThreadState {
 	Hashtable<Communicator*> *communicatorMap;
 	// an auxiliary variable used in LPU generation process
 	List<int*> *lpuIdChain;
+	// a map property to keep track of the partial results of ongoing reductions computed by the composite
+        // PPU controller thread holding the current Thread-State variable.
+        Hashtable<reduction::Result*> *localReductionResultMap;
   public:
 	ThreadState(int lpsCount, int *lpsDimensions, int *partitionArgs, ThreadIds *threadIds);
 	
@@ -154,6 +158,12 @@ class ThreadState {
 	Communicator *getCommunicator(const char *dependencyName) { 
 		return communicatorMap->Lookup(dependencyName); 
 	}
+	Hashtable<reduction::Result*> *getLocalReductionResultMap() {
+                return localReductionResultMap;
+        }
+        reduction::Result *getLocalReductionResult(const char *varName) {
+                return localReductionResultMap->Lookup(varName);
+        }
 			
 	virtual void setLpsParentIndexMap() = 0;
 	virtual void setRootLpu(Metadata *metadata) = 0;
@@ -161,6 +171,7 @@ class ThreadState {
 	virtual void initializeLPUs() = 0;
 	virtual int *computeLpuCounts(int lpsId) = 0;
 	virtual LPU *computeNextLpu(int lpsId) = 0;
+	virtual void initializeReductionResultMap() = 0;
 
 	// The get-Next-Lpu management routine is at the heart of recursive LPU management for threads by
 	// the runtime library. It takes as input the ID of the LPS on which the thread is attempting to

@@ -10,4 +10,5 @@ class ThreadStateImpl : public ThreadState {
 	void initializeLPUs();
         int *computeLpuCounts(int lpsId);
         LPU *computeNextLpu(int lpsId);
+	void initializeReductionResultMap();
 };

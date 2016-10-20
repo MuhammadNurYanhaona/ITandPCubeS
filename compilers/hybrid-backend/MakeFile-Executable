@@ -61,6 +61,9 @@ RFLAG = -pthread
 # Link with standard c, math, pthreads, and cuda libraries
 LIBS = -lc -lm -pthread -lcudart
 
+# C++ library links for external code blocks
+EXTERN_LIBS = $(shell grep 'C++ =\|C =' build/$(BUILD_SUBDIR)/external_links.txt  | cut -f2 -d "=" | tr '\n' ' ')
+
 # Rules for various parts of the target
 
 .cc.o: $*.cc
@@ -73,7 +76,7 @@ gpuCode.obj: $(CUDA_OBJS)
 	$(CUDA) -arch=$(GPUARCH) -dlink $(CUDA_OBJS) -o $@
 
 build: $(C_OBJS) gpuCode.obj
-	$(LD) -o $(EXECUTABLE) $(C_OBJS) $(CUDA_OBJS) $(LIBS) gpuCode.obj
+	$(LD) -o $(EXECUTABLE) $(C_OBJS) $(CUDA_OBJS) $(LIBS) $(EXTERN_LIBS) gpuCode.obj
 	rm -f gpuCode.obj
 
 clean:

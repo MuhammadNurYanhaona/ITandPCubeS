@@ -2,8 +2,8 @@
 #include "ast_type.h"
 #include "ast_def.h"
 #include "ast_stmt.h"
-
 #include "../utils/list.h"
+#include "../utils/string_utils.h"
 #include "../semantics/scope.h"
 #include "../semantics/symbol.h"
 #include "../static-analysis/array_assignment.h"
@@ -11,6 +11,8 @@
 
 #include <fstream>
 #include <sstream>
+#include <cstdlib>
+#include <iostream>
 
 //----------------------------------------- Variable Definition ------------------------------------------/
 
@@ -19,12 +21,14 @@ VariableDef::VariableDef(Identifier *i, Type *t) : Definition(*i->GetLocation())
 	id = i; type = t;
 	id->SetParent(this);
 	type->SetParent(this);
+	reduction = false;
 }
 
 VariableDef::VariableDef(Identifier *i) : Definition(*i->GetLocation()) {
 	Assert(i != NULL);
 	id = i; type = NULL;
 	id->SetParent(this);
+	reduction = false;
 }
 
 void VariableDef::PrintChildren(int indentLevel) {
@@ -190,6 +194,52 @@ bool ProgramDef::isIsolatedTaskProgram() {
 }
 
 Scope *ProgramDef::getScope() { return symbol->getNestedScope(); }
+
+void ProgramDef::generateExternLibraryLinkInfo(const char *linkDescriptionFile) {
+	
+	List<TaskDef*> *taskList = getTasks();
+	List<const char*> *languageList = new List<const char*>;
+	Hashtable<List<const char*>*> *languageLibraryMap = new Hashtable<List<const char*>*>;
+
+	// group the library linkage annotations from different extern code block by their language
+	for (int i = 0; i < taskList->NumElements(); i++) {
+		TaskDef *task = taskList->Nth(i);
+		IncludesAndLinksMap *externConfig = task->getExternBlocksHeadersAndLibraries();
+		List<const char*> *languages = externConfig->getLanguagesUsed();
+		for (int j = 0; j < languages->NumElements(); j++) {
+			const char *language = languages->Nth(j);
+			List<const char*> *libraries = NULL;
+			if (string_utils::contains(languageList, language)) {
+				libraries = languageLibraryMap->Lookup(language);
+			} else {
+				libraries = new List<const char*>;
+				languageLibraryMap->Enter(language, libraries);
+				languageList->Append(language);
+			}
+			LanguageIncludesAndLinks *languageConfig 
+					= externConfig->getIncludesAndLinksForLanguage(language);
+			string_utils::combineLists(libraries, languageConfig->getLibraryLinks());
+		}
+	}
+
+	// write the libraries to be included by their language type on the library description file
+        std::ofstream descriptionFile;
+        descriptionFile.open (linkDescriptionFile, std::ofstream::out);
+        if (!descriptionFile.is_open()) {
+                std::cout << "Unable to open extern block linkage description file";
+                std::exit(EXIT_FAILURE);
+        }
+	for (int i = 0; i < languageList->NumElements(); i++) {
+		const char *language = languageList->Nth(i);
+		descriptionFile << language << " =";
+		List<const char*> *libraryLinks = languageLibraryMap->Lookup(language);
+		for (int j = 0; j < libraryLinks->NumElements(); j++) {
+			descriptionFile << ' '  << '-' << libraryLinks->Nth(j);
+		}
+		descriptionFile << '\n';
+	}
+	descriptionFile.close();
+}
 
 //----------------------------------------- Tuple Definition ------------------------------------------/
 

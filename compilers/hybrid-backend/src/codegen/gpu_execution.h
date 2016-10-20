@@ -13,8 +13,13 @@
 
 #include <fstream>
 
+class TaskDef;
+
 // this function put the proper includes directives in the CUDA program file
-void initializeCudaProgramFile(const char *initials, const char *headerFile, const char *programFile);
+void initializeCudaProgramFile(const char *initials, 
+		const char *headerFile, 
+		const char *programFile, 
+		TaskDef *taskDef);
 
 void generateBatchConfigurationConstants(const char *headerFile, PCubeSModel *pcubesModel);
 

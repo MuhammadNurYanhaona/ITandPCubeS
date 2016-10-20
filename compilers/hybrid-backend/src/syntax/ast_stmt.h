@@ -6,6 +6,7 @@
 #include "../semantics/scope.h"
 #include "../static-analysis/data_access.h"
 #include "../utils/hashtable.h"
+#include "../utils/common_constant.h"
 
 #include <sstream>
 
@@ -13,7 +14,10 @@ class Expr;
 class LogicalExpr;
 class ReductionExpr;
 class Space;
-class IndexScope;	
+class IndexScope;
+class IncludesAndLinksMap;
+class ReductionMetadata;
+class PartitionHierarchy;	
 
 class Stmt : public Node {
   public:
@@ -51,6 +55,15 @@ class Stmt : public Node {
 	// are parts of this statement 
 	virtual void analyseEpochDependencies(Space *space) {}
 
+	// this function is used to recursively determine all the header file includes and library
+        // links for different extern code blocks present in an IT-task
+        virtual void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {}
+
+	// this function is used for discovering all reduction statements within a compute stage
+        virtual void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy,
+                        Space *executingLps) {}
+
 	// This is a recursive function that set flags in the parallel for loops within a 
 	// compute stage as inner-most for loops (containing no other parallel loops inside
 	// them) or not. This is a rudimentary analysis that helps to vectorize loops.
@@ -81,6 +94,9 @@ class StmtBlock : public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, Space *executingLps);
 	virtual bool flagInnermostParallelForLoops();
 	
 	//-------------------------------------------------------------------------Code Generation Routines
@@ -105,6 +121,9 @@ class ConditionalStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, Space *executingLps);
 	bool flagInnermostParallelForLoops() { return stmt->flagInnermostParallelForLoops(); }
 	
 	//-------------------------------------------------------------------------Code Generation Routines
@@ -129,6 +148,9 @@ class IfStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(
 			TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, Space *executingLps);
 	bool flagInnermostParallelForLoops();
 	
 	//-------------------------------------------------------------------------Code Generation Routines
@@ -202,6 +224,9 @@ class LoopStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines
 	virtual List<const char*> *getIndexNames() = 0;
 	virtual void analyseEpochDependencies(Space *space) { body->analyseEpochDependencies(space); }
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, Space *executingLps);
 	virtual bool flagInnermostParallelForLoops() { return body->flagInnermostParallelForLoops(); }
 	
 	//-------------------------------------------------------------------------Code Generation Routines
@@ -325,10 +350,70 @@ class WhileStmt: public Stmt {
 	//-------------------------------------------------------------------------Static Analysis Routines	
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	void analyseEpochDependencies(Space *space);
+	void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, Space *executingLps);
 	bool flagInnermostParallelForLoops() { return body->flagInnermostParallelForLoops(); }
 	
 	//-------------------------------------------------------------------------Code Generation Routines
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+};
+
+class ExternCodeBlock: public Stmt {
+  protected:
+        const char *language;
+        List<const char*> *headerIncludes;
+        List<const char*> *libraryLinks;
+        const char *codeBlock;
+  public:
+        ExternCodeBlock(const char *language,
+                        List<const char*> *headerIncludes,
+                        List<const char*> *libraryLinks,
+                        const char *codeBlock, yyltype loc);
+
+        //-------------------------------------------------------------------------Syntex Analysis Routines     
+        const char *GetPrintNameForNode() { return "ExternalCodeBlock"; }
+        void PrintChildren(int indentLevel);
+
+        //-------------------------------------------------------------------------Static Analysis Routines     
+        void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
+        //-------------------------------------------------------------------------Code Generation Routines
+        void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+};
+
+// This class is for the new parallel reduction to be carried on by LPUs of descendant LPS whose 
+// result will be one reduced value for an ancestor LPS LPU.
+class ReductionStmt : public Stmt {
+  protected:
+        // The ID/Name of the LPS that is the root of a reduction; for each LPU in the LPS 
+        // designated by the ID there will be one reduction result
+        char spaceId;
+        // The task-global scalar variable that will have the result of the reduction
+        Identifier *resultVar;
+        // The reduction operation
+        ReductionOperator op;
+        // The array/vector expression that to be reduced 
+        Expr *right;
+  public:
+        ReductionStmt(char spaceId, Identifier *left, char *opName, Expr *right, yyltype loc);
+
+        //-------------------------------------------------------------------------Syntex Analysis Routines     
+        const char *GetPrintNameForNode() { return "ReductionStatement"; }
+        void PrintChildren(int indentLevel);
+
+        //-----------------------------------------------------------------------Semantic Analysis Routines     
+        void performTypeInference(Scope *executionScope);
+        void checkSemantics(Scope *excutionScope, bool ignoreTypeFailures);
+
+        //-------------------------------------------------------------------------Static Analysis Routines     
+        Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+        void analyseEpochDependencies(Space *space);
+        void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, Space *executingLps);
+
+        //-------------------------------------------------------------------------Code Generation Routines
+        void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 #endif

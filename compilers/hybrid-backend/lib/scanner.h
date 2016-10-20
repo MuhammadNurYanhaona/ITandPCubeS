@@ -25,5 +25,7 @@ void BeginCode();		    // ditto
 void EndCode();			    // ditto
 void BeginProgram();		    // ditto	 	
 void EndProgram();		    // ditto
+void BeginFreeString();		    // ditto	
+void EndFreeString();		    // ditto	
  
 #endif
