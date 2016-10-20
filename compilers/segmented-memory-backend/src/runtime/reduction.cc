@@ -98,24 +98,26 @@ MpiReductionPrimitive::MpiReductionPrimitive(int elementSize,
 }
 
 void MpiReductionPrimitive::releaseFunction() {
-	
-	// copy data into the send buffer
-	memcpy(sendBuffer, &(intermediateResult->data), elementSize);
-	
-	// copy index next to the data
-	char *sendIndex = sendBuffer + elementSize;
-	memcpy(sendIndex, &(intermediateResult->index), sizeof(unsigned int));  
-	
-	// do MPI communication as needed
-	performCrossSegmentReduction();
-	
-	// copy data from the receive buffer
-	memcpy(&(intermediateResult->data), receiveBuffer, elementSize);
 
-	// copy index from next to data position of the receive buffer
-	char *receiveIndex = receiveBuffer + elementSize;
-	memcpy(&(intermediateResult->index), receiveIndex, sizeof(unsigned int));  
-	
+	if (segmentGroup != NULL) {	
+		// copy data into the send buffer
+		memcpy(sendBuffer, &(intermediateResult->data), elementSize);
+		
+		// copy index next to the data
+		char *sendIndex = sendBuffer + elementSize;
+		memcpy(sendIndex, &(intermediateResult->index), sizeof(unsigned int));  
+		
+		// do MPI communication as needed
+		performCrossSegmentReduction();
+		
+		// copy data from the receive buffer
+		memcpy(&(intermediateResult->data), receiveBuffer, elementSize);
+
+		// copy index from next to data position of the receive buffer
+		char *receiveIndex = receiveBuffer + elementSize;
+		memcpy(&(intermediateResult->index), receiveIndex, sizeof(unsigned int));  
+	}	
+
 	// then call super-class's release function to copy the result to the target
 	ReductionPrimitive::releaseFunction();
 }

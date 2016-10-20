@@ -447,25 +447,29 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 
 			// determine reduction primitives count
 			programFile << indent << "int " << varName << "PrimitiveCount = ";
-			programFile << "ceil(segmentCount / " << varName << "SegmentsPerPrim)";
+			programFile << "ceil(segmentCount * 1.0 / " << varName << "SegmentsPerPrim)";
 			programFile << stmtSeparator;
 
 			// iterate over all the primitives so that MPI groups and communicators can be created
 			programFile << indent << "SegmentGroup *segmentGroup = NULL" << stmtSeparator;
-			programFile << indent << "for (int i = 0; i < ";
+			programFile << indent << "// a segment group communicator is only needed if there are ";
+			programFile << "more than one segments\n";
+			programFile << indent << "if (" << varName << "SegmentsPerPrim > 1) {\n"; 
+			programFile << doubleIndent << "for (int i = 0; i < ";
 			programFile << varName << "PrimitiveCount; i++) {\n";
 			
 			// participate in segment group creation for proper primitive; for others, signal non par-
 			// ticipation status
-			programFile << doubleIndent << "if(segmentId / " << varName;
+			programFile << tripleIndent << "if(segmentId / " << varName;
 			programFile << "SegmentsPerPrim == i) {\n";
-			programFile << tripleIndent << "segmentGroup = new SegmentGroup()";
-			programFile << stmtSeparator << tripleIndent;
+			programFile << quadIndent << "segmentGroup = new SegmentGroup()";
+			programFile << stmtSeparator << quadIndent;
 			programFile << "segmentGroup->discoverGroupAndSetupCommunicator(logFile)";
 			programFile << stmtSeparator;
-			programFile << doubleIndent << "} else {\n";
-			programFile << tripleIndent << "SegmentGroup::excludeSegmentFromGroupSetup(";
+			programFile << tripleIndent << "} else {\n";
+			programFile << quadIndent << "SegmentGroup::excludeSegmentFromGroupSetup(";
 			programFile << "segmentId" << paramSeparator << "logFile)" << stmtSeparator;
+			programFile << tripleIndent << "}\n";
 			programFile << doubleIndent << "}\n";
 			programFile << indent << "}\n";
 
