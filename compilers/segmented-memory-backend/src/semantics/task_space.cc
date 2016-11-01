@@ -795,8 +795,20 @@ void PartitionHierarchy::performAllocationAnalysis(int segmentedPPS) {
 
 			if (hasOverlapping || notAllocatedBefore 
 					|| reordered || lastAllocInaccessible) {
-				array->setAllocator(lps);
-				array->getUsageStat()->flagAllocated();
+
+				// if the data structure has not been reordered since the last 
+				// allocation and the current LPS is a subpatition LPS then we
+				// allocate the structure on the parent LPS to keep the number of
+				// data parts low
+				if (lps->isSubpartitionSpace() && !reordered) {
+					Space *parentLps = lps->getParent();
+					DataStructure *parentArray = array->getSource();
+					parentArray->setAllocator(parentLps);
+					parentArray->getUsageStat()->flagAllocated();
+				} else {
+					array->setAllocator(lps);
+					array->getUsageStat()->flagAllocated();
+				}
 			}
 		}	
 	}
