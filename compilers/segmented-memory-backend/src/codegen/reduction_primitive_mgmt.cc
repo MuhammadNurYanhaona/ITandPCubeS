@@ -492,13 +492,17 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 			programFile << rdRootLpsName << "_Threads_Per_Segment; i++) {\n";
 			programFile << doubleIndent << varName << "Reducer[i] = new ";
 			programFile << "ReductionPrimitive_" << varName << "(";
-			programFile << "Space_" << rdExecLpsName << "_Threads_Per_Segment";
+			programFile << paramIndent << doubleIndent;
+			programFile << "Space_" << rdExecLpsName << "_Threads_Per_Segment / ";
+			programFile << "Space_" << rdRootLpsName  << "_Threads_Per_Segment";
 			programFile << ")" << stmtSeparator; 
+			
+			// setup log file reference in the reduction primitive 
+			programFile << doubleIndent << varName << "Reducer[i]->setLogFile(&logFile)";
+			programFile << stmtSeparator;
+			
 			programFile << indent << "}\n";
 
-			// setup log file reference in the reduction primitive 
-			programFile << indent << varName << "Reducer[i]->setLogFile(&logFile)";
-			programFile << stmtSeparator;
 		}
 	}
 	
