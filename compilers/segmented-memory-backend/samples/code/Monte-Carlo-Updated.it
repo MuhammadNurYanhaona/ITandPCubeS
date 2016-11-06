@@ -27,15 +27,6 @@ Task "Monte Carlo Area Estimation":
 		// calculate the cell boundaries based on cell dimension length and position in the grid
 		"Estimate Area" (Space B) {
 			
-			// initialize the random number generator
-			@Extern {
-				@Language "C++"
-				@Includes { time.h, cstdlib }
-				${
-					srand(time(NULL));
-				}$
-			}
-
 			// iterate parallely over the grid cells of an LPU
 			do {
 				// determine grid cell boundaries
@@ -46,29 +37,30 @@ Task "Monte Carlo Area Estimation":
 				
 				cell = grid[i][j]
 				internal_points = 0
+				seed = lpuId[0]
 
 				// has points_per_cell number of point placement trails 
-				trial = 0
-				do {
-					// generate a point within the cell boundary and calculate
-					// its position relative to the shape
-					@Extern {
-						@Language "C++"
-						@Includes { math.h, cstdlib }
-						${
-							int x = rand() % cell_length + cell.left;
-							int y = rand() % cell_length + cell.bottom;
-							
-							// tested polynomial is 10 sin x^2 + 50 cos y^3
-							double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
-							if (result <= 0.0) {
-								internal_points++; 
-							}
-						}$
-					}
-					trial = trial + 1
-				} while (trial < points_per_cell)
-				
+                                trial = 0
+                                do {
+                                        // generate a point within the cell boundary and calculate
+                                        // its position relative to the shape
+                                        @Extern {
+                                                @Language "C++"
+                                                @Includes { math.h, cstdlib }
+                                                ${
+                                                        int x = rand_r((unsigned int *) &seed) % cell_length + cell.left;
+                                                        int y = rand_r((unsigned int *) &seed) % cell_length + cell.bottom;
+                                                        
+                                                        // tested polynomial is 10 sin x^2 + 50 cos y^3
+                                                        double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
+                                                        if (result <= 0.0) {
+                                                                internal_points++; 
+                                                        }
+                                                }$
+                                        }
+                                        trial = trial + 1
+                                } while (trial < points_per_cell)
+
 				// estimate the part of the polynomial within the grid cell
 				sub_area_estimates[i][j] = cell_size * internal_points / points_per_cell
 						
@@ -90,6 +82,6 @@ Task "Monte Carlo Area Estimation":
 		}
 	Partition(b):
 		Space A <un-partitioned> { grid }
-		Space B <2D> divides Space A partitions {
-			grid, sub_area_estimates: block_size(b, b)
+		Space B <1D> divides Space A partitions {
+			grid<dim1>, sub_area_estimates<dim1>: block_count(b)
 		} 
