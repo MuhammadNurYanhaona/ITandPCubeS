@@ -85,7 +85,7 @@ Task "Vector Addition":
 	Compute:
 		"" (Space A) { do { w[i] = alpha * u[i] + beta * v[i] } for i in u }
 	Partition(b):
-		Space A <1D> { u, v, w: block_size(b) }
+		Space A <1D> { u, v, w: block_count(b) }
 
 Task "Vector Dot Product":
 	Define:
@@ -98,7 +98,7 @@ Task "Vector Dot Product":
 		"" (Space B) { do { Space A:product = reduce("sum", u[i]*v[i]) } for i in u }
 	Partition(b): 
 		Space A <un-partitioned> {u, v}
-		Space B <1D> divides Space A partitions { u, v: block_size(b) }
+		Space B <1D> divides Space A partitions { u, v: block_count(b) }
 
 Task "CSR Matrix Vector Multiply":
 	Define:
@@ -127,6 +127,6 @@ Task "CSR Matrix Vector Multiply":
 	Partition(r):
 		Space A <1D> {
 			values, columns, v: replicated
-			w: block_size(r)
-			rows: block_size(r) padding(1, 0)
+			w: block_count(r)
+			rows: block_count(r) padding(1, 0)
 		}
