@@ -183,8 +183,12 @@ List<MultidimensionalIntervalSeq*> *ListReferenceAttributes::computeSegmentFold(
 
 ListReferenceKey::ListReferenceKey(int taskEnvId, const char *varName, const char *allocatorLpsName) {
 	this->taskEnvId = taskEnvId;
-	this->varName = varName;
-	this->allocatorLpsName = allocatorLpsName;
+	if (varName != NULL) {
+		this->varName = strdup(varName);
+	} else this->varName = NULL;
+	if (allocatorLpsName != NULL) {
+		this->allocatorLpsName = allocatorLpsName;
+	} else this->allocatorLpsName = NULL;
 }
 
 char *ListReferenceKey::generateKey() {
