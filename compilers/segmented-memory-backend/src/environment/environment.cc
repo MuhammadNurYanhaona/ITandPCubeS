@@ -191,6 +191,10 @@ ListReferenceKey::ListReferenceKey(int taskEnvId, const char *varName, const cha
 	} else this->allocatorLpsName = NULL;
 }
 
+ListReferenceKey *ListReferenceKey::clone() {
+	return new ListReferenceKey(taskEnvId, varName, allocatorLpsName);
+}
+
 char *ListReferenceKey::generateKey() {
 	ostringstream stream;
 	stream << "env-" << taskEnvId;
