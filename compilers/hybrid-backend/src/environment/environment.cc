@@ -191,6 +191,10 @@ ListReferenceKey::ListReferenceKey(int taskEnvId, const char *varName, const cha
 	} else this->allocatorLpsName = NULL;
 }
 
+ListReferenceKey *ListReferenceKey::clone() {
+	return new ListReferenceKey(taskEnvId, varName, allocatorLpsName);
+}
+
 char *ListReferenceKey::generateKey() {
 	ostringstream stream;
 	stream << "env-" << taskEnvId;
@@ -235,7 +239,7 @@ ObjectVersionManager::ObjectVersionManager(ObjectIdentifier *objectIdentifier, P
 	this->objectIdentifier = objectIdentifier;
 	this->freshVersionKeys = new List<ListReferenceKey*>;
 	ListReferenceKey *sourceKey = sourceReference->getKey();
-	freshVersionKeys->Append(sourceKey);
+	freshVersionKeys->Append(sourceKey->clone());
 	dataVersions = new Hashtable<PartsListReference*>;
 	dataVersions->Enter(sourceKey->generateKey(), sourceReference);
 }

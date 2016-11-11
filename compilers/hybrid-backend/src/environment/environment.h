@@ -152,6 +152,9 @@ class ListReferenceKey {
 	void setTaskEnvId(int taskEnvId) { this->taskEnvId = taskEnvId; }
 	void setVarName(const char *varName) { this->varName = varName; }
 	void setAllocatorLps(const char *allocatorLpsName) { this->allocatorLpsName = allocatorLpsName; }
+
+	// generate a duplicate key with new memory allocations for the attributes to use the key for  archival
+	ListReferenceKey *clone();
 	
 	// generates a dummy key for pattern matching against existing keys; if the user set any value for any property
 	// on the pattern key then that property will be compared during the matching process; otherwise, that property
@@ -173,7 +176,7 @@ class PartsListReference {
   public:
 	PartsListReference(ListReferenceAttributes *attr, ListReferenceKey *key, PartsList *list) {
 		this->attributes = attr;
-		this->key = key;
+		this->key = key->clone();
 		this->partsList = list;
 	}
 	~PartsListReference() {
