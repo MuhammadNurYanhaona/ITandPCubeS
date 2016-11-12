@@ -83,7 +83,7 @@ Task "Vector Addition":
 		"" (Space A) { do { w[i] = alpha * u[i] + beta * v[i] } for i in u }
 	Partition(b):
 		Space A <1D> {
-			u, v, w: block_size(b)
+			u, v, w: block_count(b)
 		}
 
 Task "Vector Dot Product":
@@ -95,8 +95,7 @@ Task "Vector Dot Product":
 		product: create
 	Initialize:
 		w.dimension1.range.min = 0
-		partition_count = (u.dimension1.length + partition.b - 1) / partition.b
-		w.dimension1.range.max = partition_count - 1
+		w.dimension1.range.max = b - 1
 	Compute:
 		"Generate Partial Products" (Space B) {
 			do { 
@@ -111,8 +110,8 @@ Task "Vector Dot Product":
 	Partition(b): 
 		Space A <un-partitioned> { u, v, w }
 		Space B <1D> divides Space A partitions {
-			u, v: block_size(b)
-			w: block_size(1)
+			u, v: block_count(b)
+			w: block_count(b)
 		}
 
 Task "CSR Matrix Vector Multiply":
@@ -142,6 +141,6 @@ Task "CSR Matrix Vector Multiply":
 	Partition(r):
 		Space A <1D> {
 			values, columns, v: replicated
-			w: block_size(r)
-			rows: block_size(r) padding(1, 0)
+			w: block_count(r)
+			rows: block_count(r) padding(1, 0)
 		}
