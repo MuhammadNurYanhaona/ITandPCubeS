@@ -3,11 +3,12 @@ Program (args) {
 	bind_input(stencilEnv, "plate", args.input_file)
 	iterations = args.iterations
 	p = args.p
+	q = args.q
 	k = args.k
 	l = args.l
 	m = args.m
 	n = args.n
-        execute("Five Points Stencil"; stencilEnv; Initialize: iterations; Partition: p, k, l, m, n)
+        execute("Five Points Stencil"; stencilEnv; Initialize: iterations; Partition: p, q, k, l, m, n)
         bind_output(stencilEnv, "plate", args.output_file)
 }
 
@@ -45,9 +46,9 @@ Task "Five Points Stencil":
 			Repeat: from "Refine Local Estimate" for iteration_2 in global_rf
 		}
 		Repeat: from "Refine Global Estimate" for iteration_3 in total_rf
-	Partition (p, k, l, m, n):
+	Partition (p, q, k, l, m, n):
 		Space A <1D> { 
-			plate: block_count(p) padding(m)
+			plate: block_count(p, q) padding(m, m)
 		}
 		Space B <2D> divides Space A partitions { 
 			plate: block_count(k, l) padding(n, n)
