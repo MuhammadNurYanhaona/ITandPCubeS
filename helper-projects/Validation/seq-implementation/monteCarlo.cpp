@@ -82,6 +82,7 @@ int mainMonteCarlo(int argc, char *argv[]) {
         double runningTime = ((end.tv_sec + end.tv_usec / 1000000.0)
                         - (start.tv_sec + start.tv_usec / 1000000.0));
         std::cout << "Sequential Execution Time: " << runningTime << " Seconds" << std::endl;
+	std::cout << "Estimated area under the curve: " << estimate << "\n";
 	
 	return 0;
 }
