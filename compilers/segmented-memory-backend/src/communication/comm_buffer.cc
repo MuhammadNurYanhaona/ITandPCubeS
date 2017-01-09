@@ -748,11 +748,17 @@ List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive, List<Co
 		CommBuffer *buffer = originalList->Nth(i);
 		if (sortForReceive && !buffer->isReceiveActivated()) continue;
 		else if (!sortForReceive && !buffer->isSendActivated()) continue;
-		int j = 0;
-		for (; j < sortedList->NumElements(); j++) {
-			if (sortedList->Nth(j)->compareTo(buffer, sortForReceive) > 0) break;
+
+		// local, intra-segment data movement should preceed any inter-segment communication
+		if (buffer->intraSegmentBufferType()) {
+			sortedList->InsertAt(buffer, 0);
+		} else {
+			int j = 0;
+			for (; j < sortedList->NumElements(); j++) {
+				if (sortedList->Nth(j)->compareTo(buffer, sortForReceive) > 0) break;
+			}
+			sortedList->InsertAt(buffer, j);
 		}
-		sortedList->InsertAt(buffer, j);
 	}
 	return sortedList;
 }

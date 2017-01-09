@@ -110,6 +110,9 @@ class CommBuffer {
 
 	// function to setup the buffer tag
 	void setBufferTag(int prefix, int digitsForSegment);
+
+	// subclasses should return true or false depending on the type of data communication they are intended for
+	virtual bool intraSegmentBufferType() = 0;
   protected:
 	ExchangeIterator *getIterator() { return new ExchangeIterator(dataExchange); }
 };
@@ -180,6 +183,7 @@ class PhysicalCommBuffer : public CommBuffer {
 	void writeData(bool loggingEnabled, std::ostream &logFile);
 	void setData(char *data) { this->data = data; }
 	char *getData() { return data; }
+	virtual bool intraSegmentBufferType() { return false; }
 
 	// a templated function's implementation must be in the header file
 	template <class Type> static void printContent(CommBuffer *buffer, 
@@ -219,6 +223,7 @@ class PreprocessedPhysicalCommBuffer : public PreprocessedCommBuffer {
 	void writeData(bool loggingEnabled, std::ostream &logFile);
 	void setData(char *data) { this->data = data; }
 	char *getData() { return data; }
+	virtual bool intraSegmentBufferType() { return false; }
 };
 
 /* The extension of physical communication buffer to be used with index-mapping enabled
@@ -233,6 +238,7 @@ class IndexMappedPhysicalCommBuffer : public IndexMappedCommBuffer {
         virtual void writeData(bool loggingEnabled, std::ostream &logFile);
 	void setData(char *data) { this->data = data; }
         char *getData() { return data; } 	
+	virtual bool intraSegmentBufferType() { return false; }
 };
 
 /* This extension to the index-mapped-physical-buffer is useful to reduce buffer management overhead when many large
@@ -247,6 +253,7 @@ class SwiftIndexMappedPhysicalCommBuffer : public IndexMappedPhysicalCommBuffer 
 	~SwiftIndexMappedPhysicalCommBuffer();
 	void readData(bool loggingEnabled, std::ostream &logFile);
         void writeData(bool loggingEnabled, std::ostream &logFile);
+	virtual bool intraSegmentBufferType() { return false; }
   private:
 	void setupSwiftIndexMapping(DataPartIndexList *transferIndexMapping,
 			List<DataPartIndexList*> *swiftIndexMapping, 
@@ -266,6 +273,7 @@ class VirtualCommBuffer : public CommBuffer {
 	// To clarify, the segment will call eventually writeData() sometimes after readData() but the act of reading 
 	// involves reading into the destination operating memory. So the call for writing is unnecessary.
 	void writeData(bool loggingEnabled, std::ostream &logFile) {}
+	virtual bool intraSegmentBufferType() { return true; }
 };
 
 /* This is the virtual communication buffer extension with pre-processing enabled
@@ -276,6 +284,7 @@ class PreprocessedVirtualCommBuffer : public PreprocessedCommBuffer {
 			SyncConfig *syncConfig) : PreprocessedCommBuffer(exchange, syncConfig) {}
 	void readData(bool loggingEnabled, std::ostream &logFile);
 	void writeData(bool loggingEnabled, std::ostream &logFile) {}
+	virtual bool intraSegmentBufferType() { return true; }
 };
 
 /* This is the virtual communication buffer extension with index-mapping enabled
@@ -287,6 +296,7 @@ class IndexMappedVirtualCommBuffer : public IndexMappedCommBuffer {
 	virtual ~IndexMappedVirtualCommBuffer() {}
 	virtual void readData(bool loggingEnabled, std::ostream &logFile);
         void writeData(bool loggingEnabled, std::ostream &logFile) {}
+	virtual bool intraSegmentBufferType() { return true; }
 };
 
 /* This extension to the index-mapped-virtual-buffer is useful to reduce buffer management overhead when many large
@@ -304,6 +314,7 @@ class SwiftIndexMappedVirtualCommBuffer : public IndexMappedVirtualCommBuffer {
 	SwiftIndexMappedVirtualCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	~SwiftIndexMappedVirtualCommBuffer();
 	void readData(bool loggingEnabled, std::ostream &logFile);
+	virtual bool intraSegmentBufferType() { return true; }
   private:
 	void generateSwiftIndexMappings();  
 };

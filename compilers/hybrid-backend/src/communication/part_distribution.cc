@@ -86,6 +86,8 @@ vector<int*> *Container::getPartId(int dataDimensions) {
 		current = current->parent;
 		if (current == NULL) break;
 	}
+	partIdVector->insert(partIdVector->begin(), partId);
+
 	return partIdVector;
 }
 
