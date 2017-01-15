@@ -144,23 +144,16 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	
 	//*logFile << "\tGhost-sync communicator is communicating data for " << dependencyName << "\n";
 	//logFile->flush();
-	
+
+	// retrieve all buffers holding data for cross-segment communication	
 	List<CommBuffer*> *localBufferList = new List<CommBuffer*>;
 	List<CommBuffer*> *remoteBufferList = new List<CommBuffer*>;
 	seperateLocalAndRemoteBuffers(localSegmentTag, localBufferList, remoteBufferList);
-
-	for (int i = 0; i < localBufferList->NumElements(); i++) {
-		CommBuffer *localBuffer = localBufferList->Nth(i);
-		// for local buffers just update the operating memory with buffer's content; note that reading data into
-		// the buffer is not needed as that has been already done for all buffers 
-		localBuffer->writeData(false, *logFile);
-	}
 	delete localBufferList;
 
+	// if there is no cross-segment communication buffer then there is nothing to do here
 	if (remoteBufferList->NumElements() == 0) {
                 delete remoteBufferList;
-                //*logFile << "\tGhost-sync communicator locally exchanged data for " << dependencyName << "\n";
-                //logFile->flush();
                 return;
         }
 
@@ -218,10 +211,6 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	if (status != MPI_SUCCESS) {
 		cout << "Segment "<< localSegmentTag << ": some of the asynchronous receives failed\n";
 		exit(EXIT_FAILURE);
-	}
-	for (int i = 0; i < remoteRecvs; i++) {
-		CommBuffer *buffer = remoteReceiveBuffers->Nth(i);
-		buffer->writeData(false, *logFile);
 	}
 
 	// wait for all sends to finish

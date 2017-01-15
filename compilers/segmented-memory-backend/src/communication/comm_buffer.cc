@@ -763,6 +763,23 @@ List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive, List<Co
 	return sortedList;
 }
 
+List<CommBuffer*> *CommBufferManager::getFilteredList(bool filterForReceive, List<CommBuffer*> *bufferList) {
+
+        List<CommBuffer*> *originalList = commBufferList;
+        if (bufferList != NULL) {
+                originalList = bufferList;
+        }
+	List<CommBuffer*> *filteredList = new List<CommBuffer*>;
+        for (int i = 0; i < originalList->NumElements(); i++) {
+                CommBuffer *buffer = originalList->Nth(i);
+                if (filterForReceive && !buffer->isReceiveActivated()) continue;
+                else if (!filterForReceive && !buffer->isSendActivated()) continue;
+
+		filteredList->Append(buffer);
+        }
+        return filteredList;
+}
+
 void CommBufferManager::seperateLocalAndRemoteBuffers(int localSegmentTag, 
 		List<CommBuffer*> *localBufferList, 
 		List<CommBuffer*> *remoteBufferList) {

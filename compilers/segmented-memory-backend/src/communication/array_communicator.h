@@ -45,7 +45,14 @@ class GhostRegionSyncCommunicator : public Communicator {
 
 	void sendData() { performTransfer(); }
         void receiveData() {}
-	
+
+	// ghost region communicators do sending-receiving asynchronously at the same time; so after the data transfer is
+	// done for send; the receiver buffers' contents should be written to operating memory.
+	void performSendPostprocessing(int currentPpuOrder, int participantsCount) {
+		processBuffersAfterReceive(currentPpuOrder, participantsCount);
+	}
+	void perfromRecvPostprocessing(int currentPpuOrder, int participantsCount) {}
+
 	// any segment that sends ghost-region update to someone else receives updates back; so we can combine send-receive
 	// within a single function and let the later receive call to be non-halting 
 	void afterSend() { iterationNo++; }

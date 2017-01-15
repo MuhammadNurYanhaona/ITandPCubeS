@@ -348,11 +348,15 @@ class CommBufferManager {
 	virtual void receive(SignalType signal, int iteration) = 0;
 	
   protected:
-	// Communication buffers are sorted before send/receive to reduce the data buffering time in segments/processes
-	// the sorting here is dependent on what particular role the executing segment is going to play at the present
-	// instance. If no second parameter has been provided then the sorting is done over all comm buffers of this 
-	// buffer manager; otherwise the argument list gets sorted
+	// Communication buffers can be sorted before send/receive to reduce the data buffering time in segments (aka, 
+	// processes). The sorting here is dependent on what particular role the executing segment is going to play at 
+	// the present instance. If no second parameter has been provided then the sorting is done over all comm buffers 
+	// of this buffer manager; otherwise the argument list gets sorted
 	List<CommBuffer*> *getSortedList(bool sortForReceive, List<CommBuffer*> *bufferList = NULL);
+
+	// If buffer sorting seems to be unnecessary before the actual communication (e.g., if the subsequent steps do
+	// not exploit the ordering) then just filtering can be done using this alternative function
+	List<CommBuffer*> *getFilteredList(bool filterForReceive, List<CommBuffer*> *bufferList = NULL);
 
 	// This function divides the commBufferList of the buffer manager into two lists: one holding buffers for only
 	// intra-segment data transfers and the other for cross-segments data transfers
