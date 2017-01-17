@@ -132,6 +132,7 @@ GhostRegionSyncCommunicator::GhostRegionSyncCommunicator(int localSegmentTag,
 }
 
 void GhostRegionSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
+	intraSegmentCommunicator = false;
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
@@ -154,6 +155,7 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	// if there is no cross-segment communication buffer then there is nothing to do here
 	if (remoteBufferList->NumElements() == 0) {
                 delete remoteBufferList;
+		intraSegmentCommunicator = true;
                 return;
         }
 

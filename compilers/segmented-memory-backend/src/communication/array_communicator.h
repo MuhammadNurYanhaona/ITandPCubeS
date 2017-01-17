@@ -34,6 +34,10 @@ class ReplicationSyncCommunicator : public Communicator {
 
 // communicator class for the scenario of synchronizing overlapping boundary regions among LPUs of a single LPS
 class GhostRegionSyncCommunicator : public Communicator {
+  private:
+	// some ineffective computations can be skipped if the communicator only exchanges data among parts local to the
+	// current segment
+	bool intraSegmentCommunicator;	
   public:
 	GhostRegionSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
@@ -43,7 +47,7 @@ class GhostRegionSyncCommunicator : public Communicator {
 	// as participants and use the default MPI communicator
 	void setupCommunicator(bool includeNonInteractingSegments);
 
-	void sendData() { performTransfer(); }
+	void sendData() { if (!intraSegmentCommunicator) performTransfer(); }
         void receiveData() {}
 
 	// ghost region communicators do sending-receiving asynchronously at the same time; so after the data transfer is
