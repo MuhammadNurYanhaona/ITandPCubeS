@@ -98,6 +98,7 @@ TransferSpec::TransferSpec(TransferDirection direction, int elementSize) {
 	this->elementSize = elementSize;
 	this->bufferEntry = NULL;
 	this->dataIndex = NULL;
+	this->confinementContainerId = NULL;
 }
 
 void TransferSpec::setBufferEntry(char *bufferEntry, vector<int> *dataIndex) {
@@ -112,6 +113,14 @@ void TransferSpec::performTransfer(DataPartIndex dataPartIndex) {
 	} else {
 		memcpy(bufferEntry, dataPartLocation, elementSize);
 	}
+}
+
+bool TransferSpec::isIncludedInTransfer(int partNo, int idDimension, int partNoIdLevel, int indexInLevel) {
+	if (confinementContainerId == NULL) return true;
+	int vectorSize = confinementContainerId->size();
+	if (partNoIdLevel >= vectorSize) return true;
+	int *idAtLevel = confinementContainerId->at(partNoIdLevel);
+	return idAtLevel[indexInLevel] == partNo;
 }
 
 //--------------------------------------------------- Data Part Specification -----------------------------------------------------/

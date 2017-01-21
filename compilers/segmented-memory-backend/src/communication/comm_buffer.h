@@ -24,6 +24,7 @@
 #include <sstream>
 
 class DataPartIndexList;
+class TransferIndexSpec;
 
 /* To configure the communication buffers properly, we need the data-parts-list representing the operating memory for
  * a data structure for involved LPSes and data item size along with the other information provided by a confinement
@@ -158,7 +159,12 @@ class IndexMappedCommBuffer : public CommBuffer {
 	DataPartIndexList *senderTransferIndexMapping;
 	DataPartIndexList *receiverTransferIndexMapping;
   public:
-	IndexMappedCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
+	// the optional last field indicates if the confinement container IDs of sender and receiver sides of the data
+	// exchange (this communication buffer has been created for) should be used restrict read/writes to/from speci-
+	// fic data parts
+	IndexMappedCommBuffer(DataExchange *exchange, 
+			SyncConfig *syncConfig, 
+			bool usePartsConfinment = false);
 	~IndexMappedCommBuffer();
 
   	virtual void readData(bool loggingEnabled, std::ostream &logFile) = 0;
@@ -167,7 +173,8 @@ class IndexMappedCommBuffer : public CommBuffer {
 	void setupMappingBuffer(DataPartIndexList *indexMappingBuffer,
                         DataPartsList *dataPartList,
                         PartIdContainer *partContainerTree,
-                        DataItemConfig *dataConfig);	
+                        DataItemConfig *dataConfig, 
+			TransferIndexSpec *transferSpec);	
 };
 
 /* Implementation class where there is actually a physical communication buffer that will hold data before a send to 
@@ -292,7 +299,7 @@ class PreprocessedVirtualCommBuffer : public PreprocessedCommBuffer {
 class IndexMappedVirtualCommBuffer : public IndexMappedCommBuffer {
   public:
 	IndexMappedVirtualCommBuffer(DataExchange *exchange,
-                        SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig) {}
+                        SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig, true) {}
 	virtual ~IndexMappedVirtualCommBuffer() {}
 	virtual void readData(bool loggingEnabled, std::ostream &logFile);
         void writeData(bool loggingEnabled, std::ostream &logFile) {}

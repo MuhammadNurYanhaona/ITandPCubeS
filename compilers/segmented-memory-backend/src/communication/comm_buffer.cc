@@ -131,17 +131,29 @@ void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
 
 //----------------------------------------------- Index-Mapped Communication Buffer ----------------------------------------------/
 
-IndexMappedCommBuffer::IndexMappedCommBuffer(DataExchange *ex, SyncConfig *sC) : CommBuffer(ex, sC) {
+IndexMappedCommBuffer::IndexMappedCommBuffer(DataExchange *ex, 
+		SyncConfig *sC, bool usePartsConfinment) : CommBuffer(ex, sC) {
 	senderTransferIndexMapping = NULL;
 	receiverTransferIndexMapping = NULL;
 	if (isSendActivated()) {
+		TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
+		if (usePartsConfinment) {
+			transferSpec->setConfinementContainerId(dataExchange->getReadConfinementId());
+		}
 		senderTransferIndexMapping = new DataPartIndexList[elementCount];
-		setupMappingBuffer(senderTransferIndexMapping, senderPartList, senderTree, senderDataConfig);
+		setupMappingBuffer(senderTransferIndexMapping, 
+				senderPartList, senderTree, senderDataConfig, transferSpec);
+		delete transferSpec;
 	}
 	if (isReceiveActivated()) {
+		TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
+		if (usePartsConfinment) {
+			transferSpec->setConfinementContainerId(dataExchange->getWriteConfinementId());
+		}
 		receiverTransferIndexMapping = new DataPartIndexList[elementCount];
 		setupMappingBuffer(receiverTransferIndexMapping, 
-				receiverPartList, receiverTree, receiverDataConfig);
+				receiverPartList, receiverTree, receiverDataConfig, transferSpec);
+		delete transferSpec;
 	}
 }
         
@@ -157,7 +169,8 @@ IndexMappedCommBuffer::~IndexMappedCommBuffer() {
 void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBuffer,
                         DataPartsList *dataPartList,
                         PartIdContainer *partContainerTree,
-                        DataItemConfig *dataConfig) {
+                        DataItemConfig *dataConfig, 
+			TransferIndexSpec *transferSpec) {
 	
 	DataPartSpec *dataPartSpec = new DataPartSpec(dataPartList->getPartList(), dataConfig);
 	vector<XformedIndexInfo*> *transformVector = new vector<XformedIndexInfo*>;
@@ -168,7 +181,6 @@ void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBu
 
 	ExchangeIterator *iterator = getIterator();
 	long int elementIndex = 0;
-	TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
 	while (iterator->hasMoreElements()) {
 		vector<int> *dataItemIndex = iterator->getNextElement();
 		dataPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
@@ -180,7 +192,6 @@ void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBu
 
 	delete dataPartSpec;
 	delete transformVector;
-	delete transferSpec;
 }
 
 //------------------------------------------------ Physical Communication Buffer -------------------------------------------------/
