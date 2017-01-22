@@ -14,7 +14,7 @@ Program (args) {
 
 Task "Five Points Stencil":
 	Define:
-		plate: 2D Array of Real single-precision
+		plate: 2D Array of Real double-precision
 		t: Epoch
 		local_rf, global_rf, total_rf: Range
 		iteration_1, iteration_2, iteration_3: Integer

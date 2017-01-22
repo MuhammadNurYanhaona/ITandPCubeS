@@ -159,12 +159,7 @@ class IndexMappedCommBuffer : public CommBuffer {
 	DataPartIndexList *senderTransferIndexMapping;
 	DataPartIndexList *receiverTransferIndexMapping;
   public:
-	// the optional last field indicates if the confinement container IDs of sender and receiver sides of the data
-	// exchange (this communication buffer has been created for) should be used restrict read/writes to/from speci-
-	// fic data parts
-	IndexMappedCommBuffer(DataExchange *exchange, 
-			SyncConfig *syncConfig, 
-			bool usePartsConfinment = false);
+	IndexMappedCommBuffer(DataExchange *exchange, SyncConfig *syncConfig);
 	~IndexMappedCommBuffer();
 
   	virtual void readData(bool loggingEnabled, std::ostream &logFile) = 0;
@@ -299,7 +294,7 @@ class PreprocessedVirtualCommBuffer : public PreprocessedCommBuffer {
 class IndexMappedVirtualCommBuffer : public IndexMappedCommBuffer {
   public:
 	IndexMappedVirtualCommBuffer(DataExchange *exchange,
-                        SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig, true) {}
+                        SyncConfig *syncConfig) : IndexMappedCommBuffer(exchange, syncConfig) {}
 	virtual ~IndexMappedVirtualCommBuffer() {}
 	virtual void readData(bool loggingEnabled, std::ostream &logFile);
         void writeData(bool loggingEnabled, std::ostream &logFile) {}

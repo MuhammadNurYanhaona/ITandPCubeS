@@ -131,10 +131,16 @@ void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
 
 //----------------------------------------------- Index-Mapped Communication Buffer ----------------------------------------------/
 
-IndexMappedCommBuffer::IndexMappedCommBuffer(DataExchange *ex, 
-		SyncConfig *sC, bool usePartsConfinment) : CommBuffer(ex, sC) {
+IndexMappedCommBuffer::IndexMappedCommBuffer(DataExchange *ex, SyncConfig *sC) : CommBuffer(ex, sC) {
 	senderTransferIndexMapping = NULL;
 	receiverTransferIndexMapping = NULL;
+
+	// If the sender and receiver sides are using the same data parts then their confinement container IDs
+	// should be used to restrict read/writes to/from specific data parts	
+	bool isIntraSegmentBuffer = ex->isIntraSegmentExchange(localSegmentTag);
+	bool areBothPartiesShareSameDataParts = sC->getConfinementConfig()->isIntraContrainerSync();
+	bool usePartsConfinment = isIntraSegmentBuffer && areBothPartiesShareSameDataParts;
+
 	if (isSendActivated()) {
 		TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
 		if (usePartsConfinment) {
