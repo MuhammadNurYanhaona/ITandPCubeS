@@ -16,27 +16,25 @@ SendBarrier::SendBarrier(int participantCount, Communicator *communicator)
 	this->communicator = communicator;
 }
 
-bool SendBarrier::shouldWait(SignalType signal) {
-	return communicator->shouldWaitOnSend(signal, _iterationNo);
+bool SendBarrier::shouldWait(SignalType signal, int callerIterationNo) {
+	return communicator->shouldWaitOnSend(signal, callerIterationNo);
 }
 
-void SendBarrier::beforeTransfer(int order, int participants, int activeSignalsCount) {
-	if (communicator->shouldSend(activeSignalsCount)) {
-		communicator->performSendPreprocessing(order, participants);
-	}
+bool SendBarrier::shouldPerformTransfer(int activeSignalsCount, int callerIterationNo) {
+	return communicator->shouldSend(activeSignalsCount);
 }
 
-void SendBarrier::transferFunction(int activeSignalsCount) {
-	if (communicator->shouldSend(activeSignalsCount)) {
-		communicator->sendData();
-		communicator->afterSend();
-        }
+void SendBarrier::beforeTransfer(int order, int participants) {
+	communicator->performSendPreprocessing(order, participants);
+}
+
+void SendBarrier::transferFunction() {
+	communicator->sendData();
+	communicator->afterSend();
 }
         
-void SendBarrier::afterTransfer(int order, int participants, int activeSignalsCount) {
-	if (communicator->shouldSend(activeSignalsCount)) {
-		communicator->performSendPostprocessing(order, participants);
-        }
+void SendBarrier::afterTransfer(int order, int participants) {
+	communicator->performSendPostprocessing(order, participants);
 }
 
 void SendBarrier::recordTimingLog(TimingLogType logType, struct timeval &start, struct timeval &end) {
@@ -69,27 +67,25 @@ ReceiveBarrier::ReceiveBarrier(int participantCount, Communicator *communicator)
 	this->communicator = communicator;
 }
 
-bool ReceiveBarrier::shouldWait(SignalType signal) {
-	return communicator->shouldWaitOnReceive(signal, _iterationNo);
+bool ReceiveBarrier::shouldWait(SignalType signal, int callerIterationNo) {
+	return communicator->shouldWaitOnReceive(signal, callerIterationNo);
 }
 
-void ReceiveBarrier::beforeTransfer(int order, int participants, int activeSignalsCount) {
-	if (communicator->shouldReceive(activeSignalsCount, _iterationNo)) {
-		communicator->perfromRecvPreprocessing(order, participants);
-	}
+bool ReceiveBarrier::shouldPerformTransfer(int activeSignalsCount, int callerIterationNo) {
+	return communicator->shouldReceive(activeSignalsCount, callerIterationNo);
 }
 
-void ReceiveBarrier::transferFunction(int activeSignalsCount) {
-	if (communicator->shouldReceive(activeSignalsCount, _iterationNo)) {
-		communicator->receiveData();
-		communicator->afterReceive();
-	}
+void ReceiveBarrier::beforeTransfer(int order, int participants) {
+	communicator->perfromRecvPreprocessing(order, participants);
 }
 
-void ReceiveBarrier::afterTransfer(int order, int participants, int activeSignalsCount) {
-	if (communicator->shouldReceive(activeSignalsCount, _iterationNo)) {
-		communicator->perfromRecvPostprocessing(order, participants);
-	}
+void ReceiveBarrier::transferFunction() {
+	communicator->receiveData();
+	communicator->afterReceive();
+}
+
+void ReceiveBarrier::afterTransfer(int order, int participants) {
+	communicator->perfromRecvPostprocessing(order, participants);
 }
 
 void ReceiveBarrier::recordTimingLog(TimingLogType logType, struct timeval &start, struct timeval &end) {

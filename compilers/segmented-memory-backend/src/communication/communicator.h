@@ -36,12 +36,14 @@ class SendBarrier : public ParallelCommBarrier {
 	SendBarrier(int participantCount, Communicator *communicator);
 
 	// barrier interface functions
-	bool shouldWait(SignalType signal);
-	void beforeTransfer(int order, int participants, int activeSignalsCount);
-        void transferFunction(int activeSignalsCount);
-        void afterTransfer(int order, int participants, int activeSignalsCount);
+	bool shouldWait(SignalType signal, int callerIterationNo);
+	bool shouldPerformTransfer(int activeSignalsCount, int callerIterationNo);
+	void beforeTransfer(int order, int participants);
+        void transferFunction();
+        void afterTransfer(int order, int participants);
 	void recordTimingLog(TimingLogType logType, struct timeval &start, struct timeval &end);
-	
+
+	// @depricated old send barrier function when communication activities were not divided into sequential and parallel parts	
 	void executeSend();
 };
 
@@ -54,12 +56,14 @@ class ReceiveBarrier : public ParallelCommBarrier {
 	ReceiveBarrier(int participantCount, Communicator *communicator);
 
 	// barrier interface functions
-        bool shouldWait(SignalType signal);
-        void beforeTransfer(int order, int participants, int activeSignalsCount);
-        void transferFunction(int activeSignalsCount);
-        void afterTransfer(int order, int participants, int activeSignalsCount);	
+        bool shouldWait(SignalType signal, int callerIterationNo);
+	bool shouldPerformTransfer(int activeSignalsCount, int callerIterationNo);
+        void beforeTransfer(int order, int participants);
+        void transferFunction();
+        void afterTransfer(int order, int participants);	
 	void recordTimingLog(TimingLogType logType, struct timeval &start, struct timeval &end);
 
+	// @depricated old recv barrier function when communication activities were not divided into sequential and parallel parts	
 	void executeReceive();
 };
 

@@ -63,7 +63,7 @@ class GhostRegionSyncCommunicator : public Communicator {
 	void performTransfer();
 };
 
-// communictor class for the scenario of propaging update to a data from LPUs of a lower level LPS to the LPU of a higher 
+// communictor class for the scenario of propagating update to a data from LPUs of a lower level LPS to the LPU of a higher 
 // level LPS that embody the former LPUs
 class UpSyncCommunicator : public Communicator {
   protected:
