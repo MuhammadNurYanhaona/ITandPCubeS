@@ -132,6 +132,7 @@ GhostRegionSyncCommunicator::GhostRegionSyncCommunicator(int localSegmentTag,
 }
 
 void GhostRegionSyncCommunicator::setupCommunicator(bool includeNonInteractingSegments) {
+	intraSegmentCommunicator = false;
 	std::vector<int> *participants = getParticipantsTags();
         segmentGroup = new SegmentGroup(*participants);
         delete participants;
@@ -144,23 +145,17 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	
 	//*logFile << "\tGhost-sync communicator is communicating data for " << dependencyName << "\n";
 	//logFile->flush();
-	
+
+	// retrieve all buffers holding data for cross-segment communication	
 	List<CommBuffer*> *localBufferList = new List<CommBuffer*>;
 	List<CommBuffer*> *remoteBufferList = new List<CommBuffer*>;
 	seperateLocalAndRemoteBuffers(localSegmentTag, localBufferList, remoteBufferList);
-
-	for (int i = 0; i < localBufferList->NumElements(); i++) {
-		CommBuffer *localBuffer = localBufferList->Nth(i);
-		// for local buffers just update the operating memory with buffer's content; note that reading data into
-		// the buffer is not needed as that has been already done for all buffers 
-		localBuffer->writeData(false, *logFile);
-	}
 	delete localBufferList;
 
+	// if there is no cross-segment communication buffer then there is nothing to do here
 	if (remoteBufferList->NumElements() == 0) {
                 delete remoteBufferList;
-                //*logFile << "\tGhost-sync communicator locally exchanged data for " << dependencyName << "\n";
-                //logFile->flush();
+		intraSegmentCommunicator = true;
                 return;
         }
 
@@ -218,10 +213,6 @@ void GhostRegionSyncCommunicator::performTransfer() {
 	if (status != MPI_SUCCESS) {
 		cout << "Segment "<< localSegmentTag << ": some of the asynchronous receives failed\n";
 		exit(EXIT_FAILURE);
-	}
-	for (int i = 0; i < remoteRecvs; i++) {
-		CommBuffer *buffer = remoteReceiveBuffers->Nth(i);
-		buffer->writeData(false, *logFile);
 	}
 
 	// wait for all sends to finish
@@ -554,14 +545,8 @@ void DownSyncCommunicator::sendData() {
 				exit(EXIT_FAILURE);
 			}
 		}
-
-		// need to update own operating memory data as the sender will bypass the receive call on the communicator
-		buffer->writeData(false, *logFile);
-	} else {		
-		// need to update its own receiving buffer in the scatter mode separately; interchange for others are included
-		// in the scatter buffer configuration 
-		updateLocalBufferPart();
-
+	} else {
+		// scatter the data other segments are supposed to receive from this sender segment		
 		char dummyReceive = 0;
 		int status = MPI_Scatterv(scatterBuffer, sendCounts, displacements, MPI_CHAR,
                                 &dummyReceive, 0, MPI_CHAR, myRank, mpiComm);
@@ -612,6 +597,23 @@ void DownSyncCommunicator::receiveData() {
 	//*logFile << "\tDown-sync communicator received data for " << dependencyName << "\n";
 	//logFile->flush();
 } 
+
+void DownSyncCommunicator::performSendPostprocessing(int currentPpuOrder, int participantsCount) {
+
+	// There is just one buffer to access in both scenario. At this moment we do not have mechanism for parallel 
+	// element transfers from a single communication buffers. Hence the first PPU does all post processing.
+	if (currentPpuOrder == 0) {
+		if (commMode == BROADCAST) {
+			// in the broadcast transfer mode there is just one buffer
+			CommBuffer *buffer = commBufferList->Nth(0);
+			buffer->writeData(false, *logFile);
+		} else {
+			// need to update its own receiving buffer in the scatter mode separately; interchange for 
+			// others are included in the scatter buffer configuration 
+			updateLocalBufferPart();
+		}
+	}
+}
 
 void DownSyncCommunicator::allocateAndLinkScatterBuffer() {
 
@@ -753,10 +755,7 @@ void CrossSyncCommunicator::sendData() {
 
 	seperateLocalAndRemoteBuffers(localSegmentTag, localBuffers, remoteBuffers);
 	
-	// write the local buffers into operating memory; as in other cases, reading has been done already in some earlier function call
-	for (int i = 0; i < localBuffers->NumElements(); i++) {
-		localBuffers->Nth(i)->writeData(false, *logFile);
-	}
+	// local buffers' content will be written into the operating memory during the post processing operation
 	delete localBuffers;
 
 	// issue asynchronous receives first, when applicable
@@ -822,16 +821,12 @@ void CrossSyncCommunicator::sendData() {
 		}
 	}
 	
-	// wait for all receives to finish and write data back to operating memory from receive buffers
+	// wait for all receives to finish
 	if (receiveCount > 0) {
 		int status = MPI_Waitall(receiveCount, receiveRequests, MPI_STATUSES_IGNORE);
 		if (status != MPI_SUCCESS) {
 			cout << "Segment "<< localSegmentTag << ": some of the asynchronous receives failed\n";
 			exit(EXIT_FAILURE);
-		}
-		for (int i = 0; i < remoteReceives->NumElements(); i++) {
-			CommBuffer *buffer = remoteReceives->Nth(i);
-			buffer->writeData(false, *logFile);
 		}
 	}
 

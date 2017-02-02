@@ -34,6 +34,10 @@ class ReplicationSyncCommunicator : public Communicator {
 
 // communicator class for the scenario of synchronizing overlapping boundary regions among LPUs of a single LPS
 class GhostRegionSyncCommunicator : public Communicator {
+  private:
+	// some ineffective computations can be skipped if the communicator only exchanges data among parts local to the
+	// current segment
+	bool intraSegmentCommunicator;	
   public:
 	GhostRegionSyncCommunicator(int localSegmentTag, 
 		const char *dependencyName, 
@@ -43,16 +47,23 @@ class GhostRegionSyncCommunicator : public Communicator {
 	// as participants and use the default MPI communicator
 	void setupCommunicator(bool includeNonInteractingSegments);
 
-	void sendData() { performTransfer(); }
+	void sendData() { if (!intraSegmentCommunicator) performTransfer(); }
         void receiveData() {}
-	
+
+	// ghost region communicators do sending-receiving asynchronously at the same time; so after the data transfer is
+	// done for send; the receiver buffers' contents should be written to operating memory.
+	void performSendPostprocessing(int currentPpuOrder, int participantsCount) {
+		processBuffersAfterReceive(currentPpuOrder, participantsCount);
+	}
+	void perfromRecvPostprocessing(int currentPpuOrder, int participantsCount) {}
+
 	// any segment that sends ghost-region update to someone else receives updates back; so we can combine send-receive
 	// within a single function and let the later receive call to be non-halting 
 	void afterSend() { iterationNo++; }
 	void performTransfer();
 };
 
-// communictor class for the scenario of propaging update to a data from LPUs of a lower level LPS to the LPU of a higher 
+// communictor class for the scenario of propagating update to a data from LPUs of a lower level LPS to the LPU of a higher 
 // level LPS that embody the former LPUs
 class UpSyncCommunicator : public Communicator {
   protected:
@@ -115,6 +126,10 @@ class DownSyncCommunicator : public Communicator {
 	
 	// the sender segment should not wait on its own update 
 	void afterSend() { iterationNo++; }
+
+	// since the sender is also the receiver, it can immediately transfer content from the receiver buffer to the data
+	// parts in the part container tree
+	void performSendPostprocessing(int currentPpuOrder, int participantsCount);
   private:
 	// just like in the case of gather-buffer setup in the up-sync-communicator, a scatter-buffer setup is needed for
 	// this communicator when scatter_v is used as the form of collective communication 
@@ -124,7 +139,7 @@ class DownSyncCommunicator : public Communicator {
 	// then the sender with lowest segment tag setup the communication mode 
 	int getFirstSenderInCommunicator();
 
-	// In the replicated mode; all co-operating segments first should identify the sender segment for the current use
+	// In the replicated mode; all co-operating segments should first identify the sender segment for the current use
 	// of the communicator. They invoke this function for this purpose. 
 	int discoverSender(bool sendingData);
 
@@ -147,6 +162,12 @@ class CrossSyncCommunicator : public Communicator {
 
 	void sendData();
         void receiveData();
+
+	// Send and receive is done at the same time if the current segment has something to send in this communicator. 
+	// Hence, receiver buffers' content must be written back to proper data parts after the send is done. 
+	void performSendPostprocessing(int currentPpuOrder, int participantsCount) {
+		processBuffersAfterReceive(currentPpuOrder, participantsCount);
+	}
 
 	// Because the way MPI works, the sends can get deadlocked if there is/are receives on the receiving segments. But
 	// it may happen that all segments are trying to send data to others. Consequently there will be no receive issued

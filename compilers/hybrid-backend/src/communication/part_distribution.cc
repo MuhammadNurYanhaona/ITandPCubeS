@@ -65,10 +65,13 @@ int *Container::getCurrentLevelPartId(int dataDimensions) {
 
 vector<int*> *Container::getPartId(int dataDimensions) {
 
+	// there is no container ID for the root of the distribution tree
+	Container *current = this;
+	if (current->config.getLevel() == -1) return NULL;
+
 	vector<int*> *partIdVector = new vector<int*>;
 	int *partId = new int[dataDimensions];
 	int lastLps = config.getLpsId();
-	Container *current = this;
 
 	// level is -1 for the root container; so the recursion should terminate at that point
 	while (current->config.getLevel() != -1) {

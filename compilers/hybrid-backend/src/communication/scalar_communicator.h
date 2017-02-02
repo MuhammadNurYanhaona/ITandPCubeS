@@ -40,10 +40,10 @@ class ScalarCommunicator : public Communicator {
 	// of communication buffers in search of participating segments  
 	void setupCommunicator(bool includeNonInteractingSegments);
 
-	// there is no buffer preparation or post-processing for scalar variables
-	void prepareBuffersForSend() {}
-        void processBuffersAfterReceive() {}
-		
+	// there is no pre-processing step for scalar data communication
+	void performSendPreprocessing(int currentPpuOrder, int participantsCount) {}
+	void perfromRecvPreprocessing(int currentPpuOrder, int participantsCount) {}
+
 	// since there is just one instance of each scalar variable; local data interchange is inapplicable for them; the
 	// send and receive data functions should only be used when there are other participating segments (when the 
 	// active flag is true); so override has been provided to do actual transfers only in multi-party situations. 
@@ -54,6 +54,10 @@ class ScalarCommunicator : public Communicator {
 	// functions increases the iteration number of the communicator to let any subsequent receive request from PPUs
 	// on the same iteration will bypass the communicator
 	void afterSend() { iterationNo++; }
+
+	// there is no post-processing step for scalar data communication
+	void performSendPostprocessing(int currentPpuOrder, int participantsCount) {}
+	void perfromRecvPostprocessing(int currentPpuOrder, int participantsCount) {}
 	
 	// functions subclasses should override to implement specific forms of scalar synchronization
 	virtual void send() = 0;

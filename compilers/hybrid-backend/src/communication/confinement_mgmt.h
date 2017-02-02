@@ -214,6 +214,11 @@ class DataExchange {
 	bool contentsEqual(DataExchange *other);
 	void mergeWithOther(DataExchange *other);
 
+	// Reader and writer confinement IDs are the container IDs of the sender and receiver respectively. These two
+	// IDs are needed to restrict data read/write within particular data parts
+	std::vector<int*> *getReadConfinementId() { return sender->getContainerId(); }
+	std::vector<int*> *getWriteConfinementId() { return receiver->getContainerId(); }
+
 	// Like the previous function this is also used for determining what kind of communicator should be used for
 	// synchronizations for a specific data dependency
 	static int getTotalParticipantsCount(List<DataExchange*> *exchangeList, bool sendingSide);

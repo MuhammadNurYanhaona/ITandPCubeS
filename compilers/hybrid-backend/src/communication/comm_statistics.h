@@ -25,7 +25,9 @@ class CommStatistics {
 	Hashtable<double*> *confinementConstrTimeMap;
 	Hashtable<double*> *bufferSetupTimeMap;
 	Hashtable<double*> *commResourcesSetupTimeMap;
+	Hashtable<double*> *bufferReadTimeMap;
 	Hashtable<double*> *communicationTimeMap;
+	Hashtable<double*> *bufferWriteTimeMap;
 
 	// a mutex to protect the stat object from being corrupted if multiple threads try to enter timing data 
 	//into it at the same time
@@ -41,7 +43,9 @@ class CommStatistics {
 	void addConfinementConstrTime(const char *dependency, struct timeval &start, struct timeval &end);	
 	void addBufferSetupTime(const char *dependency, struct timeval &start, struct timeval &end);	
 	void addCommResourcesSetupTime(const char *dependency, struct timeval &start, struct timeval &end);	
+	void addBufferReadTime(const char *dependency, struct timeval &start, struct timeval &end);
 	void addCommunicationTime(const char *dependency, struct timeval &start, struct timeval &end);
+	void addBufferWriteTime(const char *dependency, struct timeval &start, struct timeval &end);
 	
 	// function to be used at program's end to log the total time spent on different communication dependencies
 	void logStatistics(int indentation, std::ofstream &logFile);

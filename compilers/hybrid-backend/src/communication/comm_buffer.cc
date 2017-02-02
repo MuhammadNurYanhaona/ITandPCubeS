@@ -134,14 +134,32 @@ void PreprocessedCommBuffer::setupMappingBuffer(char **buffer,
 IndexMappedCommBuffer::IndexMappedCommBuffer(DataExchange *ex, SyncConfig *sC) : CommBuffer(ex, sC) {
 	senderTransferIndexMapping = NULL;
 	receiverTransferIndexMapping = NULL;
+
+	// If the sender and receiver sides are using the same data parts then their confinement container IDs
+	// should be used to restrict read/writes to/from specific data parts	
+	bool isIntraSegmentBuffer = ex->isIntraSegmentExchange(localSegmentTag);
+	bool areBothPartiesShareSameDataParts = sC->getConfinementConfig()->isIntraContrainerSync();
+	bool usePartsConfinment = isIntraSegmentBuffer && areBothPartiesShareSameDataParts;
+
 	if (isSendActivated()) {
+		TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
+		if (usePartsConfinment) {
+			transferSpec->setConfinementContainerId(dataExchange->getReadConfinementId());
+		}
 		senderTransferIndexMapping = new DataPartIndexList[elementCount];
-		setupMappingBuffer(senderTransferIndexMapping, senderPartList, senderTree, senderDataConfig);
+		setupMappingBuffer(senderTransferIndexMapping, 
+				senderPartList, senderTree, senderDataConfig, transferSpec);
+		delete transferSpec;
 	}
 	if (isReceiveActivated()) {
+		TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
+		if (usePartsConfinment) {
+			transferSpec->setConfinementContainerId(dataExchange->getWriteConfinementId());
+		}
 		receiverTransferIndexMapping = new DataPartIndexList[elementCount];
 		setupMappingBuffer(receiverTransferIndexMapping, 
-				receiverPartList, receiverTree, receiverDataConfig);
+				receiverPartList, receiverTree, receiverDataConfig, transferSpec);
+		delete transferSpec;
 	}
 }
         
@@ -157,7 +175,8 @@ IndexMappedCommBuffer::~IndexMappedCommBuffer() {
 void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBuffer,
                         DataPartsList *dataPartList,
                         PartIdContainer *partContainerTree,
-                        DataItemConfig *dataConfig) {
+                        DataItemConfig *dataConfig, 
+			TransferIndexSpec *transferSpec) {
 	
 	DataPartSpec *dataPartSpec = new DataPartSpec(dataPartList->getPartList(), dataConfig);
 	vector<XformedIndexInfo*> *transformVector = new vector<XformedIndexInfo*>;
@@ -168,7 +187,6 @@ void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBu
 
 	ExchangeIterator *iterator = getIterator();
 	long int elementIndex = 0;
-	TransferIndexSpec *transferSpec = new TransferIndexSpec(elementSize);
 	while (iterator->hasMoreElements()) {
 		vector<int> *dataItemIndex = iterator->getNextElement();
 		dataPartSpec->initPartTraversalReference(dataItemIndex, transformVector);
@@ -180,7 +198,6 @@ void IndexMappedCommBuffer::setupMappingBuffer(DataPartIndexList *indexMappingBu
 
 	delete dataPartSpec;
 	delete transformVector;
-	delete transferSpec;
 }
 
 //------------------------------------------------ Physical Communication Buffer -------------------------------------------------/
@@ -761,6 +778,23 @@ List<CommBuffer*> *CommBufferManager::getSortedList(bool sortForReceive, List<Co
 		}
 	}
 	return sortedList;
+}
+
+List<CommBuffer*> *CommBufferManager::getFilteredList(bool filterForReceive, List<CommBuffer*> *bufferList) {
+
+        List<CommBuffer*> *originalList = commBufferList;
+        if (bufferList != NULL) {
+                originalList = bufferList;
+        }
+	List<CommBuffer*> *filteredList = new List<CommBuffer*>;
+        for (int i = 0; i < originalList->NumElements(); i++) {
+                CommBuffer *buffer = originalList->Nth(i);
+                if (filterForReceive && !buffer->isReceiveActivated()) continue;
+                else if (!filterForReceive && !buffer->isSendActivated()) continue;
+
+		filteredList->Append(buffer);
+        }
+        return filteredList;
 }
 
 void CommBufferManager::seperateLocalAndRemoteBuffers(int localSegmentTag, 

@@ -113,10 +113,33 @@ class TransferSpec {
 	char *bufferEntry;
 	// the actual index of the data-point retrieved from the interval representation of the communication buffer
 	std::vector<int> *dataIndex;
+
+	// This field is used to avoid unwanted updates in data parts that contain a to be updated element index but
+	// not intended to be updated as part of the dependency resolution process the transfer spec is intended for.
+	// To understand this apparently bizzare scenario, we need to consider the case of ghost region sync communi-
+	// cators.
+	// 
+	// In ghost-regions dependency problem, we have neighboring data parts from the same container tree, aka, the
+	// same parts list sharing their boundary regions that need to shared. Consider parts A and B. The updated
+	// boundary region of A should be copied to B and visa-versa. The overlapped region is, however, represented
+	// by an interval description only. Now the partition instructions reconfiguration process that we have
+	// implemented ensures that reading is done from the data part that did the update, but when we enable padding
+	// in the partition instructions for the writing process, both the updater and the receiver of the update data 
+	// parts are being included. This is causing writing of the data read from the location in the updater.
+	// 
+	// This is not just a waste of computation issue if we consider multiple levels of padding being synchronized
+	// by different dependency. If you draw some diagram of data parts boundary, you will see that any element
+	// index that falls within the intersecting regions of multiple dependencies will get corrupted because of
+	// the unprotected writing.
+	//
+	// Therefore, we need this container identifier and the associated validation function, isIncludedInTransfer(),
+	// to restrict access to elements within designated data parts.   
+	std::vector<int*> *confinementContainerId;
   public:
 	TransferSpec(TransferDirection direction, int elementSize);
 	TransferDirection getDirection() { return direction; }
 	virtual ~TransferSpec() {}
+	void setConfinementContainerId(std::vector<int*> *containerId) { confinementContainerId = containerId; }
 	void setBufferEntry(char *bufferEntry, std::vector<int> *dataIndex);
 	inline std::vector<int> *getDataIndex() { return dataIndex; }
 	inline int getStepSize() { return elementSize; }
@@ -124,6 +147,10 @@ class TransferSpec {
 	// function to be used to do the data transfer once the participating location in the operating memory has been
 	// identified
 	virtual void performTransfer(DataPartIndex dataPartIndex);
+
+	// function to be used to determine if a data part in the part-container tree is made accessible for the current
+	// transfer specification
+	bool isIncludedInTransfer(int partNo, int idDimension, int partNoIdLevel, int indexInLevel);
 };
 
 /* This subclass of transfer specification is used in the case where we do not intend to do a data transfer at an

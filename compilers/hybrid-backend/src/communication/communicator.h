@@ -15,37 +15,55 @@
 #define _H_communicator
 
 #include "../utils/list.h"
-#include "../runtime/comm_barrier.h"
+#include "../runtime/parallel_comm_barrier.h"
 #include "comm_buffer.h"
 #include "comm_statistics.h"
 #include "mpi_group.h"
 
 #include <iostream>
 #include <fstream>
+#include <time.h>
+#include <sys/time.h>
 
 class Communicator;
 
 /* Barrier class that is used to implement bulk synchronization during sending data
 */
-class SendBarrier : public CommBarrier {
+class SendBarrier : public ParallelCommBarrier {
   protected:
 	Communicator *communicator;
   public:
 	SendBarrier(int participantCount, Communicator *communicator);
-	bool shouldWait(SignalType signal, int iterationNo);
-	void releaseFunction(int activeSignalsCount);
+
+	// barrier interface functions
+	bool shouldWait(SignalType signal, int callerIterationNo);
+	bool shouldPerformTransfer(int activeSignalsCount, int callerIterationNo);
+	void beforeTransfer(int order, int participants);
+        void transferFunction();
+        void afterTransfer(int order, int participants);
+	void recordTimingLog(TimingLogType logType, struct timeval &start, struct timeval &end);
+
+	// @depricated old send barrier function when communication activities were not divided into sequential and parallel parts	
 	void executeSend();
 };
 
 /* Barrier class that is used to implement bulk synchronization during receiving data
 */
-class ReceiveBarrier : public CommBarrier {
+class ReceiveBarrier : public ParallelCommBarrier {
   protected:
 	Communicator *communicator;
   public:
 	ReceiveBarrier(int participantCount, Communicator *communicator);
-	bool shouldWait(SignalType signal, int iterationNo);
-	void releaseFunction(int activeSignalsCount);
+
+	// barrier interface functions
+        bool shouldWait(SignalType signal, int callerIterationNo);
+	bool shouldPerformTransfer(int activeSignalsCount, int callerIterationNo);
+        void beforeTransfer(int order, int participants);
+        void transferFunction();
+        void afterTransfer(int order, int participants);	
+	void recordTimingLog(TimingLogType logType, struct timeval &start, struct timeval &end);
+
+	// @depricated old recv barrier function when communication activities were not divided into sequential and parallel parts	
 	void executeReceive();
 };
 
@@ -82,8 +100,12 @@ class Communicator : public CommBufferManager {
 
 	// two functions to pre and post process communication buffers before a send and after a receive respectively these basically 
 	// read and write the communication buffers
-        virtual void prepareBuffersForSend();
-        virtual void processBuffersAfterReceive();
+        void prepareBuffersForSend();
+        void processBuffersAfterReceive();
+
+	// alternative functions for buffer processing that can be used for parallel subclass implementations
+	void prepareBuffersForSend(int currentPpuOrder, int participantsCount);
+        void processBuffersAfterReceive(int currentPpuOrder, int participantsCount);
 
 	// sets up the tags in each communication buffer that will be used during MPI communications in some communicator types; it 
 	// also assign the communicator an ID which can also be used as a tag in some contexts
@@ -114,11 +136,26 @@ class Communicator : public CommBufferManager {
 	virtual bool shouldReceive(int receiveRequestsCount, int iteration) { 
 		return (iteration == iterationNo && receiveRequestsCount > 0); 
 	}
-	
-	// The two functions to be implemented by subclasses to do the actual platform specific data send and receive operations
+
+	//-------------------------------------------------------------------------- Parallel Preprocessing Functions for Transfer
+	virtual void performSendPreprocessing(int currentPpuOrder, int participantsCount) {
+		prepareBuffersForSend(currentPpuOrder, participantsCount);
+	}
+	virtual void perfromRecvPreprocessing(int currentPpuOrder, int participantsCount) {}	
+
+	//----------------------------------------------------------------------------------------------------- Transfer Functions
+	// The two transfer functions to be implemented by subclasses to do the actual platform specific data send and receive 
+	// operations
 	virtual void sendData() = 0;
 	virtual void receiveData() = 0;
+
+	//------------------------------------------------------------------------- Parallel Postprocessing Functions for Transfer 
+	virtual void performSendPostprocessing(int currentPpuOrder, int participantsCount) {}
+	virtual void perfromRecvPostprocessing(int currentPpuOrder, int participantsCount) {
+		processBuffersAfterReceive(currentPpuOrder, participantsCount);
+	}	
 	
+	//--------------------------------------------------------------------- After Transfer Communicator State Update Functions
 	// There is nothing to do other than releasing the waiting PPUs after a send by default
 	virtual void afterSend() {}	
 	// Receive, on the other hand, increases the iteration number of the communicator to avoid PPUs reporting later on to get

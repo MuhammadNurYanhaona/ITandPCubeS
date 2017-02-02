@@ -238,54 +238,67 @@ int PartContainer::transferData(vector<XformedIndexInfo*> *xformVector,
 	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
 	XformedIndexInfo backupIndex = *dimIndex;
 	
+	int dataDimensions = dataConfig->getDimensionality();
+	int dimOrder = partitionInstr->getPriorityOrder();
+	
 	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
 	int transferCount = 0;
 
 	int partNo = dimIndex->partNo;
-	if (loggingEnabled) {
-		for (int i = 0; i < indentLevel; i++) logFile << '\t';
-		logFile << "Dimension: " << dimNo << " Part No: " << partNo << "\n";
-	}
-
-	vector<int> partIndex;
-	int dataDimensions = dataConfig->getDimensionality();
-	partIndex.reserve(dataDimensions);
-	for (int i = 0; i < dataDimensions; i++) {
-		partIndex.push_back(xformVector->at(i)->index);
-	}
-	int dataItemSize = transferSpec->getStepSize();
-
-	SuperPart *part = getPart(partNo);
-	if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
-		PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
-		DataPartIndex partUpdateIndex = dataPartSpec->getDataPartUpdateIndex(partLocator, 
-				&partIndex, dataItemSize);
-		transferSpec->performTransfer(partUpdateIndex);
-		transferCount++;
-	} else if (loggingEnabled) {
-		for (int i = 0; i < indentLevel; i++) logFile << '\t';
-		logFile << "Part Not Found\n"; 
-	}
-
-	if (paddedIndex != NULL) {
-		int partNo = paddedIndex->partNo;
+	if (transferSpec->isIncludedInTransfer(partNo, dataDimensions, level, dimOrder)) {
 		if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Dimension: " << dimNo << " Padded Part No: " << partNo << "\n"; 
+			logFile << "Dimension: " << dimNo << " Part No: " << partNo << "\n";
 		}
-		partIndex[dimNo] = paddedIndex->index;
+
+		vector<int> partIndex;
+		partIndex.reserve(dataDimensions);
+		for (int i = 0; i < dataDimensions; i++) {
+			partIndex.push_back(xformVector->at(i)->index);
+		}
+		int dataItemSize = transferSpec->getStepSize();
+
 		SuperPart *part = getPart(partNo);
 		if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
 			PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
-			DataPartIndex partUpdateIndex = dataPartSpec->getDataPartUpdateIndex(
-					partLocator, &partIndex, dataItemSize);
+			DataPartIndex partUpdateIndex = dataPartSpec->getDataPartUpdateIndex(partLocator, 
+					&partIndex, dataItemSize);
 			transferSpec->performTransfer(partUpdateIndex);
 			transferCount++;
 		} else if (loggingEnabled) {
 			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Padded Part Not Found\n"; 
+			logFile << "Part Not Found\n"; 
 		}
-		delete paddedIndex;
+	}
+
+	if (paddedIndex != NULL) {
+		int partNo = paddedIndex->partNo;
+		if (transferSpec->isIncludedInTransfer(partNo, dataDimensions, level, dimOrder)) {
+			if (loggingEnabled) {
+				for (int i = 0; i < indentLevel; i++) logFile << '\t';
+				logFile << "Dimension: " << dimNo << " Padded Part No: " << partNo << "\n"; 
+			}
+
+			vector<int> partIndex;
+			partIndex.reserve(dataDimensions);
+			for (int i = 0; i < dataDimensions; i++) {
+				partIndex.push_back(xformVector->at(i)->index);
+			}
+			int dataItemSize = transferSpec->getStepSize();
+
+			SuperPart *part = getPart(partNo);
+			if (part != NULL && dynamic_cast<PartLocator*>(part) != NULL) {
+				PartLocator* partLocator = reinterpret_cast<PartLocator*>(part);
+				DataPartIndex partUpdateIndex = dataPartSpec->getDataPartUpdateIndex(
+						partLocator, &partIndex, dataItemSize);
+				transferSpec->performTransfer(partUpdateIndex);
+				transferCount++;
+			} else if (loggingEnabled) {
+				for (int i = 0; i < indentLevel; i++) logFile << '\t';
+				logFile << "Padded Part Not Found\n"; 
+			}
+			delete paddedIndex;
+		}
 	}
 
 	// Multiple data transfers may result from a single transfer requests due to the presence of paddings in partition
@@ -399,41 +412,48 @@ int PartListContainer::transferData(std::vector<XformedIndexInfo*> *xformVector,
 	XformedIndexInfo *dimIndex = xformVector->at(dimNo);
 	XformedIndexInfo backupIndex = *dimIndex;
 	
+	int dataDimensions = dataConfig->getDimensionality();
+	int dimOrder = partitionInstr->getPriorityOrder();
+	
 	XformedIndexInfo *paddedIndex = partitionInstr->transformIndex(dimIndex);
 	int transferCount = 0;
 
 	int partNo = dimIndex->partNo;
-	if (loggingEnabled) {
-		for (int i = 0; i < indentLevel; i++) logFile << '\t';
-		logFile << "Dimension: " << dimNo << " Part No: " << partNo << "\n";
-	}
+	if (transferSpec->isIncludedInTransfer(partNo, dataDimensions, level, dimOrder)) {
+		if (loggingEnabled) {
+			for (int i = 0; i < indentLevel; i++) logFile << '\t';
+			logFile << "Dimension: " << dimNo << " Part No: " << partNo << "\n";
+		}
 
-	PartIdContainer *nextContainer = getContainer(partNo);
-	if (nextContainer != NULL) {
-		transferCount += nextContainer->transferData(xformVector, 
-				transferSpec, dataPartSpec, loggingEnabled, logFile, indentLevel + 1);
-	} else if (loggingEnabled) {
-		for (int i = 0; i < indentLevel; i++) logFile << '\t';
-		logFile << "Part Not Found\n";
+		PartIdContainer *nextContainer = getContainer(partNo);
+		if (nextContainer != NULL) {
+			transferCount += nextContainer->transferData(xformVector, 
+					transferSpec, dataPartSpec, loggingEnabled, logFile, indentLevel + 1);
+		} else if (loggingEnabled) {
+			for (int i = 0; i < indentLevel; i++) logFile << '\t';
+			logFile << "Part Not Found\n";
+		}
 	}
 
 	if (paddedIndex != NULL) {
 		dimIndex->copyInfo(paddedIndex);
 		int partNo = dimIndex->partNo;
-		if (loggingEnabled) {
-			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Dimension: " << dimNo << " Padded Part No: " << partNo << "\n";
-		}
-		PartIdContainer *nextContainer = getContainer(partNo);
-		if (nextContainer != NULL) {
-			transferCount += nextContainer->transferData(xformVector, 
-					transferSpec, dataPartSpec, 
-					loggingEnabled, logFile, indentLevel + 1);
-		} else if (loggingEnabled) {
-			for (int i = 0; i < indentLevel; i++) logFile << '\t';
-			logFile << "Padded Part Not Found\n";
-		}
-		delete paddedIndex;
+		if (transferSpec->isIncludedInTransfer(partNo, dataDimensions, level, dimOrder)) {
+			if (loggingEnabled) {
+				for (int i = 0; i < indentLevel; i++) logFile << '\t';
+				logFile << "Dimension: " << dimNo << " Padded Part No: " << partNo << "\n";
+			}
+			PartIdContainer *nextContainer = getContainer(partNo);
+			if (nextContainer != NULL) {
+				transferCount += nextContainer->transferData(xformVector, 
+						transferSpec, dataPartSpec, 
+						loggingEnabled, logFile, indentLevel + 1);
+			} else if (loggingEnabled) {
+				for (int i = 0; i < indentLevel; i++) logFile << '\t';
+				logFile << "Padded Part Not Found\n";
+			}
+			delete paddedIndex;
+		}	
 	}
 
 	// Multiple data transfers may result from a single transfer requests due to the presence of paddings in partition
