@@ -65,7 +65,7 @@ class StageDefinition : public Node {
 	List<Identifier*> *parameters;
 	Stmt *codeBody;
   public:
-	StageDefinition(Identifier *name, List<Identifier*> *parameter, Stmt *codeBody);
+	StageDefinition(Identifier *name, List<Identifier*> *parameters, Stmt *codeBody);
 	const char *GetPrintNameForNode() { return "Stage-Definition"; }
         void PrintChildren(int indentLevel);
 };
@@ -83,8 +83,8 @@ class FlowPart : public Node {
   protected:
 	int index;
   public:
-	FlowPart(yyltype loc);
 	static int currentFlowIndex;
+	FlowPart(yyltype loc);
 	static void resetFlowIndexRef();
 };
 
@@ -103,6 +103,7 @@ class CompositeFlowPart : public FlowPart {
 	List<FlowPart*> *nestedSubflow;
   public:
 	CompositeFlowPart(yyltype loc, List<FlowPart*> *nestedSubflow);
+        virtual void PrintChildren(int indentLevel);
 };
 
 class LpsTransition : public CompositeFlowPart {
@@ -127,12 +128,11 @@ class EpochBlock : public CompositeFlowPart {
   public:
 	EpochBlock(List<FlowPart*> *nestedSubflow, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Epoch-Boundary"; }
-        void PrintChildren(int indentLevel);
 };
 
 class RepeatControl : public Node {
   public:
-	RepeatControl(yyltype loc);
+	RepeatControl(yyltype loc) : Node(loc) {}
 };
 
 class WhileRepeat : public RepeatControl {

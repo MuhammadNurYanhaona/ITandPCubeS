@@ -327,7 +327,8 @@ compute_stage	: Variable_Name '(' names ')' '{' code '}'	{ $$ = new StageDefinit
 
 /* ----------------------------------------------------- Computation Section ------------------------------------------------------- */
 
-computation	: S_Computation ':' compute_flow		{ $$ = new ComputationSection($3, @1); };
+computation	: { FlowPart::resetFlowIndexRef(); } 
+		  S_Computation ':' compute_flow		{ $$ = new ComputationSection($4, @2); };
 compute_flow	: flow_part					{ ($$ = new List<FlowPart*>)->Append($1); }
 		| compute_flow flow_part			{ ($$ = $1)->Append($2); };
 flow_part 	: lps_transition

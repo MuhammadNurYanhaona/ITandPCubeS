@@ -64,7 +64,7 @@ class LoopStmt: public Stmt {
 	Stmt *body;
   public:
 	LoopStmt();
-     	LoopStmt(yyltype loc);
+     	LoopStmt(Stmt *body, yyltype loc);
 };
 
 class PLoopStmt: public LoopStmt {
@@ -73,6 +73,7 @@ class PLoopStmt: public LoopStmt {
   public:
 	PLoopStmt(List<IndexRangeCondition*> *rangeConditions, Stmt *body, yyltype loc);	
     	const char *GetPrintNameForNode() { return "Parallel-For-Loop"; }
+    	void PrintChildren(int indentLevel);
 };
 
 class SLoopAttribute {

@@ -19,6 +19,7 @@ class Type : public Node {
     	Type(yyltype loc) : Node(loc) {}
     	Type(const char *str);
 	virtual ~Type() {}
+	virtual const char *getName() { return typeName; }
     
     	const char *GetPrintNameForNode() { return "Type"; }
     	void PrintChildren(int indentLevel);
@@ -72,6 +73,11 @@ class MapType : public Type {
     	const char *GetPrintNameForNode() { return "Associated-List (Map)"; }
 	const char *getName() { return "Map"; }
     	void PrintChildren(int indentLevel);
+	bool hasElement(const char *elementName);
+        Type *getElementType(const char *elementName);
+        void setElement(VariableDef *newArg);
+        VariableDef* getElement(const char *elementName);
+        List<VariableDef*> *getElementList();
 };
  
 #endif

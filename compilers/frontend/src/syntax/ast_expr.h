@@ -4,7 +4,6 @@
 #include "ast.h"
 #include "ast_stmt.h"
 #include "ast_type.h"
-#include "ast_task.h"
 
 #include "../common/constant.h"
 #include "../../../common-libs/utils/list.h"
@@ -31,7 +30,7 @@ class IntConstant : public Expr {
   public:
     	IntConstant(yyltype loc, int val);
     	IntConstant(yyltype loc, int val, IntSize size);
-    	const char *GetPrintNameForNode();
+    	const char *GetPrintNameForNode() { return "Integer-Constant"; }
     	void PrintChildren(int indentLevel);
 	int getValue() { return value; }  
 };
@@ -117,16 +116,6 @@ class LogicalExpr : public Expr {
 	Expr *getRight() { return right; }    	
 };
 
-class ReductionExpr : public Expr {
-  protected:
-	ReductionOperator op;
-	Expr *right;
-  public:
-	ReductionExpr(char *opName, Expr *right, yyltype loc);
-	const char *GetPrintNameForNode() { return "Reduction-Expr"; }
-    	void PrintChildren(int indentLevel);
-};
-
 class EpochExpr : public Expr {
   protected:
 	Expr *root;
@@ -141,7 +130,6 @@ class FieldAccess : public Expr {
   protected:
 	Expr *base;
 	Identifier *field;
-	int epochVersion; 
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Field-Access"; }
@@ -153,6 +141,7 @@ class RangeExpr : public Expr {
 	Identifier *index;
 	Expr *range;
 	Expr *step;
+	bool loopingRange;
   public:
 	RangeExpr(Identifier *index, Expr *range, Expr *step, bool loopingRange, yyltype loc);		
 	const char *GetPrintNameForNode() { return "Range-Expr"; }
@@ -215,7 +204,7 @@ class NamedArgument : public Node {
 	Expr *argValue;
   public:
 	NamedArgument(char *argName, Expr *argValue, yyltype loc);	
-	const char *GetPrintNameForNode() { return "Initializer-Arg"; }
+	const char *GetPrintNameForNode() { return "Named-Argument"; }
     	void PrintChildren(int indentLevel);	    	
 	const char *getName() { return argName; }
 	Expr *getValue() { return argValue; }

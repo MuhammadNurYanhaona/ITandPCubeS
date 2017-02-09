@@ -42,8 +42,7 @@ class Node {
 
     	// printing related methods	
     	virtual const char *GetPrintNameForNode() = 0;
-    	// Print() is deliberately _not_ virtual
-    	// subclasses should override PrintChildren() instead
+    	// Print() is deliberately _not_ virtual subclasses should override PrintChildren() instead
     	void Print(int indentLevel, const char *label = NULL); 
     	void PrintLabel(int indentLevel, const char *label = NULL); 
     	virtual void PrintChildren(int indentLevel)  {}
@@ -72,11 +71,10 @@ class DimensionIdentifier : public Identifier {
 	int getDimensionNo() { return dimension; }
 };
 
-// This node class is designed to represent a portion of the tree that 
-// encountered syntax errors during parsing. The partial completed tree
-// is discarded along with the states being popped, and an instance of
-// the Error class can stand in as the placeholder in the parse tree 
-// when your parser can continue after an error.
+// This node class is designed to represent a portion of the tree that  encountered syntax errors 
+// during parsing. The partial completed tree is discarded along with the states being popped, and 
+// an instance of the Error class can stand in as the placeholder in the parse tree when your parser 
+// can continue after an error.
 class Error : public Node {
   public:
     Error() : Node() {}

@@ -147,6 +147,7 @@ create			return Create;
 reduce			return Reduce;
 Repeat			return Repeat;
 Where			return Where;
+If			return Where;
 Epoch			return Epoch;
 do			return Do;
 while			return While;

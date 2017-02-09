@@ -58,7 +58,7 @@ class TupleDef : public Definition {
         List<VariableDef*> *components;
   public:
         TupleDef(Identifier *id, List<VariableDef*> *components); 
-	const char *GetPrintNameForNode() { return "Tuple"; } 
+	const char *GetPrintNameForNode() { return "Class"; } 
         void PrintChildren(int indentLevel);
 	Identifier *getId() { return id; }
 };
