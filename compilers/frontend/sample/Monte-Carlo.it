@@ -1,0 +1,101 @@
+Program (args) { 
+        mcEnv = new TaskEnvironment(name: "Monte Carlo Area Estimation")
+        execute(task: "Monte Carlo Area Estimation"; envionment: mcEnv; 		\
+		initialize: args.cell_length, args.grid_dim, args.points_per_cell; 	\
+		partition: args.b)
+}
+
+Class Rectangle:
+	top, bottom, left, right: Integer
+
+Task "Monte Carlo Area Estimation":
+	Define:
+		grid: 2d Array of Rectangle
+		sub_area_estimates: 2d Array of Real double-precision
+		cell_length, points_per_cell: Integer
+		cell_size: Real double-precision
+		area: Real double-precision Reduction
+	Environment:
+		area: create
+	Initialize(cell_length, grid_dim, points_per_cell):
+		
+		grid.dimension1.range.min = 0
+		grid.dimension1.range.max = grid_dim - 1
+		grid.dimension2 = grid.dimension1
+		sub_area_estimates.dimension = grid.dimension
+		cell_size = cell_length * cell_length
+		
+		// initialize the random number generator for sampling
+		@Extern {
+			@Language "C++"
+			@Includes { time.h, cstdlib }
+			${ srand(time(NULL)); }$
+		}
+	Stages:
+		setupGridCells(grid, cell_length) {
+			do { 
+				grid[i][j].left = cell_length * i
+				grid[i][j].right = cell_length * (i + 1) - 1
+				grid[i][j].bottom = cell_length * j
+				grid[i][j].top = cell_length * ( j + 1) - 1
+			} for i, j in grid
+		}
+		estimateSubarea(cell_length, grid, sub_area_estimates, points_per_cell) {
+			
+			// iterate parallely over the grid cells
+			do {
+				cell = grid[i][j]
+				internal_points = 0
+				seed = lpuId[0]
+
+				// undertakes points_per_cell number of point placement trails 
+				trial = 0
+				do {
+					// generate a point within the cell boundary and calculate its position 
+					// relative to the shape
+					@Extern {
+						@Language "C++"
+						@Includes { math.h, cstdlib }
+						${
+							int x = rand_r((unsigned int *) &seed) % cell_length + cell.left;
+							int y = rand_r((unsigned int *) &seed) % cell_length + cell.bottom;
+							
+							// tested polynomial is 10 sin x^2 + 50 cos y^3
+							double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
+							if (result <= 0.0) {
+								internal_points++; 
+							}
+						}$
+					}
+					trial = trial + 1
+				} while (trial < points_per_cell)
+				
+				// estimate the part of the polynomial within the grid cell
+				sub_area_estimates[i][j] = cell_size * internal_points / points_per_cell
+						
+			} for i, j in grid
+		}
+		estimateTotalArea(result, sub_area_estimates) {
+			do {
+				reduce(result, "sum", sub_area_estimates[i][j])
+			} for i, j in sub_area_estimates
+		}
+	Computation:
+		Space A {
+			Space B {
+				// calculate the cell boundaries based on cell dimension length and position in the grid
+				setupGridCells(grid, cell_length)
+				
+				// estimate the sub-area under the polynomial within each grid cell by a fixed number of
+				// random samples   
+				estimateSubarea(cell_length, grid, sub_area_estimates, points_per_cell)
+
+				// reduce the sub-area estimates into a single final result in Space A
+				estimateTotalArea(Space A:area, sub_area_estimates)
+			}
+		}
+	Partition(b):
+		Space A <un-partitioned> { grid }
+		Space B <1d> divides Space A partitions {
+			grid<dim1>, sub_area_estimates<dim1>: block_count(b)
+		} 

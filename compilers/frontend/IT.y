@@ -55,6 +55,8 @@ void yyerror(const char *msg); // standard error-handling routine
 	Expr				*expr;
 	NamedArgument			*namedArg;
 	List<NamedArgument*>		*namedArgList;
+	NamedMultiArgument		*namedMultArg;
+	List<NamedMultiArgument*>	*namedMultArgList;
 	List<Expr*>			*exprList;
 	Stmt				*stmt;
 	List<Stmt*>			*stmtList;
@@ -201,7 +203,11 @@ void yyerror(const char *msg); // standard error-handling routine
 
 %type <namedArg>	named_arg
 %type <namedArgList>	named_args obj_args
-%type <expr>		task_invocation create_obj	
+%type <expr>		create_obj
+%type <namedMultArg>	multi_arg
+%type <namedMultArgList>multi_args	
+%type <expr>		task_invocation
+%type <exprList>	invoke_args
 	
 %type <expr>		expr field constant array_index function_call 
 %type <expr>		step_expr restrictions arg
@@ -211,6 +217,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <intList>		static_dims
 %type <id>		id
 %type <intConstant>	epoch_lag
+
 %type <stmt>		stmt parallel_loop sequencial_loop if_else_block extern_block reduction
 %type <stmtList>	stmt_block code meta_code
 %type <condStmtList>	else_block
@@ -218,6 +225,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <rangeCond>	index_range
 %type <rangeCondList>	index_ranges
 %type <sloopAttr>       sloop_attr
+
 %type <linkageType>	mode
 %type <order>		order
 %type <pInstr>		instr ordered_instr
@@ -323,7 +331,8 @@ arguments	: 						{ $$ = new List<Identifier*>; }
 stages		: S_Stages ':' stage_list			{ $$ = new StagesSection($3, @1); };
 stage_list	: compute_stage					{ ($$ = new List<StageDefinition*>)->Append($1); }
 		| stage_list compute_stage			{ ($$ = $1)->Append($2); } ;
-compute_stage	: Variable_Name '(' names ')' '{' code '}'	{ $$ = new StageDefinition(new Identifier(@1, $1), $3, new StmtBlock($6)); } ;
+compute_stage	: Variable_Name '(' names ')' 
+		  { BeginCode(); } '{' code '}'			{ $$ = new StageDefinition(new Identifier(@1, $1), $3, new StmtBlock($7)); } ;
 
 /* ----------------------------------------------------- Computation Section ------------------------------------------------------- */
 
@@ -340,11 +349,12 @@ lps_transition	: T_Space Space_ID '{' compute_flow '}'		{ $$ = new LpsTransition
 repeat_cycle	: Repeat repeat_control 
 		  '{' compute_flow '}' 				{ $$ = new RepeatCycle($2, $4, Join(@1, @5)); };
 repeat_control	: For Variable_Name In expr step_expr		{ $$ =  new ForRepeat(new RangeExpr(
-										new Identifier(@2, $2), $4, $5, true, 
-										Join(@2, @4)), @1); }	
-		| Foreach T_Space Space_ID C_Sub_Partition	{ $$ = new SubpartitionRepeat($3, Join(@1, @4)); }
+										new Identifier(@2, $2), $4, $5, Join(@2, @4)), @1); }	
+		| Foreach C_Sub_Partition			{ $$ = new SubpartitionRepeat(Join(@1, @2)); }
 		| While expr					{ $$ = new WhileRepeat($2, Join(@1, @2)); };
-condition_block	: Where expr '{' compute_flow '}'		{ $$ = new ConditionalFlowBlock($2, $4, Join(@1, @5)); };
+condition_block	: Where expr '{' compute_flow '}'		{ $$ = new ConditionalFlowBlock($2, $4, Join(@1, @5)); }
+		| Where field In expr '{' compute_flow '}'	{ $$ = new ConditionalFlowBlock(new RangeExpr($2, $4, 
+										Join(@2, @4)), $6, Join(@1, @7)); };
 epoch_block	: Epoch '{' compute_flow '}'			{ $$ = new EpochBlock($3, Join(@1, @4)); };
 stage_invoke	: Variable_Name '(' args ')'			{ $$ = new StageInvocation(new Identifier(@1, $1), $3, Join(@1, @4)); };
 
@@ -475,7 +485,8 @@ constant	: Integer					{ $$ = new IntConstant(@1, $1); }
 		| Real_Double 					{ $$ = new DoubleConstant(@1, $1); }
 		| '-' Real_Double 				{ $$ = new DoubleConstant(@1, $2 * -1); }
 		| Boolean 					{ $$ = new BoolConstant(@1, $1); }
-		| Character					{ $$ = new CharConstant(@1, $1); };	
+		| Character					{ $$ = new CharConstant(@1, $1); }	
+		| String					{ $$ = new StringConstant(@1, $1); };
 field		: id %prec Field				{ $$ = new FieldAccess(NULL, $1, @1); }
 		| field '.' id					{ $$ = new FieldAccess($1, $3, @2); }
 		| field '[' array_index ']'			{ $$ = new ArrayAccess($1, $3, Join(@2, @4)); };
@@ -490,8 +501,7 @@ function_call	: Variable_Name '(' args ')'			{
 										$$ = new FunctionCall(id, $3, Join(@1, @4));
 								  	} 
 								};
-arg		: String					{ $$ = new StringConstant(@1, $1); }
-		| T_Space Space_ID ':' Variable_Name		{ $$ = new ReductionVar($2, $4, Join(@1, @4)); }
+arg		: T_Space Space_ID ':' Variable_Name		{ $$ = new ReductionVar($2, $4, Join(@1, @4)); }
 		| expr						{ $$ = $1; };
 args		:						{ $$ = new List<Expr*>;} 
 		| arg 						{ ($$ = new List<Expr*>)->Append($1); }
@@ -513,10 +523,15 @@ create_obj	: New dynamic_type				{ $$ = new ObjectCreate($2, new List<NamedArgum
 		| New static_type '(' obj_args ')'		{ $$ = new ObjectCreate($2, $4, @1); };
 obj_args	:						{ $$ = new List<NamedArgument*>; }
 		| named_args					;
-task_invocation	: Execute '(' named_args ')'			{ $$ = new TaskInvocation($3, Join(@1, @4)); };
 named_args	: named_arg					{ ($$ = new List<NamedArgument*>)->Append($1); }
 		| named_args named_arg				{ ($$ = $1)->Append($2); };
 named_arg	: Variable_Name ':' expr			{ $$ = new NamedArgument($1, $3, Join(@1, @3)); };
+task_invocation	: Execute '(' multi_args ')'			{ $$ = new TaskInvocation($3, Join(@1, @4)); };
+multi_args	: multi_arg					{ ($$ = new List<NamedMultiArgument*>)->Append($1); }
+		| multi_args ';' multi_arg			{ ($$ = $1)->Append($3); };
+multi_arg	: Variable_Name ':' invoke_args			{ $$ = new NamedMultiArgument($1, $3, Join(@1, @3)); };
+invoke_args	: expr						{ ($$ = new List<Expr*>)->Append($1); }
+		| invoke_args ',' expr				{ ($$ = $1)->Append($3); };
 
 /* ----------------------------------------------- Function Definition ------------------------------------------------------ */
 function	: Function Variable_Name 

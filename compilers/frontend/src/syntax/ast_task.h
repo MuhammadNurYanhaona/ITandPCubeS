@@ -145,12 +145,10 @@ class WhileRepeat : public RepeatControl {
 };
 
 class SubpartitionRepeat : public RepeatControl {
-  protected:
-	char spaceId;
   public:
-	SubpartitionRepeat(char spaceId, yyltype loc);
+	SubpartitionRepeat(yyltype loc) : RepeatControl(loc) {}
 	const char *GetPrintNameForNode() { return "Subpartition-Traversal"; }
-        void PrintChildren(int indentLevel);
+        void PrintChildren(int indentLevel) {}
 };
 
 class ForRepeat : public RepeatControl {

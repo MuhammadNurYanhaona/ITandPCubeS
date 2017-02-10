@@ -107,7 +107,7 @@ Array			return T_Array;
 List			return T_List;
 Reduction		return Reduction;
 
-[0-9]+D			{
+[0-9]+d			{
 				int length = strlen(yytext);
 				char *dimensionality = (char *) malloc(length);
 				strncpy(dimensionality, yytext, length - 1);

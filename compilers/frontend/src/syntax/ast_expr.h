@@ -138,12 +138,16 @@ class FieldAccess : public Expr {
 
 class RangeExpr : public Expr {
   protected:
-	Identifier *index;
+	FieldAccess *index;
 	Expr *range;
 	Expr *step;
 	bool loopingRange;
   public:
-	RangeExpr(Identifier *index, Expr *range, Expr *step, bool loopingRange, yyltype loc);		
+	// constructor to be used when the range expression is a part of a for loop
+	RangeExpr(Identifier *index, Expr *range, Expr *step, yyltype loc);
+	// constructor to be used when it is not part of a for loop		
+	RangeExpr(Expr *index, Expr *range, yyltype loc);	
+	
 	const char *GetPrintNameForNode() { return "Range-Expr"; }
     	void PrintChildren(int indentLevel);	    	
 };	
@@ -210,11 +214,21 @@ class NamedArgument : public Node {
 	Expr *getValue() { return argValue; }
 };
 
+class NamedMultiArgument : public Node {
+  protected:
+	const char *argName;
+	List<Expr*> *argList;
+  public:
+	NamedMultiArgument(char *argName, List<Expr*> *argList, yyltype loc);
+	const char *GetPrintNameForNode() { return "Named-Multi-Argument"; }
+    	void PrintChildren(int indentLevel);	    	
+};
+
 class TaskInvocation : public Expr {
   protected:
-	List<NamedArgument*> *invocationArgs;	
+	List<NamedMultiArgument*> *invocationArgs;	
   public:
-	TaskInvocation(List<NamedArgument*> *invocationArgs, yyltype loc);
+	TaskInvocation(List<NamedMultiArgument*> *invocationArgs, yyltype loc);
 	const char *GetPrintNameForNode() { return "Task-Invocation"; }
     	void PrintChildren(int indentLevel);	    	
 };

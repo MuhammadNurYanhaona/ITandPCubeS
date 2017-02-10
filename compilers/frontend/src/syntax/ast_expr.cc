@@ -171,9 +171,9 @@ void FieldAccess::PrintChildren(int indentLevel) {
 
 //----------------------------------------------- Range Expressions --------------------------------------------------/
 
-RangeExpr::RangeExpr(Identifier *i, Expr *r, Expr *s, bool l, yyltype loc) : Expr(loc) {
+RangeExpr::RangeExpr(Identifier *i, Expr *r, Expr *s, yyltype loc) : Expr(loc) {
         Assert(i != NULL && r != NULL);
-        index = i;
+        index = new FieldAccess(NULL, i, *i->GetLocation());
         index->SetParent(this);
         range = r;
         range->SetParent(this);
@@ -181,7 +181,18 @@ RangeExpr::RangeExpr(Identifier *i, Expr *r, Expr *s, bool l, yyltype loc) : Exp
         if (step != NULL) {
                 step->SetParent(this);
         }
-        loopingRange = l;
+        loopingRange = true;
+}
+
+RangeExpr::RangeExpr(Expr *i, Expr *r, yyltype loc) : Expr(loc) {
+        Assert(i != NULL && r != NULL);
+	Assert(dynamic_cast<FieldAccess*>(i) != NULL);
+        index = (FieldAccess*) i;
+        index->SetParent(this);
+        range = r;
+        range->SetParent(this);
+        step = NULL;
+        loopingRange = false;
 }
 
 void RangeExpr::PrintChildren(int indentLevel) {
@@ -270,9 +281,25 @@ void NamedArgument::PrintChildren(int indentLevel) {
 	argValue->Print(indentLevel, argName);
 }
 
+//--------------------------------------------- Named Multi-Argument -------------------------------------------------/
+
+NamedMultiArgument::NamedMultiArgument(char *argName, List<Expr*> *argList, yyltype loc) : Node(loc) {
+	Assert(argName != NULL && argList != NULL && argList->NumElements() > 0);
+	this->argName = argName;
+	this->argList = argList;
+	for (int i = 0; i < argList->NumElements(); i++) {
+		this->argList->Nth(i)->SetParent(this);
+	}
+}
+
+void NamedMultiArgument::PrintChildren(int indentLevel) {
+	PrintLabel(indentLevel + 1, argName);
+	argList->PrintAll(indentLevel + 2);
+}
+
 //----------------------------------------------- Task Invocation ----------------------------------------------------/
 
-TaskInvocation::TaskInvocation(List<NamedArgument*> *invocationArgs, yyltype loc) : Expr(loc) {
+TaskInvocation::TaskInvocation(List<NamedMultiArgument*> *invocationArgs, yyltype loc) : Expr(loc) {
 	Assert(invocationArgs != NULL);
 	this->invocationArgs = invocationArgs;
 }

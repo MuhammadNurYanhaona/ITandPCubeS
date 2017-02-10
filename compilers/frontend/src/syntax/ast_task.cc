@@ -109,7 +109,8 @@ void StageDefinition::PrintChildren(int indentLevel) {
 	name->Print(indentLevel + 1, "Name");
         PrintLabel(indentLevel + 1, "Parameters");
         parameters->PrintAll(indentLevel + 2);
-	codeBody->Print(indentLevel + 1, "Code");
+        PrintLabel(indentLevel + 1, "Code Body");
+	codeBody->Print(indentLevel + 2);
 }
 
 //--------------------------------------------------------------------------------------------------------------------Stages Section
@@ -152,7 +153,7 @@ StageInvocation::StageInvocation(Identifier *stageName,
 }
 
 void StageInvocation::PrintChildren(int indentLevel) {
-	stageName->Print(indentLevel + 1, "Stage");
+	stageName->Print(indentLevel + 1, "Stage ");
 	PrintLabel(indentLevel + 1, "Arguments");
 	arguments->PrintAll(indentLevel + 2);
 }
@@ -180,7 +181,7 @@ LpsTransition::LpsTransition(char lpsId, List<FlowPart*> *nestedSubflow,
 }
 
 void LpsTransition::PrintChildren(int indentLevel) {
-	printf(" Space %c\n", lpsId);
+	printf(" Space %c", lpsId);
 	CompositeFlowPart::PrintChildren(indentLevel);
 }
 
@@ -213,14 +214,6 @@ WhileRepeat::WhileRepeat(Expr *condition, yyltype loc) : RepeatControl(loc) {
 
 void WhileRepeat::PrintChildren(int indentLevel) {
 	condition->Print(indentLevel + 1, "Activation-Condition ");
-}
-
-SubpartitionRepeat::SubpartitionRepeat(char spaceId, yyltype loc) : RepeatControl(loc) {
-	this->spaceId = spaceId;
-}
-
-void SubpartitionRepeat::PrintChildren(int indentLevel) {
-	printf(" Space %c", spaceId);
 }
 
 ForRepeat::ForRepeat(RangeExpr *rangeExpr, yyltype loc) : RepeatControl(loc) {
