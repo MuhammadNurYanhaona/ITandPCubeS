@@ -98,7 +98,7 @@ Task "Vector Addition":
 Task "Vector Dot Product":
 	Define:
 		u, v: 1d Array of Real double-precision
-		product: Real double-precision	
+		product: Real double-precision Reduction	
 	Environment:
 		u, v: link
 		product: create
