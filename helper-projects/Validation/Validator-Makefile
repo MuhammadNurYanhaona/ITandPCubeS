@@ -6,12 +6,17 @@
 .PHONY: clean strip
 
 # Set the default target. When you make with no arguments, this will be the target built.
-COMPILER = seq 
+COMPILER = validator-ref 
 PRODUCTS = $(COMPILER) 
 default: $(PRODUCTS)
 
 # Set up the list of source and object files
-SRCS = $(shell find . ! -name "hashtable.cpp" -name "*.cpp" -not -path "./build/*")
+SRCS = $(shell find . ! -name "hashtable.cpp" -name "*.cpp" 	\
+		-not -path "./build/*" 				\
+		-not -path "./mpi/*"				\
+		-not -path "./openmp/*" 			\
+		-not -path "./pthread/*"			\
+		-not -path "./seq-implementation/*")
 
 
 # OBJS can deal with either .cpp or .c files listed in SRCS
@@ -31,7 +36,9 @@ LD = g++
 # settings for development and debugging
 #CFLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
 # settings for optimized code generation
-CFLAGS = -O3 -mtune=native -march=native -mfpmath=sse
+CFLAGS = -O3
+# settings for vectorization support
+#CFLAGS = -O3 -mtune=native -march=native -mfpmath=sse
 
 # We need flag to enable the POSIX thread library during compiling generated code
 RFLAG = -pthread -fopenmp

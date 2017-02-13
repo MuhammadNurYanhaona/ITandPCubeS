@@ -105,7 +105,7 @@ Task "Block LU Factorization":
 					}
 					storePivot(p, k, pivot)
 					Space B {
-						Where k != pivot {
+						If k != pivot {
 							Epoch { interchangeRows(pivot, k, u, l) }
 						}
 						Where k in l.local.dimension1.range  { updateL(l, k, l_row) }
