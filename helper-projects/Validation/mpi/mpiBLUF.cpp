@@ -455,7 +455,7 @@ void saxpy(Range range) {
 
 //--------------------------------------------------------------------------- Main Function
 
-int main(int argc, char *argv[]) {
+int mainMBLUF(int argc, char *argv[]) {
 	
 	// do MPI intialization
 	MPI_Init(&argc, &argv);
