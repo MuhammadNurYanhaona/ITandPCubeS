@@ -40,6 +40,10 @@ class VariableDef : public Definition {
 	Identifier *getId() { return id; }
 	Type *getType() { return type; }
 	void setType(Type *type) { this->type = type; }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone();
 };
 
 class ProgramDef : public Definition {
@@ -50,6 +54,10 @@ class ProgramDef : public Definition {
 	ProgramDef(List<Node*> *components);
 	const char *GetPrintNameForNode() { return "Program"; } 
 	void PrintChildren(int indentLevel);	
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone();
 };
 
 class TupleDef : public Definition {
@@ -61,6 +69,10 @@ class TupleDef : public Definition {
 	const char *GetPrintNameForNode() { return "Class"; } 
         void PrintChildren(int indentLevel);
 	Identifier *getId() { return id; }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone();
 };
 
 class CoordinatorDef : public Definition {
@@ -74,6 +86,10 @@ class CoordinatorDef : public Definition {
 	void PrintChildren(int indentLevel);	
 	TupleDef *getArgumentTuple() { return argumentTuple; }
 	const char *getArgumentName() { return argument->getName(); }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone();
 };
 
 class FunctionArg : public Node {
@@ -84,6 +100,10 @@ class FunctionArg : public Node {
 	FunctionArg(Identifier *name, ArgumentType type);
 	const char *GetPrintNameForNode() { return "Argument"; } 
 	void PrintChildren(int indentLevel);
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone();
 };
 
 class FunctionDef : public Definition {
@@ -96,6 +116,10 @@ class FunctionDef : public Definition {
 	const char *GetPrintNameForNode() { return "Sequential-Function"; } 
 	void PrintChildren(int indentLevel);
 	Identifier *getId() { return id; }	
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone();
 };
 
 #endif

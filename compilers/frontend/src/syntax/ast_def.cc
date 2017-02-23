@@ -40,6 +40,22 @@ List<VariableDef*> *VariableDef::DecomposeDefs(List<Identifier*> *idList, Type *
         return varList;
 }
 
+Node *VariableDef::clone() {
+	Identifier *newId = (Identifier*) id->clone();
+	if (type == NULL) {
+		VariableDef *newDef = new VariableDef(newId);
+		if (reduction) {
+			newDef->flagAsReduction();
+		}
+		return newDef;
+	}
+	Type *newType = (Type*) type->clone();
+	VariableDef *newDef = new VariableDef(newId, newType);
+	if (reduction) {
+		newDef->flagAsReduction();
+	}
+	return newDef;
+}
 
 //----------------------------------------- Program Definition ------------------------------------------/
 
@@ -57,6 +73,17 @@ ProgramDef::ProgramDef(List<Node*> *c) : Definition() {
 void ProgramDef::PrintChildren(int indentLevel) {
         components->PrintAll(indentLevel+1);
         printf("\n");
+}
+
+Node *ProgramDef::clone() {	
+	List<Node*> *newCompList = new List<Node*>;
+	for (int i = 0; i < components->NumElements(); i++) {
+                Node *node = components->Nth(i);
+		Node *newNode = node->clone();
+		newCompList->Append(newNode);
+	}
+	ProgramDef *newDef = new ProgramDef(newCompList);
+	return newDef;
 }
 
 //----------------------------------------- Tuple Definition -------------------------------------------/
@@ -78,6 +105,17 @@ void TupleDef::PrintChildren(int indentLevel) {
         printf("\n");
 }
 
+Node *TupleDef::clone() {
+	Identifier *newId = (Identifier*) id->clone();
+	List<VariableDef*> *newCompList = new List<VariableDef*>;
+        for (int j = 0; j < components->NumElements(); j++) {
+                VariableDef *var = components->Nth(j);
+		VariableDef *newVar = (VariableDef*) var->clone();
+                newCompList->Append(newVar);
+        }
+	TupleDef *newDef = new TupleDef(newId, newCompList);
+}
+
 //----------------------------------- Coordinator/Main Definition -------------------------------------/
 
 CoordinatorDef::CoordinatorDef(Identifier *a, List<Stmt*> *c, yyltype loc) : Definition(loc) {
@@ -97,6 +135,16 @@ void CoordinatorDef::PrintChildren(int indentLevel) {
         code->PrintAll(indentLevel + 2);
 }
 
+Node *CoordinatorDef::clone() {
+	Identifier *newArg = (Identifier*) argument->clone();
+	List<Stmt*> *newCode = new List<Stmt*>;
+	for (int i = 0; i < code->NumElements(); i++) {
+                Stmt *stmt = code->Nth(i);
+		newCode->Append((Stmt*) stmt->clone());
+	}
+	return new CoordinatorDef(newArg, newCode, *GetLocation());
+}
+
 //--------------------------------------- Function Definition -----------------------------------------/
 
 FunctionArg::FunctionArg(Identifier *name, ArgumentType type) {
@@ -113,6 +161,11 @@ void FunctionArg::PrintChildren(int indentLevel) {
         	PrintLabel(indentLevel + 1, "Value Arg: ");
 	}
 	name->Print(0);
+}
+
+Node *FunctionArg::clone() {
+	Identifier *newName = (Identifier*) name->clone();
+	return new FunctionArg(newName, type);
 }
 
 FunctionDef::FunctionDef(Identifier *id, List<FunctionArg*> *arguments, Stmt *code) {
@@ -136,4 +189,17 @@ void FunctionDef::PrintChildren(int indentLevel) {
         	arguments->PrintAll(indentLevel + 2);
 	}
         code->Print(indentLevel + 1, "(Code) ");
+}
+
+Node *FunctionDef::clone() {
+	Identifier *newId = (Identifier*) id->clone();
+	List<FunctionArg*> *newArgsList = new List<FunctionArg*>;
+	if (arguments != NULL && arguments->NumElements() > 0) {
+                for (int i = 0; i < arguments->NumElements(); i++) {
+			FunctionArg *arg = arguments->Nth(i);
+			newArgsList->Append((FunctionArg*) arg->clone());
+		}
+	}
+	Stmt *newCode = (Stmt*) code->clone();
+	return new FunctionDef(newId, newArgsList, newCode);
 }

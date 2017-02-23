@@ -23,6 +23,10 @@ class Type : public Node {
     
     	const char *GetPrintNameForNode() { return "Type"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        virtual Node *clone();
 };
 
 class NamedType : public Type {

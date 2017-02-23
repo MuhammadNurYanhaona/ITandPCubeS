@@ -106,6 +106,12 @@ void ArithmaticExpr::PrintChildren(int indentLevel) {
         right->Print(indentLevel + 1);
 }
 
+Node *ArithmaticExpr::clone() {
+	Expr *newLeft = (Expr*) left->clone();
+	Expr *newRight = (Expr*) right->clone();
+	return new ArithmaticExpr(newLeft, op, newRight, *GetLocation());
+}
+
 //----------------------------------------------- Logical Expression -------------------------------------------------/
 
 LogicalExpr::LogicalExpr(Expr *l, LogicalOperator o, Expr *r, yyltype loc) : Expr(loc) {
@@ -136,6 +142,12 @@ void LogicalExpr::PrintChildren(int indentLevel) {
         right->Print(indentLevel + 1);
 }
 
+Node *LogicalExpr::clone() {
+	Expr *newRight = (Expr*) right->clone();
+	if (left == NULL) return new LogicalExpr(NULL, op, newRight, *GetLocation());
+	Expr *newLeft = (Expr*) left->clone();
+	return new LogicalExpr(newLeft, op, newRight, *GetLocation());
+}
 
 //----------------------------------------------- Reduction Expression ------------------------------------------------/
 
@@ -150,6 +162,11 @@ void EpochExpr::PrintChildren(int indentLevel) {
         root->Print(indentLevel + 1, "(RootExpr) ");
         PrintLabel(indentLevel + 1, "Lag ");
 	printf("%d", lag);
+}
+
+Node *EpochExpr::clone() {
+	Expr *newRoot = (Expr*) root->clone();
+	return new EpochExpr(newRoot, lag);
 }
 
 //-------------------------------------------------- Field Access -----------------------------------------------------/
@@ -167,6 +184,12 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
 void FieldAccess::PrintChildren(int indentLevel) {
         if(base != NULL) base->Print(indentLevel + 1);
         field->Print(indentLevel + 1);
+}
+
+Node *FieldAccess::clone() {
+	Expr *newBase = (Expr*) base->clone();
+	Identifier *newField = (Identifier*) field->clone();
+	return new FieldAccess(newBase, newField, *GetLocation());
 }
 
 //----------------------------------------------- Range Expressions --------------------------------------------------/
@@ -201,6 +224,20 @@ void RangeExpr::PrintChildren(int indentLevel) {
         if (step != NULL) step->Print(indentLevel + 1, "(Step) ");
 }
 
+Node *RangeExpr::clone() {
+	Identifier *newId = (Identifier*) index->getField()->clone();
+	Expr *newRange = (Expr*) range->clone();
+	if (loopingRange) {
+		Expr *newStep = NULL;
+		if (step != NULL) {
+			newStep = (Expr*) step->clone();
+		}
+		return new RangeExpr(newId, newRange, newStep, *GetLocation());
+	}
+	FieldAccess *newIndex = (FieldAccess*) index->clone(); 
+	return new RangeExpr(newIndex, newRange, *GetLocation());
+}
+
 //--------------------------------------------- Assignment Expression ------------------------------------------------/
 
 AssignmentExpr::AssignmentExpr(Expr *l, Expr *r, yyltype loc) : Expr(loc) {
@@ -214,6 +251,12 @@ AssignmentExpr::AssignmentExpr(Expr *l, Expr *r, yyltype loc) : Expr(loc) {
 void AssignmentExpr::PrintChildren(int indentLevel) {
         left->Print(indentLevel + 1);
         right->Print(indentLevel + 1);
+}
+
+Node *AssignmentExpr::clone() {
+	Expr *newLeft = (Expr*) left->clone();
+	Expr *newRight = (Expr*) right->clone();
+	return new AssignmentExpr(newLeft, newRight, *GetLocation());
 }
 
 //--------------------------------------------------- Array Access ----------------------------------------------------/
@@ -236,6 +279,14 @@ void IndexRange::PrintChildren(int indentLevel) {
         if (end != NULL) end->Print(indentLevel + 1);
 }
 
+Node *IndexRange::clone() {
+	Expr *newBegin = NULL;
+	Expr *newEnd = NULL;
+	if (begin != NULL) newBegin = (Expr*) begin->clone();
+	if (end != NULL) newEnd = (Expr*) end->clone();
+	return new IndexRange(newBegin, newEnd, partOfArray, *GetLocation());
+}
+
 ArrayAccess::ArrayAccess(Expr *b, Expr *i, yyltype loc) : Expr(loc) {
         Assert(b != NULL && i != NULL);
         base = b;
@@ -249,6 +300,12 @@ void ArrayAccess::PrintChildren(int indentLevel) {
         index->Print(indentLevel + 1, "(Index) ");
 }
 
+Node *ArrayAccess::clone() {
+	Expr *newBase = (Expr*) base->clone();
+	Expr *newIndex = (Expr*) index->clone();
+	return new ArrayAccess(newBase, newIndex, *GetLocation());
+}
+
 //------------------------------------------------- Function Call ----------------------------------------------------/
 
 FunctionCall::FunctionCall(Identifier *b, List<Expr*> *a, yyltype loc) : Expr(loc) {
@@ -256,7 +313,7 @@ FunctionCall::FunctionCall(Identifier *b, List<Expr*> *a, yyltype loc) : Expr(lo
         base = b;
         base->SetParent(this);
         arguments = a;
-        for (int i = 0; i <arguments->NumElements(); i++) {
+        for (int i = 0; i < arguments->NumElements(); i++) {
                 Expr *expr = arguments->Nth(i);
                 expr->SetParent(this);
         }
@@ -266,6 +323,16 @@ void FunctionCall::PrintChildren(int indentLevel) {
         base->Print(indentLevel + 1, "(Name) ");
         PrintLabel(indentLevel + 1, "Arguments");
         arguments->PrintAll(indentLevel + 2);
+}
+
+Node *FunctionCall::clone() {
+	Identifier *newBase = (Identifier*) base->clone();
+	List<Expr*> *newArgs = new List<Expr*>;
+	for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *expr = arguments->Nth(i);
+		newArgs->Append((Expr*) expr->clone());
+	}
+	return new FunctionCall(newBase, newArgs, *GetLocation());
 }
 
 //------------------------------------------------ Named Argument ----------------------------------------------------/
@@ -279,6 +346,12 @@ NamedArgument::NamedArgument(char *argName, Expr *argValue, yyltype loc) : Node(
 
 void NamedArgument::PrintChildren(int indentLevel) {
 	argValue->Print(indentLevel, argName);
+}
+
+Node *NamedArgument::clone() {
+	char *newName = strdup(argName);
+	Expr *newValue = (Expr*) argValue->clone();
+	return new NamedArgument(newName, newValue, *GetLocation());
 }
 
 //--------------------------------------------- Named Multi-Argument -------------------------------------------------/
@@ -297,16 +370,39 @@ void NamedMultiArgument::PrintChildren(int indentLevel) {
 	argList->PrintAll(indentLevel + 2);
 }
 
+Node *NamedMultiArgument::clone() {
+	char *newName = strdup(argName);
+	List<Expr*> *newArgList = new List<Expr*>;
+	for (int i = 0; i < argList->NumElements(); i++) {
+		Expr *arg = argList->Nth(i);
+                newArgList->Append((Expr*) arg->clone());
+        }
+	return new NamedMultiArgument(newName, newArgList, *GetLocation());
+}
+
 //----------------------------------------------- Task Invocation ----------------------------------------------------/
 
 TaskInvocation::TaskInvocation(List<NamedMultiArgument*> *invocationArgs, yyltype loc) : Expr(loc) {
 	Assert(invocationArgs != NULL);
 	this->invocationArgs = invocationArgs;
+	for (int i = 0; i < invocationArgs->NumElements(); i++) {
+		NamedMultiArgument *arg = invocationArgs->Nth(i);
+		arg->SetParent(this);
+	}
 }
 
 void TaskInvocation::PrintChildren(int indentLevel) {
 	PrintLabel(indentLevel + 1, "Arguments");
 	invocationArgs->PrintAll(indentLevel + 2);
+}
+
+Node *TaskInvocation::clone() {
+	List<NamedMultiArgument*> *newInvokeArgs = new List<NamedMultiArgument*>;
+	for (int i = 0; i < invocationArgs->NumElements(); i++) {
+		NamedMultiArgument *arg = invocationArgs->Nth(i);
+		newInvokeArgs->Append((NamedMultiArgument*) arg->clone());
+	}
+	return new TaskInvocation(newInvokeArgs, *GetLocation());
 }
 
 //------------------------------------------------ Object Create -----------------------------------------------------/
@@ -325,4 +421,14 @@ void ObjectCreate::PrintChildren(int indentLevel) {
         objectType->Print(indentLevel + 1);
         PrintLabel(indentLevel + 1, "Init-Arguments");
         initArgs->PrintAll(indentLevel + 2);
+}
+
+Node *ObjectCreate::clone() {
+	Type *newType = (Type*) objectType->clone();
+	List<NamedArgument*> *newArgsList = new List<NamedArgument*>;
+	for (int j = 0; j < initArgs->NumElements(); j++) {
+                NamedArgument *arg = initArgs->Nth(j);
+		newArgsList->Append((NamedArgument*) arg->clone());
+        }
+	return new ObjectCreate(newType, newArgsList, *GetLocation());
 }

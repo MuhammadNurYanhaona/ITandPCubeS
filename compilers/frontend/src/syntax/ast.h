@@ -23,7 +23,8 @@
 #ifndef _H_ast
 #define _H_ast
 
-#include <stdlib.h>   // for NULL
+#include <cstdlib>
+#include <string.h>
 #include "../common/location.h"
 
 class Symbol;
@@ -39,8 +40,15 @@ class Node {
     	yyltype *GetLocation()   { return location; }
     	void SetParent(Node *p)  { parent = p; }
     	Node *GetParent()        { return parent; }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	// This function is needed to clone stage and function definitions from the abstract syntax
+	// tree for resolving type polymorphism.
+	virtual Node *clone() {};
 
-    	// printing related methods	
+    	//---------------------------------------------------------------------------------printing related methods
+	
     	virtual const char *GetPrintNameForNode() = 0;
     	// Print() is deliberately _not_ virtual subclasses should override PrintChildren() instead
     	void Print(int indentLevel, const char *label = NULL); 
@@ -59,6 +67,10 @@ class Identifier : public Node {
 	const char *getName() { return name; }
     	const char *GetPrintNameForNode()   { return "Identifier"; }
     	void PrintChildren(int indentLevel);
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	virtual Node *clone() { return new Identifier(*GetLocation(), strdup(name)); }
 };
 
 class DimensionIdentifier : public Identifier {
@@ -69,6 +81,10 @@ class DimensionIdentifier : public Identifier {
     	const char *GetPrintNameForNode()   { return "Dimension"; }
     	void PrintChildren(int indentLevel);
 	int getDimensionNo() { return dimension; }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone() { return new DimensionIdentifier(*GetLocation(), dimension); }
 };
 
 // This node class is designed to represent a portion of the tree that  encountered syntax errors 
@@ -77,8 +93,12 @@ class DimensionIdentifier : public Identifier {
 // can continue after an error.
 class Error : public Node {
   public:
-    Error() : Node() {}
-    const char *GetPrintNameForNode()   { return "Error"; }
+	Error() : Node() {}
+	const char *GetPrintNameForNode()   { return "Error"; }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	Node *clone() { return new Error(); }
 };
 
 

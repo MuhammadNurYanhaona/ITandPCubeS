@@ -10,6 +10,7 @@
 #include "../../../common-libs/utils/hashtable.h"
 
 #include <sstream>
+#include <string.h>
 
 class TaskDef;
 class FieldAccess;
@@ -33,6 +34,10 @@ class IntConstant : public Expr {
     	const char *GetPrintNameForNode() { return "Integer-Constant"; }
     	void PrintChildren(int indentLevel);
 	int getValue() { return value; }  
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone() { return new IntConstant(*GetLocation(), value, size); }
 };
 
 class FloatConstant : public Expr {
@@ -42,6 +47,10 @@ class FloatConstant : public Expr {
     	FloatConstant(yyltype loc, float val);
     	const char *GetPrintNameForNode() { return "Float-Constant"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone() { return new FloatConstant(*GetLocation(), value); }
 };
 
 class DoubleConstant : public Expr {
@@ -51,6 +60,10 @@ class DoubleConstant : public Expr {
     	DoubleConstant(yyltype loc, double val);
     	const char *GetPrintNameForNode() { return "Double-Constant"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone() { return new DoubleConstant(*GetLocation(), value); }
 };
 
 class BoolConstant : public Expr {
@@ -60,6 +73,10 @@ class BoolConstant : public Expr {
     	BoolConstant(yyltype loc, bool val);
     	const char *GetPrintNameForNode() { return "Boolean-Constant"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone() { return new BoolConstant(*GetLocation(), value); }
 };
 
 class StringConstant : public Expr {
@@ -70,6 +87,10 @@ class StringConstant : public Expr {
     	const char *GetPrintNameForNode() { return "String-Constant"; }
     	void PrintChildren(int indentLevel);
 	const char *getValue() { return value; }
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone() { return new StringConstant(*GetLocation(), strdup(value)); }
 };
 
 class CharConstant : public Expr {
@@ -79,6 +100,10 @@ class CharConstant : public Expr {
     	CharConstant(yyltype loc, char val);
     	const char *GetPrintNameForNode() { return "Character-Constant"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone() { return new CharConstant(*GetLocation(), value); }
 };
 
 class ReductionVar : public Expr {
@@ -89,6 +114,10 @@ class ReductionVar : public Expr {
 	ReductionVar(char spaceId, const char *name, yyltype loc);	
     	const char *GetPrintNameForNode() { return "Reduction-Var"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone() { return new ReductionVar(spaceId, strdup(name), *GetLocation()); }
 };
 
 class ArithmaticExpr : public Expr {
@@ -100,6 +129,10 @@ class ArithmaticExpr : public Expr {
 	ArithmaticExpr(Expr *left, ArithmaticOperator op, Expr *right, yyltype loc);
 	const char *GetPrintNameForNode() { return "Arithmatic-Expr"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class LogicalExpr : public Expr {
@@ -114,6 +147,10 @@ class LogicalExpr : public Expr {
 	Expr *getLeft() { return left; }
 	LogicalOperator getOp() { return op; }	
 	Expr *getRight() { return right; }    	
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class EpochExpr : public Expr {
@@ -124,6 +161,10 @@ class EpochExpr : public Expr {
 	EpochExpr(Expr *root, int lag);
 	const char *GetPrintNameForNode() { return "Epoch-Expr"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class FieldAccess : public Expr {
@@ -133,7 +174,12 @@ class FieldAccess : public Expr {
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Field-Access"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
+	Identifier *getField() { return field; }	    	
 };
 
 class RangeExpr : public Expr {
@@ -150,6 +196,10 @@ class RangeExpr : public Expr {
 	
 	const char *GetPrintNameForNode() { return "Range-Expr"; }
     	void PrintChildren(int indentLevel);	    	
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };	
 
 class AssignmentExpr : public Expr {
@@ -162,6 +212,10 @@ class AssignmentExpr : public Expr {
     	void PrintChildren(int indentLevel);
 	Expr *getLeft() { return left; }
 	Expr *getRight() { return right; }
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class IndexRange : public Expr {
@@ -178,6 +232,10 @@ class IndexRange : public Expr {
 	IndexRange(Expr *begin, Expr *end, bool partOfArray, yyltype loc);
 	const char *GetPrintNameForNode() { return "Index-Range"; }
     	void PrintChildren(int indentLevel);	    	
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class ArrayAccess : public Expr {
@@ -190,6 +248,10 @@ class ArrayAccess : public Expr {
     	void PrintChildren(int indentLevel);
 	Expr *getBase() { return base; }
 	Expr *getIndex() { return index; }
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class FunctionCall : public Expr {
@@ -200,6 +262,10 @@ class FunctionCall : public Expr {
 	FunctionCall(Identifier *base, List<Expr*> *arguments, yyltype loc);		
 	const char *GetPrintNameForNode() { return "Function-Call"; }
     	void PrintChildren(int indentLevel);	    	
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class NamedArgument : public Node {
@@ -212,6 +278,10 @@ class NamedArgument : public Node {
     	void PrintChildren(int indentLevel);	    	
 	const char *getName() { return argName; }
 	Expr *getValue() { return argValue; }
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class NamedMultiArgument : public Node {
@@ -222,6 +292,10 @@ class NamedMultiArgument : public Node {
 	NamedMultiArgument(char *argName, List<Expr*> *argList, yyltype loc);
 	const char *GetPrintNameForNode() { return "Named-Multi-Argument"; }
     	void PrintChildren(int indentLevel);	    	
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class TaskInvocation : public Expr {
@@ -231,6 +305,10 @@ class TaskInvocation : public Expr {
 	TaskInvocation(List<NamedMultiArgument*> *invocationArgs, yyltype loc);
 	const char *GetPrintNameForNode() { return "Task-Invocation"; }
     	void PrintChildren(int indentLevel);	    	
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class ObjectCreate : public Expr {
@@ -241,6 +319,10 @@ class ObjectCreate : public Expr {
 	ObjectCreate(Type *objectType, List<NamedArgument*> *initArgs, yyltype loc);		
 	const char *GetPrintNameForNode() { return "Object-Create"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 #endif
