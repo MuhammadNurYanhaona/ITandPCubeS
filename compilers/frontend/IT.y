@@ -130,7 +130,7 @@ void yyerror(const char *msg); // standard error-handling routine
 /* epoch version access token */
 %token Current
 /* expression and statement related tokens */
-%token If Else Range Local Index Do Sequence Reduce
+%token If Else Range Local Index Do Sequence Reduce Return
 /* extern code block importing tokens */
 %token Extern Language Header_Includes Library_Links
 /* environment linkage type tokens */
@@ -218,7 +218,7 @@ void yyerror(const char *msg); // standard error-handling routine
 %type <id>		id
 %type <intConstant>	epoch_lag
 
-%type <stmt>		stmt parallel_loop sequencial_loop if_else_block extern_block reduction
+%type <stmt>		stmt parallel_loop sequencial_loop if_else_block extern_block reduction return_stmt
 %type <stmtList>	stmt_block code meta_code
 %type <condStmtList>	else_block
 %type <condStmt>	else else_if
@@ -420,8 +420,10 @@ stmt		: parallel_loop
 		| sequencial_loop
 		| if_else_block
 		| extern_block
+		| return_stmt
 		| reduction					 	 				
 		| expr						{ $$ = $1; };
+return_stmt	: Return expr					{ $$ = new ReturnStmt($2, Join(@1, @2)); };
 reduction	: Reduce '(' Variable_Name 
 			',' String ',' expr ')'          	{ $$ = new ReductionStmt(new Identifier(@3, $3), $5, $7, Join(@1, @8)); }	
 sequencial_loop : Do In Sequence '{' stmt_block '}'

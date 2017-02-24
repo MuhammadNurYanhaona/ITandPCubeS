@@ -23,6 +23,10 @@ class StmtBlock : public Stmt {
     	StmtBlock(List<Stmt*> *statements);
     	const char *GetPrintNameForNode() { return "Statement-Block"; }
     	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class ConditionalStmt: public Stmt {
@@ -33,6 +37,10 @@ class ConditionalStmt: public Stmt {
 	ConditionalStmt(Expr *condition, Stmt *stmt, yyltype loc);	
     	const char *GetPrintNameForNode() { return "Conditional-Stmt"; }
     	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class IfStmt: public Stmt {
@@ -42,6 +50,10 @@ class IfStmt: public Stmt {
 	IfStmt(List<ConditionalStmt*> *ifBlocks, yyltype loc);	
     	const char *GetPrintNameForNode() { return "If-Block"; }
     	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class IndexRangeCondition: public Node {
@@ -57,6 +69,10 @@ class IndexRangeCondition: public Node {
     	const char *GetPrintNameForNode() { return "Range-Condition"; }
     	void PrintChildren(int indentLevel);
 	List<Identifier*> *getIndexes() { return indexes; }
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class LoopStmt: public Stmt {
@@ -74,6 +90,10 @@ class PLoopStmt: public LoopStmt {
 	PLoopStmt(List<IndexRangeCondition*> *rangeConditions, Stmt *body, yyltype loc);	
     	const char *GetPrintNameForNode() { return "Parallel-For-Loop"; }
     	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class SLoopAttribute {
@@ -86,6 +106,10 @@ class SLoopAttribute {
         Expr *getRange() { return range; }
         Expr *getStep() { return step; }
         Expr *getRestriction() { return restriction; }
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        SLoopAttribute *clone();
 };
 
 class SLoopStmt: public LoopStmt {
@@ -94,10 +118,15 @@ class SLoopStmt: public LoopStmt {
 	Expr *rangeExpr;
 	Expr *stepExpr;
 	Expr *restriction;
+	SLoopAttribute *attrRef;
   public:
 	SLoopStmt(Identifier *id, SLoopAttribute *attr, Stmt *body, yyltype loc);	
     	const char *GetPrintNameForNode() { return "Sequential-For-Loop"; }
     	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class WhileStmt: public Stmt {
@@ -108,9 +137,13 @@ class WhileStmt: public Stmt {
 	WhileStmt(Expr *condition, Stmt *body, yyltype loc);	
 	const char *GetPrintNameForNode() { return "While-Loop"; }
     	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
-class ReductionStmt : public Stmt {
+class ReductionStmt: public Stmt {
   protected:
         Identifier *left;
         ReductionOperator op;
@@ -119,6 +152,11 @@ class ReductionStmt : public Stmt {
         ReductionStmt(Identifier *left, char *opName, Expr *right, yyltype loc);
         const char *GetPrintNameForNode() { return "Reduction-Statement"; }
         void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	ReductionStmt(Identifier *l, ReductionOperator o, Expr *r, yyltype loc);
+        Node *clone();
 };
 
 class ExternCodeBlock: public Stmt {
@@ -134,6 +172,23 @@ class ExternCodeBlock: public Stmt {
 			const char *codeBlock, yyltype loc);
 	const char *GetPrintNameForNode() { return "External-Code-Block"; }
     	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
+};
+
+class ReturnStmt: public Stmt {
+  protected:
+	Expr *expr;
+  public:
+	ReturnStmt(Expr *expr, yyltype loc);
+	const char *GetPrintNameForNode() { return "Return-Statement"; }
+	void PrintChildren(int indentLevel);
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();		
 };
 
 #endif

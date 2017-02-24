@@ -145,6 +145,7 @@ create			return Create;
 "..."			return O_SB_RANGE;
 
 reduce			return Reduce;
+return			return Return;
 Repeat			return Repeat;
 Where			return Where;
 If			return Where;

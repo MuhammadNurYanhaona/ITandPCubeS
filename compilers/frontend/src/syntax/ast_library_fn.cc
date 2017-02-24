@@ -74,3 +74,14 @@ void LibraryFunction::PrintChildren(int indentLevel) {
         PrintLabel(indentLevel + 1, "Arguments");
         arguments->PrintAll(indentLevel + 2);
 }
+
+Node *LibraryFunction::clone() {
+	Identifier *newId = (Identifier*) functionName->clone();
+	List<Expr*> *newArgsList = new List<Expr*>;
+	for (int i = 0; i < arguments->NumElements(); i++) {
+		Expr *arg = arguments->Nth(i);
+		Expr *newArg = (Expr*) arg->clone();
+		newArgsList->Append(newArg);
+	}
+	return getFunctionExpr(newId, newArgsList, *GetLocation());
+}

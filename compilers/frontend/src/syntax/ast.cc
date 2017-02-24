@@ -1,6 +1,7 @@
 #include "ast.h"
 #include <string.h>
 #include <stdio.h>
+#include <cstdlib>
 
 Node::Node(yyltype loc) {
         location = new yyltype(loc);
@@ -10,6 +11,11 @@ Node::Node(yyltype loc) {
 Node::Node() {
         location = NULL;
         parent = NULL;
+}
+
+Node *Node::clone() {
+	printf("Cloning of %s is not supported.\n", GetPrintNameForNode());
+	std::exit(EXIT_FAILURE);
 }
 
 /* The Print method is used to print the parse tree nodes. If this node has a location (most nodes do, but 

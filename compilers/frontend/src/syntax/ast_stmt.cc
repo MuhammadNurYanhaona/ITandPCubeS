@@ -25,6 +25,16 @@ void StmtBlock::PrintChildren(int indentLevel) {
         stmts->PrintAll(indentLevel + 1);
 }
 
+Node *StmtBlock::clone() {
+	List<Stmt*> *newStmtList = new List<Stmt*>;
+	for (int i = 0; i < stmts->NumElements(); i++) {
+                Stmt *stmt = stmts->Nth(i);
+		Stmt *newStmt = (Stmt*) stmt->clone();
+		newStmtList->Append(newStmt);
+        }
+	return new StmtBlock(newStmtList);
+}
+
 //-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
 ConditionalStmt::ConditionalStmt(Expr *c, Stmt *s, yyltype loc) : Stmt(loc) {
@@ -42,6 +52,12 @@ void ConditionalStmt::PrintChildren(int indentLevel) {
         stmt->Print(indentLevel);
 }
 
+Node *ConditionalStmt::clone() {
+	Expr *newCond = (Expr*) condition->clone();
+	Stmt *newStmt = (Stmt*) stmt->clone();
+	return new ConditionalStmt(newCond, newStmt, *GetLocation());
+}
+
 //------------------------------------------------------------ If/Else Block -----------------------------------------------------------/
 
 IfStmt::IfStmt(List<ConditionalStmt*> *ib, yyltype loc) : Stmt(loc) {
@@ -54,6 +70,16 @@ IfStmt::IfStmt(List<ConditionalStmt*> *ib, yyltype loc) : Stmt(loc) {
 
 void IfStmt::PrintChildren(int indentLevel) {
         ifBlocks->PrintAll(indentLevel + 1);
+}
+
+Node *IfStmt::clone() {
+	List<ConditionalStmt*> *newBlocks = new List<ConditionalStmt*>;
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+		ConditionalStmt *newStmt = (ConditionalStmt*) stmt->clone();
+		newBlocks->Append(newStmt);
+        }
+	return new IfStmt(newBlocks, *GetLocation());
 }
 
 //-------------------------------------------------------- Index Range Condition -------------------------------------------------------/
@@ -78,6 +104,20 @@ void IndexRangeCondition::PrintChildren(int indentLevel) {
         indexes->PrintAll(indentLevel + 1, "(Index) ");
         collection->Print(indentLevel + 1, "(Array/List) ");
         if (restrictions != NULL) restrictions->Print(indentLevel + 1, "(Restrictions) ");
+}
+
+Node *IndexRangeCondition::clone() {
+	List<Identifier*> *newIndexes = new List<Identifier*>;
+	for (int j = 0; j < indexes->NumElements(); j++) {
+                Identifier *index = indexes->Nth(j);
+		newIndexes->Append((Identifier*) index->clone());
+        }
+	Identifier *newColl = (Identifier*) collection->clone();
+	Expr *newRestr = NULL;
+	if (restrictions != NULL) {
+		newRestr = (Expr*) restrictions->clone();
+	}
+	return new IndexRangeCondition(newIndexes, newColl, dimensionNo, newRestr, *GetLocation());
 }
 
 //------------------------------------------------------------ Loop Statement ----------------------------------------------------------/
@@ -105,6 +145,17 @@ void PLoopStmt::PrintChildren(int indentLevel) {
         body->Print(indentLevel + 1);
 }
 
+Node *PLoopStmt::clone() {
+	List<IndexRangeCondition*> *newCondList = new List<IndexRangeCondition*>;
+	for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *condition = rangeConditions->Nth(i);
+		IndexRangeCondition *newCond = (IndexRangeCondition*) condition->clone();
+		newCondList->Append(newCond);
+        }
+	Stmt *newBody = (Stmt*) body->clone();
+	return new PLoopStmt(newCondList, newBody, *GetLocation());
+}
+
 //------------------------------------------------------- Sequential For Loop --------------------------------------------------------/
 
 SLoopAttribute::SLoopAttribute(Expr *range, Expr *step, Expr *restriction) {
@@ -114,11 +165,24 @@ SLoopAttribute::SLoopAttribute(Expr *range, Expr *step, Expr *restriction) {
         this->restriction = restriction;
 }
 
+SLoopAttribute *SLoopAttribute::clone() {
+	Expr *newRange = (Expr*) range->clone();
+	Expr *newStep = NULL;
+	if (step != NULL) newStep = (Expr*) step->clone();
+	Expr *newRestr = NULL;
+	if (restriction != NULL) newRestr = (Expr*) restriction->clone();
+	return new SLoopAttribute(newRange, newStep, newRestr);
+}
+
 SLoopStmt::SLoopStmt(Identifier *i, SLoopAttribute *attr, Stmt *b, yyltype loc) : LoopStmt(b, loc) {
-        Assert(i != NULL && attr != NULL);
-        id = i;
+        
+	Assert(i != NULL && attr != NULL);
+        
+	id = i;
         id->SetParent(this);
-        rangeExpr = attr->getRange();
+	attrRef = attr;
+        
+	rangeExpr = attr->getRange();
         rangeExpr->SetParent(this);
         stepExpr = attr->getStep();
         if (stepExpr != NULL) {
@@ -138,6 +202,13 @@ void SLoopStmt::PrintChildren(int indentLevel) {
         body->Print(indentLevel + 1);
 }
 
+Node *SLoopStmt::clone() {
+	Identifier *newId = (Identifier*) id->clone();
+	SLoopAttribute *newAttr = (SLoopAttribute*) attrRef->clone();
+	Stmt *newBody = (Stmt*) body->clone();
+	return new SLoopStmt(newId, newAttr, newBody, *GetLocation());
+}
+
 //------------------------------------------------------------ While Loop ------------------------------------------------------------/
 
 WhileStmt::WhileStmt(Expr *c, Stmt *b, yyltype loc) : Stmt(loc) {
@@ -151,6 +222,12 @@ WhileStmt::WhileStmt(Expr *c, Stmt *b, yyltype loc) : Stmt(loc) {
 void WhileStmt::PrintChildren(int indentLevel) {
         condition->Print(indentLevel + 1, "(Condition) ");
         body->Print(indentLevel + 1);
+}
+
+Node *WhileStmt::clone() {
+	Expr *newCond = (Expr*) condition->clone();
+	Stmt *newBody = (Stmt*) body->clone();
+	return new WhileStmt(newCond, newBody, *GetLocation());
 }
 
 //-------------------------------------------------------- Reduction Statement -------------------------------------------------------/
@@ -182,6 +259,14 @@ ReductionStmt::ReductionStmt(Identifier *l, char *o, Expr *r, yyltype loc) : Stm
         right->SetParent(this);
 }
 
+ReductionStmt::ReductionStmt(Identifier *l, ReductionOperator o, Expr *r, yyltype loc) : Stmt(loc) {
+        left = l;
+        left->SetParent(this);
+	op = o;
+        right = r;
+        right->SetParent(this);
+}	
+
 void ReductionStmt::PrintChildren(int indentLevel) {
         left->Print(indentLevel + 1);
         PrintLabel(indentLevel + 1, "Operator");
@@ -199,6 +284,12 @@ void ReductionStmt::PrintChildren(int indentLevel) {
                 case BAND: printf("Bitwise AND"); break;
         }
         right->Print(indentLevel + 1);
+}
+
+Node *ReductionStmt::clone() {
+	Identifier *newLeft = (Identifier*) left->clone();
+	Expr *newRight = (Expr*) right->clone();
+	return new ReductionStmt(newLeft, op, newRight, *GetLocation());	
 }
 
 //-------------------------------------------------------- External Code Block -------------------------------------------------------/
@@ -236,3 +327,33 @@ void ExternCodeBlock::PrintChildren(int indentLevel) {
         std::cout << indent.str() << "Code Block:" << codeBlock << "\n";
 }
 
+Node *ExternCodeBlock::clone() {
+	const char *newLng = strdup(language);
+	List<const char*> *newIncls = new List<const char*>;
+	for (int i = 0; i < headerIncludes->NumElements(); i++) {
+		newIncls->Append(strdup(headerIncludes->Nth(i)));
+	}
+	List<const char*> *newLibs = new List<const char*>;
+	for (int i = 0; i < libraryLinks->NumElements(); i++) {
+		newLibs->Append(strdup(libraryLinks->Nth(i)));
+	}
+	const char *newCode = strdup(codeBlock);
+	return new ExternCodeBlock(newLng, newIncls, newLibs, newCode, *GetLocation());
+}
+
+//------------------------------------------------------------ Return Stmt -----------------------------------------------------------/
+
+ReturnStmt::ReturnStmt(Expr *expr, yyltype loc) : Stmt(loc) {
+	Assert(expr != NULL);
+	this->expr = expr;
+	this->expr->SetParent(this);
+}
+
+void ReturnStmt::PrintChildren(int indentLevel) {
+	expr->Print(indentLevel + 1);
+}
+
+Node *ReturnStmt::clone() {
+	Expr *newExpr = (Expr*) expr->clone();
+	return new ReturnStmt(newExpr, *GetLocation());
+}

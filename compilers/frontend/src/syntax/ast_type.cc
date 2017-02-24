@@ -39,6 +39,10 @@ void Type::PrintChildren(int indentLevel) {
         printf("%s", typeName);
 }
 
+Node *Type::clone() {
+	return new Type(strdup(typeName));
+}
+
 //---------------------------------------------- Tuple Type ------------------------------------------------/
 
 NamedType::NamedType(Identifier *i) : Type(*i->GetLocation()) {
@@ -48,6 +52,11 @@ NamedType::NamedType(Identifier *i) : Type(*i->GetLocation()) {
 
 void NamedType::PrintChildren(int indentLevel) {
         id->Print(indentLevel+1);
+}
+
+Node *NamedType::clone() {
+	Identifier *newId = (Identifier*) id->clone();
+	return new NamedType(newId);
 }
 
 //---------------------------------------------- Array Type ------------------------------------------------/
@@ -64,6 +73,11 @@ void ArrayType::PrintChildren(int indentLevel) {
         elemType->Print(indentLevel + 1, "Element ");
 }
 
+Node *ArrayType::clone() {
+	Type *newElemType = (Type*) elemType->clone();
+	return new ArrayType(*GetLocation(), newElemType, dimensions);
+}
+
 //------------------------------------------- Static Array Type --------------------------------------------/
 
 void StaticArrayType::setLengths(List<int> *dimLengths) {
@@ -78,6 +92,15 @@ void StaticArrayType::PrintChildren(int indentLevel) {
         }
 }
 
+Node *StaticArrayType::clone() {
+	Type *newElemType = (Type*) elemType->clone();
+	StaticArrayType *newType = new StaticArrayType(*GetLocation(), newElemType, dimensions);
+	List<int> *newDimLengths = new List<int>;
+	newDimLengths->AppendAll(dimensionLengths);
+	newType->setLengths(newDimLengths);
+	return newType;	
+}
+
 //---------------------------------------------- List Type -------------------------------------------------/
 
 ListType::ListType(yyltype loc, Type *et) : Type(loc) {
@@ -87,6 +110,11 @@ ListType::ListType(yyltype loc, Type *et) : Type(loc) {
 
 void ListType::PrintChildren(int indentLevel) {
         elemType->Print(indentLevel + 1, "Element ");
+}
+
+Node *ListType::clone() {
+	Type *newElemType = (Type*) elemType->clone();
+	return new ListType(*GetLocation(), newElemType);
 }
 
 //---------------------------------------------- Map Type --------------------------------------------------/
@@ -131,3 +159,17 @@ List<VariableDef*> *MapType::getElementList() {
         return elementList;
 }
 
+Node *MapType::clone() {
+	
+	MapType *newMap = new MapType(*GetLocation());
+	List<VariableDef*> *elemList = getElementList();
+
+	for (int i = 0; i < elemList->NumElements(); i++) {
+		VariableDef *element = elemList->Nth(i);
+		VariableDef *newElem = (VariableDef*) element->clone();
+		newMap->setElement(newElem);
+	}
+	
+	delete elemList;
+	return newMap;
+}

@@ -37,6 +37,10 @@ class LibraryFunction : public Expr {
 
 	const char *GetPrintNameForNode() { return functionName->getName(); }
         void PrintChildren(int indentLevel);
+
+        //-------------------------------------------------------------- Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 
@@ -48,7 +52,7 @@ class Root : public LibraryFunction {
   public:
 	static const char *Name;	
 	Root(Identifier *id, List<Expr*> *arguments, yyltype loc) 
-		: LibraryFunction(2, id, arguments, loc) {}	
+		: LibraryFunction(2, id, arguments, loc) {}
 };
 
 class Random : public LibraryFunction {

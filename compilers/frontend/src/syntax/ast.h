@@ -45,7 +45,7 @@ class Node {
 	
 	// This function is needed to clone stage and function definitions from the abstract syntax
 	// tree for resolving type polymorphism.
-	virtual Node *clone() {};
+	virtual Node *clone();
 
     	//---------------------------------------------------------------------------------printing related methods
 	

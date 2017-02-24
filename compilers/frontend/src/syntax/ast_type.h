@@ -36,6 +36,10 @@ class NamedType : public Type {
     	NamedType(Identifier *i);
     	const char *GetPrintNameForNode() { return "Named-Type"; }
    	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class ArrayType : public Type {
@@ -47,6 +51,10 @@ class ArrayType : public Type {
 	virtual ~ArrayType() {}
     	const char *GetPrintNameForNode() { return "Dynamic-Array"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        virtual Node *clone();
 };
 
 class StaticArrayType : public ArrayType {
@@ -58,6 +66,10 @@ class StaticArrayType : public ArrayType {
     	const char *GetPrintNameForNode() { return "Static-Array"; }
     	void PrintChildren(int indentLevel);
 	void setLengths(List<int> *dimensionLengths);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class ListType : public Type {
@@ -67,6 +79,10 @@ class ListType : public Type {
 	ListType(yyltype loc, Type *elemType);	
     	const char *GetPrintNameForNode() { return "List"; }
     	void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
 
 class MapType : public Type {
@@ -82,6 +98,10 @@ class MapType : public Type {
         void setElement(VariableDef *newArg);
         VariableDef* getElement(const char *elementName);
         List<VariableDef*> *getElementList();
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+        Node *clone();
 };
  
 #endif
