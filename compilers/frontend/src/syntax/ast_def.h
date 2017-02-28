@@ -14,10 +14,27 @@ class TaskDef;
 class TupleDef;
 class CoordinatorDef;
 
+enum DefTypeId { VAR_DEF, PROG_DEF, FN_DEF, CLASS_DEF, COORD_DEF, TASK_DEF };
+
 class Definition : public Node {	
   public:
 	Definition() : Node() {}
 	Definition(yyltype loc) : Node(loc) {}
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	// Each definition, including a variable definition, should have a scope associated with it.
+        // Therefore these classes extend from a base class supporting scope attachment after AST
+        // is generated for the program. The following methods should be overridden to do the job of
+        // scope attachment. Since we do not enforce any ordering between a definition and its first
+        // use, scope attachment and validation needs to be done in two different steps for some
+	// definition types. Consequently, we have two methods here.
+        virtual void attachScope(Scope *parentScope) {}
+        virtual void validateScope(Scope *parentScope) {}
+
+	// function needed to filter different types of definitions; each subclass should return a
+	// unique type ID
+	virtual DefTypeId getDefTypeId() = 0;
 };
 
 class VariableDef : public Definition {
@@ -44,6 +61,8 @@ class VariableDef : public Definition {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	Node *clone();
+	void validateScope(Scope *parentScope);
+	DefTypeId getDefTypeId() { return VAR_DEF; }
 };
 
 class ProgramDef : public Definition {
@@ -58,6 +77,15 @@ class ProgramDef : public Definition {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	Node *clone();
+	DefTypeId getDefTypeId() { return PROG_DEF; }
+	
+	// the function that encapsulates the entire semantic analysis phase
+	void performScopeAndTypeChecking();
+
+	// component functions for doing different steps of semantic analysis
+	void analyseCustomTypes();
+
+	List<Definition*> *getComponentsByType(DefTypeId typeId);
 };
 
 class TupleDef : public Definition {
@@ -73,6 +101,9 @@ class TupleDef : public Definition {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	Node *clone();
+	void attachScope(Scope *parentScope);
+        void validateScope(Scope *parentScope);
+	DefTypeId getDefTypeId() { return CLASS_DEF; }
 };
 
 class CoordinatorDef : public Definition {
@@ -90,6 +121,7 @@ class CoordinatorDef : public Definition {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	Node *clone();
+	DefTypeId getDefTypeId() { return COORD_DEF; }
 };
 
 class FunctionArg : public Node {
@@ -104,6 +136,8 @@ class FunctionArg : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	Node *clone();
+	Identifier *getName() { return name; }
+	ArgumentType getType() { return type; }
 };
 
 class FunctionDef : public Definition {
@@ -120,6 +154,12 @@ class FunctionDef : public Definition {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	Node *clone();
+	DefTypeId getDefTypeId() { return FN_DEF; }
+	
+	// The reference and value type arguments should be treated differently inside the function body.
+	// This function annotates the expressions that involves any argument access with proper type for
+	// later analysis.
+	void annotateArgAccessesByType();
 };
 
 #endif

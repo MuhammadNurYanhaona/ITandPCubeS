@@ -197,6 +197,10 @@ class TaskDef : public Definition {
 		PartitionSection *partition);
 	const char *GetPrintNameForNode() { return "Task"; }
         void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	DefTypeId getDefTypeId() { return TASK_DEF; }
 };
 
 #endif

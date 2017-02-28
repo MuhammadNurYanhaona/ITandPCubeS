@@ -33,6 +33,9 @@ class Node {
   protected:
     	yyltype *location;
     	Node *parent;
+	
+	// this variable is needed for scope and type association with elements in the abstract syntax tree
+	Symbol *symbol;
   public:
     	Node(yyltype loc);
     	Node();
@@ -46,6 +49,9 @@ class Node {
 	// This function is needed to clone stage and function definitions from the abstract syntax
 	// tree for resolving type polymorphism.
 	virtual Node *clone();
+
+	Symbol *getSymbol() { return symbol; }
+        void setSymbol(Symbol *symbol) { this->symbol = symbol; }
 
     	//---------------------------------------------------------------------------------printing related methods
 	

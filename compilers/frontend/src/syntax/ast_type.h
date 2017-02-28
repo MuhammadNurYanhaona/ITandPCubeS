@@ -2,6 +2,7 @@
 #define _H_ast_type
 
 #include "ast.h"
+#include "../semantics/scope.h"
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
 
@@ -27,11 +28,25 @@ class Type : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         virtual Node *clone();
+
+	// These are helper methods for generating the C++ type declaration of an IT variable. Subclasses should 
+	// override these methods to apply appropriate equivalent C++ type.
+        virtual const char *getCType() { return typeName; }
+        virtual const char *getCppDeclaration(const char *varName, bool pointer = false);
+
+	static void storeBuiltInTypesInScope(Scope *scope);
 };
 
 class NamedType : public Type {
   protected:
   	Identifier *id;
+	// This is a flag to indicate if this type represents the environment of some task. We need this to do 
+	// specialized operations needed by environment objects. For example, we declare pointers for environment 
+	// types as oppose to object instances done for other named types.
+        bool environmentType;
+        // The name of the task when this is an environment type for a task
+        const char *taskName;
+
   public:
     	NamedType(Identifier *i);
     	const char *GetPrintNameForNode() { return "Named-Type"; }
@@ -40,6 +55,14 @@ class NamedType : public Type {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	const char *getCType();
+        const char *getCppDeclaration(const char *varName, bool pointer);
+	
+	// functions added to generate task-specific environment object classes
+	void flagAsEnvironmentType() { environmentType = true; }
+        bool isEnvironmentType() { return environmentType; }
+        void setTaskName(const char *taskName) { this->taskName = taskName; }
+        const char *getTaskName() { return taskName; }
 };
 
 class ArrayType : public Type {
@@ -51,10 +74,14 @@ class ArrayType : public Type {
 	virtual ~ArrayType() {}
     	const char *GetPrintNameForNode() { return "Dynamic-Array"; }
     	void PrintChildren(int indentLevel);
+	int getDimensions() { return dimensions; }
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         virtual Node *clone();
+	const char *getCType();
+        virtual const char *getCppDeclaration(const char *varName, bool pointer);
+	Type *getTerminalElementType();
 };
 
 class StaticArrayType : public ArrayType {
@@ -70,6 +97,8 @@ class StaticArrayType : public ArrayType {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	Type *reduceADimension();
+        const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class ListType : public Type {
@@ -83,6 +112,9 @@ class ListType : public Type {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	const char *getCType();
+        const char *getCppDeclaration(const char *varName, bool pointer);
+	Type *getTerminalElementType();
 };
 
 class MapType : public Type {
@@ -102,6 +134,8 @@ class MapType : public Type {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	const char *getCType() { return strdup("Hashtable<void*>"); }
+        const char *getCppDeclaration(const char *varName, bool pointer);
 };
  
 #endif

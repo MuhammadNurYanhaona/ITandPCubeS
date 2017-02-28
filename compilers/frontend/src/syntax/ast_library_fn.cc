@@ -3,6 +3,7 @@
 #include "ast_type.h"
 #include "ast_library_fn.h"
 #include "../common/errors.h"
+#include "../common/constant.h"
 #include "../../../common-libs/utils/list.h"
 
 #include <iostream>
@@ -84,4 +85,12 @@ Node *LibraryFunction::clone() {
 		newArgsList->Append(newArg);
 	}
 	return getFunctionExpr(newId, newArgsList, *GetLocation());
+}
+
+void LibraryFunction::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	Expr::retrieveExprByType(exprList, typeId);
+	for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *arg = arguments->Nth(i);
+		arg->retrieveExprByType(exprList, typeId);
+	}
 }

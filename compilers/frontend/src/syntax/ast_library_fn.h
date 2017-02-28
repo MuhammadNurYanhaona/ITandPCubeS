@@ -11,6 +11,7 @@
 #include "ast.h"
 #include "ast_expr.h"
 #include "ast_type.h"
+#include "../common/constant.h"
 #include "../../../common-libs/utils/list.h"
 
 #include <fstream>
@@ -41,6 +42,8 @@ class LibraryFunction : public Expr {
         //-------------------------------------------------------------- Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return LIB_FN_CALL; }
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 

@@ -22,6 +22,16 @@ class Expr : public Stmt {
   public:
     	Expr(yyltype loc) : Stmt(loc) { type = NULL; }
     	Expr() : Stmt() { type = NULL; }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	// subclasses should implement this function to return a unique expression ID per class 
+	virtual ExprTypeId getExprTypeId() = 0;
+
+	// Any expresssion that may have some different kind of expression as its component sub-expression
+	// must provides its own implementation for this function. Otherwise this baseclass implementation
+	// is sufficient.
+	virtual void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class IntConstant : public Expr {
@@ -38,6 +48,7 @@ class IntConstant : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone() { return new IntConstant(*GetLocation(), value, size); }
+	ExprTypeId getExprTypeId() { return INT_CONST; };
 };
 
 class FloatConstant : public Expr {
@@ -51,6 +62,7 @@ class FloatConstant : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone() { return new FloatConstant(*GetLocation(), value); }
+	ExprTypeId getExprTypeId() { return FLOAT_CONST; };
 };
 
 class DoubleConstant : public Expr {
@@ -64,6 +76,7 @@ class DoubleConstant : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone() { return new DoubleConstant(*GetLocation(), value); }
+	ExprTypeId getExprTypeId() { return DOUBLE_CONST; };
 };
 
 class BoolConstant : public Expr {
@@ -77,6 +90,7 @@ class BoolConstant : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone() { return new BoolConstant(*GetLocation(), value); }
+	ExprTypeId getExprTypeId() { return BOOL_CONST; };
 };
 
 class StringConstant : public Expr {
@@ -91,6 +105,7 @@ class StringConstant : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone() { return new StringConstant(*GetLocation(), strdup(value)); }
+	ExprTypeId getExprTypeId() { return STRING_CONST; };
 };
 
 class CharConstant : public Expr {
@@ -104,6 +119,7 @@ class CharConstant : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone() { return new CharConstant(*GetLocation(), value); }
+	ExprTypeId getExprTypeId() { return CHAR_CONST; };
 };
 
 class ReductionVar : public Expr {
@@ -118,6 +134,7 @@ class ReductionVar : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone() { return new ReductionVar(spaceId, strdup(name), *GetLocation()); }
+	ExprTypeId getExprTypeId() { return REDUCTION_VAR; };
 };
 
 class ArithmaticExpr : public Expr {
@@ -133,6 +150,8 @@ class ArithmaticExpr : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return ARITH_EXPR; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class LogicalExpr : public Expr {
@@ -151,6 +170,8 @@ class LogicalExpr : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return LOGIC_EXPR; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class EpochExpr : public Expr {
@@ -165,12 +186,18 @@ class EpochExpr : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return EPOCH_EXPR; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class FieldAccess : public Expr {
   protected:
 	Expr *base;
 	Identifier *field;
+
+	// this attributes tells if the field access should be treated as accessing via a reference or by
+	// value. The default is access-by-value
+	bool referenceField;
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Field-Access"; }
@@ -180,6 +207,14 @@ class FieldAccess : public Expr {
 
         Node *clone();
 	Identifier *getField() { return field; }	    	
+	ExprTypeId getExprTypeId() { return FIELD_ACC; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	void flagAsReferenceField() { referenceField = true; }
+
+	// This returns the first field in a chain of field accesses, e.g, if a.b.c.d is an expression then 
+	// this will return 'a'; this does not work for accessing properties from elements of an array, i.e.,
+	// if the access is like a[i].b then the function should return NULL.
+	FieldAccess *getTerminalField();
 };
 
 class RangeExpr : public Expr {
@@ -200,6 +235,8 @@ class RangeExpr : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return RANGE_EXPR; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };	
 
 class AssignmentExpr : public Expr {
@@ -216,6 +253,8 @@ class AssignmentExpr : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return ASSIGN_EXPR; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class IndexRange : public Expr {
@@ -236,6 +275,8 @@ class IndexRange : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return INDEX_RANGE; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class ArrayAccess : public Expr {
@@ -252,6 +293,8 @@ class ArrayAccess : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return ARRAY_ACC; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class FunctionCall : public Expr {
@@ -266,6 +309,8 @@ class FunctionCall : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return FN_CALL; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class NamedArgument : public Node {
@@ -282,6 +327,7 @@ class NamedArgument : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class NamedMultiArgument : public Node {
@@ -296,6 +342,7 @@ class NamedMultiArgument : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class TaskInvocation : public Expr {
@@ -309,6 +356,8 @@ class TaskInvocation : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return TASK_INVOKE; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class ObjectCreate : public Expr {
@@ -323,6 +372,8 @@ class ObjectCreate : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	ExprTypeId getExprTypeId() { return OBJ_CREATE; };
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 #endif

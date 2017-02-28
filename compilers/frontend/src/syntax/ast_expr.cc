@@ -2,12 +2,21 @@
 #include "ast_stmt.h"
 #include "ast_expr.h"
 #include "ast_type.h"
+#include "../common/constant.h"
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
+
+//--------------------------------------------------- Expression ------------------------------------------------------/
+
+void Expr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (this->getExprTypeId() == typeId) {
+		exprList->Append(this);
+	}
+}
 
 //----------------------------------------------- Constant Expression -------------------------------------------------/
 
@@ -112,6 +121,15 @@ Node *ArithmaticExpr::clone() {
 	return new ArithmaticExpr(newLeft, op, newRight, *GetLocation());
 }
 
+void ArithmaticExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		left->retrieveExprByType(exprList, typeId);
+		right->retrieveExprByType(exprList, typeId);
+	}
+}
+
 //----------------------------------------------- Logical Expression -------------------------------------------------/
 
 LogicalExpr::LogicalExpr(Expr *l, LogicalOperator o, Expr *r, yyltype loc) : Expr(loc) {
@@ -149,7 +167,16 @@ Node *LogicalExpr::clone() {
 	return new LogicalExpr(newLeft, op, newRight, *GetLocation());
 }
 
-//----------------------------------------------- Reduction Expression ------------------------------------------------/
+void LogicalExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		right->retrieveExprByType(exprList, typeId);
+		if (left != NULL) left->retrieveExprByType(exprList, typeId);
+	}
+}
+
+//------------------------------------------------- Epoch Expression --------------------------------------------------/
 
 EpochExpr::EpochExpr(Expr *r, int lag) : Expr(*r->GetLocation()) {
         Assert(r != NULL && lag >= 0);
@@ -169,6 +196,14 @@ Node *EpochExpr::clone() {
 	return new EpochExpr(newRoot, lag);
 }
 
+void EpochExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		root->retrieveExprByType(exprList, typeId);
+	}
+}
+
 //-------------------------------------------------- Field Access -----------------------------------------------------/
 
 FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
@@ -179,6 +214,7 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
         }
         field = f;
         field->SetParent(this);
+	referenceField = false;
 }
 
 void FieldAccess::PrintChildren(int indentLevel) {
@@ -189,7 +225,23 @@ void FieldAccess::PrintChildren(int indentLevel) {
 Node *FieldAccess::clone() {
 	Expr *newBase = (Expr*) base->clone();
 	Identifier *newField = (Identifier*) field->clone();
-	return new FieldAccess(newBase, newField, *GetLocation());
+	FieldAccess *newFieldAcc = new FieldAccess(newBase, newField, *GetLocation());
+	if (referenceField) {
+		newFieldAcc->flagAsReferenceField();
+	}
+	return newFieldAcc;
+}
+
+void FieldAccess::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	Expr::retrieveExprByType(exprList, typeId);
+	if (base != NULL) base->retrieveExprByType(exprList, typeId);
+}
+
+FieldAccess *FieldAccess::getTerminalField() {
+	if (base == NULL) return this;
+	FieldAccess *baseField = dynamic_cast<FieldAccess*>(baseField);
+	if (baseField == NULL) return NULL;
+	return baseField->getTerminalField();
 }
 
 //----------------------------------------------- Range Expressions --------------------------------------------------/
@@ -238,6 +290,16 @@ Node *RangeExpr::clone() {
 	return new RangeExpr(newIndex, newRange, *GetLocation());
 }
 
+void RangeExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		index->retrieveExprByType(exprList, typeId);
+		range->retrieveExprByType(exprList, typeId);
+		if (step != NULL) step->retrieveExprByType(exprList, typeId);
+	}	
+}
+
 //--------------------------------------------- Assignment Expression ------------------------------------------------/
 
 AssignmentExpr::AssignmentExpr(Expr *l, Expr *r, yyltype loc) : Expr(loc) {
@@ -257,6 +319,15 @@ Node *AssignmentExpr::clone() {
 	Expr *newLeft = (Expr*) left->clone();
 	Expr *newRight = (Expr*) right->clone();
 	return new AssignmentExpr(newLeft, newRight, *GetLocation());
+}
+
+void AssignmentExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		left->retrieveExprByType(exprList, typeId);
+		right->retrieveExprByType(exprList, typeId);
+	}
 }
 
 //--------------------------------------------------- Array Access ----------------------------------------------------/
@@ -287,6 +358,16 @@ Node *IndexRange::clone() {
 	return new IndexRange(newBegin, newEnd, partOfArray, *GetLocation());
 }
 
+void IndexRange::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		if (begin != NULL) begin->retrieveExprByType(exprList, typeId);
+		if (end != NULL) end->retrieveExprByType(exprList, typeId);
+	}
+}
+
+
 ArrayAccess::ArrayAccess(Expr *b, Expr *i, yyltype loc) : Expr(loc) {
         Assert(b != NULL && i != NULL);
         base = b;
@@ -304,6 +385,15 @@ Node *ArrayAccess::clone() {
 	Expr *newBase = (Expr*) base->clone();
 	Expr *newIndex = (Expr*) index->clone();
 	return new ArrayAccess(newBase, newIndex, *GetLocation());
+}
+
+void ArrayAccess::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		base->retrieveExprByType(exprList, typeId);
+		index->retrieveExprByType(exprList, typeId);
+	}
 }
 
 //------------------------------------------------- Function Call ----------------------------------------------------/
@@ -335,6 +425,14 @@ Node *FunctionCall::clone() {
 	return new FunctionCall(newBase, newArgs, *GetLocation());
 }
 
+void FunctionCall::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	Expr::retrieveExprByType(exprList, typeId);
+	for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *arg = arguments->Nth(i);
+		arg->retrieveExprByType(exprList, typeId);
+	}	
+}
+
 //------------------------------------------------ Named Argument ----------------------------------------------------/
 
 NamedArgument::NamedArgument(char *argName, Expr *argValue, yyltype loc) : Node(loc) {
@@ -352,6 +450,10 @@ Node *NamedArgument::clone() {
 	char *newName = strdup(argName);
 	Expr *newValue = (Expr*) argValue->clone();
 	return new NamedArgument(newName, newValue, *GetLocation());
+}
+
+void NamedArgument::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	argValue->retrieveExprByType(exprList, typeId);
 }
 
 //--------------------------------------------- Named Multi-Argument -------------------------------------------------/
@@ -380,6 +482,13 @@ Node *NamedMultiArgument::clone() {
 	return new NamedMultiArgument(newName, newArgList, *GetLocation());
 }
 
+void NamedMultiArgument::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	for (int i = 0; i < argList->NumElements(); i++) {
+                Expr *arg = argList->Nth(i);
+		arg->retrieveExprByType(exprList, typeId);
+        }
+}
+
 //----------------------------------------------- Task Invocation ----------------------------------------------------/
 
 TaskInvocation::TaskInvocation(List<NamedMultiArgument*> *invocationArgs, yyltype loc) : Expr(loc) {
@@ -403,6 +512,17 @@ Node *TaskInvocation::clone() {
 		newInvokeArgs->Append((NamedMultiArgument*) arg->clone());
 	}
 	return new TaskInvocation(newInvokeArgs, *GetLocation());
+}
+
+void TaskInvocation::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (typeId == getExprTypeId()) {
+		Expr::retrieveExprByType(exprList, typeId);
+	} else {
+		for (int i = 0; i < invocationArgs->NumElements(); i++) {
+			NamedMultiArgument *arg = invocationArgs->Nth(i);
+			arg->retrieveExprByType(exprList, typeId);
+		}
+	}
 }
 
 //------------------------------------------------ Object Create -----------------------------------------------------/
@@ -431,4 +551,12 @@ Node *ObjectCreate::clone() {
 		newArgsList->Append((NamedArgument*) arg->clone());
         }
 	return new ObjectCreate(newType, newArgsList, *GetLocation());
+}
+
+void ObjectCreate::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	Expr::retrieveExprByType(exprList, typeId);
+	for (int j = 0; j < initArgs->NumElements(); j++) {
+                NamedArgument *arg = initArgs->Nth(j);
+		arg->retrieveExprByType(exprList, typeId);
+	}
 }

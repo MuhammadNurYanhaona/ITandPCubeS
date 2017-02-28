@@ -35,6 +35,13 @@ Node *StmtBlock::clone() {
 	return new StmtBlock(newStmtList);
 }
 
+void StmtBlock::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	for (int i = 0; i < stmts->NumElements(); i++) {
+                Stmt *stmt = stmts->Nth(i);
+		stmt->retrieveExprByType(exprList, typeId);
+	}
+}
+
 //-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
 ConditionalStmt::ConditionalStmt(Expr *c, Stmt *s, yyltype loc) : Stmt(loc) {
@@ -56,6 +63,11 @@ Node *ConditionalStmt::clone() {
 	Expr *newCond = (Expr*) condition->clone();
 	Stmt *newStmt = (Stmt*) stmt->clone();
 	return new ConditionalStmt(newCond, newStmt, *GetLocation());
+}
+
+void ConditionalStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (condition != NULL) condition->retrieveExprByType(exprList, typeId);
+	stmt->retrieveExprByType(exprList, typeId);
 }
 
 //------------------------------------------------------------ If/Else Block -----------------------------------------------------------/
@@ -80,6 +92,13 @@ Node *IfStmt::clone() {
 		newBlocks->Append(newStmt);
         }
 	return new IfStmt(newBlocks, *GetLocation());
+}
+
+void IfStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+		stmt->retrieveExprByType(exprList, typeId);
+	}
 }
 
 //-------------------------------------------------------- Index Range Condition -------------------------------------------------------/
@@ -120,6 +139,10 @@ Node *IndexRangeCondition::clone() {
 	return new IndexRangeCondition(newIndexes, newColl, dimensionNo, newRestr, *GetLocation());
 }
 
+void IndexRangeCondition::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	if (restrictions != NULL) restrictions->retrieveExprByType(exprList, typeId);
+}
+
 //------------------------------------------------------------ Loop Statement ----------------------------------------------------------/
 
 LoopStmt::LoopStmt() : Stmt() {}
@@ -154,6 +177,14 @@ Node *PLoopStmt::clone() {
         }
 	Stmt *newBody = (Stmt*) body->clone();
 	return new PLoopStmt(newCondList, newBody, *GetLocation());
+}
+
+void PLoopStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *condition = rangeConditions->Nth(i);
+		condition->retrieveExprByType(exprList, typeId);
+	}
+	body->retrieveExprByType(exprList, typeId);
 }
 
 //------------------------------------------------------- Sequential For Loop --------------------------------------------------------/
@@ -209,6 +240,13 @@ Node *SLoopStmt::clone() {
 	return new SLoopStmt(newId, newAttr, newBody, *GetLocation());
 }
 
+void SLoopStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	rangeExpr->retrieveExprByType(exprList, typeId);
+	if (stepExpr != NULL) stepExpr->retrieveExprByType(exprList, typeId);
+	if (restriction != NULL) restriction->retrieveExprByType(exprList, typeId);
+	body->retrieveExprByType(exprList, typeId);
+}
+
 //------------------------------------------------------------ While Loop ------------------------------------------------------------/
 
 WhileStmt::WhileStmt(Expr *c, Stmt *b, yyltype loc) : Stmt(loc) {
@@ -228,6 +266,11 @@ Node *WhileStmt::clone() {
 	Expr *newCond = (Expr*) condition->clone();
 	Stmt *newBody = (Stmt*) body->clone();
 	return new WhileStmt(newCond, newBody, *GetLocation());
+}
+
+void WhileStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	condition->retrieveExprByType(exprList, typeId);
+	body->retrieveExprByType(exprList, typeId);
 }
 
 //-------------------------------------------------------- Reduction Statement -------------------------------------------------------/
@@ -290,6 +333,10 @@ Node *ReductionStmt::clone() {
 	Identifier *newLeft = (Identifier*) left->clone();
 	Expr *newRight = (Expr*) right->clone();
 	return new ReductionStmt(newLeft, op, newRight, *GetLocation());	
+}
+
+void ReductionStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	right->retrieveExprByType(exprList, typeId);
 }
 
 //-------------------------------------------------------- External Code Block -------------------------------------------------------/
@@ -356,4 +403,8 @@ void ReturnStmt::PrintChildren(int indentLevel) {
 Node *ReturnStmt::clone() {
 	Expr *newExpr = (Expr*) expr->clone();
 	return new ReturnStmt(newExpr, *GetLocation());
+}
+
+void ReturnStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
+	expr->retrieveExprByType(exprList, typeId);
 }

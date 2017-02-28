@@ -14,6 +14,12 @@ class Stmt : public Node {
   public:
 	Stmt() : Node() {}
      	Stmt(yyltype loc) : Node(loc) {}
+
+        //------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	// This function is needed to filter all nested expressions with a specific type for tagging and
+	// further processing.
+	virtual void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) = 0;
 };
 
 class StmtBlock : public Stmt {
@@ -27,6 +33,7 @@ class StmtBlock : public Stmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class ConditionalStmt: public Stmt {
@@ -41,6 +48,7 @@ class ConditionalStmt: public Stmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class IfStmt: public Stmt {
@@ -54,6 +62,7 @@ class IfStmt: public Stmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class IndexRangeCondition: public Node {
@@ -73,6 +82,7 @@ class IndexRangeCondition: public Node {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class LoopStmt: public Stmt {
@@ -94,6 +104,7 @@ class PLoopStmt: public LoopStmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class SLoopAttribute {
@@ -127,6 +138,7 @@ class SLoopStmt: public LoopStmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class WhileStmt: public Stmt {
@@ -141,6 +153,7 @@ class WhileStmt: public Stmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class ReductionStmt: public Stmt {
@@ -157,6 +170,7 @@ class ReductionStmt: public Stmt {
 
 	ReductionStmt(Identifier *l, ReductionOperator o, Expr *r, yyltype loc);
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 class ExternCodeBlock: public Stmt {
@@ -176,6 +190,7 @@ class ExternCodeBlock: public Stmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {}
 };
 
 class ReturnStmt: public Stmt {
@@ -189,6 +204,7 @@ class ReturnStmt: public Stmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();		
+	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 };
 
 #endif

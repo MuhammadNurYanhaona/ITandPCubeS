@@ -5,8 +5,10 @@
 
 #include "ast_def.h"
 #include "ast_type.h"
+#include "../semantics/symbol.h"
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
+#include "../../../common-libs/utils/string_utils.h"
 
 /* Class constants
  * ---------------------------------------------------------------------------------------------------------/
@@ -22,9 +24,9 @@ Type *Type::doubleType          = new Type("double");
 Type *Type::charType            = new Type("char");
 Type *Type::boolType            = new Type("bool");
 Type *Type::stringType          = new Type("const char*");
-Type *Type::dimensionType       = new Type("Dimension");
-Type *Type::rangeType           = new Type("Range");
 Type *Type::indexType           = new Type("Index");
+Type *Type::rangeType           = new Type("Range");
+Type *Type::dimensionType       = new Type("Dimension");
 Type *Type::errorType           = new Type("Error");
 Type *Type::voidType            = new Type("void");
 
@@ -43,11 +45,80 @@ Node *Type::clone() {
 	return new Type(strdup(typeName));
 }
 
+const char *Type::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << typeName << " ";
+        if (pointer) decl << "*";
+        decl << varName;
+        return strdup(decl.str().c_str());
+}
+
+void Type::storeBuiltInTypesInScope(Scope *scope) {
+
+        //----------------------------------------------------store the primitive types
+
+        scope->insert_symbol(new Symbol(intType->getName(), intType));
+        scope->insert_symbol(new Symbol(floatType->getName(), floatType));
+        scope->insert_symbol(new Symbol(doubleType->getName(), doubleType));
+        scope->insert_symbol(new Symbol(charType->getName(), charType));
+        scope->insert_symbol(new Symbol(boolType->getName(), boolType));
+        scope->insert_symbol(new Symbol(stringType->getName(), stringType));
+        scope->insert_symbol(new Symbol(errorType->getName(), errorType));
+        scope->insert_symbol(new Symbol(voidType->getName(), voidType));
+
+        //-----------create nested scope for each built-in tuple types then store them
+
+	// an integer range (typically needed for setting an array dimension)
+        yyltype dummyLocation;
+        List<VariableDef*> *rangeElements = new List<VariableDef*>;
+        rangeElements->Append(new VariableDef(
+                        new Identifier(dummyLocation, (const char*) "min"),
+                        intType));
+        rangeElements->Append(new VariableDef(
+                        new Identifier(dummyLocation, (const char*) "max"),
+                        intType));
+        TupleDef *rangeTuple = new TupleDef(
+                        new Identifier(dummyLocation, rangeType->getName()),
+                        rangeElements);
+        rangeTuple->attachScope(scope);
+
+	// array index with stride and cyclical range traversal support (not in use)
+	List<VariableDef*> *indexElements = new List<VariableDef*>;
+        indexElements->Append(new VariableDef(
+                        new Identifier(dummyLocation, (const char*) "stride"),
+                        intType));
+        indexElements->Append(new VariableDef(
+                        new Identifier(dummyLocation, (const char*) "rotate"),
+                        boolType));
+        TupleDef *indexTuple = new TupleDef(
+                        new Identifier(dummyLocation, indexType->getName()),
+                        indexElements);
+        indexTuple->attachScope(scope);
+
+	// metadata representing an array dimension
+	List<VariableDef*> *dimensionElements = new List<VariableDef*>;
+        dimensionElements->Append(new VariableDef(
+                        new Identifier(dummyLocation, (const char*) "range"),
+                        rangeType));
+        dimensionElements->Append(new VariableDef(
+                        new Identifier(dummyLocation, (const char*) "index"),
+                        indexType));
+        dimensionElements->Append(new VariableDef(
+                        new Identifier(dummyLocation, (const char*) "length"),
+                        intType));
+        TupleDef *dimensionTuple = new TupleDef(
+                        new Identifier(dummyLocation, dimensionType->getName()),
+                        dimensionElements);
+        dimensionTuple->attachScope(scope);
+}
+
 //---------------------------------------------- Tuple Type ------------------------------------------------/
 
 NamedType::NamedType(Identifier *i) : Type(*i->GetLocation()) {
         Assert(i != NULL);
         (id=i)->SetParent(this);
+	environmentType = false;
+        taskName = NULL;
 }
 
 void NamedType::PrintChildren(int indentLevel) {
@@ -57,6 +128,23 @@ void NamedType::PrintChildren(int indentLevel) {
 Node *NamedType::clone() {
 	Identifier *newId = (Identifier*) id->clone();
 	return new NamedType(newId);
+}
+
+const char *NamedType::getCType() {
+        if (!environmentType) return id->getName();
+        std::ostringstream stream;
+        const char *initials = string_utils::getInitials(taskName);
+        initials = string_utils::toLower(initials);
+        stream << initials << "::TaskEnvironmentImpl";
+        return strdup(stream.str().c_str());
+}
+
+const char *NamedType::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << getCType() << " ";
+        if (environmentType) decl << "*";
+        decl << varName;
+        return strdup(decl.str().c_str());
 }
 
 //---------------------------------------------- Array Type ------------------------------------------------/
@@ -76,6 +164,18 @@ void ArrayType::PrintChildren(int indentLevel) {
 Node *ArrayType::clone() {
 	Type *newElemType = (Type*) elemType->clone();
 	return new ArrayType(*GetLocation(), newElemType, dimensions);
+}
+
+const char *ArrayType::getCType() {
+        std::ostringstream cName;
+        cName << elemType->getCType() << "*";
+        return strdup(cName.str().c_str());
+}
+
+const char *ArrayType::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << this->getCType() << " " << varName;
+        return strdup(decl.str().c_str());
 }
 
 //------------------------------------------- Static Array Type --------------------------------------------/
@@ -101,6 +201,25 @@ Node *StaticArrayType::clone() {
 	return newType;	
 }
 
+const char *StaticArrayType::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << elemType->getCType() << " ";
+        if (pointer) decl << "*";
+        decl << varName;
+        for (int i = 0; i < dimensionLengths->NumElements(); i++) {
+                decl << '[' << dimensionLengths->Nth(i) << ']';
+        }
+        return strdup(decl.str().c_str());
+}
+
+Type *ArrayType::getTerminalElementType() {
+        ArrayType *elemArray = dynamic_cast<ArrayType*>(elemType);
+        if (elemArray != NULL) {
+                return elemArray->getTerminalElementType();
+        }
+        return elemType;
+}
+
 //---------------------------------------------- List Type -------------------------------------------------/
 
 ListType::ListType(yyltype loc, Type *et) : Type(loc) {
@@ -115,6 +234,28 @@ void ListType::PrintChildren(int indentLevel) {
 Node *ListType::clone() {
 	Type *newElemType = (Type*) elemType->clone();
 	return new ListType(*GetLocation(), newElemType);
+}
+
+const char *ListType::getCType() {
+        std::ostringstream cType;
+        cType << "std::vector<" << elemType->getCType() << ">";
+        return strdup(cType.str().c_str());
+}
+
+const char *ListType::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << this->getCType() << " ";
+        if (pointer) decl << "*";
+        decl << varName;
+        return strdup(decl.str().c_str());
+}
+
+Type *ListType::getTerminalElementType() {
+        ArrayType *elemArray = dynamic_cast<ArrayType*>(elemType);
+        if (elemArray != NULL) {
+                return elemArray->getTerminalElementType();
+        }
+        return elemType;
 }
 
 //---------------------------------------------- Map Type --------------------------------------------------/
@@ -173,3 +314,13 @@ Node *MapType::clone() {
 	delete elemList;
 	return newMap;
 }
+
+const char *MapType::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << this->getCType() << " ";
+        if (pointer) decl << "*";
+        decl << varName;
+        return strdup(decl.str().c_str());
+}
+
+

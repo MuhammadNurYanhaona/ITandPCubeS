@@ -17,10 +17,11 @@ using std::string;
 class ReportError
 {
  public:
-  	// Specific error reporting
+
+	//------------------------------------------------------------------------------------------------------------ Type Errors
+
   	static void TypeInferenceError(Identifier *id, bool suppressFailure);
   	static void UndeclaredTypeError(Identifier *variable, Type *type, const char *prefix, bool suppressFailure);
-	static void ConflictingDefinition(Identifier *id, bool suppressFailure);
 	static void NotReductionType(Identifier *id, bool suppressFailure);
 	static void InferredAndActualTypeMismatch(yyltype *loc, Type *inferred, Type *actual, bool suppressFailure);
 	static void UnknownExpressionType(Expr *expr, bool suppressFailure);
@@ -28,10 +29,14 @@ class ReportError
 	static void InvalidExprType(Expr *expr, Type *type, bool suppressFailure);
 	static void TypeMixingError(Expr *expr, Type *type1, Type *type2, const char *operation, bool suppressFailure);
 	static void IncompatibleTypes(yyltype *loc, Type *actual, Type *expected, bool suppressFailure);
-	static void UndefinedSymbol(Identifier *id, bool suppressFailure);
-	static void UndefinedSymbol(yyltype *loc, const char *name, bool suppressFailure);
 	static void WrongSymbolType(Identifier *id, const char *expectedType, bool suppressFailure);
 	static void WrongSymbolType(yyltype *loc, const char *name, const char *expectedType, bool suppressFailure);
+	static void NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure);
+	static void NotAConstant(yyltype *loc, const char *constType, bool suppressFailure);
+
+	static void ConflictingDefinition(Identifier *id, bool suppressFailure);
+	static void UndefinedSymbol(Identifier *id, bool suppressFailure);
+	static void UndefinedSymbol(yyltype *loc, const char *name, bool suppressFailure);
 	static void NoSuchFieldInBase(Identifier *field, Type *type, bool suppressFailure);
 	static void NonExistingDimensionInArray(Identifier *id, int dimensionality, int dimension, bool suppressFailure);	
 	static void NonLValueInAssignment(Expr *expr, bool suppressFailure);
@@ -47,8 +52,6 @@ class ReportError
 	static void CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure);	
 	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);
 	static void ReductionRangeInvalid(yyltype *loc, const char *rdRootLps, const char *rdBoundaryLps, bool suppressFailure);
-	static void NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure);
-	static void NotAConstant(yyltype *loc, const char *constType, bool suppressFailure);
 	
 	// Errors with computation stage to space mappings
 	static void SpaceNotFound(yyltype *loc, char spaceName); 

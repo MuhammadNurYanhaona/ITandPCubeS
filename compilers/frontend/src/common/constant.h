@@ -33,4 +33,14 @@ enum PartitionOrder { AscendingOrder, DescendingOrder, RandomOrder };
 */
 enum PartitionLinkType { LinkTypePartition, LinkTypeSubpartition, LinkTypeUndefined };
 
+/*	Identifier for different kinds of expression. Each new expression type should have an unique ID to be
+	used for quick retrieval of expressions by types.
+*/
+enum ExprTypeId { 	INT_CONST, FLOAT_CONST, DOUBLE_CONST, 
+			BOOL_CONST, CHAR_CONST, STRING_CONST,
+                  	REDUCTION_VAR, ARITH_EXPR, LOGIC_EXPR, 
+			EPOCH_EXPR, FIELD_ACC, RANGE_EXPR,
+                  	ASSIGN_EXPR, INDEX_RANGE, ARRAY_ACC, 
+			FN_CALL, TASK_INVOKE, OBJ_CREATE, LIB_FN_CALL };
+
 #endif

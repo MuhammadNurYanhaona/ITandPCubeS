@@ -1,4 +1,6 @@
 #include "ast.h"
+#include "../semantics/symbol.h"
+
 #include <string.h>
 #include <stdio.h>
 #include <cstdlib>
@@ -6,11 +8,13 @@
 Node::Node(yyltype loc) {
         location = new yyltype(loc);
         parent = NULL;
+	symbol = NULL;
 }
 
 Node::Node() {
         location = NULL;
         parent = NULL;
+	symbol = NULL;
 }
 
 Node *Node::clone() {
