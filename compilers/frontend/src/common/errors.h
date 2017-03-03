@@ -33,6 +33,11 @@ class ReportError
 	static void WrongSymbolType(yyltype *loc, const char *name, const char *expectedType, bool suppressFailure);
 	static void NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure);
 	static void NotAConstant(yyltype *loc, const char *constType, bool suppressFailure);
+	
+	//----------------------------------------------------------------------------------------------- Conflicting Usage Errors
+	static void ConflictingArrayDimensionCounts(yyltype *loc, const char *name, 
+			int oldDimension, int currDimension, bool suppressFailure);
+
 
 	static void ConflictingDefinition(Identifier *id, bool suppressFailure);
 	static void UndefinedSymbol(Identifier *id, bool suppressFailure);

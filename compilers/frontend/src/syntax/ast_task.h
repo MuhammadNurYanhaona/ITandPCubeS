@@ -68,6 +68,10 @@ class StageDefinition : public Node {
 	StageDefinition(Identifier *name, List<Identifier*> *parameters, Stmt *codeBody);
 	const char *GetPrintNameForNode() { return "Stage-Definition"; }
         void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	void determineArrayDimensions();
 };
 
 class StagesSection : public Node {
@@ -77,6 +81,10 @@ class StagesSection : public Node {
 	StagesSection(List<StageDefinition*> *stages, yyltype loc);
 	const char *GetPrintNameForNode() { return "Stages-Section"; }
         void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	List<StageDefinition*> *getStageDefinitions() { return stages; }	
 };
 
 class FlowPart : public Node {
@@ -201,6 +209,12 @@ class TaskDef : public Definition {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	DefTypeId getDefTypeId() { return TASK_DEF; }
+	
+	// This function is needed to annotate a compute stage's expressions with proper markers before a
+	// stage instanciation takes place. For example, we need to analyze the dimensionalities of arrays
+	// used within a compute stage definition before we do the type checking and scoping for an
+	// invocation of that stage from the Computation Section.
+	void analyzeStageDefinitions(); 
 };
 
 #endif

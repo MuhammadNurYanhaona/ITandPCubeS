@@ -14,7 +14,7 @@
 
 int main(int argc, const char *argv[]) {
 
-        //***************************************************** Command Line Arguments Reader
+        //********************************************************* Command Line Arguments Reader
         // read the input argument to determine IT the source file
         const char *sourceFile;
         if (argc < 2) {
@@ -22,7 +22,7 @@ int main(int argc, const char *argv[]) {
                 return -1;
         } else {
                 sourceFile = argv[1];
-                std::cout << "Source program: " << sourceFile << std::endl;
+                std::cout << "Compiling: " << sourceFile << std::endl;
         }
 
 	// redirect standard input to the source file for the front end compiler to work
@@ -33,10 +33,10 @@ int main(int argc, const char *argv[]) {
         }
 	dup2(fileDescriptor, STDIN_FILENO);
         close(fileDescriptor);
-        //***********************************************************************************
+        //***************************************************************************************
 
 	
-	//**************************************************************** Front End Compiler
+	//******************************************************************** Front End Compiler
         /* Entry point to the entire program. InitScanner() is used to set up the scanner.
          * InitParser() is used to set up the parser. The call to yyparse() will attempt to
          * parse a complete program from the input. 
@@ -44,8 +44,9 @@ int main(int argc, const char *argv[]) {
         InitScanner(); 
 	InitParser(); 
 	yyparse();
-        if (ReportError::NumErrors() > 0) return -1;
-        ProgramDef::program->Print(0);
-        //***********************************************************************************
+        if (ReportError::NumErrors() > 0) return -1;	//-------------exit after syntax analysis
+        ProgramDef::program->performScopeAndTypeChecking();
+        if (ReportError::NumErrors() > 0) return -1;	//-----------exit after semantic analysis
+        //***************************************************************************************
 }
 

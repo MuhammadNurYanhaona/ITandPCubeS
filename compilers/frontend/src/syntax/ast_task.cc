@@ -4,6 +4,7 @@
 #include "ast_stmt.h"
 #include "ast_task.h"
 #include "ast_partition.h"
+#include "../semantics/helper.h"
 #include "../common/errors.h"
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
@@ -111,6 +112,52 @@ void StageDefinition::PrintChildren(int indentLevel) {
         parameters->PrintAll(indentLevel + 2);
         PrintLabel(indentLevel + 1, "Code Body");
 	codeBody->Print(indentLevel + 2);
+}
+
+void StageDefinition::determineArrayDimensions() {
+
+	Hashtable<semantic_helper::ArrayDimConfig*> *resolvedArrays = new Hashtable<semantic_helper::ArrayDimConfig*>;
+	List<Expr*> *arrayAccesses = new List<Expr*>;
+	codeBody->retrieveExprByType(arrayAccesses, ARRAY_ACC);
+
+	for (int i = 0; i < arrayAccesses->NumElements(); i++) {
+		ArrayAccess *arrayAcc = (ArrayAccess*) arrayAccesses->Nth(i);
+		int dimensionality = arrayAcc->getIndexPosition() + 1;
+		Expr *baseExpr = arrayAcc->getEndpointOfArrayAccess();
+		FieldAccess *baseField = dynamic_cast<FieldAccess*>(baseExpr);
+
+		// This condition should not be true in the general case as arrays cannot hold other arrays 
+		// as elements in IT. The only time this will be true is when a static array property of a
+		// user defined type instance has been accessed. Those array's dimensions are already known
+		// from the type definition.
+		if (baseField == NULL || !baseField->isTerminalField()) continue;
+
+		const char *arrayName = baseField->getField()->getName();
+		
+		// check if the use of the array in the particular expression confirms with any earlier use
+		// of the same array
+		semantic_helper::ArrayDimConfig	*arrayConfig = NULL;
+		if ((arrayConfig = resolvedArrays->Lookup(arrayName)) != NULL) {
+
+			// raise an error that array access dimensions are not matching any previous access
+			if (arrayConfig->getDimensions() != dimensionality) {
+				ReportError::ConflictingArrayDimensionCounts(arrayAcc->GetLocation(), 
+					arrayName, arrayConfig->getDimensions(), dimensionality, false);
+			}
+
+		// if this is the first time use of the array then just store it as resolved
+		} else {
+			arrayConfig = new semantic_helper::ArrayDimConfig(arrayName, dimensionality);
+			resolvedArrays->Enter(arrayName, arrayConfig);
+		}
+
+		// annotate the field access as accessing an array of a particular dimensionality for later
+		// validation against actual invocation arguments
+		baseField->flagAsArrayField(dimensionality);			
+	}
+
+	delete resolvedArrays;
+	delete arrayAccesses;
 }
 
 //--------------------------------------------------------------------------------------------------------------------Stages Section
@@ -291,4 +338,12 @@ void TaskDef::PrintChildren(int indentLevel) {
 	stages->Print(indentLevel + 1);
         compute->Print(indentLevel + 1);
         partition->Print(indentLevel + 1);
+}
+
+void TaskDef::analyzeStageDefinitions() {
+	List<StageDefinition*> *stageDefs = stages->getStageDefinitions();
+	for (int i =0; i < stageDefs->NumElements(); i++) {
+		StageDefinition *stageDef = stageDefs->Nth(i);
+		stageDef->determineArrayDimensions();
+	}
 }

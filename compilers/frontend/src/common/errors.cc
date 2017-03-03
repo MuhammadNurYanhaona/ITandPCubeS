@@ -92,6 +92,13 @@ void ReportError::UnknownExpressionType(Expr *expr, bool suppressFailure) {
 	OptionalErrorReport(expr->GetLocation(), suppressFailure, "Unknown expression type");
 }
 
+void ReportError::ConflictingArrayDimensionCounts(yyltype *loc, const char *name, 
+                        int oldDimension, int currDimension, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure,
+                        "Conflicting access of '%s' as a %dD array that has been accessed as a %dD array before",
+                        name, currDimension, oldDimension);
+}
+
 void ReportError::UnsupportedOperand(Expr* expr, Type *type, 
 		const char *operation, bool suppressFailure) {
 	OptionalErrorReport(expr->GetLocation(), suppressFailure,

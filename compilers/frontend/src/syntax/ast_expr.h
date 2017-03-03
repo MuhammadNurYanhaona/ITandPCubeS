@@ -198,6 +198,11 @@ class FieldAccess : public Expr {
 	// this attributes tells if the field access should be treated as accessing via a reference or by
 	// value. The default is access-by-value
 	bool referenceField;
+
+	// this attributes tell if the field access is an array reference and if YES then the dimensionality
+	// of the array
+	bool arrayField;
+	int arrayDimensions; 
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Field-Access"; }
@@ -206,10 +211,12 @@ class FieldAccess : public Expr {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
-	Identifier *getField() { return field; }	    	
+	Identifier *getField() { return field; }
+	bool isTerminalField() { return base == NULL; }	    	
 	ExprTypeId getExprTypeId() { return FIELD_ACC; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	void flagAsReferenceField() { referenceField = true; }
+	void flagAsArrayField(int arrayDimensions);
 
 	// This returns the first field in a chain of field accesses, e.g, if a.b.c.d is an expression then 
 	// this will return 'a'; this does not work for accessing properties from elements of an array, i.e.,
@@ -295,6 +302,9 @@ class ArrayAccess : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return ARRAY_ACC; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+
+	int getIndexPosition();
+        Expr *getEndpointOfArrayAccess();
 };
 
 class FunctionCall : public Expr {

@@ -215,6 +215,8 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
         field = f;
         field->SetParent(this);
 	referenceField = false;
+	arrayField = false;
+	arrayDimensions = -1;
 }
 
 void FieldAccess::PrintChildren(int indentLevel) {
@@ -229,12 +231,18 @@ Node *FieldAccess::clone() {
 	if (referenceField) {
 		newFieldAcc->flagAsReferenceField();
 	}
+	if (arrayField) newFieldAcc->flagAsArrayField(arrayDimensions);
 	return newFieldAcc;
 }
 
 void FieldAccess::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	Expr::retrieveExprByType(exprList, typeId);
 	if (base != NULL) base->retrieveExprByType(exprList, typeId);
+}
+
+void FieldAccess::flagAsArrayField(int arrayDimensions) {
+	arrayField = true;
+	this->arrayDimensions = arrayDimensions;
 }
 
 FieldAccess *FieldAccess::getTerminalField() {
@@ -394,6 +402,19 @@ void ArrayAccess::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 		base->retrieveExprByType(exprList, typeId);
 		index->retrieveExprByType(exprList, typeId);
 	}
+}
+
+int ArrayAccess::getIndexPosition() {
+        ArrayAccess *precedingAccess = dynamic_cast<ArrayAccess*>(base);
+        if (precedingAccess != NULL) return precedingAccess->getIndexPosition() + 1;
+        return 0;
+}
+
+Expr *ArrayAccess::getEndpointOfArrayAccess() {
+        ArrayAccess *precedingAccess = dynamic_cast<ArrayAccess*>(base);
+        if (precedingAccess != NULL) {
+                return precedingAccess->getEndpointOfArrayAccess();
+        } else return base;
 }
 
 //------------------------------------------------- Function Call ----------------------------------------------------/

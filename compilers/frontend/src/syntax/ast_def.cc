@@ -137,6 +137,13 @@ void ProgramDef::performScopeAndTypeChecking() {
 		fnDef->annotateArgAccessesByType();
 	}
 
+	//-----------------analyze the stages section of the tasks before stage instanciations
+	List<Definition*> *taskDefs = getComponentsByType(TASK_DEF);
+        for (int i = 0; i < taskDefs->NumElements(); i++) {
+                TaskDef *taskDef = (TaskDef*) taskDefs->Nth(i);
+		taskDef->analyzeStageDefinitions();
+        }
+
 	//-------------------------------------associate the program scope with the definition
 
 	symbol = new Symbol("Program", this);
