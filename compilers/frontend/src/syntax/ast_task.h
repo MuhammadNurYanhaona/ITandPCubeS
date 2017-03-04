@@ -195,6 +195,10 @@ class TaskDef : public Definition {
 	StagesSection *stages;
 	ComputationSection *compute;
 	PartitionSection *partition;
+
+	// the compiler derives automatic custom types to hold environment and partition related properties
+	TupleDef *envTuple;
+        TupleDef *partitionTuple;
   public:
         TaskDef(Identifier *id, 
 		DefineSection *define, 
@@ -215,6 +219,13 @@ class TaskDef : public Definition {
 	// used within a compute stage definition before we do the type checking and scoping for an
 	// invocation of that stage from the Computation Section.
 	void analyzeStageDefinitions(); 
+
+	TupleDef *getEnvTuple() { return envTuple; }
+        TupleDef *getPartitionTuple() { return partitionTuple; }
+
+	// The custom types for task's define, environment, and partition sections are created before a 
+	// full scale type checking of the task.
+	void attachScope(Scope *parentScope);
 };
 
 #endif

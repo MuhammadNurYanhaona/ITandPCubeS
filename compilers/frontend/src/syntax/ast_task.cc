@@ -4,10 +4,13 @@
 #include "ast_stmt.h"
 #include "ast_task.h"
 #include "ast_partition.h"
-#include "../semantics/helper.h"
 #include "../common/errors.h"
+#include "../semantics/scope.h"
+#include "../semantics/symbol.h"
+#include "../semantics/helper.h"
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
+#include "../../../common-libs/utils/string_utils.h"
 
 #include <sstream>
 
@@ -346,4 +349,83 @@ void TaskDef::analyzeStageDefinitions() {
 		StageDefinition *stageDef = stageDefs->Nth(i);
 		stageDef->determineArrayDimensions();
 	}
+}
+
+void TaskDef::attachScope(Scope *parentScope) {
+
+        //--------------------------------create a scope with all the variables declared in the define section
+        
+	Scope *scope = new Scope(TaskScope);
+        List<VariableDef*> *varList = define->getDefinitions();
+        for (int i = 0; i < varList->NumElements(); i++) {
+                VariableDef *var = varList->Nth(i);
+                VariableSymbol *varSym = new VariableSymbol(var);
+                scope->insert_symbol(varSym);
+                if (var->isReduction()) {
+                        varSym->flagAsReduction();
+                }
+        }
+
+        //------------------------------------create the environment scope and at the same time a tuple for it
+
+        List<VariableDef*> *envDef = new List<VariableDef*>;
+        List<Type*> *envElementTypes = new List<Type*>;
+        Scope *envScope = new Scope(TaskScope);
+        List<EnvironmentLink*> *envLinks = environment->getLinks();
+        for (int i = 0; i < envLinks->NumElements(); i++) {
+                Identifier *var = envLinks->Nth(i)->getVariable();
+                Symbol *symbol = scope->lookup(var->getName());
+                if (symbol == NULL) {
+                        ReportError::UndefinedSymbol(var, false);
+                } else {
+                        envScope->copy_symbol(symbol);
+                        VariableSymbol *varSym = (VariableSymbol*) symbol;
+                        envDef->Append(new VariableDef(var, varSym->getType()));
+                        envElementTypes->Append(varSym->getType());
+                }
+        }
+        envDef->Append(new VariableDef(new Identifier(*GetLocation(), "name"), Type::stringType));
+        envElementTypes->Append(Type::stringType);
+
+        const char *initials = string_utils::getInitials(id->getName());
+        char *envTupleName = (char *) malloc(strlen(initials) + 12);
+        strcpy(envTupleName, initials);
+        strcat(envTupleName, "Environment");
+
+	Identifier *envId = new Identifier(*GetLocation(), envTupleName);
+        envTuple = new TupleDef(envId, envDef);
+        envTuple->flagAsEnvironment();
+        envTuple->setSymbol(new TupleSymbol(envId, envTuple, envElementTypes));
+        envTuple->getSymbol()->setNestedScope(envScope);
+        parentScope->insert_symbol(envTuple->getSymbol());
+
+	//-------------------------------------------------------create the partition scope and a tuple for it
+        
+	List<Identifier*> *partitionArgs = partition->getArguments();
+        List<VariableDef*> *partitionDef = new List<VariableDef*>;
+        List<Type*> *partElementTypes = new List<Type*>;
+        char *partTupleName = (char *) malloc(strlen(initials) + 10);
+        strcpy(partTupleName, initials);
+        strcat(partTupleName, "Partition");
+        Identifier *partitionId = new Identifier(*GetLocation(), partTupleName);
+        Scope *partScope = new Scope(TaskPartitionScope);
+        for (int i = 0; i < partitionArgs->NumElements(); i++) {
+                Identifier *arg = partitionArgs->Nth(i);
+                VariableDef *var = new VariableDef(arg, Type::intType);
+                partitionDef->Append(var);
+                partScope->insert_symbol(new VariableSymbol(var));
+                partElementTypes->Append(Type::intType);
+        }
+        partitionTuple = new TupleDef(partitionId, partitionDef);
+        partitionTuple->setSymbol(new TupleSymbol(partitionId, partitionTuple, partElementTypes));
+        partitionTuple->getSymbol()->setNestedScope(partScope);
+        parentScope->insert_symbol(partitionTuple->getSymbol());
+
+        //----------------------------------------------------set the symbol for the task and its nested scope
+        
+	symbol = new TaskSymbol(id->getName(), this);
+        symbol->setNestedScope(scope);
+        ((TaskSymbol *) symbol)->setEnvScope(envScope);
+        ((TaskSymbol *) symbol)->setPartitionScope(partScope);
+        parentScope->insert_symbol(symbol);
 }

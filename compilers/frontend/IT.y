@@ -536,9 +536,9 @@ invoke_args	: expr						{ ($$ = new List<Expr*>)->Append($1); }
 		| invoke_args ',' expr				{ ($$ = $1)->Append($3); };
 
 /* ----------------------------------------------- Function Definition ------------------------------------------------------ */
-function	: Function Variable_Name 
+function	: Function {BeginCode();} Variable_Name 
 		  '(' function_args ')'
-		  '{' code '}'					{ $$ = new FunctionDef(new Identifier(@2, $2), $4, new StmtBlock($7)); };
+		  '{' code '}'					{ $$ = new FunctionDef(new Identifier(@3, $3), $5, new StmtBlock($8)); };
 function_args	:						{ $$ = new List<FunctionArg*>; }
 		| function_arg					{ ($$ = new List<FunctionArg*>)->Append($1); }
 		| function_args ',' function_arg		{ ($$ = $1)->Append($3); };

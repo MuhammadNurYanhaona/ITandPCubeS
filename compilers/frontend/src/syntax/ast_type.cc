@@ -112,6 +112,25 @@ void Type::storeBuiltInTypesInScope(Scope *scope) {
         dimensionTuple->attachScope(scope);
 }
 
+bool Type::isAssignableFrom(Type *other) {
+
+        if (this == Type::errorType || other == Type::errorType) {
+                return true;
+        } else if (this == Type::intType) {
+                return (other == Type::charType
+                                || other == Type::intType);
+        } else if (this == Type::floatType) {
+                return (other == Type::charType
+                                || other == Type::intType
+                                || other == Type::floatType);
+        } else if (this == Type::doubleType) {
+                return (other == Type::charType
+                                || other == Type::intType
+                                || other == Type::floatType
+                                || other == Type::doubleType);
+        } else { return this == other; }
+}
+
 //---------------------------------------------- Tuple Type ------------------------------------------------/
 
 NamedType::NamedType(Identifier *i) : Type(*i->GetLocation()) {
@@ -147,6 +166,12 @@ const char *NamedType::getCppDeclaration(const char *varName, bool pointer) {
         return strdup(decl.str().c_str());
 }
 
+bool NamedType::isEqual(Type *other) {
+        NamedType *otherType = dynamic_cast<NamedType*>(other);
+        if (otherType == NULL) return false;
+        return strcmp(this->getName(), otherType->getName()) == 0;
+}
+
 //---------------------------------------------- Array Type ------------------------------------------------/
 
 ArrayType::ArrayType(yyltype loc, Type *et, int dims) : Type(loc) {
@@ -176,6 +201,13 @@ const char *ArrayType::getCppDeclaration(const char *varName, bool pointer) {
         std::ostringstream decl;
         decl << this->getCType() << " " << varName;
         return strdup(decl.str().c_str());
+}
+
+bool ArrayType::isEqual(Type *other) {
+        ArrayType *otherArray = dynamic_cast<ArrayType*>(other);
+        if (otherArray == NULL) return false;
+        if (this->dimensions != otherArray->dimensions) return false;
+        return this->elemType->isEqual(otherArray->elemType);
 }
 
 //------------------------------------------- Static Array Type --------------------------------------------/
@@ -258,6 +290,12 @@ Type *ListType::getTerminalElementType() {
         return elemType;
 }
 
+bool ListType::isEqual(Type *other) {
+        ListType *otherList = dynamic_cast<ListType*>(other);
+        if (otherList == NULL) return false;
+        return this->elemType->isEqual(otherList->elemType);
+}
+
 //---------------------------------------------- Map Type --------------------------------------------------/
 
 MapType::MapType(yyltype loc) : Type(loc) {
@@ -323,4 +361,6 @@ const char *MapType::getCppDeclaration(const char *varName, bool pointer) {
         return strdup(decl.str().c_str());
 }
 
-
+bool MapType::isEqual(Type *other) {
+	return (dynamic_cast<MapType*>(other) != NULL);
+}

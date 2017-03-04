@@ -8,6 +8,14 @@ Program (args) {
 Class Rectangle:
 	top, bottom, left, right: Integer
 
+Function init_rand() {
+	@Extern {
+		@Language "C++"
+		@Includes { time.h, cstdlib }
+		${ srand(time(NULL)); }$
+	}
+}
+
 Task "Monte Carlo Area Estimation":
 	Define:
 		grid: 2d Array of Rectangle
@@ -18,19 +26,12 @@ Task "Monte Carlo Area Estimation":
 	Environment:
 		area: create
 	Initialize(cell_length, grid_dim, points_per_cell):
-		
 		grid.dimension1.range.min = 0
 		grid.dimension1.range.max = grid_dim - 1
 		grid.dimension2 = grid.dimension1
 		sub_area_estimates.dimension = grid.dimension
 		cell_size = cell_length * cell_length
-		
-		// initialize the random number generator for sampling
-		@Extern {
-			@Language "C++"
-			@Includes { time.h, cstdlib }
-			${ srand(time(NULL)); }$
-		}
+		init_rand()	
 	Stages:
 		setupGridCells(grid, cell_length) {
 			do { 

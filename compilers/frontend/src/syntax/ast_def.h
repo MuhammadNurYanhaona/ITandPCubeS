@@ -6,6 +6,7 @@
 #include "ast_stmt.h"
 #include "../common/constant.h"
 #include "../../../common-libs/utils/list.h"
+#include "../../../common-libs/utils/hashtable.h"
 
 #include <fstream>
 #include <sstream>
@@ -92,6 +93,12 @@ class TupleDef : public Definition {
   protected:
         Identifier *id;
         List<VariableDef*> *components;
+
+	// This is a flag to indicate if this custom type represents the environment of some task. 
+	// We need this to do specialized operations needed by environment objects. For example, 
+	// we declare pointers for environment types as opposed to object instances done for other 
+        // tuple types.
+        bool environment;
   public:
         TupleDef(Identifier *id, List<VariableDef*> *components); 
 	const char *GetPrintNameForNode() { return "Class"; } 
@@ -104,6 +111,8 @@ class TupleDef : public Definition {
 	void attachScope(Scope *parentScope);
         void validateScope(Scope *parentScope);
 	DefTypeId getDefTypeId() { return CLASS_DEF; }
+	void flagAsEnvironment() { environment = true; }
+        bool isEnvironment() { return environment; }
 };
 
 class CoordinatorDef : public Definition {
@@ -152,6 +161,10 @@ class FunctionDef : public Definition {
 	Identifier *getId() { return id; }	
 	
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	// a static map of function definitions is needed to retrieve a matching function definition by
+	// a matching name during polymorphic function resolutions based on call context
+	static Hashtable<FunctionDef*> *fnDefMap;
 	
 	Node *clone();
 	DefTypeId getDefTypeId() { return FN_DEF; }

@@ -34,6 +34,10 @@ class Type : public Node {
         virtual const char *getCType() { return typeName; }
         virtual const char *getCppDeclaration(const char *varName, bool pointer = false);
 
+	// These two functions are needed for expression type inferrence, and for type validation and matching.
+	virtual bool isAssignableFrom(Type *other);
+        virtual bool isEqual(Type *other) { return this == other; }
+
 	static void storeBuiltInTypesInScope(Scope *scope);
 };
 
@@ -57,6 +61,8 @@ class NamedType : public Type {
         Node *clone();
 	const char *getCType();
         const char *getCppDeclaration(const char *varName, bool pointer);
+	bool isAssignableFrom(Type *other) { return isEqual(other); }
+        bool isEqual(Type *other);
 	
 	// functions added to generate task-specific environment object classes
 	void flagAsEnvironmentType() { environmentType = true; }
@@ -82,6 +88,8 @@ class ArrayType : public Type {
 	const char *getCType();
         virtual const char *getCppDeclaration(const char *varName, bool pointer);
 	Type *getTerminalElementType();
+	bool isAssignableFrom(Type *other) { return isEqual(other); }
+        bool isEqual(Type *other);
 };
 
 class StaticArrayType : public ArrayType {
@@ -115,6 +123,8 @@ class ListType : public Type {
 	const char *getCType();
         const char *getCppDeclaration(const char *varName, bool pointer);
 	Type *getTerminalElementType();
+	bool isAssignableFrom(Type *other) { return isEqual(other); }
+        bool isEqual(Type *other);
 };
 
 class MapType : public Type {
@@ -136,6 +146,8 @@ class MapType : public Type {
         Node *clone();
 	const char *getCType() { return strdup("Hashtable<void*>"); }
         const char *getCppDeclaration(const char *varName, bool pointer);
+	bool isAssignableFrom(Type *other) { return isEqual(other); }
+        bool isEqual(Type *other);
 };
  
 #endif

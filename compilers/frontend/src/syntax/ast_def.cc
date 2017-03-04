@@ -121,8 +121,13 @@ void ProgramDef::performScopeAndTypeChecking() {
         Type::storeBuiltInTypesInScope(scope);
 	List<Definition*> *classDefs = getComponentsByType(CLASS_DEF);
 	for (int i = 0; i < classDefs->NumElements(); i++) {
-		Definition *classDef = classDefs->Nth(i);
-		classDef->attachScope(scope);	
+		TupleDef *classDef = (TupleDef*) classDefs->Nth(i);
+		Identifier *defId = classDef->getId();
+                if (scope->lookup(defId->getName()) != NULL) {
+                        ReportError::ConflictingDefinition(defId, false);
+                } else {
+			classDef->attachScope(scope);
+		}	
 	}
 	for (int i = 0; i < classDefs->NumElements(); i++) {
 		Definition *classDef = classDefs->Nth(i);
@@ -137,6 +142,20 @@ void ProgramDef::performScopeAndTypeChecking() {
 		fnDef->annotateArgAccessesByType();
 	}
 
+	//---------------------create a static function definition map to retrieve definitions
+	//----------------------by name for type-inference analysis for any function-call made 
+	//--------------------------------------------------------from the rest of the program
+	FunctionDef::fnDefMap = new Hashtable<FunctionDef*>;
+	for (int i = 0; i < fnDefs->NumElements(); i++) {
+		FunctionDef *fnDef = (FunctionDef*) fnDefs->Nth(i);
+		const char *fnName = fnDef->getId()->getName();
+                if (FunctionDef::fnDefMap->Lookup(fnName) != NULL) {
+                        ReportError::ConflictingDefinition(fnDef->getId(), false);
+                } else {
+			FunctionDef::fnDefMap->Enter(fnName, fnDef);
+		}
+	}
+ 
 	//-----------------analyze the stages section of the tasks before stage instanciations
 	List<Definition*> *taskDefs = getComponentsByType(TASK_DEF);
         for (int i = 0; i < taskDefs->NumElements(); i++) {
@@ -270,6 +289,8 @@ Node *FunctionArg::clone() {
 	Identifier *newName = (Identifier*) name->clone();
 	return new FunctionArg(newName, type);
 }
+	
+Hashtable<FunctionDef*> *FunctionDef::fnDefMap = NULL;
 
 FunctionDef::FunctionDef(Identifier *id, List<FunctionArg*> *arguments, Stmt *code) {
 	Assert(id != NULL && code != NULL);

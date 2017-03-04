@@ -1,8 +1,3 @@
-/* File: errors.cc
- * ---------------
- * Implementation for error-reporting class.
- */
-
 #include "errors.h"
 #include <iostream>
 #include <sstream>
@@ -73,7 +68,7 @@ void ReportError::UndeclaredTypeError(Identifier *variable, Type *type,
 
 void ReportError::ConflictingDefinition(Identifier *id, bool suppressFailure) {
 	OptionalErrorReport(id->GetLocation(), suppressFailure, 
-			"'%s' already declared in this scope", id->getName());
+			"'%s' has already been declared in this scope", id->getName());
 }
 
 void ReportError::NotReductionType(Identifier *id, bool suppressFailure) {
