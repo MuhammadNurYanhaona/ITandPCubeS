@@ -18,6 +18,13 @@ void Expr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	}
 }
 
+int Expr::performTypeInference(Scope *executionScope, Type *assumedType) {
+	if (this->type != NULL && this->type != Type::errorType) {
+		return inferExprTypes(executionScope, assumedType);
+	}
+	return 0;
+}
+
 //----------------------------------------------- Constant Expression -------------------------------------------------/
 
 IntConstant::IntConstant(yyltype loc, int val) : Expr(loc) {

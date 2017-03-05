@@ -3,8 +3,10 @@
 #include "ast_expr.h"
 #include "ast_def.h"
 #include "ast_task.h"
-#include "../common/location.h"
 #include "../common/errors.h"
+#include "../common/location.h"
+#include "../semantics/scope.h"
+#include "../semantics/symbol.h"
 #include "../../../common-libs/utils/list.h"
 
 #include <iostream>
@@ -42,6 +44,15 @@ void StmtBlock::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	}
 }
 
+int StmtBlock::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+	int resolvedExprs = 0;
+	for (int i = 0; i < stmts->NumElements(); i++) {
+                Stmt *stmt = stmts->Nth(i);
+		resolvedExprs += stmt->resolveExprTypesAndScopes(executionScope, iteration);
+	}
+	return resolvedExprs;
+}
+
 //-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
 ConditionalStmt::ConditionalStmt(Expr *c, Stmt *s, yyltype loc) : Stmt(loc) {
@@ -68,6 +79,16 @@ Node *ConditionalStmt::clone() {
 void ConditionalStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	if (condition != NULL) condition->retrieveExprByType(exprList, typeId);
 	stmt->retrieveExprByType(exprList, typeId);
+}
+
+int ConditionalStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+	int resolvedExprs = stmt->resolveExprTypesAndScopes(executionScope, iteration);
+	if (condition != NULL) {
+		resolvedExprs += condition->resolveExprTypesAndScopes(executionScope, iteration);
+		int inferredTypes = condition->performTypeInference(executionScope, Type::boolType);
+		resolvedExprs += inferredTypes;
+	}
+	return resolvedExprs;
 }
 
 //------------------------------------------------------------ If/Else Block -----------------------------------------------------------/
@@ -99,6 +120,15 @@ void IfStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
                 ConditionalStmt *stmt = ifBlocks->Nth(i);
 		stmt->retrieveExprByType(exprList, typeId);
 	}
+}
+
+int IfStmt::resolveExprTypesAndScopes(Scope *excutionScope, int iteration) {
+	int resolvedExprs = 0;
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+		resolvedExprs += stmt->resolveExprTypesAndScopes(excutionScope, iteration);
+	}
+	return resolvedExprs;
 }
 
 //-------------------------------------------------------- Index Range Condition -------------------------------------------------------/
@@ -143,14 +173,44 @@ void IndexRangeCondition::retrieveExprByType(List<Expr*> *exprList, ExprTypeId t
 	if (restrictions != NULL) restrictions->retrieveExprByType(exprList, typeId);
 }
 
+int IndexRangeCondition::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+	if (iteration == 0) {
+		for (int i = 0; i < indexes->NumElements(); i++) {
+			Identifier *ind = indexes->Nth(i);
+			const char* indexName = ind->getName();
+			if (executionScope->lookup(indexName) != NULL) {
+				ReportError::ConflictingDefinition(ind, false);
+			} else {
+				// The current version of the compiler resolves indexes as integer types as 
+				// opposed to IndexType that support non-unit stepping and wrapped around
+				// index range traversal. This is so since we have not enabled those features
+				// in the language yet.
+				VariableDef *variable = new VariableDef(ind, Type::intType);
+				executionScope->insert_symbol(new VariableSymbol(variable));
+			}
+		}
+	}
+	if (restrictions != NULL) {
+		int resolvedExprs = restrictions->resolveExprTypesAndScopes(executionScope, iteration);
+		int inferredTypes = restrictions->performTypeInference(executionScope, Type::boolType);
+		resolvedExprs += inferredTypes;
+		return resolvedExprs;
+	}
+	return 0;		
+}
+
 //------------------------------------------------------------ Loop Statement ----------------------------------------------------------/
 
-LoopStmt::LoopStmt() : Stmt() {}
+LoopStmt::LoopStmt() : Stmt() {
+	this->body = NULL;
+	this->scope = NULL;
+}
 
 LoopStmt::LoopStmt(Stmt *body, yyltype loc) : Stmt(loc) {
 	Assert(body != NULL);
 	this->body = body;
 	this->body->SetParent(this);
+	this->scope = NULL;
 }
 
 //------------------------------------------------------------ Parallel Loop ----------------------------------------------------------/
@@ -185,6 +245,32 @@ void PLoopStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 		condition->retrieveExprByType(exprList, typeId);
 	}
 	body->retrieveExprByType(exprList, typeId);
+}
+
+int PLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+
+	// create a new scope for the loop and enter it
+	Scope *loopScope = NULL;
+	if (iteration == 0) {
+		Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
+	} else {
+		loopScope = executionScope->enter_scope(this->scope);
+	}
+
+	int resolvedExprs = 0;
+	for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *condition = rangeConditions->Nth(i);
+		resolvedExprs += condition->resolveExprTypesAndScopes(loopScope, iteration);
+	}
+	
+	// try to resolve the body after evaluating the iteration expression to maximize type discovery
+	resolvedExprs += body->resolveExprTypesAndScopes(loopScope, iteration);
+
+	// exit the scope
+	loopScope->detach_from_parent();
+        this->scope = loopScope;
+
+	return resolvedExprs;
 }
 
 //------------------------------------------------------- Sequential For Loop --------------------------------------------------------/
@@ -247,6 +333,46 @@ void SLoopStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	body->retrieveExprByType(exprList, typeId);
 }
 
+int SLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+	
+	// create a new scope for the loop and enter it
+	Scope *loopScope = NULL;
+	if (iteration == 0) {
+		Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
+		
+		// enter the loop iterator in the scope
+		if (loopScope->lookup(id->getName()) != NULL) {
+                	ReportError::ConflictingDefinition(id, false);
+		} else {
+			VariableSymbol *var = new VariableSymbol(new VariableDef(id, Type::intType));
+			loopScope->insert_symbol(var);
+		}
+	} else {
+		loopScope = executionScope->enter_scope(this->scope);
+	}
+
+	int resolvedExprs = 0;
+	
+	// Type inference process only makes progress if the type of the expression is currently unknown 
+	// or erroneously resolved. So it is okay to just invoke the inference process after an attempt 
+	// is made to resolve the expression using the normal process. 
+	resolvedExprs += rangeExpr->resolveExprTypesAndScopes(loopScope, iteration);
+	resolvedExprs += rangeExpr->performTypeInference(loopScope, Type::rangeType);
+	if (stepExpr != NULL) {
+		resolvedExprs += stepExpr->resolveExprTypesAndScopes(loopScope, iteration);
+		resolvedExprs += stepExpr->performTypeInference(loopScope, Type::intType);
+	}
+	
+	// try to resolve the body after evaluating the iteration expression to maximize type discovery
+	resolvedExprs += body->resolveExprTypesAndScopes(loopScope, iteration);
+
+	// exit the scope
+	loopScope->detach_from_parent();
+        this->scope = loopScope;
+
+	return resolvedExprs;
+}
+
 //------------------------------------------------------------ While Loop ------------------------------------------------------------/
 
 WhileStmt::WhileStmt(Expr *c, Stmt *b, yyltype loc) : Stmt(loc) {
@@ -271,6 +397,17 @@ Node *WhileStmt::clone() {
 void WhileStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	condition->retrieveExprByType(exprList, typeId);
 	body->retrieveExprByType(exprList, typeId);
+}
+
+int WhileStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+	
+	int resolvedExprs = 0;
+	resolvedExprs += condition->resolveExprTypesAndScopes(executionScope, iteration);
+	resolvedExprs += condition->performTypeInference(executionScope, Type::boolType);
+
+	// try to resolve the body after evaluating the iteration expression to maximize type discovery
+	resolvedExprs += body->resolveExprTypesAndScopes(executionScope, iteration);
+	return resolvedExprs;
 }
 
 //-------------------------------------------------------- Reduction Statement -------------------------------------------------------/
@@ -337,6 +474,49 @@ Node *ReductionStmt::clone() {
 
 void ReductionStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	right->retrieveExprByType(exprList, typeId);
+}
+
+int ReductionStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+
+	int resolvedExprs = right->resolveExprTypesAndScopes(executionScope, iteration);
+	if (op == LOR || op == LAND) {
+		resolvedExprs += right->performTypeInference(executionScope, Type::boolType);
+	}
+
+	// resolve the result type from the reduced expression type
+	Type *rightType = right->getType();
+	Type *resultType = inferResultTypeFromOpAndExprType(rightType);	
+	if (resultType != NULL) {
+		const char *resultVar = left->getName();
+		if (executionScope->lookup(resultVar) == NULL) {
+			VariableSymbol *var = new VariableSymbol(new VariableDef(left, Type::intType));
+			executionScope->insert_inferred_symbol(var);
+			resolvedExprs++;	
+		}
+	}
+
+	return resolvedExprs;
+}
+
+Type *ReductionStmt::inferResultTypeFromOpAndExprType(Type *exprType) {
+
+	if (exprType == NULL || exprType == Type::errorType) return NULL;
+        
+	switch (op) {
+                case SUM: return exprType;
+                case PRODUCT: return exprType;
+                case MAX: return exprType;
+                case MIN: return exprType;
+                case AVG: return exprType;
+                case MIN_ENTRY: return Type::intType;
+                case MAX_ENTRY: return Type::intType;
+                case LOR: return Type::boolType;
+                case LAND: return Type::boolType;
+                case BOR: return exprType;
+                case BAND: return exprType;
+        }
+
+	return NULL;
 }
 
 //-------------------------------------------------------- External Code Block -------------------------------------------------------/
@@ -407,4 +587,8 @@ Node *ReturnStmt::clone() {
 
 void ReturnStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 	expr->retrieveExprByType(exprList, typeId);
+}
+
+int ReturnStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
+	return expr->resolveExprTypesAndScopes(executionScope, iteration);
 }

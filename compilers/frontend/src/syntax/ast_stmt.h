@@ -9,6 +9,8 @@
 #include <sstream>
 
 class Expr;
+class Scope;
+class Type;
 
 class Stmt : public Node {
   public:
@@ -20,6 +22,17 @@ class Stmt : public Node {
 	// This function is needed to filter all nested expressions with a specific type for tagging and
 	// further processing.
 	virtual void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) = 0;
+
+	// Scope-and-type checking is done by recursively going through each statement within a code block 
+	// and then by examining each expression within that statement. All sub-classes of statement class, 
+	// therefore should provide an implementation for this method. Since IT has a mixture of implicit
+	// and explicit typing, this function has to be invoked again and again to infer the unknown types 
+	// of some expressions until a fixed-point has been reached when no new type can be inferred. Whether
+	// a particular invocation of this method has resolved any new type is determined by the returned 
+	// value. The returned integer indicates the number of new type resolutions. The second argument
+	// indicates the round at which the scope-and-type resolution is currently in for special treatment
+	// of the first iteration when needed. 
+	virtual int resolveExprTypesAndScopes(Scope *executionScope, int iteration) = 0;
 };
 
 class StmtBlock : public Stmt {
@@ -34,6 +47,7 @@ class StmtBlock : public Stmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 };
 
 class ConditionalStmt: public Stmt {
@@ -49,6 +63,7 @@ class ConditionalStmt: public Stmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 };
 
 class IfStmt: public Stmt {
@@ -63,6 +78,7 @@ class IfStmt: public Stmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 };
 
 class IndexRangeCondition: public Node {
@@ -83,11 +99,15 @@ class IndexRangeCondition: public Node {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 };
 
 class LoopStmt: public Stmt {
   protected:
 	Stmt *body;
+	
+	// this scope is needed to declare the index variables that are used to traverse index ranges
+	Scope *scope;
   public:
 	LoopStmt();
      	LoopStmt(Stmt *body, yyltype loc);
@@ -105,6 +125,7 @@ class PLoopStmt: public LoopStmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 };
 
 class SLoopAttribute {
@@ -139,6 +160,7 @@ class SLoopStmt: public LoopStmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 };
 
 class WhileStmt: public Stmt {
@@ -154,6 +176,7 @@ class WhileStmt: public Stmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 };
 
 class ReductionStmt: public Stmt {
@@ -171,6 +194,12 @@ class ReductionStmt: public Stmt {
 	ReductionStmt(Identifier *l, ReductionOperator o, Expr *r, yyltype loc);
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+
+	// The reduction operator can be used not only for inferring the type of the expression being reduced
+	// but also sometimes for inferring the type type of the result variable. This function embodies the
+	// logic of inferring a result variable type given the reduced expression type as an argument.
+	Type *inferResultTypeFromOpAndExprType(Type *exprType);
 };
 
 class ExternCodeBlock: public Stmt {
@@ -191,6 +220,7 @@ class ExternCodeBlock: public Stmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {}
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration) {}
 };
 
 class ReturnStmt: public Stmt {
@@ -205,6 +235,8 @@ class ReturnStmt: public Stmt {
 
         Node *clone();		
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	Expr *getExpr() { return expr; }
 };
 
 #endif

@@ -15,6 +15,7 @@
 class TaskDef;
 class FieldAccess;
 class Space;
+class Scope;
 
 class Expr : public Stmt {
   protected:
@@ -25,6 +26,8 @@ class Expr : public Stmt {
 	
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
+	Type *getType() { return type; }
+
 	// subclasses should implement this function to return a unique expression ID per class 
 	virtual ExprTypeId getExprTypeId() = 0;
 
@@ -32,6 +35,17 @@ class Expr : public Stmt {
 	// must provides its own implementation for this function. Otherwise this baseclass implementation
 	// is sufficient.
 	virtual void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration) { return 0; }
+
+	// Sometimes the type of an expression can be assumed from the context it has been used. Similarly,
+	// a larger parent expression my lead to type discoveries of its sub-expressions. This function is
+	// the interface for this kind of type inference. The return value should indicate the number of 
+	// new type resolutions have been enabled through the type inference mechanism. 
+	int performTypeInference(Scope *executionScope, Type *assumedType);
+  protected:
+	// supporting function for the type inference procedure that subclasses to provide implementation for
+	virtual int inferExprTypes(Scope *executionScope, Type *assignedType) { return 0; }
 };
 
 class IntConstant : public Expr {
