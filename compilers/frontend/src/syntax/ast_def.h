@@ -14,6 +14,7 @@
 class TaskDef;
 class TupleDef;
 class CoordinatorDef;
+class FunctionInstance;
 
 enum DefTypeId { VAR_DEF, PROG_DEF, FN_DEF, CLASS_DEF, COORD_DEF, TASK_DEF };
 
@@ -113,6 +114,7 @@ class TupleDef : public Definition {
 	DefTypeId getDefTypeId() { return CLASS_DEF; }
 	void flagAsEnvironment() { environment = true; }
         bool isEnvironment() { return environment; }
+	VariableDef *getComponent(const char *name);
 };
 
 class CoordinatorDef : public Definition {
@@ -154,6 +156,7 @@ class FunctionDef : public Definition {
 	Identifier *id;
 	List<FunctionArg*> *arguments;
 	Stmt *code;
+	List<FunctionInstance*> *instanceList;
   public:
 	FunctionDef(Identifier *id, List<FunctionArg*> *arguments, Stmt *code);
 	const char *GetPrintNameForNode() { return "Sequential-Function"; } 
@@ -168,11 +171,45 @@ class FunctionDef : public Definition {
 	
 	Node *clone();
 	DefTypeId getDefTypeId() { return FN_DEF; }
+	List<FunctionArg*> *getArguments() { return arguments; }
+	Stmt *getCode() { return code; }
 	
 	// The reference and value type arguments should be treated differently inside the function body.
 	// This function annotates the expressions that involves any argument access with proper type for
 	// later analysis.
 	void annotateArgAccessesByType();
+
+	// This creates a new function instance for a specific parameter types combination that arouse from
+	// a specific call context. this works if the type resolution process on the function body completes 
+	// successfully of course. 
+	Type *resolveFnInstanceForParameterTypes(Scope *programScope, 
+			List<Type*> *paramTypes, 
+			Identifier *callerId);
+  protected:
+	FunctionInstance *getInstanceForParamTypes(List<Type*> *paramTypes);	
+};
+
+// IT functions are type polymorphic. To generate code for a function for a specific call context, we need
+// to resolve the function body for the parameter types and generate a type-specific copy of the function.
+// This class represents such a type-specific instance. We could not just generate a templated function from
+// original function definition as IT uses type inference to resolve local variables' types and not fixing
+// the return types of functions would leave any expressions having a function call also unresolved. 
+class FunctionInstance {
+  protected:
+	const char *fnName;
+	List<FunctionArg*> *arguments;
+	List<Type*> *argumentTypes;
+	Type *returnType;
+	Stmt *code;
+  public:
+	FunctionInstance(FunctionDef *fnDef, 
+		int instanceId, List<Type*> *argTypes, Scope *programScope);
+	Type *getReturnType() { return returnType; }
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	void performScopeAndTypeChecking(Scope *programScope);
+	bool isMatchingArguments(List<Type*> *argTypeList);
 };
 
 #endif

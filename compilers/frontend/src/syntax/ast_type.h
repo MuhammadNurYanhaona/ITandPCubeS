@@ -90,6 +90,7 @@ class ArrayType : public Type {
 	Type *getTerminalElementType();
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
         bool isEqual(Type *other);
+	virtual Type *reduceADimension();
 };
 
 class StaticArrayType : public ArrayType {
@@ -105,8 +106,8 @@ class StaticArrayType : public ArrayType {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
-	Type *reduceADimension();
         const char *getCppDeclaration(const char *varName, bool pointer);
+	Type *reduceADimension();
 };
 
 class ListType : public Type {

@@ -13,9 +13,7 @@
 const char *Root::Name = "root";
 const char *Random::Name = "random";
 const char *LoadArray::Name = "load_array";
-const char *LoadListOfArrays::Name = "load_list_of_arrays";
 const char *StoreArray::Name = "store_array";
-const char *StoreListOfArrays::Name = "store_list_of_arrays";
 const char *BindInput::Name = "bind_input";
 const char *BindOutput::Name = "bind_output";
 
@@ -36,10 +34,10 @@ LibraryFunction::LibraryFunction(int argumentCount, Identifier *functionName, Li
 
 bool LibraryFunction::isLibraryFunction(Identifier *id) {
         const char* name = id->getName();
-        return (strcmp(name, Root::Name) == 0 || strcmp(name, Random::Name) == 0
-                || strcmp(name, LoadArray::Name) == 0 || strcmp(name, LoadListOfArrays::Name) == 0
+        return (strcmp(name, Root::Name) == 0 
+		|| strcmp(name, Random::Name) == 0
+                || strcmp(name, LoadArray::Name) == 0 
                 || strcmp(name, StoreArray::Name) == 0
-                || strcmp(name, StoreListOfArrays::Name) == 0
                 || strcmp(name, BindInput::Name) == 0
                 || strcmp(name, BindOutput::Name) == 0);
 }
@@ -49,19 +47,16 @@ LibraryFunction *LibraryFunction::getFunctionExpr(Identifier *id, List<Expr*> *a
         const char* name = id->getName();
         LibraryFunction *function = NULL;
 
-        // note that there should never be a default 'else' block here; then the system will fail to find user defined functions
+        // note that there should never be a default 'else' block here; then the system will fail to find user 
+	// defined functions
         if (strcmp(name, Root::Name) == 0) {
                 function = new Root(id, arguments, loc);
         } else if (strcmp(name, Random::Name) == 0) {
                 function = new Random(id, arguments, loc);
         } else if (strcmp(name, LoadArray::Name) == 0) {
                 function = new LoadArray(id, arguments, loc);
-        } else if (strcmp(name, LoadListOfArrays::Name) == 0) {
-                function = new LoadListOfArrays(id, arguments, loc);
         } else if (strcmp(name, StoreArray::Name) == 0) {
                 function = new StoreArray(id, arguments, loc);
-        } else if (strcmp(name, StoreListOfArrays::Name) == 0) {
-                function = new StoreListOfArrays(id, arguments, loc);
         } else if (strcmp(name, BindInput::Name) == 0) {
                 function = new BindInput(id, arguments, loc);
         } else if (strcmp(name, BindOutput::Name) == 0) {
@@ -93,4 +88,80 @@ void LibraryFunction::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeI
                 Expr *arg = arguments->Nth(i);
 		arg->retrieveExprByType(exprList, typeId);
 	}
+}
+
+//-------------------------------------------------------------- Root -----------------------------------------------------------/
+
+int Root::resolveExprTypes(Scope *scope) {
+
+	int resolvedExprs = 0;
+	Expr *arg1 = arguments->Nth(0);
+        Expr *arg2 = arguments->Nth(1);
+        resolvedExprs += arg1->resolveExprTypes(scope);
+        resolvedExprs += arg2->resolveExprTypes(scope);
+	resolvedExprs += arg2->performTypeInference(scope, Type::intType);
+
+	Type *arg1Type = arg1->getType();
+	if (arg1Type != NULL && arg2->getType() != NULL) {
+		this->type = arg1Type;
+		resolvedExprs++;
+	}
+	return resolvedExprs;
+}
+
+//--------------------------------------------------------- Array Operation -----------------------------------------------------/
+
+int ArrayOperation::resolveExprTypes(Scope *scope) {
+
+	int resolvedExprs = 0;
+	Expr *arg1 = arguments->Nth(0);
+        resolvedExprs += arg1->resolveExprTypes(scope);
+        Type *arg1Type = arg1->getType();
+
+	Expr *arg2 = arguments->Nth(1);
+        resolvedExprs += arg2->resolveExprTypes(scope);
+	resolvedExprs += arg2->performTypeInference(scope, Type::stringType);
+        Type *arg2Type = arg2->getType();
+
+	if (arg1Type != NULL && arg2Type != NULL) {
+		this->type = Type::voidType;
+		resolvedExprs++;
+	}
+	return resolvedExprs;
+}
+
+//--------------------------------------------------------- Bind Operation ------------------------------------------------------/
+
+int BindOperation::resolveExprTypes(Scope *scope) {
+
+	int resolvedExprs = 0;
+	Expr *arg1 = arguments->Nth(0);	
+	resolvedExprs += arg1->resolveExprTypes(scope);
+
+	// identify the task environment type from the first argument
+        Type *arg1Type = arg1->getType();
+	NamedType *envType = NULL;
+	if (arg1Type != NULL) {
+                NamedType *objectType = dynamic_cast<NamedType*>(arg1Type);
+                if (objectType != NULL && !objectType->isEnvironmentType()) {
+                        envType = objectType;
+                }
+        }
+
+	Expr *arg2 = arguments->Nth(1);
+	resolvedExprs += arg2->resolveExprTypes(scope);
+	resolvedExprs += arg2->performTypeInference(scope, Type::stringType);
+	Type *arg2Type = arg2->getType();
+
+	Expr *arg3 = arguments->Nth(2);
+	resolvedExprs += arg3->resolveExprTypes(scope);
+	resolvedExprs += arg3->performTypeInference(scope, Type::stringType);
+	Type *arg3Type = arg3->getType();
+
+	if (arg1Type != NULL && arg2Type != NULL && arg3Type != NULL) {
+		this->type = Type::voidType;
+		resolvedExprs++;
+	}
+
+	return resolvedExprs;
 }

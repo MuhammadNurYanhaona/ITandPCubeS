@@ -56,6 +56,11 @@ class Root : public LibraryFunction {
 	static const char *Name;	
 	Root(Identifier *id, List<Expr*> *arguments, yyltype loc) 
 		: LibraryFunction(2, id, arguments, loc) {}
+
+        //-------------------------------------------------------------- Helper functions for Semantic Analysis
+
+	int resolveExprTypes(Scope *scope);
+	int countTypeErrors();
 };
 
 class Random : public LibraryFunction {
@@ -64,17 +69,23 @@ class Random : public LibraryFunction {
 	Random(Identifier *id, List<Expr*> *arguments, yyltype loc) 
 			: LibraryFunction(0, id, arguments, loc) {
 		this->type = Type::intType;
-	}	
+	}
+	int countTypeErrors();	
 };
 
 /*------------------------------------------------------------------------------------------------------------- 
-	   Four functions for loading or storing array(s) directly in the coordinator program
+	       Functions for loading or storing arrays directly in the coordinator program
 -------------------------------------------------------------------------------------------------------------*/
 
 class ArrayOperation : public LibraryFunction {
   public:
 	ArrayOperation(Identifier *id, List<Expr*> *arguments, yyltype loc)
                 : LibraryFunction(2, id, arguments, loc) {}
+
+        //-------------------------------------------------------------- Helper functions for Semantic Analysis
+
+	virtual int resolveExprTypes(Scope *scope);
+	int countTypeErrors();
 };
 
 class LoadArray : public ArrayOperation {
@@ -91,20 +102,6 @@ class StoreArray : public ArrayOperation {
 			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
 };
 
-class LoadListOfArrays : public ArrayOperation {
-  public:
-	static const char *Name;	
-	LoadListOfArrays(Identifier *id, List<Expr*> *arguments, 
-			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
-};
-
-class StoreListOfArrays : public ArrayOperation {
-  public:
-	static const char *Name;	
-	StoreListOfArrays(Identifier *id, List<Expr*> *arguments, 
-			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
-};
-
 /*------------------------------------------------------------------------------------------------------------- 
 	   Functions for instructing a task to get data input or write data output to/from files
 -------------------------------------------------------------------------------------------------------------*/
@@ -113,6 +110,11 @@ class BindOperation : public LibraryFunction {
   public:
 	BindOperation(Identifier *id, List<Expr*> *arguments, yyltype loc)
                 : LibraryFunction(3, id, arguments, loc) {}
+
+        //-------------------------------------------------------------- Helper functions for Semantic Analysis
+
+	int resolveExprTypes(Scope *scope);
+	int countTypeErrors();
 };
 
 class BindInput : public BindOperation {

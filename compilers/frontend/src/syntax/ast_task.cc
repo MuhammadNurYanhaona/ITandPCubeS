@@ -351,6 +351,11 @@ void TaskDef::analyzeStageDefinitions() {
 	}
 }
 
+List<Type*> *TaskDef::getInitArgTypes() {
+	if (initialize == NULL) return new List<Type*>;
+        else return initialize->getArgumentTypes();
+}
+
 void TaskDef::attachScope(Scope *parentScope) {
 
         //--------------------------------create a scope with all the variables declared in the define section

@@ -33,6 +33,10 @@ class Stmt : public Node {
 	// indicates the round at which the scope-and-type resolution is currently in for special treatment
 	// of the first iteration when needed. 
 	virtual int resolveExprTypesAndScopes(Scope *executionScope, int iteration) = 0;
+
+	// This function is needed to determine if the type-and-scope resolution process ended with some
+	// expressions type-less or having error type.
+	virtual int countTypeErrors() = 0;
 };
 
 class StmtBlock : public Stmt {
@@ -48,6 +52,7 @@ class StmtBlock : public Stmt {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 };
 
 class ConditionalStmt: public Stmt {
@@ -64,6 +69,7 @@ class ConditionalStmt: public Stmt {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 };
 
 class IfStmt: public Stmt {
@@ -79,6 +85,7 @@ class IfStmt: public Stmt {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 };
 
 class IndexRangeCondition: public Node {
@@ -100,6 +107,7 @@ class IndexRangeCondition: public Node {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 };
 
 class LoopStmt: public Stmt {
@@ -126,6 +134,7 @@ class PLoopStmt: public LoopStmt {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 };
 
 class SLoopAttribute {
@@ -161,6 +170,7 @@ class SLoopStmt: public LoopStmt {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 };
 
 class WhileStmt: public Stmt {
@@ -177,6 +187,7 @@ class WhileStmt: public Stmt {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 };
 
 class ReductionStmt: public Stmt {
@@ -195,7 +206,9 @@ class ReductionStmt: public Stmt {
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	int countTypeErrors();
 
+  protected:
 	// The reduction operator can be used not only for inferring the type of the expression being reduced
 	// but also sometimes for inferring the type type of the result variable. This function embodies the
 	// logic of inferring a result variable type given the reduced expression type as an argument.
@@ -220,7 +233,8 @@ class ExternCodeBlock: public Stmt {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {}
-	int resolveExprTypesAndScopes(Scope *executionScope, int iteration) {}
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration) { return 0; }
+	int countTypeErrors() { return 0; }
 };
 
 class ReturnStmt: public Stmt {
@@ -237,6 +251,7 @@ class ReturnStmt: public Stmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	Expr *getExpr() { return expr; }
+	int countTypeErrors();
 };
 
 #endif

@@ -35,25 +35,31 @@ class ReportError
 	static void NotAConstant(yyltype *loc, const char *constType, bool suppressFailure);
 	
 	//----------------------------------------------------------------------------------------------- Conflicting Usage Errors
+	
 	static void ConflictingArrayDimensionCounts(yyltype *loc, const char *name, 
 			int oldDimension, int currDimension, bool suppressFailure);
-
-
 	static void ConflictingDefinition(Identifier *id, bool suppressFailure);
-	static void UndefinedSymbol(Identifier *id, bool suppressFailure);
-	static void UndefinedSymbol(yyltype *loc, const char *name, bool suppressFailure);
+
+	//--------------------------------------------------------------------------------------------------- Invalid Usage Errors
+
+	static void NonLValueInAssignment(Expr *expr, bool suppressFailure);
+	static void TooFewOrTooManyParameters(Identifier *name, int actual, int expected, bool suppressFailure);
+	static void TooManyParametersInNew(yyltype *loc, const char *objectType, int actual, int expected, bool suppressFailure);
 	static void NoSuchFieldInBase(Identifier *field, Type *type, bool suppressFailure);
 	static void NonExistingDimensionInArray(Identifier *id, int dimensionality, int dimension, bool suppressFailure);	
-	static void NonLValueInAssignment(Expr *expr, bool suppressFailure);
 	static void InvalidArrayAccess(yyltype *loc, Type *actualType, bool suppressFailure);
-	static void TooFewOrTooManyParameters(Identifier *name, int actual, int expected, bool suppressFailure);
-	static void TaskNameRequiredInEnvironmentCreate(yyltype *loc, bool suppressFailure);
 	static void InvalidObjectTypeInNew(Type *type, bool suppressFailure);
-	static void TooManyParametersInNew(yyltype *loc, const char *objectType, int actual, int expected, bool suppressFailure);
-	static void UndefinedTask(yyltype *loc, const char *name, bool suppressFailure);
 	static void NonArrayInIndexedIteration(Identifier *id, Type *type, bool suppressFailure);	
-	static void UnknownIndexToArrayAssociation(Identifier *index, Identifier *array, bool suppressFailure);	
 	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	
+	
+	//-------------------------------------------------------------------------------------------- Missing Information  Errors
+
+	static void UndefinedSymbol(Identifier *id, bool suppressFailure);
+	static void UndefinedSymbol(yyltype *loc, const char *name, bool suppressFailure);
+	static void UnspecifiedTaskToExecute(yyltype *loc, bool suppressFailure);
+	static void TaskNameRequiredInEnvironmentCreate(yyltype *loc, bool suppressFailure);
+	static void UndefinedTask(yyltype *loc, const char *name, bool suppressFailure);
+	static void UnknownIndexToArrayAssociation(Identifier *index, Identifier *array, bool suppressFailure);	
 	static void CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure);	
 	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);
 	static void ReductionRangeInvalid(yyltype *loc, const char *rdRootLps, const char *rdBoundaryLps, bool suppressFailure);

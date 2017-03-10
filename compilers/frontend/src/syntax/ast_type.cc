@@ -210,6 +210,11 @@ bool ArrayType::isEqual(Type *other) {
         return this->elemType->isEqual(otherArray->elemType);
 }
 
+Type *ArrayType::reduceADimension() {
+        if (dimensions == 1) return elemType;
+        return new ArrayType(*GetLocation(), elemType, dimensions - 1);
+}
+
 //------------------------------------------- Static Array Type --------------------------------------------/
 
 void StaticArrayType::setLengths(List<int> *dimLengths) {
@@ -250,6 +255,17 @@ Type *ArrayType::getTerminalElementType() {
                 return elemArray->getTerminalElementType();
         }
         return elemType;
+}
+
+Type *StaticArrayType::reduceADimension() {
+        if (dimensions == 1) return elemType;
+        StaticArrayType *arrayType = new StaticArrayType(*GetLocation(), elemType, dimensions - 1);
+        List<int> *dims = new List<int>;
+        for (int i = 1; i < dimensionLengths->NumElements(); i++) {
+                dims->Append(dimensionLengths->Nth(i));
+        }
+        arrayType->setLengths(dims);
+        return arrayType;
 }
 
 //---------------------------------------------- List Type -------------------------------------------------/

@@ -36,7 +36,11 @@ class Expr : public Stmt {
 	// is sufficient.
 	virtual void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 
-	int resolveExprTypesAndScopes(Scope *executionScope, int iteration) { return 0; }
+	// the two type resolution functions that extend the resolution process from statement subclasses to 
+	// expression subclasses; subclasses should provide implementation for the first; the second is just
+	// a maching implementation for the interface function for scope-and-type checking
+	virtual int resolveExprTypes(Scope *scope) { return 0; }
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 
 	// Sometimes the type of an expression can be assumed from the context it has been used. Similarly,
 	// a larger parent expression my lead to type discoveries of its sub-expressions. This function is
@@ -45,7 +49,7 @@ class Expr : public Stmt {
 	int performTypeInference(Scope *executionScope, Type *assumedType);
   protected:
 	// supporting function for the type inference procedure that subclasses to provide implementation for
-	virtual int inferExprTypes(Scope *executionScope, Type *assignedType) { return 0; }
+	virtual int inferExprTypes(Scope *scope, Type *assignedType) { return 0; }
 };
 
 class IntConstant : public Expr {
@@ -63,6 +67,7 @@ class IntConstant : public Expr {
 
         Node *clone() { return new IntConstant(*GetLocation(), value, size); }
 	ExprTypeId getExprTypeId() { return INT_CONST; };
+	int countTypeErrors();
 };
 
 class FloatConstant : public Expr {
@@ -77,6 +82,7 @@ class FloatConstant : public Expr {
 
         Node *clone() { return new FloatConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return FLOAT_CONST; };
+	int countTypeErrors();
 };
 
 class DoubleConstant : public Expr {
@@ -91,6 +97,7 @@ class DoubleConstant : public Expr {
 
         Node *clone() { return new DoubleConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return DOUBLE_CONST; };
+	int countTypeErrors();
 };
 
 class BoolConstant : public Expr {
@@ -105,6 +112,7 @@ class BoolConstant : public Expr {
 
         Node *clone() { return new BoolConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return BOOL_CONST; };
+	int countTypeErrors();
 };
 
 class StringConstant : public Expr {
@@ -120,6 +128,7 @@ class StringConstant : public Expr {
 
         Node *clone() { return new StringConstant(*GetLocation(), strdup(value)); }
 	ExprTypeId getExprTypeId() { return STRING_CONST; };
+	int countTypeErrors();
 };
 
 class CharConstant : public Expr {
@@ -134,6 +143,7 @@ class CharConstant : public Expr {
 
         Node *clone() { return new CharConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return CHAR_CONST; };
+	int countTypeErrors();
 };
 
 class ReductionVar : public Expr {
@@ -149,6 +159,8 @@ class ReductionVar : public Expr {
 
         Node *clone() { return new ReductionVar(spaceId, strdup(name), *GetLocation()); }
 	ExprTypeId getExprTypeId() { return REDUCTION_VAR; };
+	int resolveExprTypes(Scope *scope);
+	int countTypeErrors();
 };
 
 class ArithmaticExpr : public Expr {
@@ -166,6 +178,9 @@ class ArithmaticExpr : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return ARITH_EXPR; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class LogicalExpr : public Expr {
@@ -186,6 +201,9 @@ class LogicalExpr : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return LOGIC_EXPR; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class EpochExpr : public Expr {
@@ -202,6 +220,9 @@ class EpochExpr : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return EPOCH_EXPR; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class FieldAccess : public Expr {
@@ -236,6 +257,10 @@ class FieldAccess : public Expr {
 	// this will return 'a'; this does not work for accessing properties from elements of an array, i.e.,
 	// if the access is like a[i].b then the function should return NULL.
 	FieldAccess *getTerminalField();
+	
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class RangeExpr : public Expr {
@@ -258,6 +283,9 @@ class RangeExpr : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return RANGE_EXPR; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };	
 
 class AssignmentExpr : public Expr {
@@ -276,6 +304,9 @@ class AssignmentExpr : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return ASSIGN_EXPR; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class IndexRange : public Expr {
@@ -298,6 +329,9 @@ class IndexRange : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return INDEX_RANGE; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class ArrayAccess : public Expr {
@@ -319,6 +353,9 @@ class ArrayAccess : public Expr {
 
 	int getIndexPosition();
         Expr *getEndpointOfArrayAccess();
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class FunctionCall : public Expr {
@@ -335,6 +372,9 @@ class FunctionCall : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return FN_CALL; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 class NamedArgument : public Node {
@@ -367,6 +407,9 @@ class NamedMultiArgument : public Node {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	const char *getName() { return argName; }
+	List<Expr*> *getArgList() { return argList; }
 };
 
 class TaskInvocation : public Expr {
@@ -382,6 +425,18 @@ class TaskInvocation : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return TASK_INVOKE; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
+
+	// helper functions to retrieve different types of task invocation arguments 
+	const char *getTaskName();
+	FieldAccess *getEnvArgument();
+	List<Expr*> *getInitArguments();
+	List<Expr*> *getPartitionArguments();
+
+  protected:
+	NamedMultiArgument *retrieveArgByName(const char *argName);
 };
 
 class ObjectCreate : public Expr {
@@ -398,6 +453,9 @@ class ObjectCreate : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return OBJ_CREATE; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
+	int countTypeErrors();
 };
 
 #endif

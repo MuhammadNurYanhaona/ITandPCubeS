@@ -127,6 +127,10 @@ void ReportError::UndefinedSymbol(yyltype *loc, const char *name, bool suppressF
 	OptionalErrorReport(loc, suppressFailure, "No definition found for '%s'", name);
 }
 
+void ReportError::UnspecifiedTaskToExecute(yyltype *loc, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "A valid 'task' name and 'environment' must exist to execute");
+}
+
 void ReportError::WrongSymbolType(Identifier *id, const char *expectedType, bool suppressFailure) {
 	OptionalErrorReport(id->GetLocation(), suppressFailure, 
 			"Symbol type for '%s' does not match; expecting '%s'", 
@@ -173,7 +177,7 @@ void ReportError::TooFewOrTooManyParameters(Identifier *name, int actual,
 }
 
 void ReportError::TaskNameRequiredInEnvironmentCreate(yyltype *loc, bool suppressFailure) {
-	OptionalErrorReport(loc, suppressFailure, "The name of the task must be specified in environment creation");
+	OptionalErrorReport(loc, suppressFailure, "The 'name' of the task must be specified in environment creation");
 }
 
 void ReportError::InvalidObjectTypeInNew(Type *type, bool suppressFailure) {

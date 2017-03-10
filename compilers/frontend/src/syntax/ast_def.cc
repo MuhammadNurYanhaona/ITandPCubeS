@@ -192,6 +192,7 @@ TupleDef::TupleDef(Identifier *i, List<VariableDef*> *c) : Definition(*i->GetLoc
                 VariableDef *var = components->Nth(j);
                 var->SetParent(this);
         }
+	environment = false;
 }
 
 void TupleDef::PrintChildren(int indentLevel) {
@@ -209,6 +210,8 @@ Node *TupleDef::clone() {
                 newCompList->Append(newVar);
         }
 	TupleDef *newDef = new TupleDef(newId, newCompList);
+	if (environment) newDef->flagAsEnvironment();
+	return newDef;
 }
 
 void TupleDef::attachScope(Scope *parentScope) {
@@ -236,6 +239,14 @@ void TupleDef::validateScope(Scope *parentScope) {
                 VariableDef *element = components->Nth(i);
                 element->validateScope(parentScope);
         }
+}
+
+VariableDef *TupleDef::getComponent(const char *name) {
+        for (int i = 0; i < components->NumElements(); i++) {
+                VariableDef *element = components->Nth(i);
+                if (strcmp(element->getId()->getName(), name) == 0) return element;
+        }
+        return NULL;
 }
 
 //----------------------------------- Coordinator/Main Definition -------------------------------------/
@@ -277,7 +288,7 @@ FunctionArg::FunctionArg(Identifier *name, ArgumentType type) {
 }
         
 void FunctionArg::PrintChildren(int indentLevel) {
-	if (type = VALUE_TYPE) {
+	if (type == VALUE_TYPE) {
 		PrintLabel(indentLevel + 1, "Reference Arg:");
 	} else {
         	PrintLabel(indentLevel + 1, "Value Arg: ");
@@ -304,6 +315,7 @@ FunctionDef::FunctionDef(Identifier *id, List<FunctionArg*> *arguments, Stmt *co
 			arguments->Nth(i)->SetParent(this);
 		}
 	}
+	instanceList = new List<FunctionInstance*>;
 }
         
 void FunctionDef::PrintChildren(int indentLevel) {
@@ -362,4 +374,64 @@ void FunctionDef::annotateArgAccessesByType() {
 
 	delete fieldAccesses;
 	delete refArgNames;
+}
+
+Type *FunctionDef::resolveFnInstanceForParameterTypes(Scope *programScope, 
+		List<Type*> *paramTypes, Identifier *callerId) {
+
+	if (arguments->NumElements() != paramTypes->NumElements()) {
+		ReportError::TooFewOrTooManyParameters(callerId, paramTypes->NumElements(),
+				arguments->NumElements(), false);
+		return Type::errorType;
+	}
+
+	// check if the function has been resolved already for the specific parameter type combination
+	FunctionInstance *fnInstance = getInstanceForParamTypes(paramTypes);
+	if (fnInstance != NULL) return fnInstance->getReturnType();
+
+			
+}
+
+FunctionInstance *FunctionDef::getInstanceForParamTypes(List<Type*> *paramTypes) {
+	for (int i = 0; i < instanceList->NumElements(); i++) {
+		FunctionInstance *instance = instanceList->Nth(i);
+		if (instance->isMatchingArguments(paramTypes)) return instance;
+	}
+	return NULL;	
+}
+
+//---------------------------------------- Function Instance ------------------------------------------/
+
+FunctionInstance::FunctionInstance(FunctionDef *fnDef, 
+		int instanceId, List<Type*> *argTypes, Scope *programScope) {
+	
+	// generate a unique name for the function instance
+	std::ostringstream stream;
+	stream << fnDef->getId()->getName();
+	stream << "_" << instanceId;
+	this->fnName = strdup(stream.str().c_str());
+	
+	// get the argument names from the original function definition and assign them types
+	this->arguments = fnDef->getArguments();
+	this->argumentTypes = argTypes;
+
+	// create a complete clone of the code for instance specific analysis later
+	this->code = (Stmt*) fnDef->getCode()->clone();
+
+	// do scope and type checking to resolve types of expressions in the body of the code
+	performScopeAndTypeChecking(programScope);
+
+	// check if the function has any un-resolved or erroneous expression  
+
+	this->returnType = NULL;
+		
+}
+
+bool FunctionInstance::isMatchingArguments(List<Type*> *argTypeList) {
+	for (int i = 0; i < argumentTypes->NumElements(); i++) {
+		Type *actualType = argTypeList->Nth(i);
+		Type *expectedType = argumentTypes->Nth(i);
+		if (!actualType->isEqual(expectedType)) return false;
+	}
+	return true;
 }

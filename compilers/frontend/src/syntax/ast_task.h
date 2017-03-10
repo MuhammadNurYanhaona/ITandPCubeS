@@ -34,6 +34,10 @@ class InitializeSection : public Node {
 	InitializeSection(List<Identifier*> *arguments, List<Stmt*> *code, yyltype loc);	
         const char *GetPrintNameForNode() { return "Initialize-Section"; }
         void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	List<Type*> *getArgumentTypes() { return argumentTypes; }	
 };
 
 class EnvironmentLink : public Node {
@@ -222,6 +226,7 @@ class TaskDef : public Definition {
 
 	TupleDef *getEnvTuple() { return envTuple; }
         TupleDef *getPartitionTuple() { return partitionTuple; }
+	List<Type*> *getInitArgTypes();
 
 	// The custom types for task's define, environment, and partition sections are created before a 
 	// full scale type checking of the task.

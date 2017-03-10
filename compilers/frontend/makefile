@@ -32,9 +32,9 @@ YACC = bison
 # Set up the necessary flags for the tools
 #--------------------------------------------------------------------------------------------------
 # settings for debug mode code generation
-#CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
+CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
 # settings for optimized code generation
-CFLAGS = -O3
+#CFLAGS = -O3
 
 # The -d flag tells lex to set up for debugging. Can turn on/off by
 # setting value of global yy_flex_debug inside the scanner itself
