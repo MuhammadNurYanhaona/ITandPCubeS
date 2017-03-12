@@ -71,6 +71,25 @@ void ReportError::ConflictingDefinition(Identifier *id, bool suppressFailure) {
 			"'%s' has already been declared in this scope", id->getName());
 }
 
+void ReportError::CouldNotResolveFnForArgs(yyltype *loc, const char *fnName, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure,
+                        "'%s' has already been declared in this scope", fnName);
+}
+
+void ReportError::CyclicalFnCalls(yyltype *loc, const char *fnName, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure,
+                        "a cycle found in the call chain when processing '%s'; currently the compiler cannot handle recursive functions", fnName);
+}
+
+void ReportError::ConflictingReturnTypes(yyltype *loc, Type *oldType, Type *newType, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "previous return type '%s' for function is in conflict with the current '%s'",
+			oldType->getName(), newType->getName());
+}
+
+void ReportError::ReturnStmtOutsideFn(yyltype *loc, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "a return statement is only allowed inside a function");
+}
+
 void ReportError::NotReductionType(Identifier *id, bool suppressFailure) {
 	OptionalErrorReport(id->GetLocation(), suppressFailure,
 			"'%s' is not a task-global Reduction variable", id->getName());
@@ -172,8 +191,8 @@ void ReportError::InvalidArrayAccess(yyltype *loc, Type *actualType, bool suppre
 void ReportError::TooFewOrTooManyParameters(Identifier *name, int actual, 
 		int expected, bool suppressFailure) {
 	OptionalErrorReport(name->GetLocation(), suppressFailure,
-			"Function '%s' expects %d arguments but provided %d", 
-			name->getName() , expected, actual);
+			"Function/Section '%s' expects %d arguments but provided %d", 
+			name->getName(), expected, actual);
 }
 
 void ReportError::TaskNameRequiredInEnvironmentCreate(yyltype *loc, bool suppressFailure) {

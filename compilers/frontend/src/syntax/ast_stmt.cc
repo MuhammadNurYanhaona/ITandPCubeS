@@ -53,6 +53,15 @@ int StmtBlock::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	return resolvedExprs;
 }
 
+int StmtBlock::emitScopeAndTypeErrors(Scope *scope) {
+	int errors = 0;
+        for (int i = 0; i < stmts->NumElements(); i++) {
+                Stmt *stmt = stmts->Nth(i);
+                errors += stmt->emitScopeAndTypeErrors(scope);
+	}
+	return errors;
+}
+
 //-------------------------------------------------------- Conditional Statement -------------------------------------------------------/
 
 ConditionalStmt::ConditionalStmt(Expr *c, Stmt *s, yyltype loc) : Stmt(loc) {
@@ -89,6 +98,21 @@ int ConditionalStmt::resolveExprTypesAndScopes(Scope *executionScope, int iterat
 		resolvedExprs += inferredTypes;
 	}
 	return resolvedExprs;
+}
+
+int ConditionalStmt::emitScopeAndTypeErrors(Scope *scope) {
+	int errors = 0;
+	if (condition != NULL) {
+		Type *condType = condition->getType();
+		if (condType != NULL && condType != Type::boolType) {
+			ReportError::InvalidExprType(condition, Type::boolType, false);
+			errors++;
+		} else {
+			errors += condition->emitScopeAndTypeErrors(scope);
+		}
+	}
+	errors += stmt->emitScopeAndTypeErrors(scope);
+	return errors;
 }
 
 //------------------------------------------------------------ If/Else Block -----------------------------------------------------------/
@@ -129,6 +153,15 @@ int IfStmt::resolveExprTypesAndScopes(Scope *excutionScope, int iteration) {
 		resolvedExprs += stmt->resolveExprTypesAndScopes(excutionScope, iteration);
 	}
 	return resolvedExprs;
+}
+
+int IfStmt::emitScopeAndTypeErrors(Scope *scope) {
+	int errors = 0;
+	for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+		errors += stmt->emitScopeAndTypeErrors(scope);
+	}
+	return errors;
 }
 
 //-------------------------------------------------------- Index Range Condition -------------------------------------------------------/
@@ -197,6 +230,39 @@ int IndexRangeCondition::resolveExprTypesAndScopes(Scope *executionScope, int it
 		return resolvedExprs;
 	}
 	return 0;		
+}
+
+int IndexRangeCondition::emitScopeAndTypeErrors(Scope *scope) {
+
+	int errors = 0;
+
+	// make sure that the iteration is happening over the indices an array
+	Symbol *colSymbol = scope->lookup(collection->getName());
+        if (colSymbol == NULL) {
+                ReportError::UndefinedSymbol(collection, false);
+		errors++;
+        } else {
+                VariableSymbol *varSym = (VariableSymbol*) colSymbol;
+                Type *varType = varSym->getType();
+                ArrayType *arrayType = dynamic_cast<ArrayType*>(varType);
+                if (arrayType == NULL) {
+                        ReportError::NonArrayInIndexedIteration(collection, varType, false);
+			errors++;
+                }
+        }
+
+	// if there is any additional iteration restriction, it must be of boolean type
+	if (restrictions != NULL) {
+		Type *condType = restrictions->getType();
+		if (condType != NULL && condType != Type::boolType) {
+			ReportError::InvalidExprType(restrictions, Type::boolType, false);
+			errors++;
+		} else {
+			errors += restrictions->emitScopeAndTypeErrors(scope);
+		}
+	}
+
+	return errors;
 }
 
 //------------------------------------------------------------ Loop Statement ----------------------------------------------------------/
@@ -271,6 +337,16 @@ int PLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
         this->scope = loopScope;
 
 	return resolvedExprs;
+}
+
+int PLoopStmt::emitScopeAndTypeErrors(Scope *scope) {
+	int errors = 0;
+        for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *condition = rangeConditions->Nth(i);
+                errors += condition->emitScopeAndTypeErrors(scope);
+        }
+        errors += body->emitScopeAndTypeErrors(scope);
+        return errors;
 }
 
 //------------------------------------------------------- Sequential For Loop --------------------------------------------------------/
@@ -362,6 +438,10 @@ int SLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 		resolvedExprs += stepExpr->resolveExprTypesAndScopes(loopScope, iteration);
 		resolvedExprs += stepExpr->performTypeInference(loopScope, Type::intType);
 	}
+	if (restriction != NULL) {
+		resolvedExprs += restriction->resolveExprTypesAndScopes(loopScope, iteration);
+                resolvedExprs += restriction->performTypeInference(loopScope, Type::boolType);
+	}
 	
 	// try to resolve the body after evaluating the iteration expression to maximize type discovery
 	resolvedExprs += body->resolveExprTypesAndScopes(loopScope, iteration);
@@ -371,6 +451,41 @@ int SLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
         this->scope = loopScope;
 
 	return resolvedExprs;
+}
+
+int SLoopStmt::emitScopeAndTypeErrors(Scope *scope) {
+	int errors = 0;
+	
+	// range expression must be of range type
+	errors += rangeExpr->emitScopeAndTypeErrors(scope);
+	Type *type = rangeExpr->getType();
+	if (type != NULL && type != Type::rangeType) {
+		ReportError::InvalidExprType(rangeExpr, Type::rangeType, false);
+		errors++;
+	}
+	
+	// if exists, step expression must of integer type
+        if (stepExpr != NULL) {
+		errors += stepExpr->emitScopeAndTypeErrors(scope);
+		Type *type = stepExpr->getType();
+		if (type != NULL && type != Type::intType) {
+			ReportError::InvalidExprType(stepExpr, Type::intType, false);
+			errors++;
+		}
+	}
+
+	// if exists, restriction must be of boolean type
+        if (restriction != NULL) {
+		errors += restriction->emitScopeAndTypeErrors(scope);
+		Type *type = restriction->getType();
+		if (type != NULL && type != Type::boolType) {
+			ReportError::InvalidExprType(restriction, Type::boolType, false);
+			errors++;
+		}
+	}
+
+        errors += body->emitScopeAndTypeErrors(scope);
+	return errors;
 }
 
 //------------------------------------------------------------ While Loop ------------------------------------------------------------/
@@ -408,6 +523,18 @@ int WhileStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	// try to resolve the body after evaluating the iteration expression to maximize type discovery
 	resolvedExprs += body->resolveExprTypesAndScopes(executionScope, iteration);
 	return resolvedExprs;
+}
+
+int WhileStmt::emitScopeAndTypeErrors(Scope *scope) {
+	int errors = 0;
+	errors += condition->emitScopeAndTypeErrors(scope);
+	Type *condType = condition->getType();
+	if (condType != NULL && condType != Type::boolType) {
+		ReportError::InvalidExprType(condition, Type::boolType, false);
+		errors++;
+	}
+        errors += body->emitScopeAndTypeErrors(scope);
+	return errors;
 }
 
 //-------------------------------------------------------- Reduction Statement -------------------------------------------------------/
@@ -489,7 +616,7 @@ int ReductionStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteratio
 	if (resultType != NULL) {
 		const char *resultVar = left->getName();
 		if (executionScope->lookup(resultVar) == NULL) {
-			VariableSymbol *var = new VariableSymbol(new VariableDef(left, Type::intType));
+			VariableSymbol *var = new VariableSymbol(new VariableDef(left, resultType));
 			executionScope->insert_inferred_symbol(var);
 			resolvedExprs++;	
 		}
@@ -517,6 +644,10 @@ Type *ReductionStmt::inferResultTypeFromOpAndExprType(Type *exprType) {
         }
 
 	return NULL;
+}
+
+int ReductionStmt::emitScopeAndTypeErrors(Scope *scope) {
+	return right->emitScopeAndTypeErrors(scope);
 }
 
 //-------------------------------------------------------- External Code Block -------------------------------------------------------/
@@ -590,5 +721,30 @@ void ReturnStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 }
 
 int ReturnStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
-	return expr->resolveExprTypesAndScopes(executionScope, iteration);
+	
+	int resolvedExprs = expr->resolveExprTypesAndScopes(executionScope, iteration);
+	
+	// if the return type is resolved then assign it to the function that embodies this statement
+	Type *returnType = expr->getType();
+	if (returnType != NULL && returnType != Type::errorType) {
+		FunctionInstance *fnInstance = FunctionInstance::getMostRecentFunction();
+		if (fnInstance == NULL) {
+			ReportError::ReturnStmtOutsideFn(GetLocation(), false);
+		} else {
+			Type *oldReturnType = fnInstance->getReturnType();
+			if (oldReturnType == NULL 
+					|| returnType->isAssignableFrom(oldReturnType)) {
+				fnInstance->setReturnType(returnType);
+			} else if (!oldReturnType->isAssignableFrom(returnType)) {
+				ReportError::ConflictingReturnTypes(GetLocation(), 
+						oldReturnType, returnType, false);
+			}
+		}
+	}
+
+	return resolvedExprs;
+}
+
+int ReturnStmt::emitScopeAndTypeErrors(Scope *scope) {
+	return expr->emitScopeAndTypeErrors(scope);
 }

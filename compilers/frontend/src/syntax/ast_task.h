@@ -227,6 +227,7 @@ class TaskDef : public Definition {
 	TupleDef *getEnvTuple() { return envTuple; }
         TupleDef *getPartitionTuple() { return partitionTuple; }
 	List<Type*> *getInitArgTypes();
+	int getPartitionArgsCount();
 
 	// The custom types for task's define, environment, and partition sections are created before a 
 	// full scale type checking of the task.

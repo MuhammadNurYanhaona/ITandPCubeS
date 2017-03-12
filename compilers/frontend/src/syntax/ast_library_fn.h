@@ -17,6 +17,8 @@
 #include <fstream>
 #include <sstream>
 
+class Scope;
+
 class LibraryFunction : public Expr {
   protected:
 	List<Expr*> *arguments;
@@ -44,6 +46,10 @@ class LibraryFunction : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return LIB_FN_CALL; }
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+	int emitSemanticErrors(Scope *scope);
+
+	// subclasses should provide implementation for this function for semantic validation
+	virtual int emitErrorsInArguments(Scope *scope) = 0;
 };
 
 
@@ -60,7 +66,7 @@ class Root : public LibraryFunction {
         //-------------------------------------------------------------- Helper functions for Semantic Analysis
 
 	int resolveExprTypes(Scope *scope);
-	int countTypeErrors();
+	int emitErrorsInArguments(Scope *scope);
 };
 
 class Random : public LibraryFunction {
@@ -70,6 +76,7 @@ class Random : public LibraryFunction {
 			: LibraryFunction(0, id, arguments, loc) {
 		this->type = Type::intType;
 	}
+	int emitErrorsInArguments(Scope *scope) { return 0; }
 	int countTypeErrors();	
 };
 
@@ -85,7 +92,7 @@ class ArrayOperation : public LibraryFunction {
         //-------------------------------------------------------------- Helper functions for Semantic Analysis
 
 	virtual int resolveExprTypes(Scope *scope);
-	int countTypeErrors();
+	virtual int emitErrorsInArguments(Scope *scope);
 };
 
 class LoadArray : public ArrayOperation {
@@ -114,7 +121,7 @@ class BindOperation : public LibraryFunction {
         //-------------------------------------------------------------- Helper functions for Semantic Analysis
 
 	int resolveExprTypes(Scope *scope);
-	int countTypeErrors();
+	virtual int emitErrorsInArguments(Scope *scope);
 };
 
 class BindInput : public BindOperation {

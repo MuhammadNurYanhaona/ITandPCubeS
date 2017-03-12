@@ -39,6 +39,7 @@ class ReportError
 	static void ConflictingArrayDimensionCounts(yyltype *loc, const char *name, 
 			int oldDimension, int currDimension, bool suppressFailure);
 	static void ConflictingDefinition(Identifier *id, bool suppressFailure);
+	static void ConflictingReturnTypes(yyltype *loc, Type *oldType, Type *newType, bool suppressFailure);
 
 	//--------------------------------------------------------------------------------------------------- Invalid Usage Errors
 
@@ -51,6 +52,12 @@ class ReportError
 	static void InvalidObjectTypeInNew(Type *type, bool suppressFailure);
 	static void NonArrayInIndexedIteration(Identifier *id, Type *type, bool suppressFailure);	
 	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	
+	static void ReturnStmtOutsideFn(yyltype *loc, bool suppressFailure);
+	
+	//------------------------------------------------------------------------------------- Polymorphic Type Resolution Errors
+
+	static void CouldNotResolveFnForArgs(yyltype *loc, const char *fnName, bool suppressFailure);
+	static void CyclicalFnCalls(yyltype *loc, const char *fnName, bool suppressFailure);
 	
 	//-------------------------------------------------------------------------------------------- Missing Information  Errors
 

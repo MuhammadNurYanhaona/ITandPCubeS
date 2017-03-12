@@ -38,6 +38,15 @@ int Expr::performTypeInference(Scope *executionScope, Type *assumedType) {
 	return 0;
 }
 
+int Expr::emitScopeAndTypeErrors(Scope *scope) {
+	int errors = 0;
+	if (type == NULL || type == Type::errorType) {
+		ReportError::UnknownExpressionType(this, false);
+		errors++;
+	}
+	return errors + emitSemanticErrors(scope);	
+}
+
 //----------------------------------------------- Constant Expression -------------------------------------------------/
 
 IntConstant::IntConstant(yyltype loc, int val) : Expr(loc) {
@@ -121,6 +130,25 @@ int ReductionVar::resolveExprTypes(Scope *scope) {
 	return 0;
 }
 
+int ReductionVar::emitSemanticErrors(Scope *scope) {
+
+	Symbol *symbol = scope->lookup(name);
+        if (symbol == NULL) {
+		ReportError::UndefinedSymbol(GetLocation(), name, false);
+		return 1;
+	}
+	VariableSymbol *varSymbol = dynamic_cast<VariableSymbol*>(symbol);
+	if (varSymbol == NULL) {
+		ReportError::WrongSymbolType(GetLocation(), name, "Reduction Variable", false);
+		return 1;
+	} else if (!varSymbol->isReduction()) {
+		Identifier *varId = new Identifier(*GetLocation(), name);
+		ReportError::NotReductionType(varId, false);
+		return 1;
+	}
+	return 0;
+}
+
 //---------------------------------------------- Arithmatic Expression ------------------------------------------------/
 
 ArithmaticExpr::ArithmaticExpr(Expr *l, ArithmaticOperator o, Expr *r, yyltype loc) : Expr(loc) {
@@ -188,6 +216,57 @@ int ArithmaticExpr::resolveExprTypes(Scope *scope) {
 	resolvedExprs += right->performTypeInference(scope, leftType);
 
 	return resolvedExprs;
+}
+
+int ArithmaticExpr::emitSemanticErrors(Scope *scope) {
+	
+	int errors = 0;
+
+	// check the validity of the left-hand-side expression and its use in the arithmatic expression
+	errors += left->emitScopeAndTypeErrors(scope);
+	Type *leftType = left->getType();
+	if (leftType != NULL && !(leftType == Type::intType
+                        || leftType == Type::floatType
+                        || leftType == Type::doubleType
+                        || leftType == Type::charType
+                        || leftType == Type::errorType)) {
+                ReportError::UnsupportedOperand(left, leftType, "arithmatic expression", false);
+		errors++;
+        }
+	
+	// check the validity of the right-hand-side expression and its use in the arithmatic expression
+	errors += right->emitScopeAndTypeErrors(scope);
+	Type *rightType = right->getType();
+        if (rightType != NULL && !(rightType == Type::intType
+                        || rightType == Type::floatType
+                        || rightType == Type::doubleType
+                        || rightType == Type::charType
+                        || rightType == Type::errorType)) {
+                ReportError::UnsupportedOperand(right, rightType, "arithmatic expression", false);
+		errors++;
+        }
+
+	// check the validity of combining the left and right hand-side expressions in arithmatic
+        if (op == BITWISE_AND || op == BITWISE_OR || op == BITWISE_XOR) {
+                if ((leftType != NULL 
+				&& !(leftType == Type::intType 
+					|| leftType == Type::errorType))
+                       		|| (rightType != NULL && !(rightType == Type::intType
+                                        || rightType == Type::errorType))) {
+                        ReportError::UnsupportedOperand(right,
+                                        rightType, "arithmatic expression", false);
+			errors++;
+                }
+        }
+        if (leftType != NULL && rightType != NULL) {
+                if (!leftType->isAssignableFrom(rightType) 
+				&& !rightType->isAssignableFrom(leftType)) {
+                        ReportError::TypeMixingError(this,
+                                        leftType, rightType, "arithmatic expression", false);
+			errors++;
+                }
+        }
+	return errors;
 }
 
 //----------------------------------------------- Logical Expression -------------------------------------------------/
@@ -259,6 +338,60 @@ int LogicalExpr::resolveExprTypes(Scope *scope) {
 	return resolvedExprs;
 }
 
+int LogicalExpr::emitSemanticErrors(Scope *scope) {
+
+	int errors = 0;
+	
+	// check the validity of the component expressions
+	errors += right->emitScopeAndTypeErrors(scope);
+	Type *rightType = right->getType();
+	Type *leftType = NULL;
+	if (left != NULL) {
+		errors += left->emitScopeAndTypeErrors(scope);
+        	leftType = left->getType();
+	}
+
+	// check the validity of combining/using the component expression(s) in the spcecific way as done by
+	// the current expression
+	bool arithmaticOperator = (op == EQ || op == NE || op == GT || op == LT || op == GTE || op == LTE);
+        if (arithmaticOperator) {
+                if (leftType != NULL && !(leftType == Type::intType
+                                || leftType == Type::floatType
+                                || leftType == Type::doubleType
+                                || leftType == Type::charType
+                                || leftType == Type::errorType)) {
+                        ReportError::UnsupportedOperand(left, leftType, "logical expression", false);
+			errors++;
+                }
+                if (rightType != NULL && !(rightType == Type::intType
+                                || rightType == Type::floatType
+                                || rightType == Type::doubleType
+                                || rightType == Type::charType
+                                || rightType == Type::errorType)) {
+                        ReportError::UnsupportedOperand(right, rightType, "logical expression", false);
+			errors++;
+                }
+                if (leftType != NULL && rightType != NULL) {
+                        if (!leftType->isAssignableFrom(rightType)
+                                        && !rightType->isAssignableFrom(leftType)) {
+                                ReportError::TypeMixingError(this, leftType, rightType,
+                                                "logical expression", false);
+				errors++;
+                        }
+                }
+        } else {
+                if (rightType != NULL && !rightType->isAssignableFrom(Type::boolType)) {
+                        ReportError::IncompatibleTypes(right->GetLocation(), rightType, Type::boolType, false);
+			errors++;
+                }
+                if (leftType != NULL && !leftType->isAssignableFrom(Type::boolType)) {
+                        ReportError::IncompatibleTypes(left->GetLocation(), leftType, Type::boolType, false);
+			errors++;
+                }
+        }
+	return errors;
+}
+
 //------------------------------------------------- Epoch Expression --------------------------------------------------/
 
 EpochExpr::EpochExpr(Expr *r, int lag) : Expr(*r->GetLocation()) {
@@ -297,6 +430,10 @@ int EpochExpr::resolveExprTypes(Scope *scope) {
 		resolvedExprs++;
 	}
 	return resolvedExprs;
+}
+
+int EpochExpr::emitSemanticErrors(Scope *scope) {
+	return root->emitScopeAndTypeErrors(scope);
 }
 
 //-------------------------------------------------- Field Access -----------------------------------------------------/
@@ -397,6 +534,69 @@ int FieldAccess::resolveExprTypes(Scope *scope) {
 	return resolvedExprs;
 }
 
+int FieldAccess::emitSemanticErrors(Scope *scope) {
+	
+	// check for the case when the current field access is not corresponding to accessing a property of
+	// a larger object
+	if (base == NULL) {
+		Symbol *symbol = scope->lookup(field->getName());
+                if (symbol != NULL && dynamic_cast<VariableSymbol*>(symbol) != NULL) {
+			
+			VariableSymbol *varSym = dynamic_cast<VariableSymbol*>(symbol);
+                        this->type = varSym->getType();
+
+			// if the field is of some custom-type then that type must be defined
+                        NamedType *tupleType = dynamic_cast<NamedType*>(this->type);
+                        if (tupleType != NULL) {
+                                Symbol *typeSymbol = scope->lookup(tupleType->getName());
+                                if (typeSymbol == NULL) {
+                                        ReportError::UndeclaredTypeError(field, this->type, NULL, false);
+                                        return 1;
+                                }
+                        }
+                } else {
+                        ReportError::UndefinedSymbol(field, false);
+                        return 1;
+                }
+		return 0;
+	}
+
+	// check for the alternative case where the field access is accessing a property of a larger object
+	int errors = 0;
+	errors += base->emitScopeAndTypeErrors(scope);
+	Type *baseType = base->getType();
+	if (baseType != NULL) {
+		ArrayType *arrayType = dynamic_cast<ArrayType*>(baseType);
+		MapType *mapType = dynamic_cast<MapType*>(baseType);
+		ListType *listType = dynamic_cast<ListType*>(baseType);
+		if (arrayType != NULL) {
+			DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(field);
+			if (dimension != NULL) {
+				int dimensionality = arrayType->getDimensions();
+				int fieldDimension = dimension->getDimensionNo();
+				if (fieldDimension > dimensionality) {
+					ReportError::NonExistingDimensionInArray(field, 
+							dimensionality, fieldDimension, false);
+					errors++;
+				}
+			} else {
+				ReportError::NoSuchFieldInBase(field, arrayType, false);
+				errors++;
+			} 
+		} else if (mapType == NULL && listType == NULL) {
+			Symbol *symbol = scope->lookup(baseType->getName());
+			if (symbol != NULL) {
+				Scope *baseScope = symbol->getNestedScope();
+				if (baseScope == NULL || baseScope->lookup(field->getName()) == NULL) {
+					ReportError::NoSuchFieldInBase(field, baseType, false);
+					errors++;
+				}
+			}
+		}
+	}
+	return errors;
+}
+
 //----------------------------------------------- Range Expressions --------------------------------------------------/
 
 RangeExpr::RangeExpr(Identifier *i, Expr *r, Expr *s, yyltype loc) : Expr(loc) {
@@ -465,7 +665,7 @@ int RangeExpr::resolveExprTypes(Scope *scope) {
 		// IndexType that support non-unit stepping and wrapped around index range traversal. 
 		// This is so since we have not enabled those features in the language yet.
 		VariableDef *variable = new VariableDef(fieldId, Type::intType);
-		scope->insert_symbol(new VariableSymbol(variable));
+		scope->insert_inferred_symbol(new VariableSymbol(variable));
 	}
 
 	resolvedExprs += range->resolveExprTypes(scope);
@@ -480,6 +680,37 @@ int RangeExpr::resolveExprTypes(Scope *scope) {
 	resolvedExprs++;
 
 	return resolvedExprs; 	
+}
+
+int RangeExpr::emitSemanticErrors(Scope *scope) {
+
+	int errors = 0;
+	errors += index->emitScopeAndTypeErrors(scope);
+        Type *indexType = index->getType();
+        if (indexType != NULL && indexType != Type::intType && indexType != Type::errorType) {
+        	ReportError::IncompatibleTypes(index->GetLocation(), 
+				indexType, Type::intType, false);
+		errors++;
+        }
+
+	errors += emitScopeAndTypeErrors(scope);
+	Type *rangeType = range->getType();
+        if (rangeType != NULL && rangeType != Type::rangeType) {
+                 ReportError::IncompatibleTypes(range->GetLocation(), 
+				rangeType, Type::rangeType, false);
+        }
+
+	if (step != NULL) {
+                errors += step->emitScopeAndTypeErrors(scope);
+                Type *stepType = step->getType();
+                if (stepType != NULL 
+				&& !Type::intType->isAssignableFrom(stepType)) {
+                        ReportError::IncompatibleTypes(step->GetLocation(), 
+					stepType, Type::intType, false);
+                }
+        }
+
+	return errors;
 }
 
 //--------------------------------------------- Assignment Expression ------------------------------------------------/
@@ -517,13 +748,49 @@ int AssignmentExpr::resolveExprTypes(Scope *scope) {
 	resolvedExprs += right->resolveExprTypes(scope);
 	Type *rightType = right->getType();
 	resolvedExprs += left->resolveExprTypes(scope);
-	resolvedExprs += left->performTypeInference(scope, rightType);
 	Type *leftType = left->getType();
+	resolvedExprs += left->performTypeInference(scope, rightType);
+	resolvedExprs += right->performTypeInference(scope, leftType);
 	if (leftType != NULL && rightType != NULL && leftType->isAssignableFrom(rightType)) {
 		this->type = leftType;
 		resolvedExprs++;
 	}
 	return resolvedExprs;
+}
+
+int AssignmentExpr::emitSemanticErrors(Scope *scope) {
+
+	int errors = 0;
+	errors += left->emitScopeAndTypeErrors(scope);
+	errors += right->emitScopeAndTypeErrors(scope);
+
+	// check if the two sides of the assignment are compatible with each other
+	Type *leftType = left->getType();
+	Type *rightType = right->getType();
+	if (leftType != NULL && rightType != NULL && !leftType->isAssignableFrom(rightType)) {
+                ReportError::TypeMixingError(this, leftType, rightType, "assignment", false);
+		errors++;
+        }
+
+	// check if the left-hand side of the assignment is a valid receiver expression
+	FieldAccess *fieldAccess = dynamic_cast<FieldAccess*>(left);
+        ArrayAccess *arrayAccess = dynamic_cast<ArrayAccess*>(left);
+        if (fieldAccess == NULL && arrayAccess == NULL) {
+                EpochExpr *epochExpr = dynamic_cast<EpochExpr*>(left);
+                if (epochExpr == NULL) {
+                        ReportError::NonLValueInAssignment(left, false);
+			errors++;
+                } else {
+                        Expr *epochRoot = epochExpr->getRootExpr();
+                        fieldAccess = dynamic_cast<FieldAccess*>(epochRoot);
+                        arrayAccess = dynamic_cast<ArrayAccess*>(epochRoot);
+                        if (fieldAccess == NULL && arrayAccess == NULL) {
+                                ReportError::NonLValueInAssignment(left, false);
+				errors++;
+                        }
+                }
+        }
+	return errors;
 }
 
 //------------------------------------------------- Index Range -------------------------------------------------------/
@@ -576,6 +843,27 @@ int IndexRange::resolveExprTypes(Scope *scope) {
 	this->type = (partOfArray) ? Type::voidType : Type::rangeType;
 	resolvedExprs++;
 	return resolvedExprs;
+}
+
+int IndexRange::emitSemanticErrors(Scope *scope) {
+	int errors = 0;
+	if (begin != NULL) {
+		errors += begin->emitScopeAndTypeErrors(scope);
+		Type *beginType = begin->getType();
+                if (beginType != NULL && !Type::intType->isAssignableFrom(beginType)) {
+                        ReportError::IncompatibleTypes(begin->GetLocation(), 
+					beginType, Type::intType, false);
+		}
+	}
+	if (end != NULL) {
+		errors += end->emitScopeAndTypeErrors(scope);
+		Type *endType = end->getType();
+                if (endType != NULL && !Type::intType->isAssignableFrom(endType)) {
+                        ReportError::IncompatibleTypes(end->GetLocation(), 
+					endType, Type::intType, false);
+		}
+	}
+	return errors;
 }
 
 //--------------------------------------------------- Array Access ----------------------------------------------------/
@@ -645,6 +933,23 @@ int ArrayAccess::resolveExprTypes(Scope *scope) {
 	}
 	resolvedExprs++;
 	return resolvedExprs;
+}
+
+int ArrayAccess::emitSemanticErrors(Scope *scope) {
+	
+	int errors = 0;
+	errors += base->emitScopeAndTypeErrors(scope);
+        Type *baseType = base->getType();
+        if (baseType == NULL) {
+		ReportError::InvalidArrayAccess(GetLocation(), NULL, false);
+        } else {
+                ArrayType *arrayType = dynamic_cast<ArrayType*>(baseType);
+                if (arrayType == NULL) {
+			ReportError::InvalidArrayAccess(base->GetLocation(), baseType, false);
+		}
+	}
+	errors += index->emitScopeAndTypeErrors(scope);
+	return errors;
 }
 
 //------------------------------------------------- Function Call -----------------------------------------------------/
@@ -717,6 +1022,15 @@ int FunctionCall::resolveExprTypes(Scope *scope) {
 
 	delete argTypeList;
 	return resolvedExprs;
+}
+
+int FunctionCall::emitSemanticErrors(Scope *scope) {
+	int errors = 0;
+	for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *arg = arguments->Nth(i);
+		errors += arg->emitScopeAndTypeErrors(scope);
+	}
+	return errors;
 }
 
 //------------------------------------------------ Named Argument ----------------------------------------------------/
@@ -884,6 +1198,73 @@ int TaskInvocation::resolveExprTypes(Scope *scope) {
 		resolvedExprs++;
 	}
 	return resolvedExprs;	
+}
+
+int TaskInvocation::emitSemanticErrors(Scope *scope) {
+
+	if (type == NULL || type == Type::errorType) return 0;
+
+	int errors = 0;
+	const char *taskName = getTaskName();
+	Symbol *task = (TaskSymbol*) scope->lookup(taskName);
+	TaskDef *taskDef = (TaskDef*) task->getNode();
+	
+	// the environment argument should be of proper type specific to the task being invoked
+	FieldAccess *environment = getEnvArgument();
+	TupleDef *envTuple = taskDef->getEnvTuple();
+	Type *expectedEnvType = new NamedType(envTuple->getId());
+	Type *envType = environment->getType();
+	if (!envType->isEqual(expectedEnvType)) {
+		ReportError::IncompatibleTypes(environment->GetLocation(), envType,
+					expectedEnvType, false);
+		errors++;
+	}
+
+	// if there are any initialization arguments then the number should match the expected
+	// arguments and the types should be appropriate
+	List<Type*> *initArgTypes = taskDef->getInitArgTypes();
+	List<Expr*> *initArgs = getInitArguments();
+	if (initArgTypes->NumElements() != initArgs->NumElements()) {
+		NamedMultiArgument *init = retrieveArgByName("initialize");
+		Identifier *sectionId = new Identifier(*init->GetLocation(), "Initialize");
+		ReportError::TooFewOrTooManyParameters(sectionId, initArgs->NumElements(),
+				initArgTypes->NumElements(), false);
+	} else {
+		for (int i = 0; i < initArgTypes->NumElements(); i++) {
+			Type *expected = initArgTypes->Nth(i);
+			Expr *arg = initArgs->Nth(i);
+			errors += arg->emitScopeAndTypeErrors(scope);
+			Type *found = arg->getType();
+			if (found != NULL && found != Type::errorType 
+					&& !expected->isAssignableFrom(found)) {
+				ReportError::IncompatibleTypes(arg->GetLocation(),
+						found, expected, false);
+				errors++;
+			}
+		}
+	}
+	
+	// all partition arguments should be integers and their count should match expectation
+	List<Expr*> *partitionArgs = getPartitionArguments();
+	int argsCount = taskDef->getPartitionArgsCount();
+	if (argsCount != partitionArgs->NumElements()) {
+		NamedMultiArgument *partition = retrieveArgByName("partition");
+		Identifier *sectionId = new Identifier(*partition->GetLocation(), "Partition");
+		ReportError::TooFewOrTooManyParameters(sectionId, partitionArgs->NumElements(),
+				argsCount, false);
+	} else {
+		for (int i = 0; i < partitionArgs->NumElements(); i++) {
+			Expr *arg = partitionArgs->Nth(i);
+			errors += arg->emitScopeAndTypeErrors(scope);
+			Type *argType = arg->getType();
+			if (argType != NULL && !Type::intType->isAssignableFrom(argType)) {
+                                ReportError::IncompatibleTypes(arg->GetLocation(),
+					argType, Type::intType, false);
+                        }
+		}
+	}
+
+	return errors;
 }
 
 const char *TaskInvocation::getTaskName() {
@@ -1064,3 +1445,5 @@ int ObjectCreate::resolveExprTypes(Scope *scope) {
 	this->type = Type::errorType;
 	return 0;
 }
+
+

@@ -15,6 +15,7 @@ class TaskDef;
 class TupleDef;
 class CoordinatorDef;
 class FunctionInstance;
+class Scope;
 
 enum DefTypeId { VAR_DEF, PROG_DEF, FN_DEF, CLASS_DEF, COORD_DEF, TASK_DEF };
 
@@ -201,15 +202,29 @@ class FunctionInstance {
 	List<Type*> *argumentTypes;
 	Type *returnType;
 	Stmt *code;
+
+	// two scoping properties are needed to hold the parameters and local variables of the function
+	Scope *fnHeaderScope;
+	Scope *fnBodyScope;
+
+  public:
+	// these two static variables are needed to check for a cycle in the polymorphic function resolution
+	// process and through error
+	static List<const char*> *fnNameStack;
+	static List<FunctionInstance*> *fnInstanceStack;
   public:
 	FunctionInstance(FunctionDef *fnDef, 
 		int instanceId, List<Type*> *argTypes, Scope *programScope);
 	Type *getReturnType() { return returnType; }
+	void setReturnType(Type *type) { returnType = type; }
 	
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	void performScopeAndTypeChecking(Scope *programScope);
 	bool isMatchingArguments(List<Type*> *argTypeList);
+
+	// return the function that has been added in the instance stack most recently
+	static FunctionInstance *getMostRecentFunction();
 };
 
 #endif

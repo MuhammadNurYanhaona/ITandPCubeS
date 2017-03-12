@@ -356,6 +356,10 @@ List<Type*> *TaskDef::getInitArgTypes() {
         else return initialize->getArgumentTypes();
 }
 
+int TaskDef::getPartitionArgsCount() { 
+        return partition->getArgumentsCount(); 
+}
+
 void TaskDef::attachScope(Scope *parentScope) {
 
         //--------------------------------create a scope with all the variables declared in the define section

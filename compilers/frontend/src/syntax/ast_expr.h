@@ -47,9 +47,18 @@ class Expr : public Stmt {
 	// the interface for this kind of type inference. The return value should indicate the number of 
 	// new type resolutions have been enabled through the type inference mechanism. 
 	int performTypeInference(Scope *executionScope, Type *assumedType);
+	
+	// The interface function for the same function from the stmt superclass; this takes care of the
+	// case where the current expression is in error or type-less. Sub-classes should provide 
+	// implementation for the emitSemanticErrors() function for more elaboration of error cases.
+	int emitScopeAndTypeErrors(Scope *scope);
+
   protected:
 	// supporting function for the type inference procedure that subclasses to provide implementation for
 	virtual int inferExprTypes(Scope *scope, Type *assignedType) { return 0; }
+
+	// function to print and count any scope, type, and other semantic errors in an expression
+	virtual int emitSemanticErrors(Scope *scope) { return 0; }
 };
 
 class IntConstant : public Expr {
@@ -67,7 +76,6 @@ class IntConstant : public Expr {
 
         Node *clone() { return new IntConstant(*GetLocation(), value, size); }
 	ExprTypeId getExprTypeId() { return INT_CONST; };
-	int countTypeErrors();
 };
 
 class FloatConstant : public Expr {
@@ -82,7 +90,6 @@ class FloatConstant : public Expr {
 
         Node *clone() { return new FloatConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return FLOAT_CONST; };
-	int countTypeErrors();
 };
 
 class DoubleConstant : public Expr {
@@ -97,7 +104,6 @@ class DoubleConstant : public Expr {
 
         Node *clone() { return new DoubleConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return DOUBLE_CONST; };
-	int countTypeErrors();
 };
 
 class BoolConstant : public Expr {
@@ -112,7 +118,6 @@ class BoolConstant : public Expr {
 
         Node *clone() { return new BoolConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return BOOL_CONST; };
-	int countTypeErrors();
 };
 
 class StringConstant : public Expr {
@@ -128,7 +133,6 @@ class StringConstant : public Expr {
 
         Node *clone() { return new StringConstant(*GetLocation(), strdup(value)); }
 	ExprTypeId getExprTypeId() { return STRING_CONST; };
-	int countTypeErrors();
 };
 
 class CharConstant : public Expr {
@@ -143,7 +147,6 @@ class CharConstant : public Expr {
 
         Node *clone() { return new CharConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return CHAR_CONST; };
-	int countTypeErrors();
 };
 
 class ReductionVar : public Expr {
@@ -160,7 +163,7 @@ class ReductionVar : public Expr {
         Node *clone() { return new ReductionVar(spaceId, strdup(name), *GetLocation()); }
 	ExprTypeId getExprTypeId() { return REDUCTION_VAR; };
 	int resolveExprTypes(Scope *scope);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class ArithmaticExpr : public Expr {
@@ -180,7 +183,7 @@ class ArithmaticExpr : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class LogicalExpr : public Expr {
@@ -203,7 +206,7 @@ class LogicalExpr : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class EpochExpr : public Expr {
@@ -214,6 +217,7 @@ class EpochExpr : public Expr {
 	EpochExpr(Expr *root, int lag);
 	const char *GetPrintNameForNode() { return "Epoch-Expr"; }
     	void PrintChildren(int indentLevel);
+	Expr *getRootExpr() { return root; }
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
@@ -222,7 +226,7 @@ class EpochExpr : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class FieldAccess : public Expr {
@@ -260,7 +264,7 @@ class FieldAccess : public Expr {
 	
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class RangeExpr : public Expr {
@@ -285,7 +289,7 @@ class RangeExpr : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };	
 
 class AssignmentExpr : public Expr {
@@ -306,7 +310,7 @@ class AssignmentExpr : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class IndexRange : public Expr {
@@ -331,7 +335,7 @@ class IndexRange : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class ArrayAccess : public Expr {
@@ -355,7 +359,7 @@ class ArrayAccess : public Expr {
         Expr *getEndpointOfArrayAccess();
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class FunctionCall : public Expr {
@@ -374,7 +378,7 @@ class FunctionCall : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 };
 
 class NamedArgument : public Node {
@@ -427,7 +431,7 @@ class TaskInvocation : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
+	int emitSemanticErrors(Scope *scope);
 
 	// helper functions to retrieve different types of task invocation arguments 
 	const char *getTaskName();
@@ -454,8 +458,6 @@ class ObjectCreate : public Expr {
 	ExprTypeId getExprTypeId() { return OBJ_CREATE; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
-	int inferExprTypes(Scope *scope, Type *assignedType);
-	int countTypeErrors();
 };
 
 #endif

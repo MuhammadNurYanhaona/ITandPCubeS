@@ -384,12 +384,43 @@ Type *FunctionDef::resolveFnInstanceForParameterTypes(Scope *programScope,
 				arguments->NumElements(), false);
 		return Type::errorType;
 	}
+	
+	// check for cycle in the function type resolution process
+	const char *fnName = id->getName();
+	for (int i = 0; i < FunctionInstance::fnNameStack->NumElements(); i++) {
+		const char *nameInStack = FunctionInstance::fnNameStack->Nth(i);
+		if (strcmp(fnName, nameInStack) == 0) {
+			ReportError::CyclicalFnCalls(callerId->GetLocation(), fnName, false);	
+			return Type::errorType;
+		}
+	}
 
 	// check if the function has been resolved already for the specific parameter type combination
 	FunctionInstance *fnInstance = getInstanceForParamTypes(paramTypes);
 	if (fnInstance != NULL) return fnInstance->getReturnType();
 
-			
+	// try to create a new function instance for the argument types
+	int instanceId = instanceList->NumElements();
+	fnInstance = new FunctionInstance(this, instanceId, paramTypes, programScope);
+
+	// put the function instance in function call stack then do the scope-and-type checking
+	FunctionInstance::fnNameStack->Append(fnName);
+	FunctionInstance::fnInstanceStack->Append(fnInstance);
+	fnInstance->performScopeAndTypeChecking(programScope);
+
+	// remove the function instance from the stack after scope-and-type checking is complete
+	int stackSize = FunctionInstance::fnNameStack->NumElements();
+	FunctionInstance::fnNameStack->RemoveAt(stackSize - 1);
+	FunctionInstance::fnInstanceStack->RemoveAt(stackSize - 1);
+
+	// only store the function instance if the return type is not in error
+	if (fnInstance->getReturnType() != Type::errorType) {
+		instanceList->Append(fnInstance);
+	} else {
+		ReportError::CouldNotResolveFnForArgs(callerId->GetLocation(), fnName, false);	
+	}
+
+	return fnInstance->getReturnType();		
 }
 
 FunctionInstance *FunctionDef::getInstanceForParamTypes(List<Type*> *paramTypes) {
@@ -402,29 +433,72 @@ FunctionInstance *FunctionDef::getInstanceForParamTypes(List<Type*> *paramTypes)
 
 //---------------------------------------- Function Instance ------------------------------------------/
 
+List<const char*> *FunctionInstance::fnNameStack = new List<const char*>;
+List<FunctionInstance*> *FunctionInstance::fnInstanceStack = new List<FunctionInstance*>;
+
 FunctionInstance::FunctionInstance(FunctionDef *fnDef, 
 		int instanceId, List<Type*> *argTypes, Scope *programScope) {
-	
+
 	// generate a unique name for the function instance
 	std::ostringstream stream;
-	stream << fnDef->getId()->getName();
-	stream << "_" << instanceId;
+	stream << fnDef->getId()->getName() << "_" << instanceId;
 	this->fnName = strdup(stream.str().c_str());
 	
 	// get the argument names from the original function definition and assign them types
 	this->arguments = fnDef->getArguments();
 	this->argumentTypes = argTypes;
+	
+	this->returnType = NULL;
 
 	// create a complete clone of the code for instance specific analysis later
 	this->code = (Stmt*) fnDef->getCode()->clone();
 
 	// do scope and type checking to resolve types of expressions in the body of the code
-	performScopeAndTypeChecking(programScope);
+	performScopeAndTypeChecking(programScope);	
+}
 
-	// check if the function has any un-resolved or erroneous expression  
+void FunctionInstance::performScopeAndTypeChecking(Scope *programScope) {
+	
+	// create a new parameter scope for the function and insert arguments as symbols in it
+	fnHeaderScope = new Scope(FunctionScope);
+        for (int i = 0; i < arguments->NumElements(); i++) {
+		Identifier *argName = arguments->Nth(i)->getName();
+		Type *argType = argumentTypes->Nth(i);	
+		VariableDef *var = new VariableDef(argName, argType);
+                VariableSymbol *varSym = new VariableSymbol(var);
+                fnHeaderScope->insert_symbol(varSym);
+        }
 
-	this->returnType = NULL;
-		
+	// do a scope-and-type analysis of the function body
+	Scope *parameterScope = programScope->enter_scope(fnHeaderScope);
+	Scope *executionScope = parameterScope->enter_scope(new Scope(FunctionBodyScope));
+
+	// the scope and type analysis should repeat as long as we resolve new expression types
+	int iteration = 0;
+	int resolvedTypes = 0;
+	do {
+		resolvedTypes = code->resolveExprTypesAndScopes(executionScope, iteration);
+		iteration++;
+	} while (resolvedTypes != 0);
+
+
+	// check if the function has any un-resolved or erroneous expression; if there is any
+	// expression in error then the return type should be invalid
+	int errorCount = code->emitScopeAndTypeErrors(executionScope);
+	if (errorCount > 0) {
+		this->returnType = Type::errorType;
+	} else {
+		// if the function instance return type is NULL after scope-and-type resolution
+		// then the function definition has no return statement in it
+		if (this->returnType == NULL) {
+			this->returnType = Type::voidType;
+		}
+	}
+	
+	// store the function body scope in the instance (after breacking the parent scope links)
+	parameterScope->detach_from_parent();
+	executionScope->detach_from_parent();
+	fnBodyScope = executionScope;
 }
 
 bool FunctionInstance::isMatchingArguments(List<Type*> *argTypeList) {
@@ -434,4 +508,10 @@ bool FunctionInstance::isMatchingArguments(List<Type*> *argTypeList) {
 		if (!actualType->isEqual(expectedType)) return false;
 	}
 	return true;
+}
+
+FunctionInstance *FunctionInstance::getMostRecentFunction() {
+	int stackSize = FunctionInstance::fnInstanceStack->NumElements();
+	if (stackSize == 0) return NULL;
+	return FunctionInstance::fnInstanceStack->Nth(stackSize - 1);
 }

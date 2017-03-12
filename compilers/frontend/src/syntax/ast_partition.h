@@ -111,7 +111,11 @@ class PartitionSection : public Node {
 	PartitionSection(List<Identifier*> *arguments, List<PartitionSpec*> *spaceSpecs, yyltype loc);
 	const char *GetPrintNameForNode() { return "Partition-Section"; }
         void PrintChildren(int indentLevel);
-	List<Identifier*> *getArguments() { return arguments; }	
+	List<Identifier*> *getArguments() { return arguments; }
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	int getArgumentsCount() { return arguments->NumElements(); }	
 };
 
 #endif

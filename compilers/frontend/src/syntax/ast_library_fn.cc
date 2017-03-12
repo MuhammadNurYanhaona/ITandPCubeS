@@ -4,6 +4,8 @@
 #include "ast_library_fn.h"
 #include "../common/errors.h"
 #include "../common/constant.h"
+#include "../semantics/scope.h"
+#include "../semantics/symbol.h"
 #include "../../../common-libs/utils/list.h"
 
 #include <iostream>
@@ -90,6 +92,17 @@ void LibraryFunction::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeI
 	}
 }
 
+int LibraryFunction::emitSemanticErrors(Scope *scope) {
+	if (argumentCount != arguments->NumElements()) {
+                std::cout << "argument count problem\n";
+                ReportError::TooFewOrTooManyParameters(functionName, arguments->NumElements(),
+                                argumentCount, false);
+		return 1;
+        } else {
+                return emitErrorsInArguments(scope);
+        }
+}
+
 //-------------------------------------------------------------- Root -----------------------------------------------------------/
 
 int Root::resolveExprTypes(Scope *scope) {
@@ -107,6 +120,33 @@ int Root::resolveExprTypes(Scope *scope) {
 		resolvedExprs++;
 	}
 	return resolvedExprs;
+}
+
+int Root::emitErrorsInArguments(Scope *scope) {
+
+	int errors = 0;
+	Expr *arg1 = arguments->Nth(0);
+	errors += arg1->emitScopeAndTypeErrors(scope);
+        Type *arg1Type = arg1->getType();
+        if (arg1Type != NULL && arg1Type != Type::intType
+                        && arg1Type != Type::floatType
+                        && arg1Type != Type::doubleType
+                        && arg1Type != Type::errorType) {
+                ReportError::InvalidExprType(arg1, arg1Type, false);
+		errors++;
+        }
+
+        Expr *arg2 = arguments->Nth(1);
+	errors += arg2->emitScopeAndTypeErrors(scope);
+        Type *arg2Type = arg2->getType();
+        if (arg2Type != NULL && arg2Type != Type::intType 
+			&& arg2Type != Type::errorType) {
+                ReportError::IncompatibleTypes(arg2->GetLocation(), 
+			arg2Type, Type::intType, false);
+		errors++;
+        }
+
+	return errors;
 }
 
 //--------------------------------------------------------- Array Operation -----------------------------------------------------/
@@ -128,6 +168,31 @@ int ArrayOperation::resolveExprTypes(Scope *scope) {
 		resolvedExprs++;
 	}
 	return resolvedExprs;
+}
+
+int ArrayOperation::emitErrorsInArguments(Scope *scope) {
+	
+	int errors = 0;
+	Expr *arg1 = arguments->Nth(0);
+	errors += arg1->emitScopeAndTypeErrors(scope);
+        Type *arg1Type = arg1->getType();
+        if (arg1Type != NULL) {
+                ArrayType *arrayType = dynamic_cast<ArrayType*>(arg1Type);
+                if (arrayType == NULL) {
+                        ReportError::InvalidArrayAccess(arg1->GetLocation(), arg1Type, false);
+			errors++;
+                }
+        }
+
+        Expr *arg2 = arguments->Nth(1);
+	errors += arg2->emitScopeAndTypeErrors(scope);
+        Type *arg2Type = arg2->getType();
+        if (arg2Type != NULL && arg2Type != Type::stringType && arg2Type != Type::errorType) {
+                ReportError::IncompatibleTypes(arg2->GetLocation(), 
+			arg2Type, Type::stringType, false);
+		errors++;
+        }
+        return errors;
 }
 
 //--------------------------------------------------------- Bind Operation ------------------------------------------------------/
@@ -164,4 +229,51 @@ int BindOperation::resolveExprTypes(Scope *scope) {
 	}
 
 	return resolvedExprs;
+}
+
+int BindOperation::emitErrorsInArguments(Scope *scope) {
+	
+	int errors = 0;
+	NamedType *envType = NULL;
+        Expr *arg1 = arguments->Nth(0);
+        errors += arg1->emitScopeAndTypeErrors(scope);
+        Type *arg1Type = arg1->getType();
+        if (arg1Type != NULL) {
+                NamedType *objectType = dynamic_cast<NamedType*>(arg1Type);
+                if (objectType == NULL || !objectType->isEnvironmentType()) {
+                        ReportError::NotAnEnvironment(arg1->GetLocation(), arg1Type, false);
+			errors++;
+                } else {
+                        envType = objectType;
+                }
+        }
+
+        Expr *arg2 = arguments->Nth(1);
+        StringConstant *varName = dynamic_cast<StringConstant*>(arg2);
+        if (varName == NULL) {
+                ReportError::NotAConstant(arg2->GetLocation(), "string", false);
+		errors++;
+        } else if (envType != NULL) {
+                const char *arrayName = varName->getValue();
+                Symbol *symbol = scope->lookup(envType->getTaskName());
+                TaskSymbol *task = dynamic_cast<TaskSymbol*>(symbol);
+                TaskDef *taskDef = (TaskDef*) task->getNode();
+                TupleDef *envTuple = taskDef->getEnvTuple();
+                if (envTuple->getComponent(arrayName) == NULL) {
+                        ReportError::InvalidInitArg(arg2->GetLocation(), 
+					envType->getName(), arrayName, false);
+			errors++;
+                }
+        }
+
+        Expr *arg3 = arguments->Nth(2);
+	errors += arg3->emitScopeAndTypeErrors(scope);
+        Type *arg3Type = arg3->getType();
+        if (arg3Type != NULL && arg3Type != Type::stringType && arg3Type != Type::errorType) {
+                ReportError::IncompatibleTypes(arg3->GetLocation(), 
+				arg3Type, Type::stringType, false);
+		errors++;
+        }
+
+	return errors;
 }
