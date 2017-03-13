@@ -517,11 +517,14 @@ void WhileStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 int WhileStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	
 	int resolvedExprs = 0;
+	resolvedExprs += body->resolveExprTypesAndScopes(executionScope, iteration);
+	
+	// We resolve the condition after we evaluate the body because the IT while loop is
+	// similar to a 'do {...} while (condition);' loop in C. We want the while condition 
+	// to pick up any local variable defined in the loop body.
 	resolvedExprs += condition->resolveExprTypesAndScopes(executionScope, iteration);
 	resolvedExprs += condition->performTypeInference(executionScope, Type::boolType);
 
-	// try to resolve the body after evaluating the iteration expression to maximize type discovery
-	resolvedExprs += body->resolveExprTypesAndScopes(executionScope, iteration);
 	return resolvedExprs;
 }
 

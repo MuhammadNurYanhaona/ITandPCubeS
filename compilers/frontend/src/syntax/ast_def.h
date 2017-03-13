@@ -121,7 +121,10 @@ class TupleDef : public Definition {
 class CoordinatorDef : public Definition {
   protected:
 	Identifier *argument;
-	List<Stmt*> *code;
+	Stmt *code;
+	
+	// two scope and type attributes needed for analyzing the program coordinator function
+	Scope *executionScope;
 	TupleDef *argumentTuple;
   public:
 	CoordinatorDef(Identifier *argument, List<Stmt*> *code, yyltype loc);
@@ -134,6 +137,7 @@ class CoordinatorDef : public Definition {
 	
 	Node *clone();
 	DefTypeId getDefTypeId() { return COORD_DEF; }
+	void validateScope(Scope *parentScope);
 };
 
 class FunctionArg : public Node {

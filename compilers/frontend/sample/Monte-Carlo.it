@@ -1,6 +1,6 @@
 Program (args) { 
         mcEnv = new TaskEnvironment(name: "Monte Carlo Area Estimation")
-        execute(task: "Monte Carlo Area Estimation"; envionment: mcEnv; 		\
+        execute(task: "Monte Carlo Area Estimation"; environment: mcEnv; 		\
 		initialize: args.cell_length, args.grid_dim, args.points_per_cell; 	\
 		partition: args.b)
 }

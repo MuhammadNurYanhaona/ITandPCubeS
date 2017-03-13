@@ -108,15 +108,15 @@ Node *ProgramDef::clone() {
 	return newDef;
 }
 
-// note that the sequencing of some supporting function calls within this function is important 
-// for the correct operation of semantic analysis
+// note that the sequencing of some supporting function calls within this function is important  for 
+// the correct operation of semantic analysis
 void ProgramDef::performScopeAndTypeChecking() {
 	
-	//-----------------------------------------define an overall scope for the program and
+	//------------------------------------------------define an overall scope for the program and
  
 	Scope *scope = new Scope(ProgramScope);
 
-	//--------------------determine the element types and properties of user defined types
+	//---------------------------determine the element types and properties of user defined types
 
         Type::storeBuiltInTypesInScope(scope);
 	List<Definition*> *classDefs = getComponentsByType(CLASS_DEF);
@@ -134,17 +134,17 @@ void ProgramDef::performScopeAndTypeChecking() {
 		classDef->validateScope(scope);	
 	}
 
-	//------------annotate the use of function arguments inside function bodies with value
-	//-----------------------------------------------value or reference type specification
+	//------------------annotate the use of function arguments inside function bodies with value
+	//-----------------------------------------------------value or reference type specification
 	List<Definition*> *fnDefs = getComponentsByType(FN_DEF);
 	for (int i = 0; i < fnDefs->NumElements(); i++) {
 		FunctionDef *fnDef = (FunctionDef*) fnDefs->Nth(i);
 		fnDef->annotateArgAccessesByType();
 	}
 
-	//---------------------create a static function definition map to retrieve definitions
-	//----------------------by name for type-inference analysis for any function-call made 
-	//--------------------------------------------------------from the rest of the program
+	//---------------------------create a static function definition map to retrieve definitions
+	//----------------------------by name for type-inference analysis for any function-call made 
+	//--------------------------------------------------------------from the rest of the program
 	FunctionDef::fnDefMap = new Hashtable<FunctionDef*>;
 	for (int i = 0; i < fnDefs->NumElements(); i++) {
 		FunctionDef *fnDef = (FunctionDef*) fnDefs->Nth(i);
@@ -156,24 +156,34 @@ void ProgramDef::performScopeAndTypeChecking() {
 		}
 	}
  
-	//-----------------analyze the stages section of the tasks before stage instanciations
+	//-----------------------analyze the stages section of the tasks before stage instanciations
 	List<Definition*> *taskDefs = getComponentsByType(TASK_DEF);
         for (int i = 0; i < taskDefs->NumElements(); i++) {
                 TaskDef *taskDef = (TaskDef*) taskDefs->Nth(i);
 		taskDef->analyzeStageDefinitions();
         }
 
-	//---------------------------------perform scope preparations for all task definitions
+	//---------------------------------------perform scope preparations for all task definitions
 	for (int i = 0; i < taskDefs->NumElements(); i++) {
 		TaskDef *task = (TaskDef*) taskDefs->Nth(i);
 		task->attachScope(scope);
 		task->typeCheckInitializeSection(scope);
 	}
-	//-------------------------------if there are errors in some tasks' Initialize Section 
-	//---------------------------------then there is not any point progressing any further
+	//-------------------------------------if there are errors in some tasks' Initialize Section 
+	//---------------------------------------then there is not any point progressing any further
 	if (ReportError::NumErrors() > 0) return;
+
+	//--------------------------------------------------process the program coordinator function
+	List<Definition*> *defList = getComponentsByType(COORD_DEF);
+	if (defList->NumElements() != 1) {
+		std::cout << "Error: There must be one and only one program coordinator function\n";
+		std::exit(EXIT_FAILURE);
+	}
+	CoordinatorDef *coordinator = (CoordinatorDef*) defList->Nth(0);
+	coordinator->attachScope(scope);
+	coordinator->validateScope(scope);
 	
-	//-------------------------------------associate the program scope with the definition
+	//-------------------------------------------associate the program scope with the definition
 
 	symbol = new Symbol("Program", this);
         symbol->setNestedScope(scope);
@@ -262,30 +272,56 @@ VariableDef *TupleDef::getComponent(const char *name) {
 //----------------------------------- Coordinator/Main Definition -------------------------------------/
 
 CoordinatorDef::CoordinatorDef(Identifier *a, List<Stmt*> *c, yyltype loc) : Definition(loc) {
-        Assert(a != NULL && c != NULL);
+        
+	Assert(a != NULL && c != NULL);
         argument = a;
-        code = c;
+        code = new StmtBlock(c);
+	code->SetParent(this);
         argument->SetParent(this);
-        for (int i = 0; i < code->NumElements(); i++) {
-                Stmt *stmt = code->Nth(i);
-                stmt->SetParent(this);
-        }
+
+	argumentTuple = NULL;
+	executionScope = NULL;
 }
 
 void CoordinatorDef::PrintChildren(int indentLevel) {
         if (argument != NULL) argument->Print(indentLevel + 1, "(Argument) ");
         PrintLabel(indentLevel + 1, "Code");
-        code->PrintAll(indentLevel + 2);
+        code->Print(indentLevel + 2);
 }
 
 Node *CoordinatorDef::clone() {
 	Identifier *newArg = (Identifier*) argument->clone();
-	List<Stmt*> *newCode = new List<Stmt*>;
-	for (int i = 0; i < code->NumElements(); i++) {
-                Stmt *stmt = code->Nth(i);
-		newCode->Append((Stmt*) stmt->clone());
-	}
-	return new CoordinatorDef(newArg, newCode, *GetLocation());
+	Stmt *newCode = (Stmt*) code->clone();
+	List<Stmt*> *codeList = new List<Stmt*>;
+	codeList->Append(newCode);
+	return new CoordinatorDef(newArg, codeList, *GetLocation());
+}
+
+void CoordinatorDef::validateScope(Scope *parentScope) {
+
+        // Create a scope for holding the command line arguments
+        Scope *scope = parentScope->enter_scope(new Scope(ProgramScope));
+        VariableDef *commandLineArg = new VariableDef(argument, new MapType(*argument->GetLocation()));
+        scope->insert_symbol(new VariableSymbol(commandLineArg));
+
+        // Create the execution scope attached to the command line arguments' scope
+        executionScope = scope->enter_scope(new Scope(CoordinatorScope));
+
+	// the scope and type analysis should repeat as long as we resolve new expression types
+        int iteration = 0;
+        int resolvedTypes = 0;
+        do {    resolvedTypes = code->resolveExprTypesAndScopes(executionScope, iteration);
+                iteration++;
+        } while (resolvedTypes != 0);
+
+        // emit all scope and type errors, if exist
+        code->emitScopeAndTypeErrors(executionScope);	
+
+        // generate the definition for a structure to hold the arguments for the coordinator function
+        MapType *argumentMap = (MapType*) commandLineArg->getType();
+        List<VariableDef*> *argumentList = argumentMap->getElementList();
+        Identifier *tupleId = new Identifier(*argument->GetLocation(), "ProgramArgs");
+        argumentTuple = new TupleDef(tupleId, argumentList);
 }
 
 //--------------------------------------- Function Definition -----------------------------------------/
