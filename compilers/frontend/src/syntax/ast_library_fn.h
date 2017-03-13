@@ -66,6 +66,7 @@ class Root : public LibraryFunction {
         //-------------------------------------------------------------- Helper functions for Semantic Analysis
 
 	int resolveExprTypes(Scope *scope);
+	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitErrorsInArguments(Scope *scope);
 };
 

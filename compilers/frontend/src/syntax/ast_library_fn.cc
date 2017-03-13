@@ -122,6 +122,14 @@ int Root::resolveExprTypes(Scope *scope) {
 	return resolvedExprs;
 }
 
+int Root::inferExprTypes(Scope *scope, Type *assignedType) {
+	this->type = assignedType;
+	int resolvedExprs = 1;
+	Expr *arg1 = arguments->Nth(0);
+	resolvedExprs += arg1->performTypeInference(scope, assignedType);
+	return resolvedExprs;
+}
+
 int Root::emitErrorsInArguments(Scope *scope) {
 
 	int errors = 0;

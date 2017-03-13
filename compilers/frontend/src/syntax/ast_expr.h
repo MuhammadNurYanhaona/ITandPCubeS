@@ -55,6 +55,10 @@ class Expr : public Stmt {
 
   protected:
 	// supporting function for the type inference procedure that subclasses to provide implementation for
+	// Note that for some expression such as logical-expression and range-expression the type is fixed
+	// and the their sub-expression's expected types are already known. These expressions should apply
+	// type inference of sub-expression as part of the resolveExprTypes(scope) function. They do not need
+	// to extend this function.
 	virtual int inferExprTypes(Scope *scope, Type *assignedType) { return 0; }
 
 	// function to print and count any scope, type, and other semantic errors in an expression
@@ -205,7 +209,6 @@ class LogicalExpr : public Expr {
 	ExprTypeId getExprTypeId() { return LOGIC_EXPR; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
-	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 };
 
@@ -288,7 +291,6 @@ class RangeExpr : public Expr {
 	ExprTypeId getExprTypeId() { return RANGE_EXPR; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
-	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 };	
 
@@ -334,7 +336,6 @@ class IndexRange : public Expr {
 	ExprTypeId getExprTypeId() { return INDEX_RANGE; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
-	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 };
 
@@ -358,7 +359,6 @@ class ArrayAccess : public Expr {
 	int getIndexPosition();
         Expr *getEndpointOfArrayAccess();
 	int resolveExprTypes(Scope *scope);
-	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 };
 
@@ -377,7 +377,6 @@ class FunctionCall : public Expr {
 	ExprTypeId getExprTypeId() { return FN_CALL; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
-	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 };
 
@@ -430,7 +429,6 @@ class TaskInvocation : public Expr {
 	ExprTypeId getExprTypeId() { return TASK_INVOKE; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
-	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 
 	// helper functions to retrieve different types of task invocation arguments 
