@@ -55,6 +55,7 @@ class NamedType : public Type {
     	NamedType(Identifier *i);
     	const char *GetPrintNameForNode() { return "Named-Type"; }
    	void PrintChildren(int indentLevel);
+	const char *getName() { return id->getName(); }
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
@@ -81,6 +82,7 @@ class ArrayType : public Type {
     	const char *GetPrintNameForNode() { return "Dynamic-Array"; }
     	void PrintChildren(int indentLevel);
 	int getDimensions() { return dimensions; }
+	const char *getName();
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
@@ -117,6 +119,7 @@ class ListType : public Type {
 	ListType(yyltype loc, Type *elemType);	
     	const char *GetPrintNameForNode() { return "List"; }
     	void PrintChildren(int indentLevel);
+	const char *getName();
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 

@@ -687,13 +687,19 @@ void ExternCodeBlock::PrintChildren(int indentLevel) {
 
 Node *ExternCodeBlock::clone() {
 	const char *newLng = strdup(language);
-	List<const char*> *newIncls = new List<const char*>;
-	for (int i = 0; i < headerIncludes->NumElements(); i++) {
-		newIncls->Append(strdup(headerIncludes->Nth(i)));
+	List<const char*> *newIncls = NULL;
+	if (headerIncludes != NULL) {
+		newIncls = new List<const char*>;
+		for (int i = 0; i < headerIncludes->NumElements(); i++) {
+			newIncls->Append(strdup(headerIncludes->Nth(i)));
+		}
 	}
-	List<const char*> *newLibs = new List<const char*>;
-	for (int i = 0; i < libraryLinks->NumElements(); i++) {
-		newLibs->Append(strdup(libraryLinks->Nth(i)));
+	List<const char*> *newLibs = NULL;
+	if (libraryLinks != NULL) {	
+		newLibs = new List<const char*>;
+		for (int i = 0; i < libraryLinks->NumElements(); i++) {
+			newLibs->Append(strdup(libraryLinks->Nth(i)));
+		}
 	}
 	const char *newCode = strdup(codeBlock);
 	return new ExternCodeBlock(newLng, newIncls, newLibs, newCode, *GetLocation());

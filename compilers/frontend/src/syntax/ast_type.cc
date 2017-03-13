@@ -186,6 +186,22 @@ void ArrayType::PrintChildren(int indentLevel) {
         elemType->Print(indentLevel + 1, "Element ");
 }
 
+const char *ArrayType::getName() {
+	const char *elementTypeName = elemType->getName();
+        int elemNameLength = strlen(elementTypeName);
+        std::ostringstream stm ;
+        stm << dimensions; 
+        std::string str =  stm.str();
+        char *dimensionality = (char *) str.c_str();
+        int dimensionalityLength = strlen(dimensionality);
+        int length = dimensionalityLength + elemNameLength + 12;
+        char *arrayName = (char *) malloc(length * sizeof(char));
+        strcpy(arrayName, dimensionality);  
+        strcat(arrayName, "D Array of ");
+        strcat(arrayName, elementTypeName); 
+        return (const char*) arrayName;
+}
+
 Node *ArrayType::clone() {
 	Type *newElemType = (Type*) elemType->clone();
 	return new ArrayType(*GetLocation(), newElemType, dimensions);
@@ -277,6 +293,16 @@ ListType::ListType(yyltype loc, Type *et) : Type(loc) {
 
 void ListType::PrintChildren(int indentLevel) {
         elemType->Print(indentLevel + 1, "Element ");
+}
+
+const char *ListType::getName() {
+        const char *elementTypeName = elemType->getName();
+        int elemNameLength = strlen(elementTypeName);
+        int length = elemNameLength + 9;
+        char *listName = (char *) malloc(length * sizeof(char));
+        strcpy(listName, "List of ");
+        strcat(listName, elementTypeName);
+        return (const char*) listName;
 }
 
 Node *ListType::clone() {

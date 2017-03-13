@@ -37,10 +37,8 @@ InitializeSection::InitializeSection(List<Identifier*> *a, List<Stmt*> *c, yylty
                 arguments->Nth(i)->SetParent(this);
         }
         argumentTypes = NULL;
-        code = c;
-        for (int i = 0; i < code->NumElements(); i++) {
-                code->Nth(i)->SetParent(this);
-        }
+        code = new StmtBlock(c);
+	code->SetParent(this);
 }
 
 void InitializeSection::PrintChildren(int indentLevel) {
@@ -49,7 +47,62 @@ void InitializeSection::PrintChildren(int indentLevel) {
                 arguments->PrintAll(indentLevel + 2);
         }
         PrintLabel(indentLevel + 1, "Code");
-        code->PrintAll(indentLevel + 2);
+        code->Print(indentLevel + 2);
+}
+
+void InitializeSection::performScopeAndTypeChecking(Scope *parentScope) {
+	
+	// Generate a parameter scope for initialize arguments
+        Scope *parameterScope = new Scope(TaskInitScope);
+        TaskDef *taskDef = (TaskDef*) this->parent;
+        Scope *taskDefineScope = taskDef->getSymbol()->getNestedScope();
+        for (int i = 0; i < arguments->NumElements(); i++) {
+                Identifier *id = arguments->Nth(i);
+                if (taskDefineScope->lookup(id->getName()) != NULL) {
+                        parameterScope->copy_symbol(taskDefineScope->lookup(id->getName()));
+                } else {
+                        parameterScope->insert_symbol(new VariableSymbol(id->getName(), NULL));
+                }
+        }
+
+	// enter to the nested scopes for the task and the init section
+        Scope *executionScope  = parentScope->enter_scope(taskDefineScope);
+        executionScope = executionScope->enter_scope(parameterScope);
+
+        // create a new scope for the init body (code section)
+        Scope *initBodyScope = executionScope->enter_scope(new Scope(TaskInitBodyScope));
+
+	// the scope and type analysis should repeat as long as we resolve new expression types
+        int iteration = 0;
+        int resolvedTypes = 0;
+        do {	resolvedTypes = code->resolveExprTypesAndScopes(initBodyScope, iteration);
+                iteration++;
+        } while (resolvedTypes != 0);
+
+	// emit all scope and type errors, if exist
+	code->emitScopeAndTypeErrors(initBodyScope);
+	
+	// prepare the scopes for storage
+	taskDefineScope->detach_from_parent();
+        parameterScope->detach_from_parent();
+        initBodyScope->detach_from_parent();
+
+        // save parameter and init body scopes
+        TaskSymbol *taskSymbol = (TaskSymbol*) taskDef->getSymbol();
+        taskSymbol->setInitScope(parameterScope);
+        this->scope = initBodyScope;
+
+        // store the argument types for actual to formal parameter matching
+        argumentTypes = new List<Type*>;
+        for (int i = 0; i < arguments->NumElements(); i++) {
+                Identifier *id = arguments->Nth(i);
+                VariableSymbol *symbol = (VariableSymbol*) parameterScope->lookup(id->getName());
+                if (symbol->getType() == NULL) {
+                        ReportError::TypeInferenceError(id, false);
+                } else {
+                        argumentTypes->Append(symbol->getType());
+                }
+        }	
 }
 
 //----------------------------------------------------- Environment Section -------------------------------------------------------/
@@ -437,4 +490,13 @@ void TaskDef::attachScope(Scope *parentScope) {
         ((TaskSymbol *) symbol)->setEnvScope(envScope);
         ((TaskSymbol *) symbol)->setPartitionScope(partScope);
         parentScope->insert_symbol(symbol);
+}
+
+void TaskDef::typeCheckInitializeSection(Scope *scope) {
+	if (initialize != NULL) {
+                Scope *executionScope = scope->enter_scope(new Scope(ExecutionScope));
+                NamedType *partitionType = new NamedType(partitionTuple->getId());
+                executionScope->insert_symbol(new VariableSymbol("partition", partitionType));
+                initialize->performScopeAndTypeChecking(executionScope);
+        }
 }

@@ -16,6 +16,32 @@ Function init_rand() {
 	}
 }
 
+Function perform_sampling(cell, seed, trial_count) {
+	cell_length = cell.right - cell.left + 1
+	internal_points = 0
+	trial = 0
+	do {
+		// generate a point within the cell boundary and calculate its position
+		// relative to the shape
+		@Extern {
+			@Language "C++"
+			@Includes { math.h, cstdlib }
+			${
+				int x = rand_r((unsigned int *) &seed) % cell_length + cell.left;
+				int y = rand_r((unsigned int *) &seed) % cell_length + cell.bottom;
+				
+				// tested polynomial is 10 sin x^2 + 50 cos y^3
+				double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
+				if (result <= 0.0) {
+					internal_points++; 
+				}
+			}$
+		}
+		trial = trial + 1
+	} while (trial < trial_count)
+	return internal_points
+}
+
 Task "Monte Carlo Area Estimation":
 	Define:
 		grid: 2d Array of Rectangle
@@ -46,30 +72,10 @@ Task "Monte Carlo Area Estimation":
 			// iterate parallely over the grid cells
 			do {
 				cell = grid[i][j]
-				internal_points = 0
 				seed = lpuId[0]
 
 				// undertakes points_per_cell number of point placement trails 
-				trial = 0
-				do {
-					// generate a point within the cell boundary and calculate its position 
-					// relative to the shape
-					@Extern {
-						@Language "C++"
-						@Includes { math.h, cstdlib }
-						${
-							int x = rand_r((unsigned int *) &seed) % cell_length + cell.left;
-							int y = rand_r((unsigned int *) &seed) % cell_length + cell.bottom;
-							
-							// tested polynomial is 10 sin x^2 + 50 cos y^3
-							double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
-							if (result <= 0.0) {
-								internal_points++; 
-							}
-						}$
-					}
-					trial = trial + 1
-				} while (trial < points_per_cell)
+				internal_points = perform_sampling(cell, seed, points_per_cell)
 				
 				// estimate the part of the polynomial within the grid cell
 				sub_area_estimates[i][j] = cell_size * internal_points / points_per_cell

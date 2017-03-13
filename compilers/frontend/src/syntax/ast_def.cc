@@ -163,6 +163,16 @@ void ProgramDef::performScopeAndTypeChecking() {
 		taskDef->analyzeStageDefinitions();
         }
 
+	//---------------------------------perform scope preparations for all task definitions
+	for (int i = 0; i < taskDefs->NumElements(); i++) {
+		TaskDef *task = (TaskDef*) taskDefs->Nth(i);
+		task->attachScope(scope);
+		task->typeCheckInitializeSection(scope);
+	}
+	//-------------------------------if there are errors in some tasks' Initialize Section 
+	//---------------------------------then there is not any point progressing any further
+	if (ReportError::NumErrors() > 0) return;
+	
 	//-------------------------------------associate the program scope with the definition
 
 	symbol = new Symbol("Program", this);

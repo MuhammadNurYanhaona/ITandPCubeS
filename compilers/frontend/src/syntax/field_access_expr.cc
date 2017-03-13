@@ -66,7 +66,7 @@ int FieldAccess::resolveExprTypes(Scope *scope) {
 	int resolvedExprs = 0;
 	if (base == NULL) {			// consider the terminal case of accessing a variable first
 		VariableSymbol *symbol = (VariableSymbol*) scope->lookup(field->getName());
-                if (symbol != NULL) {
+                if (symbol != NULL && symbol->getType() != NULL) {
                         this->type = symbol->getType();
 			resolvedExprs++;
 		}
@@ -130,7 +130,9 @@ int FieldAccess::inferExprTypes(Scope *scope, Type *assignedType) {
 		return 0;
         }
 
-	// if the field-access is a standalone field, create a new symbol for it in scope with the assigned type
+	// If the field-access is a standalone field then setup the type of the variable symbol it is associated
+	// with. If there is no such symbol then create a new symbol for the field with the assigned type.
+	this->type = assignedType;
 	VariableSymbol *symbol = (VariableSymbol*) scope->lookup(field->getName());
 	if (symbol != NULL) {
 		symbol->setType(this->type);
@@ -144,7 +146,6 @@ int FieldAccess::inferExprTypes(Scope *scope, Type *assignedType) {
 			return 0;
 		}
 	}
-	this->type = assignedType;
 	return 1;
 }
 

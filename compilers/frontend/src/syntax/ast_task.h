@@ -29,7 +29,10 @@ class InitializeSection : public Node {
   protected:
 	List<Identifier*> *arguments;
 	List<Type*> *argumentTypes;
-	List<Stmt*> *code;
+	StmtBlock *code;
+
+	// The Initialize Section has its own scope for executing the code embedded within it 
+	Scope *scope;
   public: 
 	InitializeSection(List<Identifier*> *arguments, List<Stmt*> *code, yyltype loc);	
         const char *GetPrintNameForNode() { return "Initialize-Section"; }
@@ -37,6 +40,7 @@ class InitializeSection : public Node {
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
+	void performScopeAndTypeChecking(Scope *parentScope);
 	List<Type*> *getArgumentTypes() { return argumentTypes; }	
 };
 
@@ -232,6 +236,10 @@ class TaskDef : public Definition {
 	// The custom types for task's define, environment, and partition sections are created before a 
 	// full scale type checking of the task.
 	void attachScope(Scope *parentScope);
+
+	// The Initialize Section, if exists, should be validated first so that the arguments of any task 
+	// invocation found in the coordinator function can be validated.  
+	void typeCheckInitializeSection(Scope *scope);
 };
 
 #endif
