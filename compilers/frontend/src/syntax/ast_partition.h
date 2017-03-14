@@ -3,10 +3,15 @@
 
 #include "ast.h"
 #include "ast_expr.h"
+#include "../common/constant.h"
 #include "../../../common-libs/utils/list.h"
 
 class TaskDef;
+class Scope;
 class IntConstant;
+class ArrayDataStructure;
+class PartitionHierarchy;
+class PartitionFunctionConfig;
 
 class SpaceLinkage : public Node {
   protected:
@@ -16,6 +21,12 @@ class SpaceLinkage : public Node {
 	SpaceLinkage(PartitionLinkType linkType, char parentSpace, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Space-Linkage"; }
         void PrintChildren(int indentLevel);
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	char getParentId() { return parentSpace; }
+	bool linkedToSubpartition() { return linkType == LinkTypeSubpartition; }
+	Space *getParentSpace(PartitionHierarchy *partitionHierarchy);
 };
 
 class PartitionArg : public Node {
@@ -28,6 +39,11 @@ class PartitionArg : public Node {
 	PartitionArg(IntConstant *value);			
 	const char *GetPrintNameForNode() { return "Partition-Arg"; }
         void PrintChildren(int indentLevel);
+	
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	Node *getContent();
+	void validateScope(Scope *partitionScope);
 };
 
 class PartitionInstr : public Node {
@@ -45,6 +61,13 @@ class PartitionInstr : public Node {
 	const char *GetPrintNameForNode() { return "Partition-Instr"; }
         void PrintChildren(int indentLevel);
 	void SetOrder(PartitionOrder o) { order = o; }
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	bool isInstructedForReplication() { return replicated; }
+        PartitionFunctionConfig *generateConfiguration(List<int> *dataDimensions,
+                        int dimensionAccessStartIndex, 
+			Scope *partitionScope);	
 };
 
 class VarDimensions {
@@ -71,6 +94,12 @@ class DataConfigurationSpec : public Node {
 	const char *GetPrintNameForNode() { return "Data-Item-Spec"; }
 	void SetParentLink(SpaceLinkage *p) { parentLink = p; }
         void PrintChildren(int indentLevel);
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	ArrayDataStructure *addPartitionConfiguration(Space *space,
+                	Scope *partitionScope, 
+			PartitionHierarchy *partitionHierarchy);
 };
 
 class SubpartitionSpec : public Node {
@@ -83,6 +112,12 @@ class SubpartitionSpec : public Node {
 		List<DataConfigurationSpec*> *specList, yyltype loc);
 	const char *GetPrintNameForNode() { return "Subpartition-Configuration"; }
         void PrintChildren(int indentLevel);		
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+
+	void addSpaceConfiguration(TaskDef *taskDef, 
+			PartitionHierarchy *currentHierarchy, 
+			Space *ownerSpace);	
 };
 
 class PartitionSpec : public Node {
@@ -101,12 +136,20 @@ class PartitionSpec : public Node {
 	const char *GetPrintNameForNode() { return "Space-Configuration"; }
         void PrintChildren(int indentLevel);
 	SpaceLinkage *getSpaceLinkage() { return parentLink; }
+
+	//------------------------------------------------------------------ Helper functions for Semantic Analysis
+	
+	void addSpaceConfiguration(TaskDef *taskDef, PartitionHierarchy *currentHierarchy);	
 };
 
 class PartitionSection : public Node {
   protected:
 	List<Identifier*> *arguments;
 	List<PartitionSpec*> *spaceSpecs;
+
+	// the hierarchical description of the Partition Section as partial ordering of LPSes and their 
+	// contents
+	PartitionHierarchy *partitionHierarchy;
   public:
 	PartitionSection(List<Identifier*> *arguments, List<PartitionSpec*> *spaceSpecs, yyltype loc);
 	const char *GetPrintNameForNode() { return "Partition-Section"; }
@@ -115,7 +158,11 @@ class PartitionSection : public Node {
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
-	int getArgumentsCount() { return arguments->NumElements(); }	
+	int getArgumentsCount() { return arguments->NumElements(); }
+
+	// This interpretes the instructions of the Partition Section, validates those instructions, and 
+        // constructs a hierarchical description of LPSes and their data content.
+	void constructPartitionHierarchy(TaskDef *taskDef);	
 };
 
 #endif

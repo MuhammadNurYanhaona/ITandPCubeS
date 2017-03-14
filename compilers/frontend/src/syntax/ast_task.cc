@@ -500,3 +500,7 @@ void TaskDef::typeCheckInitializeSection(Scope *scope) {
                 initialize->performScopeAndTypeChecking(executionScope);
         }
 }
+
+void TaskDef::constructPartitionHierarchy() {
+         partition->constructPartitionHierarchy(this);
+}

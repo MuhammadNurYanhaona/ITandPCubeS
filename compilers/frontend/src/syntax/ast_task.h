@@ -220,6 +220,7 @@ class TaskDef : public Definition {
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
+	DefineSection *getDefineSection() { return define; }
 	DefTypeId getDefTypeId() { return TASK_DEF; }
 	
 	// This function is needed to annotate a compute stage's expressions with proper markers before a
@@ -240,6 +241,10 @@ class TaskDef : public Definition {
 	// The Initialize Section, if exists, should be validated first so that the arguments of any task 
 	// invocation found in the coordinator function can be validated.  
 	void typeCheckInitializeSection(Scope *scope);
+
+	// This interpretes the instructions of the Partition Section, validates those instructions, and 
+	// constructs a hierarchical description of LPSes and their data content.
+	void constructPartitionHierarchy();
 };
 
 #endif

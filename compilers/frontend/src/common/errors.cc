@@ -380,7 +380,7 @@ void ReportError::ArgumentMissingInPartitionFunction(yyltype *loc, const char *f
 }
 
 void ReportError::InvalidPadding(yyltype *loc, const char *functionName) {
-	const char* message = "For uniform padding in front and back padding arguments count should match partitioning arguments count. For non-uniform padding the former should be twice of the latter in %s.";
+	const char* message = "For uniform padding with '%s', the number of front and back padding arguments should match partitioning arguments count. \nFor non-uniform padding, the former should be twice of the latter.";
 	Formatted(loc, message, functionName);
 }
 

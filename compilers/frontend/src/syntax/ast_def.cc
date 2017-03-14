@@ -173,6 +173,12 @@ void ProgramDef::performScopeAndTypeChecking() {
 	//---------------------------------------then there is not any point progressing any further
 	if (ReportError::NumErrors() > 0) return;
 
+	//----------------------------------------------Construct the partition hierarchies of tasks
+	for (int i = 0; i < taskDefs->NumElements(); i++) {
+                TaskDef *task = (TaskDef*) taskDefs->Nth(i);
+		task->constructPartitionHierarchy();
+	}
+
 	//--------------------------------------------------process the program coordinator function
 	List<Definition*> *defList = getComponentsByType(COORD_DEF);
 	if (defList->NumElements() != 1) {
