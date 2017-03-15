@@ -95,7 +95,7 @@ int FieldAccess::resolveExprTypes(Scope *scope) {
 				resolvedExprs++;
 			}
 		}
-	} else {				// check if the field access to a property of a custom type
+	} else {				// check if the field access is a property of a custom type
 		Symbol *symbol = scope->lookup(baseType->getName());
 		if (symbol != NULL) {
 			Scope *baseScope = symbol->getNestedScope();
@@ -104,6 +104,9 @@ int FieldAccess::resolveExprTypes(Scope *scope) {
 					= (VariableSymbol*) baseScope->lookup(field->getName());
 				this->type = fieldSymbol->getType();
 				resolvedExprs++;
+			} else {
+				ReportError::NoSuchFieldInBase(field, baseType, false);
+				this->type = Type::errorType;
 			}
 		}
 	}
