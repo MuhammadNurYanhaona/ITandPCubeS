@@ -159,6 +159,7 @@ class PartitionSection : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	int getArgumentsCount() { return arguments->NumElements(); }
+	PartitionHierarchy *getPartitionHierarchy();
 
 	// This interpretes the instructions of the Partition Section, validates those instructions, and 
         // constructs a hierarchical description of LPSes and their data content.

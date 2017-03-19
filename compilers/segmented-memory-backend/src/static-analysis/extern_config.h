@@ -22,7 +22,7 @@ class LanguageIncludesAndLinks {
 	List<const char*> *getLibraryLinks() { return libraryLinks; }
 };
 
-// This class holds information about all header includes and library links of all languages found within a IT task
+// This class holds information about all header includes and library links of all languages found within a IT task.
 class IncludesAndLinksMap {
   protected:
 	Hashtable<LanguageIncludesAndLinks*> *map;

@@ -45,9 +45,9 @@ void AssignmentExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId
 
 int AssignmentExpr::resolveExprTypes(Scope *scope) {
 	int resolvedExprs = 0;
-	resolvedExprs += right->resolveExprTypes(scope);
+	resolvedExprs += right->resolveExprTypesAndScopes(scope);
 	Type *rightType = right->getType();
-	resolvedExprs += left->resolveExprTypes(scope);
+	resolvedExprs += left->resolveExprTypesAndScopes(scope);
 	Type *leftType = left->getType();
 	resolvedExprs += left->performTypeInference(scope, rightType);
 	resolvedExprs += right->performTypeInference(scope, leftType);

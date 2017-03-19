@@ -275,8 +275,8 @@ void ReportError::ImpermissibleRepeat(yyltype *loc, const char *spaceName, const
 	Formatted(loc, "Cannot nest a repeat loop spanning up to Space %s inside Space %s", repeatLoopSpace, spaceName);
 }
 
-void ReportError::SubpartitionRepeatNotSupported(yyltype *loc, char spaceName) {
-	Formatted(loc, "Space %c is not sub-partitioned to have a repeat loop like this", spaceName);
+void ReportError::SubpartitionRepeatNotSupported(yyltype *loc, const char *spaceName) {
+	Formatted(loc, "Space %s is not sub-partitioned to have a repeat loop like this", spaceName);
 }
 
 void ReportError::RepeatBeginningInvalid(yyltype *loc, const char *allowedFurthestRoot) {

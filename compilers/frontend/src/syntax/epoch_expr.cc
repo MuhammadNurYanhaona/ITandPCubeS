@@ -43,7 +43,7 @@ void EpochExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 
 int EpochExpr::resolveExprTypes(Scope *scope) {
 
-	int resolvedExprs = root->resolveExprTypes(scope);
+	int resolvedExprs = root->resolveExprTypesAndScopes(scope);
 	Type *rootType = root->getType();
 
 	if (rootType != NULL && rootType != Type::errorType) {

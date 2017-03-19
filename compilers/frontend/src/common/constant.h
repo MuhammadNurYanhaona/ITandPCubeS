@@ -15,6 +15,14 @@ enum IntSize		{	BYTE, TWO_BYTES, FOUR_BYTE };
 
 enum ArgumentType	{	VALUE_TYPE, REFERENCE_TYPE };
 
+/*	Environment variable linkage types indicate how an environmental data structure is made available to
+	or by a task
+	TypeCreate: means the task execution creates a new instance
+	TypeLink: means the structure is linked to the task environment at the beginning
+	TypeCreateIfNotLinked: is self-explanatory after the above two
+*/
+enum LinkageType { TypeCreate, TypeLink, TypeCreateIfNotLinked };
+
 /*      Partition Order specifies in what order individual partitions (or subpartitions) of a space will be
         generated and processed by the runtime. This parameter is mostly relevant for subpartitioned spaces
         as in normal cases partitions of a space are independent. 
@@ -42,5 +50,28 @@ enum ExprTypeId { 	INT_CONST, FLOAT_CONST, DOUBLE_CONST,
 			EPOCH_EXPR, FIELD_ACC, RANGE_EXPR,
                   	ASSIGN_EXPR, INDEX_RANGE, ARRAY_ACC, 
 			FN_CALL, TASK_INVOKE, OBJ_CREATE, LIB_FN_CALL };
+
+/*      Task global variables may be synchronized/retrieved in several cases. The cases are
+        Entrance: moving from a higher to a lower space
+        Exit: exiting from a lower to higher space
+        Return: returning from a lower to a higher space
+        Reappearance: moving from one stage of a space to another of the same space
+*/
+enum SyncStageType { Entrance_Sync, Exit_Sync, Return_Sync, Reappearance_Sync };
+
+/*      Depending on the type of sync stage synchronization need is different. Scenarios are
+        Load: need to read some data structures into a space
+        Load_And_Configure: need to read data structures and also to update metadata of those structures
+        Ghost_Region_Update: need to do padding region synchronization
+        Restore: Need to upload changes from below to upper region for persistence
+*/
+enum SyncMode { Load, Load_And_Configure, Ghost_Region_Update, Restore };
+
+/*      Repeat Cycles can be of three types
+	Range_Repeat: repitition of the indexes of an index range
+        Condition_Repeat: is a generic while loop condition based repeat
+	Subpartition_Repeat: iteration of an LPU sub-partitions
+*/
+enum RepeatCycleType { Range_Repeat, Condition_Repeat, Subpartition_Repeat };
 
 #endif

@@ -53,11 +53,11 @@ void IndexRange::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 int IndexRange::resolveExprTypes(Scope *scope) {
 	int resolvedExprs = 0;
 	if (begin != NULL) {
-		resolvedExprs += begin->resolveExprTypes(scope);
+		resolvedExprs += begin->resolveExprTypesAndScopes(scope);
 		resolvedExprs += begin->performTypeInference(scope, Type::intType);
 	}
 	if (end != NULL) {
-		resolvedExprs += end->resolveExprTypes(scope);
+		resolvedExprs += end->resolveExprTypesAndScopes(scope);
 		resolvedExprs += end->performTypeInference(scope, Type::intType);
 	}
 	this->type = (partOfArray) ? Type::voidType : Type::rangeType;

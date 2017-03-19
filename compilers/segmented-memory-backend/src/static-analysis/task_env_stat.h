@@ -13,7 +13,7 @@ class FlowStage;
  * use of the environmental data structures it has access to.   
  */
 
-/* This class tells if the end of a task execution the view of a data structure from a particular LPs  becomes 
+/* This class tells if the end of a task execution, the view of a data structure from a particular LPs becomes 
  * stale or remains fresh. */ 
 class EnvVarLpsStat {
   protected:
@@ -29,8 +29,8 @@ class EnvVarLpsStat {
 	Space *getLps() { return lps; }
 };
 
-/* This class tells whether an environmental data structure was read-only inside a task or has it been updated.
- * It also keeps track of the states of different LPSes that accesses/updates the data structure as part of the 
+/* This class tells whether an environmental data structure was read-only inside a task or it has been updated.
+ * It also keeps track of the states of different LPSes that access/update the data structure as part of the 
  * task execution. */
 class EnvVarStat {
   protected:
@@ -63,7 +63,7 @@ class TaskEnvStat {
 	EnvVarStat *getVariableStat(const char *varName) { return varStatMap->Lookup(varName); }
 	
 	// We adopt the policy of keeping all LPSes of a task up-to-date with the latest modification of all data
-	// structures they individually access at the end of the task's execution. To achieve that, we insert 
+	// structures they individually access -- at the end of the task's execution. To achieve that, we insert 
 	// sync stages for LPSes at the end of the computation flow that read all stale data structures an LPS is
 	// interested in. We do this stage insertation before the data dependency analysis kicks in and draws the
 	// dependency arcs between stages.  

@@ -551,6 +551,10 @@ void PartitionSection::PrintChildren(int indentLevel) {
         spaceSpecs->PrintAll(indentLevel + 1);
 }
 
+PartitionHierarchy *PartitionSection::getPartitionHierarchy() {
+	return partitionHierarchy;
+}
+
 void PartitionSection::constructPartitionHierarchy(TaskDef *taskDef) {
 
         PartitionHierarchy *hierarchy = new PartitionHierarchy();

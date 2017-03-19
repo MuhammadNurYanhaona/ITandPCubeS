@@ -63,9 +63,9 @@ int LogicalExpr::resolveExprTypes(Scope *scope) {
 
 	int resolvedExprs = 0;
 	if (left != NULL) {
-		resolvedExprs += left->resolveExprTypes(scope);
+		resolvedExprs += left->resolveExprTypesAndScopes(scope);
 	}
-	resolvedExprs += right->resolveExprTypes(scope);
+	resolvedExprs += right->resolveExprTypesAndScopes(scope);
 
 	bool arithmaticOp = (op == EQ || op == NE || op == GT || op == LT || op == GTE || op == LTE);
 	if (arithmaticOp) {

@@ -50,7 +50,7 @@ int NamedMultiArgument::resolveExprTypes(Scope *scope) {
 	int resolvedExprs = 0;
 	for (int i = 0; i < argList->NumElements(); i++) {
                 Expr *arg = argList->Nth(i);
-		resolvedExprs += arg->resolveExprTypes(scope);
+		resolvedExprs += arg->resolveExprTypesAndScopes(scope);
 	}
 	return resolvedExprs;
 }
@@ -134,7 +134,7 @@ int TaskInvocation::resolveExprTypes(Scope *scope) {
 		for (int i = 0; i < initArgs->NumElements(); i++) {
 			Expr *expr = initArgs->Nth(i);
 			Type *type = initArgTypes->Nth(i);
-			resolvedExprs += expr->resolveExprTypes(scope);
+			resolvedExprs += expr->resolveExprTypesAndScopes(scope);
 			resolvedExprs += expr->performTypeInference(scope, type);
 			if (expr->getType() == NULL) {
 				fullyResolved = false;
@@ -146,7 +146,7 @@ int TaskInvocation::resolveExprTypes(Scope *scope) {
 	List<Expr*> *partitionArgs = getPartitionArguments();
 	for (int i =0; i < partitionArgs->NumElements(); i++) {
 		Expr *arg = partitionArgs->Nth(i);
-		resolvedExprs += arg->resolveExprTypes(scope);
+		resolvedExprs += arg->resolveExprTypesAndScopes(scope);
 		resolvedExprs += arg->performTypeInference(scope, Type::intType);
 	}
 

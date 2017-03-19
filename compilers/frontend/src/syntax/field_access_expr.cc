@@ -73,13 +73,13 @@ int FieldAccess::resolveExprTypes(Scope *scope) {
 		return resolvedExprs;
 	}
 
-	resolvedExprs += base->resolveExprTypes(scope);
+	resolvedExprs += base->resolveExprTypesAndScopes(scope);
 	Type *baseType = base->getType();
 	if (baseType == NULL || baseType == Type::errorType) return resolvedExprs;
 
 	ArrayType *arrayType = dynamic_cast<ArrayType*>(baseType);
 	MapType *mapType = dynamic_cast<MapType*>(baseType);
-	if (arrayType != NULL) {		// check for the field access to be a part of an array		
+	if (arrayType != NULL) {		// check for the field access to be a part of an array
 		if (strcmp(field->getName(), Identifier::LocalId) == 0) {
 			this->type = arrayType;
 			resolvedExprs++;
@@ -197,7 +197,7 @@ int FieldAccess::emitSemanticErrors(Scope *scope) {
 							dimensionality, fieldDimension, false);
 					errors++;
 				}
-			} else {
+			} else if (strcmp(field->getName(), Identifier::LocalId) != 0) {
 				ReportError::NoSuchFieldInBase(field, arrayType, false);
 				errors++;
 			} 

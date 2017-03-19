@@ -110,8 +110,8 @@ int Root::resolveExprTypes(Scope *scope) {
 	int resolvedExprs = 0;
 	Expr *arg1 = arguments->Nth(0);
         Expr *arg2 = arguments->Nth(1);
-        resolvedExprs += arg1->resolveExprTypes(scope);
-        resolvedExprs += arg2->resolveExprTypes(scope);
+        resolvedExprs += arg1->resolveExprTypesAndScopes(scope);
+        resolvedExprs += arg2->resolveExprTypesAndScopes(scope);
 	resolvedExprs += arg2->performTypeInference(scope, Type::intType);
 
 	Type *arg1Type = arg1->getType();
@@ -163,11 +163,11 @@ int ArrayOperation::resolveExprTypes(Scope *scope) {
 
 	int resolvedExprs = 0;
 	Expr *arg1 = arguments->Nth(0);
-        resolvedExprs += arg1->resolveExprTypes(scope);
+        resolvedExprs += arg1->resolveExprTypesAndScopes(scope);
         Type *arg1Type = arg1->getType();
 
 	Expr *arg2 = arguments->Nth(1);
-        resolvedExprs += arg2->resolveExprTypes(scope);
+        resolvedExprs += arg2->resolveExprTypesAndScopes(scope);
 	resolvedExprs += arg2->performTypeInference(scope, Type::stringType);
         Type *arg2Type = arg2->getType();
 
@@ -209,7 +209,7 @@ int BindOperation::resolveExprTypes(Scope *scope) {
 
 	int resolvedExprs = 0;
 	Expr *arg1 = arguments->Nth(0);	
-	resolvedExprs += arg1->resolveExprTypes(scope);
+	resolvedExprs += arg1->resolveExprTypesAndScopes(scope);
 
 	// identify the task environment type from the first argument
         Type *arg1Type = arg1->getType();
@@ -222,12 +222,12 @@ int BindOperation::resolveExprTypes(Scope *scope) {
         }
 
 	Expr *arg2 = arguments->Nth(1);
-	resolvedExprs += arg2->resolveExprTypes(scope);
+	resolvedExprs += arg2->resolveExprTypesAndScopes(scope);
 	resolvedExprs += arg2->performTypeInference(scope, Type::stringType);
 	Type *arg2Type = arg2->getType();
 
 	Expr *arg3 = arguments->Nth(2);
-	resolvedExprs += arg3->resolveExprTypes(scope);
+	resolvedExprs += arg3->resolveExprTypesAndScopes(scope);
 	resolvedExprs += arg3->performTypeInference(scope, Type::stringType);
 	Type *arg3Type = arg3->getType();
 

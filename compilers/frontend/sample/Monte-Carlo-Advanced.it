@@ -120,14 +120,15 @@ Task "Monte Carlo Area Estimation":
 				}
 				initializeEstimateDiffs(estimate_diffs, precision_threshold)
 				
-				Repeat for round in [1...max_rounds] 
-						and (estimate_diffs[lpuId[0]][lpuId[1]] > precision_threshold) {
-					Space C {		
-						performSampling(points_per_cell, grid, 
-								internal_points, Space B:placement_result)
+				Repeat for round in [1...max_rounds] {
+					If estimate_diffs[lpuId[0]][lpuId[1]] > precision_threshold {
+						Space C {		
+							performSampling(points_per_cell, grid, 
+									internal_points, Space B:placement_result)
+						}
+						estimateSubarea(internal_points, points_per_cell, 
+								round, estimate_diffs, local_estimates)
 					}
-					estimateSubarea(internal_points, points_per_cell, 
-							round, estimate_diffs, local_estimates)
 				}
 				
 				estimateTotalArea(Space A:area, local_estimates)

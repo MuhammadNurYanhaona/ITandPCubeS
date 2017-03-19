@@ -113,7 +113,7 @@ int ObjectCreate::resolveExprTypes(Scope *scope) {
 			NamedArgument *currentArg = initArgs->Nth(i);
 			const char *argName = currentArg->getName();
 			Expr *argValue = currentArg->getValue();
-			resolvedExprs += argValue->resolveExprTypes(scope);
+			resolvedExprs += argValue->resolveExprTypesAndScopes(scope);
 			VariableDef *propertyDef = tupleDef->getComponent(argName);
         		if (propertyDef == NULL) {
 				ReportError::InvalidInitArg(GetLocation(), typeName, argName, false);	

@@ -73,22 +73,14 @@ int RangeExpr::resolveExprTypes(Scope *scope) {
 	
 	int resolvedExprs = 0;	
 
-	Identifier *fieldId = index->getField();
-	VariableSymbol *symbol = (VariableSymbol*) scope->lookup(fieldId->getName());
-	if (symbol == NULL && loopingRange) {
-
-		// The current version of the compiler resolves indexes as integer types as  opposed to 
-		// IndexType that support non-unit stepping and wrapped around index range traversal. 
-		// This is so since we have not enabled those features in the language yet.
-		VariableDef *variable = new VariableDef(fieldId, Type::intType);
-		scope->insert_inferred_symbol(new VariableSymbol(variable));
-	}
-
-	resolvedExprs += range->resolveExprTypes(scope);
+	resolvedExprs += index->resolveExprTypesAndScopes(scope);
+	resolvedExprs += index->performTypeInference(scope, Type::intType);
+	
+	resolvedExprs += range->resolveExprTypesAndScopes(scope);
 	resolvedExprs += range->performTypeInference(scope, Type::rangeType);
 
 	if (step != NULL) {
-		resolvedExprs += step->resolveExprTypes(scope);
+		resolvedExprs += step->resolveExprTypesAndScopes(scope);
 		resolvedExprs += step->performTypeInference(scope, Type::intType);
 	}
 
@@ -109,7 +101,7 @@ int RangeExpr::emitSemanticErrors(Scope *scope) {
 		errors++;
         }
 
-	errors += emitScopeAndTypeErrors(scope);
+	errors += range->emitScopeAndTypeErrors(scope);
 	Type *rangeType = range->getType();
         if (rangeType != NULL && rangeType != Type::rangeType) {
                  ReportError::IncompatibleTypes(range->GetLocation(), 

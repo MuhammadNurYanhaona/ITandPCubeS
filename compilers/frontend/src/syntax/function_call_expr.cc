@@ -57,7 +57,7 @@ int FunctionCall::resolveExprTypes(Scope *scope) {
 	List<Type*> *argTypeList = new List<Type*>;
 	for (int i = 0; i < arguments->NumElements(); i++) {
                 Expr *arg = arguments->Nth(i);
-		resolvedExprs += arg->resolveExprTypes(scope);
+		resolvedExprs += arg->resolveExprTypesAndScopes(scope);
 		Type *argType = arg->getType();
 		if (argType == NULL || argType == Type::errorType) {
 			allArgsResolved = false;

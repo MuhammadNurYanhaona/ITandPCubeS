@@ -36,11 +36,10 @@ class Expr : public Stmt {
 	// is sufficient.
 	virtual void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 
-	// the two type resolution functions that extend the resolution process from statement subclasses to 
-	// expression subclasses; subclasses should provide implementation for the first; the second is just
-	// a maching implementation for the interface function for scope-and-type checking
-	virtual int resolveExprTypes(Scope *scope) { return 0; }
-	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
+	// the interface function for scope-and-type checking inherited from the stmt base class; subclasses
+	// should provide implementation for the protected function resolveExprTypes(Scope *scope) that does
+	// all the work
+	int resolveExprTypesAndScopes(Scope *executionScope, int iteration = 0);
 
 	// Sometimes the type of an expression can be assumed from the context it has been used. Similarly,
 	// a larger parent expression my lead to type discoveries of its sub-expressions. This function is
@@ -54,6 +53,10 @@ class Expr : public Stmt {
 	int emitScopeAndTypeErrors(Scope *scope);
 
   protected:
+	// The type resolution function that subclasses should implement; this gets called only when the
+	// current expression type is NULL
+	virtual int resolveExprTypes(Scope *scope) { return 0; }
+
 	// supporting function for the type inference procedure that subclasses to provide implementation for
 	// Note that for some expression such as logical-expression and range-expression the type is fixed
 	// and the their sub-expression's expected types are already known. These expressions should apply

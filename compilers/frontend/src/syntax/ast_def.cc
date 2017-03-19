@@ -178,6 +178,16 @@ void ProgramDef::performScopeAndTypeChecking() {
                 TaskDef *task = (TaskDef*) taskDefs->Nth(i);
 		task->constructPartitionHierarchy();
 	}
+	
+	//--------------------------------------------------Construct the computation flows of tasks
+	for (int i = 0; i < taskDefs->NumElements(); i++) {
+                TaskDef *task = (TaskDef*) taskDefs->Nth(i);
+		task->constructComputationFlow(scope);
+	}
+
+	//--------------------------------if the flow construction process failed for some task then
+	//-------------------------------------------------there is no point progressing any further 
+	if (ReportError::NumErrors() > 0) return;
 
 	//--------------------------------------------------process the program coordinator function
 	List<Definition*> *defList = getComponentsByType(COORD_DEF);

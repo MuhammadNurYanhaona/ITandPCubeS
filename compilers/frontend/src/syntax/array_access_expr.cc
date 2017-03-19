@@ -59,7 +59,7 @@ Expr *ArrayAccess::getEndpointOfArrayAccess() {
 int ArrayAccess::resolveExprTypes(Scope *scope) {
 
 	int resolvedExprs = 0;
-	resolvedExprs += base->resolveExprTypes(scope);
+	resolvedExprs += base->resolveExprTypesAndScopes(scope);
         Type *baseType = base->getType();
 	if (baseType == NULL) return resolvedExprs;
 
@@ -72,10 +72,10 @@ int ArrayAccess::resolveExprTypes(Scope *scope) {
 	IndexRange *indexRange = dynamic_cast<IndexRange*>(index);
         if (indexRange != NULL) {
 		this->type = arrayType;
-		resolvedExprs += indexRange->resolveExprTypes(scope);
+		resolvedExprs += indexRange->resolveExprTypesAndScopes(scope);
 	} else {
 		this->type = arrayType->reduceADimension();
-		resolvedExprs += index->resolveExprTypes(scope);
+		resolvedExprs += index->resolveExprTypesAndScopes(scope);
 		resolvedExprs += index->performTypeInference(scope, Type::intType);	
 	}
 	resolvedExprs++;

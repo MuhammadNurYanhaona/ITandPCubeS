@@ -61,9 +61,9 @@ void ArithmaticExpr::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId
 int ArithmaticExpr::resolveExprTypes(Scope *scope) {
 	
 	int resolvedExprs = 0;
-	resolvedExprs += left->resolveExprTypes(scope);
+	resolvedExprs += left->resolveExprTypesAndScopes(scope);
         Type *leftType = left->getType();
-        resolvedExprs += right->resolveExprTypes(scope);
+        resolvedExprs += right->resolveExprTypesAndScopes(scope);
         Type *rightType = right->getType();
 
 	if (leftType != NULL && rightType != NULL) {
