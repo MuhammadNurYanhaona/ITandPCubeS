@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -97,5 +97,10 @@ int ArrayAccess::emitSemanticErrors(Scope *scope) {
 	}
 	errors += index->emitScopeAndTypeErrors(scope);
 	return errors;
+}
+
+void ArrayAccess::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	base->retrieveTerminalFieldAccesses(fieldList);
+	index->retrieveTerminalFieldAccesses(fieldList);
 }
 

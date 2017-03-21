@@ -82,6 +82,8 @@ class StageDefinition : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	void determineArrayDimensions();
+	const char *getName() { return name->getName(); }
+	List<Identifier*> *getParameters() { return parameters; }
 };
 
 class StagesSection : public Node {
@@ -94,7 +96,8 @@ class StagesSection : public Node {
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
-	List<StageDefinition*> *getStageDefinitions() { return stages; }	
+	List<StageDefinition*> *getStageDefinitions() { return stages; }
+	StageDefinition *retrieveStage(const char *stageName);	
 };
 
 class FlowPart : public Node {
@@ -128,7 +131,18 @@ class StageInvocation : public FlowPart {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo);	
+			semantic_helper::FlowStageConstrInfo *cnstrInfo);
+
+	// This function investigates the argument expressions and the parameters of the compute
+	// stage being invoked and determines the best way to convert any use of a parameter in the
+	// stage definition body with that of the corresponding argument during the polymorphic type
+	// resolution process.
+	List<semantic_helper::ParamReplacementConfig*> *generateParamReplacementConfigs(); 
+
+	// Some arguments may need to be evaluated into local variables before the execution of the 
+	// actual code of the compute-stage. This function generates statements for this operation.
+	List<Stmt*> *produceParamGeneratorCode(Scope *stageScope,
+			List<semantic_helper::ParamReplacementConfig*> *paramReplConfigList);	
 };
 
 class CompositeFlowPart : public FlowPart {
@@ -302,6 +316,7 @@ class TaskDef : public Definition {
 
 	DefineSection *getDefineSection() { return define; }
 	DefTypeId getDefTypeId() { return TASK_DEF; }
+	StagesSection *getStagesSection() { return stages; }
 	
 	// This function is needed to annotate a compute stage's expressions with proper markers before a
 	// stage instanciation takes place. For example, we need to analyze the dimensionalities of arrays

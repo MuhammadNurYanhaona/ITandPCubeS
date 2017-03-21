@@ -77,6 +77,7 @@ class Identifier : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	virtual Node *clone() { return new Identifier(*GetLocation(), strdup(name)); }
+	void changeName(const char *newName) { this->name = strdup(newName); }
 };
 
 class DimensionIdentifier : public Identifier {

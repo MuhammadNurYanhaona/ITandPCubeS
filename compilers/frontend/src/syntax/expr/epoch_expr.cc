@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -62,5 +62,9 @@ int EpochExpr::inferExprTypes(Scope *scope, Type *assignedType) {
 
 int EpochExpr::emitSemanticErrors(Scope *scope) {
 	return root->emitScopeAndTypeErrors(scope);
+}
+
+void EpochExpr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	root->retrieveTerminalFieldAccesses(fieldList);
 }
 

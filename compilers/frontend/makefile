@@ -18,7 +18,7 @@ OBJS = y.tab.o lex.yy.o						\
 	$(patsubst %.c, %.o, $(filter %.c, $(SRCS)))		\
 	$(patsubst %.c, %.o, $(filter %.cc, $(LIB_SRCS)))
 
-SRC_JUNK = src/*.o src/*/*.o 
+SRC_JUNK = $(shell find src -name "*.o")
 LIB_JUNK = ../common-libs/*.o ../common-libs/*/*.o
 TOOL_JUNK= *.o lex.yy.c dpp.yy.c y.tab.c y.tab.h *.core core y.output
 
@@ -75,8 +75,7 @@ $(COMPILER) : $(OBJS)
 	rm -f $(TOOL_JUNK) 
 
 clean:
-	rm -f $(SRC_JUNK) 
+	rm -f $(SRC_JUNK)
 	rm -f $(LIB_JUNK)
 	rm -f $(TOOL_JUNK)
 	rm -f $(PRODUCTS)
-	

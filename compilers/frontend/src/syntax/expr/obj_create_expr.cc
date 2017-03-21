@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -175,6 +175,14 @@ int ObjectCreate::resolveExprTypes(Scope *scope) {
 	// if none of the previous conditions matches then this object creation is in error and flaged as such
 	this->type = Type::errorType;
 	return 0;
+}
+
+void ObjectCreate::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	for (int i = 0; i < initArgs->NumElements(); i++) {
+		NamedArgument *currentArg = initArgs->Nth(i);
+		Expr *argValue = currentArg->getValue();
+		argValue->retrieveTerminalFieldAccesses(fieldList);
+	}	
 }
 
 

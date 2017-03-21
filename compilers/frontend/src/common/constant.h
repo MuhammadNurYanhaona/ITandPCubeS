@@ -74,4 +74,15 @@ enum SyncMode { Load, Load_And_Configure, Ghost_Region_Update, Restore };
 */
 enum RepeatCycleType { Range_Repeat, Condition_Repeat, Subpartition_Repeat };
 
+/*	The types in this enum are needed for polymorphic stage resolution. We update statements and 
+	expressions within a stage instanciation based on the argument expression types.
+	Evaluate_Before: says that the argument should be evaluated at the beginning of the stage and
+		a local variable with a name matching the parameter name should be created.
+	No_Replacement: says that the argument and parameter names are the same and no change is needed.
+	Change_Name: says that field accesses of the parameter should be renamed to access the argument.
+	Update_Expr: is needed for arrays with sub-range expressions. All array element and metadata
+		accesses must be changed to alternative expressions appropriate for the argument.
+*/
+enum FieldReplacementType { Evaluate_Before, No_Replacement, Change_Name, Update_Expr };
+
 #endif

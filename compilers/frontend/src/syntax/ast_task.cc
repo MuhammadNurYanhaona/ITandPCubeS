@@ -32,83 +32,6 @@ void DefineSection::PrintChildren(int indentLevel) {
         define->PrintAll(indentLevel + 1);
 }
 
-//----------------------------------------------------- Initialize Section --------------------------------------------------------/
-
-InitializeSection::InitializeSection(List<Identifier*> *a, List<Stmt*> *c, yyltype loc) : Node(loc) {
-        Assert(a != NULL && c != NULL);
-        arguments = a;
-        for (int i = 0; i < arguments->NumElements(); i++) {
-                arguments->Nth(i)->SetParent(this);
-        }
-        argumentTypes = NULL;
-        code = new StmtBlock(c);
-	code->SetParent(this);
-}
-
-void InitializeSection::PrintChildren(int indentLevel) {
-        if (arguments->NumElements() > 0) {
-                PrintLabel(indentLevel + 1, "Arguments");
-                arguments->PrintAll(indentLevel + 2);
-        }
-        PrintLabel(indentLevel + 1, "Code");
-        code->Print(indentLevel + 2);
-}
-
-void InitializeSection::performScopeAndTypeChecking(Scope *parentScope) {
-	
-	// Generate a parameter scope for initialize arguments
-        Scope *parameterScope = new Scope(TaskInitScope);
-        TaskDef *taskDef = (TaskDef*) this->parent;
-        Scope *taskDefineScope = taskDef->getSymbol()->getNestedScope();
-        for (int i = 0; i < arguments->NumElements(); i++) {
-                Identifier *id = arguments->Nth(i);
-                if (taskDefineScope->lookup(id->getName()) != NULL) {
-                        parameterScope->copy_symbol(taskDefineScope->lookup(id->getName()));
-                } else {
-                        parameterScope->insert_symbol(new VariableSymbol(id->getName(), NULL));
-                }
-        }
-
-	// enter to the nested scopes for the task and the init section
-        Scope *executionScope  = parentScope->enter_scope(taskDefineScope);
-        executionScope = executionScope->enter_scope(parameterScope);
-
-        // create a new scope for the init body (code section)
-        Scope *initBodyScope = executionScope->enter_scope(new Scope(TaskInitBodyScope));
-
-	// the scope and type analysis should repeat as long as we resolve new expression types
-        int iteration = 0;
-        int resolvedTypes = 0;
-        do {	resolvedTypes = code->resolveExprTypesAndScopes(initBodyScope, iteration);
-                iteration++;
-        } while (resolvedTypes != 0);
-
-	// emit all scope and type errors, if exist
-	code->emitScopeAndTypeErrors(initBodyScope);
-	
-	// prepare the scopes for storage
-	taskDefineScope->detach_from_parent();
-        parameterScope->detach_from_parent();
-        initBodyScope->detach_from_parent();
-
-        // save parameter and init body scopes
-        TaskSymbol *taskSymbol = (TaskSymbol*) taskDef->getSymbol();
-        taskSymbol->setInitScope(parameterScope);
-        this->scope = initBodyScope;
-
-        // store the argument types for actual to formal parameter matching
-        argumentTypes = new List<Type*>;
-        for (int i = 0; i < arguments->NumElements(); i++) {
-                Identifier *id = arguments->Nth(i);
-                VariableSymbol *symbol = (VariableSymbol*) parameterScope->lookup(id->getName());
-                if (symbol->getType() == NULL) {
-                        ReportError::TypeInferenceError(id, false);
-                } else {
-                        argumentTypes->Append(symbol->getType());
-                }
-        }	
-}
-
 //----------------------------------------------------- Environment Section -------------------------------------------------------/
 
 //------------------------------------------------------------------------------------------------------------------Environment Link
@@ -225,10 +148,23 @@ void StageDefinition::determineArrayDimensions() {
 StagesSection::StagesSection(List<StageDefinition*> *stages, yyltype loc) : Node(loc) {
 	Assert(stages != NULL && stages->NumElements() > 0);
 	this->stages = stages;
+	for (int i = 0; i < stages->NumElements(); i++) {
+		stages->Nth(i)->SetParent(this);
+	}
 }
 
 void StagesSection::PrintChildren(int indentLevel) {
 	stages->PrintAll(indentLevel + 1);
+}
+
+StageDefinition *StagesSection::retrieveStage(const char *stageName) {
+	for (int i = 0; i < stages->NumElements(); i++) {
+		StageDefinition *stage = stages->Nth(i);
+		if (strcmp(stage->getName(), stageName) == 0) {
+			return stage;
+		}
+	}
+	return NULL;
 }
 
 //----------------------------------------------------- Computation Section -------------------------------------------------------/
@@ -244,29 +180,6 @@ FlowPart::FlowPart(yyltype loc) : Node(loc) {
 
 void FlowPart::resetFlowIndexRef() {
 	currentFlowIndex = 0;
-}
-
-//------------------------------------------------------------------------------------------------------------------Stage Invocation
-
-StageInvocation::StageInvocation(Identifier *stageName, 
-		List<Expr*> *arguments, yyltype loc) : FlowPart(loc) {
-	Assert(stageName != NULL && arguments != NULL && arguments->NumElements() > 0);
-	this->stageName = stageName;
-	this->stageName->SetParent(this);
-	this->arguments = arguments;
-	for (int i = 0; i < arguments->NumElements(); i++) {
-		this->arguments->Nth(i)->SetParent(this);
-	}
-}
-
-void StageInvocation::PrintChildren(int indentLevel) {
-	stageName->Print(indentLevel + 1, "Stage ");
-	PrintLabel(indentLevel + 1, "Arguments");
-	arguments->PrintAll(indentLevel + 2);
-}
-
-void StageInvocation::constructComputeFlow(CompositeStage *currCompStage,
-		semantic_helper::FlowStageConstrInfo *cnstrInfo) {
 }
 
 //---------------------------------------------------------------------------------------------------------------Composite Flow Part

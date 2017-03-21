@@ -283,8 +283,8 @@ void ReportError::RepeatBeginningInvalid(yyltype *loc, const char *allowedFurthe
 	Formatted(loc, "The beginning stage of repeat should be %s or any that comes after that", allowedFurthestRoot);
 }
 
-void ReportError::ArrayPartitionUnknown(yyltype *loc, const char *arrayName, const char *stageName, const char spaceId) {
-	Formatted(loc, "Array '%s' cannot be used in %s as '%s' is not partitioned in corresponding Space %c", 
+void ReportError::ArrayPartitionUnknown(yyltype *loc, const char *arrayName, const char *stageName, const char *spaceId) {
+	Formatted(loc, "Array '%s' cannot be used in %s as '%s' is not partitioned in corresponding Space %s", 
 		arrayName, stageName, arrayName, spaceId);
 }
 

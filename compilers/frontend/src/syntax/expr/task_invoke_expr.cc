@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -222,6 +222,20 @@ int TaskInvocation::emitSemanticErrors(Scope *scope) {
 	}
 
 	return errors;
+}
+
+void TaskInvocation::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	fieldList->Append(getEnvArgument());
+	List<Expr*> *initArgs = getInitArguments();
+	for (int i = 0; i < initArgs->NumElements(); i++) {
+		Expr *arg = initArgs->Nth(i);
+		arg->retrieveTerminalFieldAccesses(fieldList);
+	}
+	List<Expr*> *partitionArgs = getPartitionArguments();
+	for (int i = 0; i < partitionArgs->NumElements(); i++) {
+		Expr *arg = partitionArgs->Nth(i);
+		arg->retrieveTerminalFieldAccesses(fieldList);
+	}
 }
 
 const char *TaskInvocation::getTaskName() {

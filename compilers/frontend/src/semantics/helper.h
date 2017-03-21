@@ -7,6 +7,7 @@
 
 #include "scope.h"
 #include "task_space.h"
+#include "array_acc_transfrom.h"
 #include "../lex/scanner.h"
 
 namespace semantic_helper {
@@ -55,6 +56,31 @@ namespace semantic_helper {
 		PartitionHierarchy *getLpsHierarchy() { return lpsHierarchy; }
                 Scope *getScope() { return scope; }
         };
+
+	// this instructs how to replace the use of parameters of compute stages with invocation
+	// arguments during the polymorpic stage resolution process
+	class ParamReplacementConfig {
+	  private:
+		Identifier *parameter;
+		Expr *invokingArg;
+		FieldReplacementType replacementType;
+		
+		// this attribute is only applicable for array-part argument
+		ArrayPartConfig *arrayPartConfig;
+	  public:
+		ParamReplacementConfig(Identifier *parameter, 
+				Expr *invokingArg, FieldReplacementType replacementType) {
+			this->parameter = parameter;
+			this->invokingArg = invokingArg;
+			this->replacementType = replacementType;
+			this->arrayPartConfig = NULL;
+		}
+		Identifier *getParameter() { return parameter; }
+		Expr *getInvokingArg() { return invokingArg; }
+		FieldReplacementType getReplacementType() { return replacementType; }
+		void setArrayPartConfig(ArrayPartConfig *config) { arrayPartConfig = config; }
+		ArrayPartConfig *getArrayPartConfig() { return arrayPartConfig; }	
+	};
 };
 
 #endif

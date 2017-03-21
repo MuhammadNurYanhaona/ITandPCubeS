@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -213,5 +213,13 @@ int FieldAccess::emitSemanticErrors(Scope *scope) {
 		}
 	}
 	return errors;
+}
+
+void FieldAccess::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	if (base != NULL) {
+		base->retrieveTerminalFieldAccesses(fieldList);
+	} else {
+		fieldList->Append(this);
+	}
 }
 

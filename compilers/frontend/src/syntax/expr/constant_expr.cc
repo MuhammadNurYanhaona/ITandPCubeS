@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -81,6 +81,8 @@ ReductionVar::ReductionVar(char spaceId, const char *name, yyltype loc) : Expr(l
 	Assert(name != NULL);
 	this->spaceId = spaceId;
 	this->name = name;
+	fieldRepresentation = new FieldAccess(NULL, new Identifier(loc, name), loc);
+	fieldRepresentation->SetParent(this);
 }
 
 void ReductionVar::PrintChildren(int indentLevel) {
@@ -113,5 +115,9 @@ int ReductionVar::emitSemanticErrors(Scope *scope) {
 		return 1;
 	}
 	return 0;
+}
+
+void ReductionVar::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	fieldList->Append(fieldRepresentation);
 }
 

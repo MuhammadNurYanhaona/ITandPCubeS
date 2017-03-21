@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -92,5 +92,12 @@ int FunctionCall::emitSemanticErrors(Scope *scope) {
 		errors += arg->emitScopeAndTypeErrors(scope);
 	}
 	return errors;
+}
+
+void FunctionCall::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *arg = arguments->Nth(i);
+		arg->retrieveTerminalFieldAccesses(fieldList);
+	}	
 }
 

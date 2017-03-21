@@ -52,6 +52,10 @@ class Expr : public Stmt {
 	// implementation for the emitSemanticErrors() function for more elaboration of error cases.
 	int emitScopeAndTypeErrors(Scope *scope);
 
+	// Terminal field accesses are access to base variables -- not to propertiers. This method is needed
+	// for scope and other usage validation of variable accesses within a code.
+	virtual void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+
   protected:
 	// The type resolution function that subclasses should implement; this gets called only when the
 	// current expression type is NULL
@@ -160,6 +164,9 @@ class ReductionVar : public Expr {
   protected:
 	char spaceId;
 	const char *name;
+
+	// a field representation of the variable used in reduction for aiding semantic analysis
+	FieldAccess *fieldRepresentation;
   public:
 	ReductionVar(char spaceId, const char *name, yyltype loc);	
     	const char *GetPrintNameForNode() { return "Reduction-Var"; }
@@ -171,6 +178,7 @@ class ReductionVar : public Expr {
 	ExprTypeId getExprTypeId() { return REDUCTION_VAR; };
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class ArithmaticExpr : public Expr {
@@ -191,6 +199,7 @@ class ArithmaticExpr : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class LogicalExpr : public Expr {
@@ -213,6 +222,7 @@ class LogicalExpr : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class EpochExpr : public Expr {
@@ -233,6 +243,7 @@ class EpochExpr : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class FieldAccess : public Expr {
@@ -271,6 +282,7 @@ class FieldAccess : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class RangeExpr : public Expr {
@@ -295,6 +307,7 @@ class RangeExpr : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };	
 
 class AssignmentExpr : public Expr {
@@ -316,6 +329,7 @@ class AssignmentExpr : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class IndexRange : public Expr {
@@ -331,7 +345,8 @@ class IndexRange : public Expr {
   public:
 	IndexRange(Expr *begin, Expr *end, bool partOfArray, yyltype loc);
 	const char *GetPrintNameForNode() { return "Index-Range"; }
-    	void PrintChildren(int indentLevel);	    	
+    	void PrintChildren(int indentLevel);
+	bool isFullRange() { return fullRange; }	    	
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
@@ -340,6 +355,7 @@ class IndexRange : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class ArrayAccess : public Expr {
@@ -363,6 +379,7 @@ class ArrayAccess : public Expr {
         Expr *getEndpointOfArrayAccess();
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class FunctionCall : public Expr {
@@ -381,6 +398,7 @@ class FunctionCall : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 class NamedArgument : public Node {
@@ -433,6 +451,7 @@ class TaskInvocation : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 
 	// helper functions to retrieve different types of task invocation arguments 
 	const char *getTaskName();
@@ -459,6 +478,7 @@ class ObjectCreate : public Expr {
 	ExprTypeId getExprTypeId() { return OBJ_CREATE; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
+	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 };
 
 #endif

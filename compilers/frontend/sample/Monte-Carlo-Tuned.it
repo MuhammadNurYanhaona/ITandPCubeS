@@ -115,7 +115,7 @@ Task "Monte Carlo Area Estimation":
 				setupGridCells(grid, cell_length)
 				
 				// estimate the sub-area under the polynomial within each grid cell 
-				estimateSubarea(precision_threshold, cell_length, 
+				estimateSubarea(precision_threshold, max_rounds, cell_length, 
 						grid, sub_area_estimates, points_per_cell)
 
 				// reduce the sub-area estimates into a single final result in Space A

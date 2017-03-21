@@ -1,13 +1,13 @@
-#include "ast.h"
-#include "ast_stmt.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/hashtable.h"
+#include "../ast.h"
+#include "../ast_stmt.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -99,5 +99,10 @@ int AssignmentExpr::emitSemanticErrors(Scope *scope) {
                 }
         }
 	return errors;
+}
+
+void AssignmentExpr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
+	left->retrieveTerminalFieldAccesses(fieldList);
+	right->retrieveTerminalFieldAccesses(fieldList);
 }
 

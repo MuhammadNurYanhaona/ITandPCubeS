@@ -80,7 +80,7 @@ class ReportError
 	static void ImpermissibleRepeat(yyltype *loc, const char *spaceName, const char *repeatLoopSpace);
 	static void SubpartitionRepeatNotSupported(yyltype *loc, const char *spaceName);
 	static void RepeatBeginningInvalid(yyltype *loc, const char *allowedFurthestRoot);
-	static void ArrayPartitionUnknown(yyltype *loc, const char *arrayName, const char *stageName, const char spaceId);
+	static void ArrayPartitionUnknown(yyltype *loc, const char *arrayName, const char *stageName, const char *spaceId);
 	
 	// partition specific error
 	static void DuplicateSpaceDefinition(yyltype *loc, char spaceName);
