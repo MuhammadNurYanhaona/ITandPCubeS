@@ -95,3 +95,14 @@ void IndexRange::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	}
 }
 
+void IndexRange::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+	if (begin != NULL) {
+		begin->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	}
+	if (end != NULL) {
+		end->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	}
+}
+

@@ -50,6 +50,12 @@ class LibraryFunction : public Expr {
 
 	// subclasses should provide implementation for this function for semantic validation
 	virtual int emitErrorsInArguments(Scope *scope) = 0;
+
+	// function interface inherited from the statement base-class that is used to resolve a type
+	// polymorphic compute stage for a particular set of arguments for the parameters 
+	virtual void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 

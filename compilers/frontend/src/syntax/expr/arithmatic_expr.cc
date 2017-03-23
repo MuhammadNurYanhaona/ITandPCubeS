@@ -145,3 +145,11 @@ void ArithmaticExpr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList
 	left->retrieveTerminalFieldAccesses(fieldList);
 	right->retrieveTerminalFieldAccesses(fieldList);
 }
+
+void ArithmaticExpr::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+
+	left->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	right->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}

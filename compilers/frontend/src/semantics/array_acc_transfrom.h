@@ -56,9 +56,10 @@ class ArrayPartConfig {
 	// array part
 	int getOrigDimension(int partDimNo);
 
-	// generate an array access relative to the base array from the argument expression relative to 
-	// the array part
-	ArrayAccess *getTransformedAccess(ArrayAccess *accessExpr);		
+	// generates an array access relative to the base array from the argument expression relative to 
+	// the array part then updates pointers in the argument expression to make it swich access to the
+	// generated expression 
+	void transformedAccessToArrayPart(ArrayAccess *accessExpr);		
 };
 
 #endif

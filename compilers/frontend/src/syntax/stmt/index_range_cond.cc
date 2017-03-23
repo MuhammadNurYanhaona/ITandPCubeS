@@ -8,6 +8,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
 
 #include <iostream>

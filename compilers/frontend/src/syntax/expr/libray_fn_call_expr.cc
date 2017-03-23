@@ -1,12 +1,12 @@
-#include "ast.h"
-#include "ast_expr.h"
-#include "ast_type.h"
-#include "ast_library_fn.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/scope.h"
-#include "../semantics/symbol.h"
-#include "../../../common-libs/utils/list.h"
+#include "../ast.h"
+#include "../ast_expr.h"
+#include "../ast_type.h"
+#include "../ast_library_fn.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/scope.h"
+#include "../../semantics/symbol.h"
+#include "../../../../common-libs/utils/list.h"
 
 #include <iostream>
 
@@ -101,6 +101,16 @@ int LibraryFunction::emitSemanticErrors(Scope *scope) {
         } else {
                 return emitErrorsInArguments(scope);
         }
+}
+
+void LibraryFunction::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+	
+	for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *arg = arguments->Nth(i);
+		arg->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	}
 }
 
 //-------------------------------------------------------------- Root -----------------------------------------------------------/

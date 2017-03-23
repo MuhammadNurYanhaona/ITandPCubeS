@@ -6,6 +6,8 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/helper.h"
+#include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -21,6 +23,7 @@ ArrayAccess::ArrayAccess(Expr *b, Expr *i, yyltype loc) : Expr(loc) {
         base->SetParent(this);
         index = i;
         index->SetParent(this);
+	fillerIndexAccess = false;
 }
 
 void ArrayAccess::PrintChildren(int indentLevel) {
@@ -102,5 +105,65 @@ int ArrayAccess::emitSemanticErrors(Scope *scope) {
 void ArrayAccess::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	base->retrieveTerminalFieldAccesses(fieldList);
 	index->retrieveTerminalFieldAccesses(fieldList);
+}
+
+void ArrayAccess::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+
+	//-------------------------------if this is not an access to a parameter then just move forward
+	
+	Expr *rootArray = getEndpointOfArrayAccess();
+	FieldAccess *rootField = dynamic_cast<FieldAccess*>(rootArray);
+	// if the base expression is not a terminal field access of array type then it is definitely
+	// not an access to a parameter array part (this can still be an access to a whole array passed
+	// as an argument)
+	if (rootField == NULL || !rootField->isTerminalField()) {
+		base->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);	 
+		index->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+		return;	
+	}
+	const char *arrayName = rootField->getField()->getName();
+	ParamReplacementConfig *arrayPartReplConfig = arrayAccXformInstrMap->Lookup(arrayName);
+	// this is the more likely whole array being passed as an argument case; in that situation, 
+	// just name change application on field-access expression will suffice as the transformation
+	if (arrayPartReplConfig == NULL) {
+		base->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);	 
+		index->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+		return;	
+	}
+
+	//---------------------------------------------------------end of skipping transformation logic 
+
+	// If the current array access is not the final index access of the array then the replacement
+	// process has been already completed for the base expression. We only need to do any necessary
+	// parameter replacement for the elements in the index expression
+	if (!isFinalIndexAccess() && !fillerIndexAccess) {
+		index->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	
+	} else {
+		// transform the array access expression chain
+		ArrayPartConfig *arrayPartConfig = arrayPartReplConfig->getArrayPartConfig();
+		arrayPartConfig->transformedAccessToArrayPart(this);		
+
+		// Apply any transformation needed in the index expression. This is done after the 
+		// transformation of the array access expression chain as the transformation may change 
+		// the index expression and flag the new index as a filler index being added during the 
+		// transformation process.
+		if (!fillerIndexAccess) {
+			index->performStageParamReplacement(nameAdjustmentInstrMap, 
+					arrayAccXformInstrMap);
+		}
+	}
+
+	// Continue the transformation towards the base array. Note that we do this last to have a tail 
+	// to head progression in the transformation process.
+	base->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);	 
+}
+
+bool ArrayAccess::isFinalIndexAccess() {
+	if (parent == NULL) return true;
+	ArrayAccess *parentArrayAcc = dynamic_cast<ArrayAccess*>(parent);
+	return (parentArrayAcc != NULL);
 }
 

@@ -143,3 +143,12 @@ void LogicalExpr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	right->retrieveTerminalFieldAccesses(fieldList);
 }
 
+void LogicalExpr::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+	if (left != NULL) {
+		left->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	}
+	right->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}
+

@@ -90,7 +90,8 @@ class DimensionIdentifier : public Identifier {
 	int getDimensionNo() { return dimension; }
 	
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
-	
+
+	void setDimensionNo(int dimension) { this->dimension = dimension; }	
 	Node *clone() { return new DimensionIdentifier(*GetLocation(), dimension); }
 };
 

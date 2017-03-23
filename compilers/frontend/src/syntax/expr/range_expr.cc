@@ -129,3 +129,14 @@ void RangeExpr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	}
 }
 
+void RangeExpr::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+
+	index->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	range->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	if (step != NULL) {
+		step->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	}
+}
+

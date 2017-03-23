@@ -185,4 +185,13 @@ void ObjectCreate::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) 
 	}	
 }
 
-
+void ObjectCreate::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+	
+	for (int i = 0; i < initArgs->NumElements(); i++) {
+		NamedArgument *currentArg = initArgs->Nth(i);
+		Expr *argValue = currentArg->getValue();
+		argValue->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	}
+}

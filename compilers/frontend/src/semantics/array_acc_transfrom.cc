@@ -84,7 +84,7 @@ int ArrayPartConfig::getOrigDimension(int partDimNo) {
 	return dimMappings->Nth(partDimNo);
 }
 
-ArrayAccess *ArrayPartConfig::getTransformedAccess(ArrayAccess *accessExpr) {
+void ArrayPartConfig::transformedAccessToArrayPart(ArrayAccess *accessExpr) {
 	
 	// extract the base array field access and the index accesses from the argument expression
 	FieldAccess *baseArray = NULL;
@@ -107,6 +107,7 @@ ArrayAccess *ArrayPartConfig::getTransformedAccess(ArrayAccess *accessExpr) {
 	// create a list of index access expressions relative to the original array
 	List<Expr*> *newIndexExprList = new List<Expr*>;
 	int totalDims = type->getDimensions();
+	List<bool> *clonedDimConfigList = new List<bool>;
 	for (int dimNo = 0; dimNo < totalDims; dimNo++) {
 		
 		// retrieve the filler expression for current dimension
@@ -118,15 +119,16 @@ ArrayAccess *ArrayPartConfig::getTransformedAccess(ArrayAccess *accessExpr) {
 			Expr *indexAccess = indexExprList->Nth(0);
 			indexExprList->RemoveAt(0);	// remove the head to advance to the next expression
 			newIndexExprList->Append(indexAccess);
+			clonedDimConfigList->Append(false);
 
 		// otherwise, copy the stored filler expression and put it in the index access expression list
 		} else {
 			// cloning is needed as there are parent pointers in any expression that we must not
 			// corrupt by placing the same filler index access expression in multiple array access
 			// expressions of the compute stage
-			Expr *clonedIndexAccess = (Expr*) fillerExpr->clone();
-			
+			Expr *clonedIndexAccess = (Expr*) fillerExpr->clone();	
 			newIndexExprList->Append(clonedIndexAccess);
+			clonedDimConfigList->Append(true);
 		}
 	}
 
@@ -136,7 +138,16 @@ ArrayAccess *ArrayPartConfig::getTransformedAccess(ArrayAccess *accessExpr) {
 	for (int dimNo = 0; dimNo < totalDims; dimNo++) {
 		Expr *indexExpr = newIndexExprList->Nth(dimNo);
 		currentExpr = new ArrayAccess(currentExpr, indexExpr, location);
+		if (clonedDimConfigList->Nth(dimNo)) {
+			((ArrayAccess*) currentExpr)->flagAsFillerIndexAccess();
+		}
 	}
+	ArrayAccess *finalArrayAcc = (ArrayAccess*) currentExpr;
 
-	return (ArrayAccess*) currentExpr;	 
+	// now swich the pointers in the argument array access expression to refer to the generated expression
+	accessExpr->setBase(finalArrayAcc->getBase());
+	accessExpr->setIndex(finalArrayAcc->getIndex());
+	if (clonedDimConfigList->Nth(totalDims - 1)) {
+		accessExpr->flagAsFillerIndexAccess();
+	}	 
 }

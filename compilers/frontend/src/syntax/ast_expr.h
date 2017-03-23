@@ -181,6 +181,7 @@ class ReductionVar : public Expr {
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
+	const char *getName() { return name; }
         Node *clone() { return new ReductionVar(spaceId, strdup(name), *GetLocation()); }
 	ExprTypeId getExprTypeId() { return REDUCTION_VAR; };
 	int resolveExprTypes(Scope *scope);
@@ -207,6 +208,9 @@ class ArithmaticExpr : public Expr {
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class LogicalExpr : public Expr {
@@ -230,6 +234,9 @@ class LogicalExpr : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class EpochExpr : public Expr {
@@ -251,6 +258,9 @@ class EpochExpr : public Expr {
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class FieldAccess : public Expr {
@@ -290,6 +300,9 @@ class FieldAccess : public Expr {
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class RangeExpr : public Expr {
@@ -315,6 +328,9 @@ class RangeExpr : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };	
 
 class AssignmentExpr : public Expr {
@@ -337,6 +353,9 @@ class AssignmentExpr : public Expr {
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class IndexRange : public Expr {
@@ -363,12 +382,22 @@ class IndexRange : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class ArrayAccess : public Expr {
   protected:
 	Expr *base;
 	Expr *index;
+
+	// This variable serves as a flag to avoid repititive transformation of compute stage parameters
+	// during the resolution of compute stages based on invocation arguments. If true, this means
+	// the current index access of the base array represented by this expression has been added 
+	// into the array access expression chain during some earlier step of the transformation process.
+	// So the index should be skipped any further transformation.
+	bool fillerIndexAccess;
   public:
 	ArrayAccess(Expr *base, Expr *index, yyltype loc);		
 	const char *GetPrintNameForNode() { return "Array-Access"; }
@@ -381,12 +410,32 @@ class ArrayAccess : public Expr {
         Node *clone();
 	ExprTypeId getExprTypeId() { return ARRAY_ACC; };
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
-
+	void flagAsFillerIndexAccess() { fillerIndexAccess = true; }
+	
+	// tells which dimension of the array this expression is accessing
 	int getIndexPosition();
-        Expr *getEndpointOfArrayAccess();
+
+	// These two functions are needed to apply array-access expression translations as part of the
+	// polymorphic compute stage resolution process. We generate a new access expression chain 
+	// relative to the original array from an access to an argument array representing a part of the 
+	// original. For example, a row or column of a matrix. We set up new base and index expressions 
+	// to refer to the transformed array access expression chain through these two pointers.
+	void setBase(Expr *baseExpr) { this->base = baseExpr; }
+	void setIndex(Expr *indexExpr) { this->index = indexExpr; }
+        
+	// this returns the base array, field access, expression the array access has originated from
+	Expr *getEndpointOfArrayAccess();
+
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+
+	// tells if the current array access expression is the last index access in the chain of array
+	// indexes beginning at the base array
+	bool isFinalIndexAccess();
 };
 
 class FunctionCall : public Expr {
@@ -406,6 +455,9 @@ class FunctionCall : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class NamedArgument : public Node {
@@ -459,6 +511,9 @@ class TaskInvocation : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 
 	// helper functions to retrieve different types of task invocation arguments 
 	const char *getTaskName();
@@ -486,6 +541,9 @@ class ObjectCreate : public Expr {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypes(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 #endif

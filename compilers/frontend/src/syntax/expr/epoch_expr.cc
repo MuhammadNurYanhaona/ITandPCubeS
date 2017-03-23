@@ -68,3 +68,9 @@ void EpochExpr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	root->retrieveTerminalFieldAccesses(fieldList);
 }
 
+void EpochExpr::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+	root->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}
+

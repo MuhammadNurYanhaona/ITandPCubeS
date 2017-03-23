@@ -238,6 +238,20 @@ void TaskInvocation::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList
 	}
 }
 
+void TaskInvocation::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+	
+	for (int i = 0; i < invocationArgs->NumElements(); i++) {
+		NamedMultiArgument *multiArg = invocationArgs->Nth(i);
+		List<Expr*> *argList =multiArg->getArgList();
+		for (int j = 0; j < argList->NumElements(); j++) {
+			Expr *argument = argList->Nth(j);
+			argument->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+		}
+	}
+}
+
 const char *TaskInvocation::getTaskName() {
 	NamedMultiArgument *nameArg = retrieveArgByName("task");
 	if (nameArg == NULL) return NULL;

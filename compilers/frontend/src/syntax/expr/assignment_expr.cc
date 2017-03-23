@@ -106,3 +106,11 @@ void AssignmentExpr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList
 	right->retrieveTerminalFieldAccesses(fieldList);
 }
 
+void AssignmentExpr::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+
+	left->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	right->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}
+

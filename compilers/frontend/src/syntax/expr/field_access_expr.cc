@@ -6,6 +6,8 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/helper.h"
+#include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -220,6 +222,53 @@ void FieldAccess::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 		base->retrieveTerminalFieldAccesses(fieldList);
 	} else {
 		fieldList->Append(this);
+	}
+}
+
+void FieldAccess::performStageParamReplacement(
+		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
+	
+	// When the current field access is an access to a variable -- not to a property -- we check if the
+	// variable accessed is a parameter and apply the proper name substitution for the matching argument.
+	if (base == NULL) {
+		const char *fieldName = field->getName();
+		ParamReplacementConfig *nameReplConfig = nameAdjustmentInstrMap->Lookup(fieldName);
+		if (nameReplConfig == NULL) return;
+
+		Expr *argument = nameReplConfig->getInvokingArg();
+		FieldAccess *fieldArg = dynamic_cast<FieldAccess*>(argument);
+		ReductionVar *reductionVarArg = dynamic_cast<ReductionVar*>(argument);
+
+		if (fieldArg != NULL) {
+			const char *argName = fieldArg->getField()->getName();
+			this->field->changeName(argName);
+		} else if (reductionVarArg != NULL) {
+			const char *varName = reductionVarArg->getName();
+			this->field->changeName(varName);
+		}
+	
+	// if the current field access is accessing a property, then an adjustment is only needed when the
+	// property is a dimension of an array that is a parameter to the underlying compute stage and a part
+	// of a larger array has been passed as an argument
+	} else {
+		
+		base->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+		
+		// deal with the dimension property
+		DimensionIdentifier *dimension = dynamic_cast<DimensionIdentifier*>(field);
+		if (dimension != NULL) {
+			FieldAccess *baseField = getTerminalField();
+			if (baseField == NULL) return;
+			
+			const char *arrayName = baseField->getField()->getName();
+			ParamReplacementConfig *arrayReplConfig = arrayAccXformInstrMap->Lookup(arrayName);
+			if (arrayReplConfig != NULL) {
+				ArrayPartConfig *partConfig = arrayReplConfig->getArrayPartConfig();
+				int origDim = partConfig->getOrigDimension(dimension->getDimensionNo());
+				dimension->setDimensionNo(origDim);
+			}
+		}
 	}
 }
 
