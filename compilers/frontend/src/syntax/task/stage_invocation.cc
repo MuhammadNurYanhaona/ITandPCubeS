@@ -40,8 +40,7 @@ void StageInvocation::PrintChildren(int indentLevel) {
 	arguments->PrintAll(indentLevel + 2);
 }
 
-void StageInvocation::constructComputeFlow(CompositeStage *currCompStage,
-		semantic_helper::FlowStageConstrInfo *cnstrInfo) {
+void StageInvocation::constructComputeFlow(CompositeStage *currCompStage, FlowStageConstrInfo *cnstrInfo) {
 
 	Space *currLps = cnstrInfo->getCurrSpace();
 	int group = cnstrInfo->getCurrGroupIndex();
@@ -105,13 +104,57 @@ void StageInvocation::constructComputeFlow(CompositeStage *currCompStage,
 	
 	//------------------------------------------------------------------------------ end of argument validation
 
-	// assign the scope to the stage instanciation
+	//--------------------------------------------------------------- resolve the stage definition body for the
+	//------------------------------------------------------------- arguments being used for current invocation
+
+	// cloning is a must here as the same compute stages may be invoked from multiple places
+	Stmt *codeBody = stageDef->getCode();
+	Stmt *code = (Stmt*) codeBody->clone();
+
+	// get metadata for parameter replacement
+	List<ParamReplacementConfig*> *paramReplConfs = generateParamReplacementConfigs();
+	
+	// produce code for parameters that should be generated from the argument
+	List<Stmt*> *paramGeneratorCode = produceParamGeneratorCode(stageScope, paramReplConfs);
+	
+	// create a map of parameter to replacement config for field accesses needing only name change in the code 
+	Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap = new Hashtable<ParamReplacementConfig*>;
+	for (int i = 0; i < paramReplConfs->NumElements(); i++) {
+		ParamReplacementConfig *conf = paramReplConfs->Nth(i);
+		if (conf->getReplacementType() != Change_Name) continue;
+
+		const char *paramName = conf->getParameter()->getName();
+		nameAdjustmentInstrMap->Enter(paramName, conf);	
+	}
+
+	// create another map of parameter to replacement config for arguments that are array parts, consequently
+	// requiring a more complex transformation of expressions involving the parameter	
+	Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap  = new Hashtable<ParamReplacementConfig*>;
+	for (int i = 0; i < paramReplConfs->NumElements(); i++) {
+		ParamReplacementConfig *conf = paramReplConfs->Nth(i);
+		if (conf->getReplacementType() != Update_Expr) continue;
+
+		const char *paramName = conf->getParameter()->getName();
+		arrayAccXformInstrMap->Enter(paramName, conf);	
+	}
+
+	// generate the final code by combining any param generator statements with the resolved original code
+	Stmt *finalCode = NULL;
+	if (paramGeneratorCode->NumElements() != 0) {
+		paramGeneratorCode->Append(code);
+		finalCode = new StmtBlock(paramGeneratorCode);
+	} else {
+		finalCode = code;
+	}
+
+	//----------------------------------------------------------------------end of polymorphic stage resolution 
+
+	// assign the code and scope to the stage instanciation
 }
 
-List<semantic_helper::ParamReplacementConfig*> *StageInvocation::generateParamReplacementConfigs() {
+List<ParamReplacementConfig*> *StageInvocation::generateParamReplacementConfigs() {
 	
-	List<semantic_helper::ParamReplacementConfig*> *replacementList 
-			= new List<semantic_helper::ParamReplacementConfig*>;	
+	List<ParamReplacementConfig*> *replacementList = new List<ParamReplacementConfig*>;	
 	const char *nameOfStage = stageName->getName();
 	StageDefinition *stageDef = TaskDef::currentTask->getStagesSection()->retrieveStage(nameOfStage);
 	List<Identifier*> *parameters = stageDef->getParameters();
@@ -121,7 +164,7 @@ List<semantic_helper::ParamReplacementConfig*> *StageInvocation::generateParamRe
 		Identifier *param = parameters->Nth(i);
 		const char *paramName = param->getName();
 		Expr *argument = arguments->Nth(i);
-		semantic_helper::ParamReplacementConfig *config = NULL;
+		ParamReplacementConfig *config = NULL;
 		
 		// get argument type and check if it is a dynamic array
 		Type *type = argument->getType();
@@ -145,8 +188,7 @@ List<semantic_helper::ParamReplacementConfig*> *StageInvocation::generateParamRe
 		// if the argument is none of the above three types then it must be evaluated before and a local
 		// variable matching the parameter name must be created in the compute stage body
 		if (!(isReductionVar || isTerminalField || isArrayPart)) {
-			config = new semantic_helper::ParamReplacementConfig(param, 
-					argument, Evaluate_Before);
+			config = new ParamReplacementConfig(param, argument, Evaluate_Before);
 			replacementList->Append(config);
 			continue;
 		}
@@ -156,13 +198,11 @@ List<semantic_helper::ParamReplacementConfig*> *StageInvocation::generateParamRe
 		if (isTerminalField) {
 			const char *argName = fieldAcc->getField()->getName();
 			if (strcmp(argName, paramName) == 0) {
-				config = new semantic_helper::ParamReplacementConfig(param, 
-						argument, No_Replacement);
+				config = new ParamReplacementConfig(param, argument, No_Replacement);
 			// if the names are not the same then any access to the parameter field can be just renamed
 			// to access the argument
 			} else {
-				config = new semantic_helper::ParamReplacementConfig(param,
-                                                argument, Change_Name);
+				config = new ParamReplacementConfig(param, argument, Change_Name);
 			}
 			replacementList->Append(config);
 			continue;
@@ -171,8 +211,7 @@ List<semantic_helper::ParamReplacementConfig*> *StageInvocation::generateParamRe
 		// a reduction variable as an argument will always demand a change of name from parameter access to
 		// access to the argument variable
 		if (isReductionVar) {
-			config = new semantic_helper::ParamReplacementConfig(param,
-					argument, Change_Name);
+			config = new ParamReplacementConfig(param, argument, Change_Name);
 			replacementList->Append(config);
 			continue;
 		}
@@ -180,7 +219,7 @@ List<semantic_helper::ParamReplacementConfig*> *StageInvocation::generateParamRe
 		// the last remaing case is that the argument is a part of an array; this is the most complicated 
 		// case; we need to update expressions that use the corresponding parameter in many ways to produce
 		// valid and intended accesses to the argument array's element and metadata
-		config = new semantic_helper::ParamReplacementConfig(param, argument, Update_Expr);
+		config = new ParamReplacementConfig(param, argument, Update_Expr);
 		// set up an array-part-cofig for this replacement type to facilitate expression replacements
 		config->setArrayPartConfig(new ArrayPartConfig(arrayAcc));
 		replacementList->Append(config);
@@ -190,12 +229,14 @@ List<semantic_helper::ParamReplacementConfig*> *StageInvocation::generateParamRe
 }
 
 List<Stmt*> *StageInvocation::produceParamGeneratorCode(Scope *stageScope,
-		List<semantic_helper::ParamReplacementConfig*> *paramReplConfigList) {
+		List<ParamReplacementConfig*> *paramReplConfigList) {
 
 	List<Stmt*> *stmtList = new List<Stmt*>;
 	for (int i = 0; i < paramReplConfigList->NumElements(); i++) {
-		semantic_helper::ParamReplacementConfig *config = paramReplConfigList->Nth(i);
-		if (config->getReplacementType() != Evaluate_Before) continue;
+		ParamReplacementConfig *config = paramReplConfigList->Nth(i);
+		if (config->getReplacementType() != Evaluate_Before) {
+			continue;
+		}
 
 		Identifier *param = config->getParameter();
 		Expr *argument = config->getInvokingArg();

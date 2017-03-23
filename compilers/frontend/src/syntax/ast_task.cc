@@ -32,141 +32,6 @@ void DefineSection::PrintChildren(int indentLevel) {
         define->PrintAll(indentLevel + 1);
 }
 
-//----------------------------------------------------- Environment Section -------------------------------------------------------/
-
-//------------------------------------------------------------------------------------------------------------------Environment Link
-EnvironmentLink::EnvironmentLink(Identifier *v, LinkageType m) : Node(*v->GetLocation()) {
-        Assert(v != NULL);
-        var = v;
-        var->SetParent(this);
-        mode = m;
-}
-
-List<EnvironmentLink*> *EnvironmentLink::decomposeLinks(List<Identifier*> *idList, LinkageType mode) {
-        List<EnvironmentLink*> *links = new List<EnvironmentLink*>;
-        for (int i = 0; i < idList->NumElements(); i++) {
-           links->Append(new EnvironmentLink(idList->Nth(i), mode));
-        }
-        return links;
-}
-
-void EnvironmentLink::PrintChildren(int indentLevel) {
-        var->Print(indentLevel + 1);
-}
-
-const char *EnvironmentLink::GetPrintNameForNode() {
-        return (mode == TypeCreate) ? "Create"
-                : (mode == TypeLink) ? "Link" : "Create if Not Linked";
-}
-
-//---------------------------------------------------------------------------------------------------------------Environment Config
-EnvironmentSection::EnvironmentSection(List<EnvironmentLink*> *l, yyltype loc) : Node(loc) {
-        Assert(l != NULL);
-        links = l;
-        for (int i = 0; i < links->NumElements(); i++) {
-                links->Nth(i)->SetParent(this);
-        }
-}
-
-void EnvironmentSection::PrintChildren(int indentLevel) {
-        links->PrintAll(indentLevel + 1);
-}
-
-//------------------------------------------------------- Stages Section ----------------------------------------------------------/
-
-//------------------------------------------------------------------------------------------------------------------Stage Definition
-StageDefinition::StageDefinition(Identifier *name, List<Identifier*> *parameters, Stmt *codeBody) {
-	Assert(name != NULL 
-		&& parameters != NULL && parameters->NumElements() > 0 
-		&& codeBody != NULL);
-	this->name = name;
-	this->name->SetParent(this);
-	this->parameters = parameters;
-	for (int i = 0; i < parameters->NumElements(); i++) {
-		this->parameters->Nth(i)->SetParent(this);
-	}
-	this->codeBody = codeBody;
-	this->codeBody->SetParent(this);
-}
-
-void StageDefinition::PrintChildren(int indentLevel) {
-	name->Print(indentLevel + 1, "Name");
-        PrintLabel(indentLevel + 1, "Parameters");
-        parameters->PrintAll(indentLevel + 2);
-        PrintLabel(indentLevel + 1, "Code Body");
-	codeBody->Print(indentLevel + 2);
-}
-
-void StageDefinition::determineArrayDimensions() {
-
-	Hashtable<semantic_helper::ArrayDimConfig*> *resolvedArrays = new Hashtable<semantic_helper::ArrayDimConfig*>;
-	List<Expr*> *arrayAccesses = new List<Expr*>;
-	codeBody->retrieveExprByType(arrayAccesses, ARRAY_ACC);
-
-	for (int i = 0; i < arrayAccesses->NumElements(); i++) {
-		ArrayAccess *arrayAcc = (ArrayAccess*) arrayAccesses->Nth(i);
-		int dimensionality = arrayAcc->getIndexPosition() + 1;
-		Expr *baseExpr = arrayAcc->getEndpointOfArrayAccess();
-		FieldAccess *baseField = dynamic_cast<FieldAccess*>(baseExpr);
-
-		// This condition should not be true in the general case as arrays cannot hold other arrays 
-		// as elements in IT. The only time this will be true is when a static array property of a
-		// user defined type instance has been accessed. Those array's dimensions are already known
-		// from the type definition.
-		if (baseField == NULL || !baseField->isTerminalField()) continue;
-
-		const char *arrayName = baseField->getField()->getName();
-		
-		// check if the use of the array in the particular expression confirms with any earlier use
-		// of the same array
-		semantic_helper::ArrayDimConfig	*arrayConfig = NULL;
-		if ((arrayConfig = resolvedArrays->Lookup(arrayName)) != NULL) {
-
-			// raise an error that array access dimensions are not matching any previous access
-			if (arrayConfig->getDimensions() != dimensionality) {
-				ReportError::ConflictingArrayDimensionCounts(arrayAcc->GetLocation(), 
-					arrayName, arrayConfig->getDimensions(), dimensionality, false);
-			}
-
-		// if this is the first time use of the array then just store it as resolved
-		} else {
-			arrayConfig = new semantic_helper::ArrayDimConfig(arrayName, dimensionality);
-			resolvedArrays->Enter(arrayName, arrayConfig);
-		}
-
-		// annotate the field access as accessing an array of a particular dimensionality for later
-		// validation against actual invocation arguments
-		baseField->flagAsArrayField(dimensionality);			
-	}
-
-	delete resolvedArrays;
-	delete arrayAccesses;
-}
-
-//--------------------------------------------------------------------------------------------------------------------Stages Section
-
-StagesSection::StagesSection(List<StageDefinition*> *stages, yyltype loc) : Node(loc) {
-	Assert(stages != NULL && stages->NumElements() > 0);
-	this->stages = stages;
-	for (int i = 0; i < stages->NumElements(); i++) {
-		stages->Nth(i)->SetParent(this);
-	}
-}
-
-void StagesSection::PrintChildren(int indentLevel) {
-	stages->PrintAll(indentLevel + 1);
-}
-
-StageDefinition *StagesSection::retrieveStage(const char *stageName) {
-	for (int i = 0; i < stages->NumElements(); i++) {
-		StageDefinition *stage = stages->Nth(i);
-		if (strcmp(stage->getName(), stageName) == 0) {
-			return stage;
-		}
-	}
-	return NULL;
-}
-
 //----------------------------------------------------- Computation Section -------------------------------------------------------/
 
 //-------------------------------------------------------------------------------------------------------------------------Flow Part
@@ -197,8 +62,7 @@ void CompositeFlowPart::PrintChildren(int indentLevel) {
 	nestedSubflow->PrintAll(indentLevel + 2);
 }
 
-void CompositeFlowPart::constructComputeFlow(CompositeStage *currCompStage,
-		semantic_helper::FlowStageConstrInfo *cnstrInfo) {
+void CompositeFlowPart::constructComputeFlow(CompositeStage *currCompStage, FlowStageConstrInfo *cnstrInfo) {
 
 	Space *currLps = cnstrInfo->getCurrSpace();
 	int group = cnstrInfo->getCurrGroupIndex();
@@ -229,8 +93,7 @@ void LpsTransition::PrintChildren(int indentLevel) {
 	CompositeFlowPart::PrintChildren(indentLevel);
 }
 
-void LpsTransition::constructComputeFlow(CompositeStage *currCompStage,
-		semantic_helper::FlowStageConstrInfo *cnstrInfo) {
+void LpsTransition::constructComputeFlow(CompositeStage *currCompStage, FlowStageConstrInfo *cnstrInfo) {
 
 	Space *lastLps = cnstrInfo->getCurrSpace();
 	int group = cnstrInfo->getCurrGroupIndex();
@@ -278,8 +141,7 @@ void ConditionalFlowBlock::PrintChildren(int indentLevel) {
 	CompositeFlowPart::PrintChildren(indentLevel);
 }
 
-void ConditionalFlowBlock::constructComputeFlow(CompositeStage *currCompStage,
-                        semantic_helper::FlowStageConstrInfo *cnstrInfo) {
+void ConditionalFlowBlock::constructComputeFlow(CompositeStage *currCompStage, FlowStageConstrInfo *cnstrInfo) {
 
 	Space *currLps = cnstrInfo->getCurrSpace();
 	int group = cnstrInfo->getCurrGroupIndex();
@@ -322,8 +184,7 @@ void ConditionalFlowBlock::constructComputeFlow(CompositeStage *currCompStage,
 EpochBlock::EpochBlock(List<FlowPart*> *nestedSubflow, 
 		yyltype loc) : CompositeFlowPart(loc, nestedSubflow) {}
 
-void EpochBlock::constructComputeFlow(CompositeStage *currCompStage,
-		semantic_helper::FlowStageConstrInfo *cnstrInfo) {
+void EpochBlock::constructComputeFlow(CompositeStage *currCompStage, FlowStageConstrInfo *cnstrInfo) {
 	
 	Space *currLps = cnstrInfo->getCurrSpace();
 	int group = cnstrInfo->getCurrGroupIndex();
@@ -397,8 +258,7 @@ void RepeatCycle::PrintChildren(int indentLevel) {
 	CompositeFlowPart::PrintChildren(indentLevel);
 }
 
-void RepeatCycle::constructComputeFlow(CompositeStage *currCompStage,
-		semantic_helper::FlowStageConstrInfo *cnstrInfo) {
+void RepeatCycle::constructComputeFlow(CompositeStage *currCompStage, FlowStageConstrInfo *cnstrInfo) {
 	
 	Space *currLps = cnstrInfo->getCurrSpace();
 	int group = cnstrInfo->getCurrGroupIndex();
@@ -481,7 +341,7 @@ void ComputationSection::PrintChildren(int indentLevel) {
         computeFlow->PrintAll(indentLevel + 1);
 }
 
-CompositeStage *ComputationSection::generateComputeFlow(semantic_helper::FlowStageConstrInfo *cnstrInfo) {
+CompositeStage *ComputationSection::generateComputeFlow(FlowStageConstrInfo *cnstrInfo) {
 	
 	Space *currLps = cnstrInfo->getCurrSpace();
 	CompositeStage *compStage = new CompositeStage(currLps);
@@ -676,7 +536,7 @@ void TaskDef::constructComputationFlow(Scope *programScope) {
 	executionScope->insert_symbol(new VariableSymbol("partition", partitionType));
 
 	// pass control to the Computation Section to prepare the computation flow
-	semantic_helper::FlowStageConstrInfo cnstrInfo 
-			= semantic_helper::FlowStageConstrInfo(rootLps, executionScope, lpsHierarchy);
+	FlowStageConstrInfo cnstrInfo = FlowStageConstrInfo(rootLps, 
+			executionScope, lpsHierarchy);
 	CompositeStage *computation = compute->generateComputeFlow(&cnstrInfo);
 }

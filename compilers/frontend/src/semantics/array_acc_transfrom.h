@@ -47,6 +47,7 @@ class ArrayPartConfig {
 	List<Expr*> *fillerDimAccExprList;
   public:
 	ArrayPartConfig(ArrayAccess *arrayPartExpr);
+	FieldAccess *getBaseArrayAccess() { return baseArrayAccess; }
 
 	// tells if the dimension indicated by the argument has an associated subrange limiter expression
 	bool isLimitedIndexRange(int dimNo);

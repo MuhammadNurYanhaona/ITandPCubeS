@@ -188,6 +188,12 @@ void ReportError::InvalidArrayAccess(yyltype *loc, Type *actualType, bool suppre
 	}
 }
 
+void ReportError::InvalidReductionExpr(Expr *expr, bool suppressFailure) {
+	OptionalErrorReport(expr->GetLocation(), suppressFailure,
+			"Expecting a reduction variable of the form 'Space ID: Variable' but got a '%s'",
+			expr->GetPrintNameForNode());
+}
+
 void ReportError::TooFewOrTooManyParameters(Identifier *name, int actual, 
 		int expected, bool suppressFailure) {
 	OptionalErrorReport(name->GetLocation(), suppressFailure,

@@ -49,6 +49,7 @@ class ReportError
 	static void NoSuchFieldInBase(Identifier *field, Type *type, bool suppressFailure);
 	static void NonExistingDimensionInArray(Identifier *id, int dimensionality, int dimension, bool suppressFailure);	
 	static void InvalidArrayAccess(yyltype *loc, Type *actualType, bool suppressFailure);
+	static void InvalidReductionExpr(Expr *expr, bool suppressFailure);
 	static void InvalidObjectTypeInNew(Type *type, bool suppressFailure);
 	static void NonArrayInIndexedIteration(Identifier *id, Type *type, bool suppressFailure);	
 	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	

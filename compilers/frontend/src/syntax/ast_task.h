@@ -7,7 +7,6 @@
 #include "ast_def.h"
 #include "ast_expr.h"
 #include "../common/constant.h"
-#include "../semantics/helper.h"
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
 
@@ -16,6 +15,8 @@
 class TaskDef;
 class PartitionSection;
 class CompositeStage;
+class ParamReplacementConfig;
+class FlowStageConstrInfo;
 
 class DefineSection : public Node {
   protected:
@@ -84,6 +85,7 @@ class StageDefinition : public Node {
 	void determineArrayDimensions();
 	const char *getName() { return name->getName(); }
 	List<Identifier*> *getParameters() { return parameters; }
+	Stmt *getCode() { return codeBody; }
 };
 
 class StagesSection : public Node {
@@ -115,8 +117,8 @@ class FlowPart : public Node {
 	// ingradient for the intermediate representation. Over this flow, all static analyses are 
 	// done. Then code generation for different back-end compilers is also done by translating 
 	// the flow.
-	virtual void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo) = 0;	
+	virtual void constructComputeFlow(CompositeStage *currCompStage,
+		FlowStageConstrInfo *cnstrInfo) = 0;	
 };
 
 class StageInvocation : public FlowPart {
@@ -130,19 +132,18 @@ class StageInvocation : public FlowPart {
 
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
-	void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo);
+	void constructComputeFlow(CompositeStage *currCompStage, FlowStageConstrInfo *cnstrInfo);
 
 	// This function investigates the argument expressions and the parameters of the compute
 	// stage being invoked and determines the best way to convert any use of a parameter in the
 	// stage definition body with that of the corresponding argument during the polymorphic type
 	// resolution process.
-	List<semantic_helper::ParamReplacementConfig*> *generateParamReplacementConfigs(); 
+	List<ParamReplacementConfig*> *generateParamReplacementConfigs(); 
 
 	// Some arguments may need to be evaluated into local variables before the execution of the 
 	// actual code of the compute-stage. This function generates statements for this operation.
 	List<Stmt*> *produceParamGeneratorCode(Scope *stageScope,
-			List<semantic_helper::ParamReplacementConfig*> *paramReplConfigList);	
+			List<ParamReplacementConfig*> *paramReplConfigList);	
 };
 
 class CompositeFlowPart : public FlowPart {
@@ -155,7 +156,7 @@ class CompositeFlowPart : public FlowPart {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	virtual void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo);	
+			FlowStageConstrInfo *cnstrInfo);	
 };
 
 class LpsTransition : public CompositeFlowPart {
@@ -169,7 +170,7 @@ class LpsTransition : public CompositeFlowPart {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo);	
+			FlowStageConstrInfo *cnstrInfo);	
 };
 
 class ConditionalFlowBlock : public CompositeFlowPart {
@@ -183,7 +184,7 @@ class ConditionalFlowBlock : public CompositeFlowPart {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo);	
+			FlowStageConstrInfo *cnstrInfo);	
 };
 
 class EpochBlock : public CompositeFlowPart {
@@ -194,7 +195,7 @@ class EpochBlock : public CompositeFlowPart {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo);	
+			FlowStageConstrInfo *cnstrInfo);	
 };
 
 class RepeatControl : public Node {
@@ -264,7 +265,7 @@ class RepeatCycle : public CompositeFlowPart {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
 	void constructComputeFlow(CompositeStage *currCompStage, 
-			semantic_helper::FlowStageConstrInfo *cnstrInfo);	
+			FlowStageConstrInfo *cnstrInfo);	
 };
 
 class ComputationSection : public Node {
@@ -281,7 +282,7 @@ class ComputationSection : public Node {
 	// Section and the instructions this class contains. The resulting flow is returned wrapped 
 	// within the composite stage and used for all subsequent static analysis of the task and also
 	// for back-end specific code generation.
-	CompositeStage *generateComputeFlow(semantic_helper::FlowStageConstrInfo *cnstrInfo);
+	CompositeStage *generateComputeFlow(FlowStageConstrInfo *cnstrInfo);
 };
 
 class TaskDef : public Definition {

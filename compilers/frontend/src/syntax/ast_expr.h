@@ -16,6 +16,7 @@ class TaskDef;
 class FieldAccess;
 class Space;
 class Scope;
+class ParamReplacementConfig;
 
 class Expr : public Stmt {
   protected:
@@ -56,6 +57,12 @@ class Expr : public Stmt {
 	// for scope and other usage validation of variable accesses within a code.
 	virtual void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 
+	// An interface inherited from the statement superclass for resolving type polymorphic compute stages. 
+	// Subclasses should provide a meaningful recursive implementation for this function so that all 
+	// field and array accesses done on the underlying compute stage parameters are updated properly.
+	virtual void performStageParamReplacement(
+                        Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+                        Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {}
   protected:
 	// The type resolution function that subclasses should implement; this gets called only when the
 	// current expression type is NULL

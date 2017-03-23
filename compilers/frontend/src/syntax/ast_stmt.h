@@ -9,8 +9,10 @@
 #include <sstream>
 
 class Expr;
+class ReductionVar;
 class Scope;
 class Type;
+class ParamReplacementConfig;
 
 class Stmt : public Node {
   public:
@@ -37,6 +39,19 @@ class Stmt : public Node {
 	// This function is needed to determine if the type-and-scope resolution process ended with some
 	// expressions type-less or having error type. The return types indicates the number of errors.
 	virtual int emitScopeAndTypeErrors(Scope *scope) = 0;
+
+	// Subclasses should implement this function to support the polymorphic compute stage resolultion
+	// process. Note that we do not intend to produce copies of arrays (or parts of arrays) to generate 
+	// stage parameters to realize the stage invocations as templated function calls in the back-ends. 
+	// Copying array is costly. Furthermore, templated functions does not fit well into the implicit 
+	// typing mechanism of IT. So our scheme is to replace the use of parameters in stage definitions 
+	// with that of arguments. This mechanism requires either changing the names of referred fields and 
+	// arrays in statements and expressions; or for array parts, in particular, updating the array access 
+	// expressions. The two map arguments of this function contains all instructions for parameter 
+	// replacement.
+	virtual void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) = 0;
 };
 
 class StmtBlock : public Stmt {
@@ -53,6 +68,9 @@ class StmtBlock : public Stmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class ConditionalStmt: public Stmt {
@@ -70,6 +88,9 @@ class ConditionalStmt: public Stmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class IfStmt: public Stmt {
@@ -86,6 +107,9 @@ class IfStmt: public Stmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class IndexRangeCondition: public Node {
@@ -108,6 +132,9 @@ class IndexRangeCondition: public Node {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class LoopStmt: public Stmt {
@@ -135,6 +162,9 @@ class PLoopStmt: public LoopStmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class SLoopAttribute {
@@ -171,6 +201,9 @@ class SLoopStmt: public LoopStmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class WhileStmt: public Stmt {
@@ -188,6 +221,9 @@ class WhileStmt: public Stmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 };
 
 class ReductionStmt: public Stmt {
@@ -195,6 +231,12 @@ class ReductionStmt: public Stmt {
         Identifier *left;
         ReductionOperator op;
         Expr *right;
+
+	// Having a non-null reduction variable associated means this reduction statement's result should
+	// be shared among all the LPUs descending from the same ancestor LPU in the LPS indicated by the 
+	// reduction variable. If this is NULL then the reduction statement should evaluate locally in each 
+	// LPU. 
+	ReductionVar *reductionVar;
   public:
         ReductionStmt(Identifier *left, char *opName, Expr *right, yyltype loc);
         const char *GetPrintNameForNode() { return "Reduction-Statement"; }
@@ -207,6 +249,9 @@ class ReductionStmt: public Stmt {
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	int emitScopeAndTypeErrors(Scope *scope);
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 
   protected:
 	// The reduction operator can be used not only for inferring the type of the expression being reduced
@@ -232,9 +277,15 @@ class ExternCodeBlock: public Stmt {
         //------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
+
+	// there is no meaningful implementation for any of these functions as an external code block is
+	// taken as a whole and applied in the generated code without any analysis from the IT compiler
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {}
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration) { return 0; }
 	int emitScopeAndTypeErrors(Scope *scope) { return 0; }
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {}
 };
 
 class ReturnStmt: public Stmt {
@@ -252,6 +303,12 @@ class ReturnStmt: public Stmt {
 	int resolveExprTypesAndScopes(Scope *executionScope, int iteration);
 	Expr *getExpr() { return expr; }
 	int emitScopeAndTypeErrors(Scope *scope);
+
+	// there is no action in this regard on return statements as compute stages cannot have return 
+	// statements -- only IT functions can have them
+	void performStageParamReplacement(
+			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
+			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {}
 };
 
 #endif
