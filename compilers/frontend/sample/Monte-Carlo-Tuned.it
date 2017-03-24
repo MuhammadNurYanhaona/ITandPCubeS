@@ -78,7 +78,7 @@ Task "Monte Carlo Area Estimation":
 				seed = lpuId[0]
 
 				// repeat the estimation until the desired precision is reached
-				prev_estimate = 0
+				prev_estimate = 0.000000
 				total_internal_points = 0
 				round = 1
 				do {

@@ -53,10 +53,14 @@ class StageInstanciation : public FlowStage {
   protected:
 	Stmt *code;
 	Scope *scope;
+	const char *name;
   public:
 	StageInstanciation(Space *space);
+	void setCode(Stmt *code) { this->code = code; }
 	void setCode(List<Stmt*> *stmtList);
 	void setScope(Scope *scope) { this->scope = scope; }
+	void setName(const char *name) { this->name = name; }
+	const char *getName() { return name; }
 	Scope *getScope() { return scope; }
 	void print(int indent) {}
 };

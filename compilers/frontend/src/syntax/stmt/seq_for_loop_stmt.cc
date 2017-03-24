@@ -79,7 +79,7 @@ int SLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	// create a new scope for the loop and enter it
 	Scope *loopScope = NULL;
 	if (iteration == 0) {
-		Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
+		loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
 		
 		// enter the loop iterator in the scope
 		if (loopScope->lookup(id->getName()) != NULL) {
@@ -118,11 +118,13 @@ int SLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	return resolvedExprs;
 }
 
-int SLoopStmt::emitScopeAndTypeErrors(Scope *scope) {
+int SLoopStmt::emitScopeAndTypeErrors(Scope *executionScope) {
+
 	int errors = 0;
+	Scope *loopScope = executionScope->enter_scope(this->scope);
 	
 	// range expression must be of range type
-	errors += rangeExpr->emitScopeAndTypeErrors(scope);
+	errors += rangeExpr->emitScopeAndTypeErrors(loopScope);
 	Type *type = rangeExpr->getType();
 	if (type != NULL && type != Type::rangeType) {
 		ReportError::InvalidExprType(rangeExpr, Type::rangeType, false);
@@ -131,7 +133,7 @@ int SLoopStmt::emitScopeAndTypeErrors(Scope *scope) {
 	
 	// if exists, step expression must of integer type
         if (stepExpr != NULL) {
-		errors += stepExpr->emitScopeAndTypeErrors(scope);
+		errors += stepExpr->emitScopeAndTypeErrors(loopScope);
 		Type *type = stepExpr->getType();
 		if (type != NULL && type != Type::intType) {
 			ReportError::InvalidExprType(stepExpr, Type::intType, false);
@@ -141,7 +143,7 @@ int SLoopStmt::emitScopeAndTypeErrors(Scope *scope) {
 
 	// if exists, restriction must be of boolean type
         if (restriction != NULL) {
-		errors += restriction->emitScopeAndTypeErrors(scope);
+		errors += restriction->emitScopeAndTypeErrors(loopScope);
 		Type *type = restriction->getType();
 		if (type != NULL && type != Type::boolType) {
 			ReportError::InvalidExprType(restriction, Type::boolType, false);
@@ -149,7 +151,8 @@ int SLoopStmt::emitScopeAndTypeErrors(Scope *scope) {
 		}
 	}
 
-        errors += body->emitScopeAndTypeErrors(scope);
+        errors += body->emitScopeAndTypeErrors(loopScope);
+	loopScope->detach_from_parent();
 	return errors;
 }
 

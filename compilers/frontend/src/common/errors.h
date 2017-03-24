@@ -55,10 +55,11 @@ class ReportError
 	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	
 	static void ReturnStmtOutsideFn(yyltype *loc, bool suppressFailure);
 	
-	//------------------------------------------------------------------------------------- Polymorphic Type Resolution Errors
+	//------------------------------------------------------------------------------- Polymorphic Type/stage Resolution Errors
 
 	static void CouldNotResolveFnForArgs(yyltype *loc, const char *fnName, bool suppressFailure);
 	static void CyclicalFnCalls(yyltype *loc, const char *fnName, bool suppressFailure);
+	static void CouldNotResolveStageForArgs(yyltype *loc, const char *stageName, bool suppressFailure);
 	
 	//-------------------------------------------------------------------------------------------- Missing Information  Errors
 

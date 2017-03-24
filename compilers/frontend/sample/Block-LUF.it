@@ -86,7 +86,7 @@ Task "Block LU Factorization":
 		}
 		saxpy(u, u_block, l_block, row_range) {
 			do {	
-				total = 0.0
+				total = 0.000000
 				do {	total = total + u_block[i][m] * l_block[m][j] 
 				} for m in u_block
 				u[i][j] = u[i][j] - total

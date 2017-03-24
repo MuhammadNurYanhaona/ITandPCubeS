@@ -1,11 +1,11 @@
-#include "ast.h"
-#include "ast_task.h"
-#include "ast_partition.h"
-#include "../common/errors.h"
-#include "../common/constant.h"
-#include "../semantics/symbol.h"
-#include "../semantics/task_space.h"
-#include "../../../common-libs/utils/list.h"
+#include "../ast.h"
+#include "../ast_task.h"
+#include "../ast_partition.h"
+#include "../../common/errors.h"
+#include "../../common/constant.h"
+#include "../../semantics/symbol.h"
+#include "../../semantics/task_space.h"
+#include "../../../../common-libs/utils/list.h"
 
 //----------------------------------------- Linking Spaces Together ---------------------------------------------/
 

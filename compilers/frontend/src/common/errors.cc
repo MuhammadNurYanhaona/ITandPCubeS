@@ -81,6 +81,11 @@ void ReportError::CyclicalFnCalls(yyltype *loc, const char *fnName, bool suppres
                         "a cycle found in the call chain when processing '%s'; currently the compiler cannot handle recursive functions", fnName);
 }
 
+void ReportError::CouldNotResolveStageForArgs(yyltype *loc, const char *stageName, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure,
+                        "scope and type analysis of '%s' failed for the given invocation arguments", stageName);
+}
+
 void ReportError::ConflictingReturnTypes(yyltype *loc, Type *oldType, Type *newType, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, "previous return type '%s' for function is in conflict with the current '%s'",
 			oldType->getName(), newType->getName());

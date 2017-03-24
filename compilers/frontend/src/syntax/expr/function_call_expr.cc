@@ -61,6 +61,8 @@ int FunctionCall::resolveExprTypes(Scope *scope) {
 		Type *argType = arg->getType();
 		if (argType == NULL || argType == Type::errorType) {
 			allArgsResolved = false;
+		} else {
+			argTypeList->Append(argType);
 		}
 	}
 

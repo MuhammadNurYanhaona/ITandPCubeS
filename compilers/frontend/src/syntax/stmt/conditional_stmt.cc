@@ -32,7 +32,10 @@ void ConditionalStmt::PrintChildren(int indentLevel) {
 }
 
 Node *ConditionalStmt::clone() {
-	Expr *newCond = (Expr*) condition->clone();
+	Expr *newCond = NULL;
+	if (condition != NULL) { 
+		newCond = (Expr*) condition->clone();
+	}
 	Stmt *newStmt = (Stmt*) stmt->clone();
 	return new ConditionalStmt(newCond, newStmt, *GetLocation());
 }

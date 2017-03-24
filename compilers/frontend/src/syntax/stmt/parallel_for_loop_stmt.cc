@@ -67,7 +67,7 @@ int PLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	// create a new scope for the loop and enter it
 	Scope *loopScope = NULL;
 	if (iteration == 0) {
-		Scope *loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
+		loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
 	} else {
 		loopScope = executionScope->enter_scope(this->scope);
 	}
@@ -88,13 +88,15 @@ int PLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	return resolvedExprs;
 }
 
-int PLoopStmt::emitScopeAndTypeErrors(Scope *scope) {
+int PLoopStmt::emitScopeAndTypeErrors(Scope *executionScope) {
 	int errors = 0;
+	Scope *loopScope = executionScope->enter_scope(this->scope);
         for (int i = 0; i < rangeConditions->NumElements(); i++) {
                 IndexRangeCondition *condition = rangeConditions->Nth(i);
-                errors += condition->emitScopeAndTypeErrors(scope);
+                errors += condition->emitScopeAndTypeErrors(loopScope);
         }
-        errors += body->emitScopeAndTypeErrors(scope);
+        errors += body->emitScopeAndTypeErrors(loopScope);
+	loopScope->detach_from_parent();
         return errors;
 }
 

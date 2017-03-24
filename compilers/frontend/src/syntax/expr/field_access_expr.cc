@@ -36,7 +36,10 @@ void FieldAccess::PrintChildren(int indentLevel) {
 }
 
 Node *FieldAccess::clone() {
-	Expr *newBase = (Expr*) base->clone();
+	Expr *newBase = NULL;
+	if (base != NULL) {
+		newBase = (Expr*) base->clone();
+	}
 	Identifier *newField = (Identifier*) field->clone();
 	FieldAccess *newFieldAcc = new FieldAccess(newBase, newField, *GetLocation());
 	if (referenceField) {

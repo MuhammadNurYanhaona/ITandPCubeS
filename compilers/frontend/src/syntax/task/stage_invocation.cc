@@ -49,6 +49,8 @@ void StageInvocation::constructComputeFlow(CompositeStage *currCompStage, FlowSt
 	// creates a new scope for the stage invocation
 	Scope *parentScope = cnstrInfo->getScope();
 	Scope *stageScope = parentScope->enter_scope(new Scope(ComputationStageScope));
+	Symbol *lpuIdSymbol = currLps->getLpuIdSymbol();
+        if (lpuIdSymbol != NULL) { stageScope->insert_symbol(lpuIdSymbol); }
 	
 	// validate that the stage being invoked does exist
 	const char *nameOfStage = stageName->getName();
@@ -138,7 +140,27 @@ void StageInvocation::constructComputeFlow(CompositeStage *currCompStage, FlowSt
 		arrayAccXformInstrMap->Enter(paramName, conf);	
 	}
 
-	// generate the final code by combining any param generator statements with the resolved original code
+	// apply the parameter replacement strategy on the code
+	code->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+	
+	// then do scope-and-type analysis in the updated code
+	// the scope and type analysis should repeat as long as we resolve new expression types
+        int iteration = 0;
+        int resolvedTypes = 0;
+        do {
+                resolvedTypes = code->resolveExprTypesAndScopes(stageScope, iteration);
+                iteration++;
+        } while (resolvedTypes != 0);
+
+	// check if the stage instance has any un-resolved or erroneous expression; if there is any expression in 
+	// error then we can stop and exit
+        errorCount = code->emitScopeAndTypeErrors(stageScope);
+	if (errorCount > 0) {
+		ReportError::CouldNotResolveStageForArgs(GetLocation(), nameOfStage, false);
+		std::exit(EXIT_FAILURE);
+	}
+
+	// generate the final code by combining a1ny param generator statements with the resolved original code
 	Stmt *finalCode = NULL;
 	if (paramGeneratorCode->NumElements() != 0) {
 		paramGeneratorCode->Append(code);
@@ -149,7 +171,24 @@ void StageInvocation::constructComputeFlow(CompositeStage *currCompStage, FlowSt
 
 	//----------------------------------------------------------------------end of polymorphic stage resolution 
 
-	// assign the code and scope to the stage instanciation
+	// create a stage instanciation
+	StageInstanciation *stageInstance = new StageInstanciation(currLps);
+	int index = cnstrInfo->getLastStageIndex();
+        stageInstance->setIndex(index);
+        stageInstance->setGroupNo(group);
+        stageInstance->setRepeatIndex(repeatBlock);
+        cnstrInfo->advanceLastStageIndex();
+
+	// assign the code, the scope, and a name to the stage instance
+	stageInstance->setCode(finalCode);
+	stageScope->detach_from_parent();
+	stageInstance->setScope(stageScope);
+	std::ostringstream nameStream;
+	nameStream << nameOfStage << "_stage_" << index;
+	stageInstance->setName(strdup(nameStream.str().c_str())); 
+
+	// add the newly created stage to the parent composite stage    
+        currCompStage->addStageAtEnd(stageInstance);
 }
 
 List<ParamReplacementConfig*> *StageInvocation::generateParamReplacementConfigs() {

@@ -92,7 +92,7 @@ Task "Monte Carlo Area Estimation":
 				reduce(result, "sum", points[i][j])
 			} for i, j in points
 		}
-		estimateSubarea(internal_points, sample_count, round, diff, sub_ara_estimates) {
+		estimateSubarea(internal_points, sample_count, round, diff, estimates) {
 			row = estimates.dimension1.range.min
 			col = estimates.dimension2.range.min
 			cell_size = cell_length * cell_length
@@ -100,7 +100,7 @@ Task "Monte Carlo Area Estimation":
 			weight = 1.0 / round
 			old_estimate = estimates[row][col]
 			updated_estimate = curr_estimate * weight + old_estimate * (1 - weight)
-			sub_area_estimates[row][col] = updated_estimate
+			estimates[row][col] = updated_estimate
 			if (updated_estimate > old_estimate) {
 				diff[row][col] = updated_estimate - old_estimate
 			} else {
@@ -126,7 +126,7 @@ Task "Monte Carlo Area Estimation":
 							performSampling(points_per_cell, grid, 
 									internal_points, Space B:placement_result)
 						}
-						estimateSubarea(internal_points, points_per_cell, 
+						estimateSubarea(placement_result, points_per_cell, 
 								round, estimate_diffs, local_estimates)
 					}
 				}
