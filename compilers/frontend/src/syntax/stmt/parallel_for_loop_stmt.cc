@@ -8,7 +8,9 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -109,4 +111,14 @@ void PLoopStmt::performStageParamReplacement(
 		condition->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	}
 	body->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}
+
+Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(
+		TaskGlobalReferences *globalReferences) {
+        Hashtable<VariableAccess*> *table = body->getAccessedGlobalVariables(globalReferences);
+        for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *cond = rangeConditions->Nth(i);
+                mergeAccessedVariables(table, cond->getAccessedGlobalVariables(globalReferences));
+        }
+        return table;
 }

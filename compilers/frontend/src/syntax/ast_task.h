@@ -17,6 +17,7 @@ class PartitionSection;
 class CompositeStage;
 class ParamReplacementConfig;
 class FlowStageConstrInfo;
+class VariableAccess;
 
 class DefineSection : public Node {
   protected:
@@ -36,6 +37,8 @@ class InitializeSection : public Node {
 
 	// The Initialize Section has its own scope for executing the code embedded within it 
 	Scope *scope;
+	// an access map is needed to track what task global variable has been used how during initialization
+	Hashtable<VariableAccess*> *accessMap;
   public: 
 	InitializeSection(List<Identifier*> *arguments, List<Stmt*> *code, yyltype loc);	
         const char *GetPrintNameForNode() { return "Initialize-Section"; }
@@ -44,7 +47,8 @@ class InitializeSection : public Node {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 	
 	void performScopeAndTypeChecking(Scope *parentScope);
-	List<Type*> *getArgumentTypes() { return argumentTypes; }	
+	List<Type*> *getArgumentTypes() { return argumentTypes; }
+	void performVariableAccessAnalysis(Scope *taskGlobalScope);	
 };
 
 class EnvironmentLink : public Node {
@@ -345,6 +349,9 @@ class TaskDef : public Definition {
 	// This method generates a computation flow for the task by combining information from the Stages
 	// and Computation Sections and also validates that flow during the construction process.
 	void constructComputationFlow(Scope *programScope);
+
+	// the final round of semantic validation of the task is done here
+	void validateScope(Scope *parentScope);
 
   public:
 	// a static reference to the current task to facilitate access during different sub-phases of 

@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -112,3 +113,20 @@ void FunctionCall::performStageParamReplacement(
 	}
 }
 
+Hashtable<VariableAccess*> *FunctionCall::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+	Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+        for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *expr = arguments->Nth(i);
+                Hashtable<VariableAccess*> *argTable = expr->getAccessedGlobalVariables(globalReferences);
+                Stmt::mergeAccessedVariables(table, argTable);
+        }
+        Iterator<VariableAccess*> iter = table->GetIterator();
+        VariableAccess *accessLog;
+        while((accessLog = iter.GetNextValue()) != NULL) {
+                if(accessLog->isContentAccessed())
+                        accessLog->getContentAccessFlags()->flagAsRead();
+                if (accessLog->isMetadataAccessed())
+                        accessLog->getMetadataAccessFlags()->flagAsRead();
+        }        
+        return table;
+}

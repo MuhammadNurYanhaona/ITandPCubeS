@@ -123,6 +123,12 @@ void ProgramDef::performScopeAndTypeChecking() {
 	//-------------------------------------------------there is no point progressing any further 
 	if (ReportError::NumErrors() > 0) return;
 
+	//--------------------------------------------------------------Now validate the task scopes
+	for (int i = 0; i < taskDefs->NumElements(); i++) {
+                TaskDef *task = (TaskDef*) taskDefs->Nth(i);
+		task->validateScope(scope);
+	}	
+
 	//--------------------------------------------------process the program coordinator function
 	List<Definition*> *defList = getComponentsByType(COORD_DEF);
 	if (defList->NumElements() != 1) {

@@ -187,6 +187,9 @@ void StageInvocation::constructComputeFlow(CompositeStage *currCompStage, FlowSt
 	nameStream << nameOfStage << "_stage_" << index;
 	stageInstance->setName(strdup(nameStream.str().c_str())); 
 
+	// assign the location of the current AST element to the flow-stage for later error checking purpose
+	stageInstance->assignLocation(GetLocation());
+
 	// add the newly created stage to the parent composite stage    
         currCompStage->addStageAtEnd(stageInstance);
 }

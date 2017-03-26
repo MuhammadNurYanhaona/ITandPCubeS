@@ -186,5 +186,24 @@ void TaskDef::constructComputationFlow(Scope *programScope) {
 	// pass control to the Computation Section to prepare the computation flow
 	FlowStageConstrInfo cnstrInfo = FlowStageConstrInfo(rootLps, 
 			executionScope, lpsHierarchy);
-	CompositeStage *computation = compute->generateComputeFlow(&cnstrInfo);
+	computation = compute->generateComputeFlow(&cnstrInfo);
 }
+
+void TaskDef::validateScope(Scope *parentScope) {
+	
+	// check if the variables in the Define Section have valid types
+	List<VariableDef*> *varList = define->getDefinitions();
+        for (int i = 0; i < varList->NumElements(); i++) {
+                VariableDef *var = varList->Nth(i);
+                var->validateScope(parentScope);
+        }
+
+	// check access characteristics of task-global variables in the initialize section
+	Scope *scope = symbol->getNestedScope();
+	if (initialize != NULL) {
+		initialize->performVariableAccessAnalysis(scope);
+	}
+
+	// check access characteristics of task-global variables in the computation flow
+	computation->performDataAccessChecking(scope);
+} 

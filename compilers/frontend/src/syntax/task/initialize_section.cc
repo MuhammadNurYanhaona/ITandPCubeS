@@ -11,6 +11,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../semantics/computation_flow.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
@@ -94,4 +95,21 @@ void InitializeSection::performScopeAndTypeChecking(Scope *parentScope) {
                 }
         }	
 }
+
+void InitializeSection::performVariableAccessAnalysis(Scope *taskGlobalScope) {
+        accessMap = new Hashtable<VariableAccess*>;
+        for (int i = 0; i < arguments->NumElements(); i++) {
+                Identifier *id = arguments->Nth(i);
+                if (taskGlobalScope->lookup(id->getName()) != NULL) {
+                        VariableAccess *accessLog = new VariableAccess(id->getName());
+                        accessLog->markContentAccess();
+                        accessLog->getContentAccessFlags()->flagAsWritten();
+                        accessMap->Enter(id->getName(), accessLog, true);
+                }
+        }
+        TaskGlobalReferences *references = new TaskGlobalReferences(taskGlobalScope);
+	Hashtable<VariableAccess*> *table = code->getAccessedGlobalVariables(references);
+	Stmt::mergeAccessedVariables(accessMap, table);
+}
+
 

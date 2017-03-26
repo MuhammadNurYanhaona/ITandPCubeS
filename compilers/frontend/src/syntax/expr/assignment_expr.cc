@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -112,5 +113,52 @@ void AssignmentExpr::performStageParamReplacement(
 
 	left->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	right->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}
+
+Hashtable<VariableAccess*> *AssignmentExpr::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+        const char* baseVarName = left->getBaseVarName();
+        if (baseVarName == NULL) {
+                ReportError::NotLValueinAssignment(GetLocation());
+        }
+        Hashtable<VariableAccess*> *table = left->getAccessedGlobalVariables(globalReferences);
+        if (baseVarName != NULL && table->Lookup(baseVarName) != NULL) {
+                VariableAccess *accessLog = table->Lookup(baseVarName);
+                if(accessLog->isContentAccessed())
+                        accessLog->getContentAccessFlags()->flagAsWritten();
+                if (accessLog->isMetadataAccessed())
+                        accessLog->getMetadataAccessFlags()->flagAsWritten();
+        }
+
+        Hashtable<VariableAccess*> *rTable = right->getAccessedGlobalVariables(globalReferences);
+        Iterator<VariableAccess*> iter = rTable->GetIterator();
+        VariableAccess *accessLog;
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+		if (accessLog->isMetadataAccessed()) accessLog->getMetadataAccessFlags()->flagAsRead();
+		if(accessLog->isContentAccessed()) accessLog->getContentAccessFlags()->flagAsRead();
+                if (table->Lookup(accessLog->getName()) != NULL) {
+                        table->Lookup(accessLog->getName())->mergeAccessInfo(accessLog);
+                } else {
+                        table->Enter(accessLog->getName(), accessLog, true);
+                }
+        }
+        // check if any local/global reference is made to some global variable through the assignment expression and
+        // take care of that
+        FieldAccess *field = dynamic_cast<FieldAccess*>(left);
+        if (field != NULL && field->isTerminalField()) {
+                const char *rightSide = right->getBaseVarName();
+                Type *rightType = right->getType();
+                ArrayType *arrayType = dynamic_cast<ArrayType*>(rightType);
+                if (rightSide != NULL && globalReferences->doesReferToGlobal(rightSide) && arrayType != NULL) {
+                        if (!globalReferences->isGlobalVariable(baseVarName)) {
+                                VariableSymbol *root = globalReferences->getGlobalRoot(rightSide);
+                                globalReferences->setNewReference(baseVarName, root->getName());
+                        } else {
+                                accessLog = table->Lookup(baseVarName);
+                                accessLog->markContentAccess();
+                                accessLog->getContentAccessFlags()->flagAsRedirected();
+                        }
+                }
+        }
+        return table;
 }
 

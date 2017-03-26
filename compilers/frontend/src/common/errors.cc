@@ -296,7 +296,12 @@ void ReportError::RepeatBeginningInvalid(yyltype *loc, const char *allowedFurthe
 
 void ReportError::ArrayPartitionUnknown(yyltype *loc, const char *arrayName, const char *stageName, const char *spaceId) {
 	Formatted(loc, "Array '%s' cannot be used in %s as '%s' is not partitioned in corresponding Space %s", 
-		arrayName, stageName, arrayName, spaceId);
+			arrayName, stageName, arrayName, spaceId);
+}
+
+void ReportError::ArrayPartitionUnknown(yyltype *loc, const char *arrayName, const char *spaceId) {
+	Formatted(loc, "Array '%s' cannot be used in Space %s as the formar has no partition configuration in the latter", 
+			arrayName, spaceId, arrayName, spaceId);
 }
 
 void ReportError::DuplicateSpaceDefinition(yyltype *loc, char spaceName) {

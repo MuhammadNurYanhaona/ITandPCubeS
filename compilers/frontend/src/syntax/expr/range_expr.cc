@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -138,5 +139,40 @@ void RangeExpr::performStageParamReplacement(
 	if (step != NULL) {
 		step->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	}
+}
+
+Hashtable<VariableAccess*> *RangeExpr::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+
+        Hashtable<VariableAccess*> *table = range->getAccessedGlobalVariables(globalReferences);
+        Iterator<VariableAccess*> iter = table->GetIterator();
+        VariableAccess *accessLog;
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                if (accessLog->isMetadataAccessed()) accessLog->getMetadataAccessFlags()->flagAsRead();
+                if (accessLog->isContentAccessed()) accessLog->getContentAccessFlags()->flagAsRead();
+        }
+
+        const char *indexName = index->getTerminalField()->getField()->getName();
+        if (globalReferences->isGlobalVariable(indexName)) {
+                accessLog = new VariableAccess(indexName);
+                accessLog->markContentAccess();
+                if (loopingRange) {
+                        accessLog->getContentAccessFlags()->flagAsWritten();
+                }
+                accessLog->getContentAccessFlags()->flagAsRead();
+                if (table->Lookup(indexName) != NULL) {
+                        table->Lookup(indexName)->mergeAccessInfo(accessLog);
+                } else table->Enter(indexName, accessLog, true);
+        }
+
+        if (step == NULL) return table;
+        Hashtable<VariableAccess*> *sTable = step->getAccessedGlobalVariables(globalReferences);
+        iter = sTable->GetIterator();
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                if (accessLog->isMetadataAccessed()) accessLog->getMetadataAccessFlags()->flagAsRead();
+                if (accessLog->isContentAccessed()) accessLog->getContentAccessFlags()->flagAsRead();
+        }
+        mergeAccessedVariables(table, sTable);
+
+        return table;
 }
 

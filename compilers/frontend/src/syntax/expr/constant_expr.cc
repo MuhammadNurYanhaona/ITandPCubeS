@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -119,5 +120,17 @@ int ReductionVar::emitSemanticErrors(Scope *scope) {
 
 void ReductionVar::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	fieldList->Append(fieldRepresentation);
+}
+
+Hashtable<VariableAccess*> *ReductionVar::getAccessedGlobalVariables(TaskGlobalReferences *globalRefs) {
+	Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+	if (globalRefs->doesReferToGlobal(name)) {
+		VariableSymbol *global = globalRefs->getGlobalRoot(name);
+		const char *globalName = global->getName();
+		VariableAccess *accessLog = new VariableAccess(globalName);
+		accessLog->markContentAccess();
+		table->Enter(globalName, accessLog, true);
+	}
+	return table;
 }
 

@@ -8,7 +8,9 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -71,4 +73,13 @@ void IfStmt::performStageParamReplacement(
                 ConditionalStmt *stmt = ifBlocks->Nth(i);
 		stmt->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	}
+}
+
+Hashtable<VariableAccess*> *IfStmt::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+        Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+        for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+                mergeAccessedVariables(table, stmt->getAccessedGlobalVariables(globalReferences));
+        }
+        return table;
 }

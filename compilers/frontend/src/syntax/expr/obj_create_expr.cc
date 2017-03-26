@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -194,4 +195,23 @@ void ObjectCreate::performStageParamReplacement(
 		Expr *argValue = currentArg->getValue();
 		argValue->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	}
+}
+
+Hashtable<VariableAccess*> *ObjectCreate::getAccessedGlobalVariables(TaskGlobalReferences *globalRefs) {
+	Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+	for (int i = 0; i < initArgs->NumElements(); i++) {
+		NamedArgument *currentArg = initArgs->Nth(i);
+		Expr *argValue = currentArg->getValue();
+		Hashtable<VariableAccess*> *argTable = argValue->getAccessedGlobalVariables(globalRefs);
+                Stmt::mergeAccessedVariables(table, argTable);
+	}
+	Iterator<VariableAccess*> iter = table->GetIterator();
+        VariableAccess *accessLog;
+        while((accessLog = iter.GetNextValue()) != NULL) {
+                if(accessLog->isContentAccessed())
+                        accessLog->getContentAccessFlags()->flagAsRead();
+                if (accessLog->isMetadataAccessed())
+                        accessLog->getMetadataAccessFlags()->flagAsRead();
+        }
+        return table;
 }

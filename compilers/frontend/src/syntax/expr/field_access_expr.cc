@@ -7,6 +7,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
@@ -220,6 +221,8 @@ int FieldAccess::emitSemanticErrors(Scope *scope) {
 	return errors;
 }
 
+
+
 void FieldAccess::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	if (base != NULL) {
 		base->retrieveTerminalFieldAccesses(fieldList);
@@ -273,5 +276,45 @@ void FieldAccess::performStageParamReplacement(
 			}
 		}
 	}
+}
+
+Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+        if (base == NULL) {
+                Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+                const char *fieldName = field->getName();
+                if (globalReferences->doesReferToGlobal(fieldName)) {
+                        VariableSymbol *global = globalReferences->getGlobalRoot(fieldName);
+                        Type *globalType = global->getType();
+                        const char *globalName = global->getName();
+                        VariableAccess *accessLog = new VariableAccess(globalName);
+                        if ((dynamic_cast<ArrayType*>(globalType)) == NULL) {
+                                accessLog->markContentAccess();
+                        }
+                        table->Enter(globalName, accessLog, true);
+                }
+                return table;
+        } else {
+                FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+	        Hashtable<VariableAccess*> *table = base->getAccessedGlobalVariables(globalReferences);
+                if (baseField == NULL || !baseField->isTerminalField()) return table;
+                const char *fieldName = baseField->field->getName();
+                if (globalReferences->doesReferToGlobal(fieldName)) {
+                        VariableSymbol *global = globalReferences->getGlobalRoot(fieldName);
+                        Type *globalType = global->getType();
+                        const char *globalName = global->getName();
+                        VariableAccess *accessLog = table->Lookup(globalName);
+                        if ((dynamic_cast<ArrayType*>(globalType)) != NULL) {
+                                accessLog->markMetadataAccess(); 
+                        } else {
+                                accessLog->markContentAccess();
+                        }
+                }
+                return table;
+        }
+}
+
+const char *FieldAccess::getBaseVarName() {
+        if (base == NULL) return field->getName();
+        return base->getBaseVarName();
 }
 

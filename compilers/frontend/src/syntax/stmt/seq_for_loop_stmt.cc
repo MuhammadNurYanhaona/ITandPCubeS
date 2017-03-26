@@ -8,7 +8,9 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -170,4 +172,25 @@ void SLoopStmt::performStageParamReplacement(
 				nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	}
 }
+
+Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+
+        Hashtable<VariableAccess*> *table = body->getAccessedGlobalVariables(globalReferences);
+        mergeAccessedVariables(table, rangeExpr->getAccessedGlobalVariables(globalReferences));
+        if (stepExpr != NULL) mergeAccessedVariables(table,
+                        stepExpr->getAccessedGlobalVariables(globalReferences));
+        if (restriction != NULL) mergeAccessedVariables(table,
+                        restriction->getAccessedGlobalVariables(globalReferences));
+
+        Iterator<VariableAccess*> iter = table->GetIterator();
+        VariableAccess *accessLog;
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                if(accessLog->isContentAccessed())
+                        accessLog->getContentAccessFlags()->flagAsRead();
+                if (accessLog->isMetadataAccessed())
+                        accessLog->getMetadataAccessFlags()->flagAsRead();
+        }
+        return table;
+}
+
 

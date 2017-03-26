@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -72,5 +73,10 @@ void EpochExpr::performStageParamReplacement(
 		Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 		Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {
 	root->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}
+
+Hashtable<VariableAccess*> *EpochExpr::getAccessedGlobalVariables(
+		TaskGlobalReferences *globalRefs) {
+        return root->getAccessedGlobalVariables(globalRefs);
 }
 

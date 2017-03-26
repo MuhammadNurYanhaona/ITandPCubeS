@@ -7,6 +7,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
@@ -159,6 +160,33 @@ void ArrayAccess::performStageParamReplacement(
 	// Continue the transformation towards the base array. Note that we do this last to have a tail 
 	// to head progression in the transformation process.
 	base->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);	 
+}
+
+Hashtable<VariableAccess*> *ArrayAccess::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+
+        Hashtable<VariableAccess*> *table = base->getAccessedGlobalVariables(globalReferences);
+        const char *baseVarName = getBaseVarName();
+        FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+        if (baseField != NULL && baseField->isTerminalField()) {
+                VariableAccess *accessLog = table->Lookup(baseVarName);
+                if (accessLog != NULL) {
+                        accessLog->markContentAccess();
+                }
+        }
+        Hashtable<VariableAccess*> *indexTable = index->getAccessedGlobalVariables(globalReferences);
+        Iterator<VariableAccess*> iter = indexTable->GetIterator();
+        VariableAccess *indexAccess;
+        while ((indexAccess = iter.GetNextValue()) != NULL) {
+                if (indexAccess->isMetadataAccessed()) indexAccess->getMetadataAccessFlags()->flagAsRead();
+                if(indexAccess->isContentAccessed()) indexAccess->getContentAccessFlags()->flagAsRead();
+                if (table->Lookup(indexAccess->getName()) != NULL) {
+                        VariableAccess *accessLog = table->Lookup(indexAccess->getName());
+                        accessLog->mergeAccessInfo(indexAccess);
+                } else {
+                        table->Enter(indexAccess->getName(), indexAccess, true);
+                }
+        }
+        return table;
 }
 
 bool ArrayAccess::isFinalIndexAccess() {

@@ -8,7 +8,9 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -146,4 +148,45 @@ void ReductionStmt::performStageParamReplacement(
 		}
 		this->reductionVar = (ReductionVar*) reductionVar->clone();
 	}
+}
+
+Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+
+        Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+	if (reductionVar != NULL) {
+		const char *resultName = reductionVar->getName();
+		VariableAccess *accessLog = new VariableAccess(resultName);
+		accessLog->markContentAccess();
+		accessLog->getContentAccessFlags()->flagAsReduced();
+		table->Enter(resultName, accessLog, true);
+	}
+
+        Hashtable<VariableAccess*> *rTable = right->getAccessedGlobalVariables(globalReferences);
+	List<Expr*> *rightFieldAccesses = new List<Expr*>;
+        right->retrieveExprByType(rightFieldAccesses, FIELD_ACC);
+        for (int i = 0; i < rightFieldAccesses->NumElements(); i++) {
+		FieldAccess *exprField = (FieldAccess*) rightFieldAccesses->Nth(i);
+                FieldAccess *rootField = exprField->getTerminalField();
+                if (rootField == NULL) continue;
+
+                const char *varName = rootField->getField()->getName();
+                VariableAccess *accessLog = rTable->Lookup(varName);
+
+                // if the field is not a task-global variable then we can ignore it 
+                if (accessLog == NULL) continue;
+
+                Type *fieldType = rootField->getType();
+                ArrayType *array = dynamic_cast<ArrayType*>(fieldType);
+
+                // if the field is not an array then its access flags are already set properly
+                if (array == NULL) continue;
+
+                // if the content of the array has been accessed then it should be flagged as read
+                if (accessLog->isContentAccessed()) {
+                        accessLog->getContentAccessFlags()->flagAsRead();
+                }
+        }
+
+        mergeAccessedVariables(table, rTable);
+        return table;
 }

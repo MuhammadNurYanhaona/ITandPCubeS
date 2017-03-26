@@ -13,11 +13,14 @@
 #include "ast_type.h"
 #include "../common/constant.h"
 #include "../../../common-libs/utils/list.h"
+#include "../../../common-libs/utils/hashtable.h"
 
 #include <fstream>
 #include <sstream>
 
 class Scope;
+class VariableAccess;
+class TaskGlobalReferences;
 
 class LibraryFunction : public Expr {
   protected:
@@ -56,6 +59,10 @@ class LibraryFunction : public Expr {
 	virtual void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+
+	// function interface inherited from the statement base-class to be used to validate access of
+	// task-global data structures from different LPSes 
+	virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };
 
 

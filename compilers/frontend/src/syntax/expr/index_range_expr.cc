@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -104,5 +105,25 @@ void IndexRange::performStageParamReplacement(
 	if (end != NULL) {
 		end->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	}
+}
+
+Hashtable<VariableAccess*> *IndexRange::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+        Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+        if (begin != NULL) {
+                table = begin->getAccessedGlobalVariables(globalReferences);
+        }
+        if (end != NULL) {
+                Hashtable<VariableAccess*> *eTable = end->getAccessedGlobalVariables(globalReferences);
+		Stmt::Stmt::mergeAccessedVariables(table, eTable);
+        }
+	Iterator<VariableAccess*> iter = table->GetIterator();
+        VariableAccess *accessLog;
+        while((accessLog = iter.GetNextValue()) != NULL) {
+                if(accessLog->isContentAccessed())
+                        accessLog->getContentAccessFlags()->flagAsRead();
+                if (accessLog->isMetadataAccessed())
+                        accessLog->getMetadataAccessFlags()->flagAsRead();
+        }
+        return table;
 }
 

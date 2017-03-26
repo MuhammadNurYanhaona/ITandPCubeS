@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -48,4 +49,8 @@ int Expr::emitScopeAndTypeErrors(Scope *scope) {
 }
 
 void Expr::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {}
+
+Hashtable<VariableAccess*> *Expr::getAccessedGlobalVariables(TaskGlobalReferences *globalRefs) {
+	return new Hashtable<VariableAccess*>;
+}
 

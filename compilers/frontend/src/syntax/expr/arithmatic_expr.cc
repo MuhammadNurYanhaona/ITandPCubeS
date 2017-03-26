@@ -6,6 +6,7 @@
 #include "../../common/constant.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -152,4 +153,21 @@ void ArithmaticExpr::performStageParamReplacement(
 
 	left->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
 	right->performStageParamReplacement(nameAdjustmentInstrMap, arrayAccXformInstrMap);
+}
+
+Hashtable<VariableAccess*> *ArithmaticExpr::getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+
+        Hashtable<VariableAccess*> *table = right->getAccessedGlobalVariables(globalReferences);
+        Hashtable<VariableAccess*> *lTable = left->getAccessedGlobalVariables(globalReferences);
+        Stmt::mergeAccessedVariables(table, lTable);
+
+        Iterator<VariableAccess*> iter = table->GetIterator();
+        VariableAccess *accessLog;
+        while((accessLog = iter.GetNextValue()) != NULL) {
+                if(accessLog->isContentAccessed())
+                        accessLog->getContentAccessFlags()->flagAsRead();
+                if (accessLog->isMetadataAccessed())
+                        accessLog->getMetadataAccessFlags()->flagAsRead();
+        }
+        return table;
 }

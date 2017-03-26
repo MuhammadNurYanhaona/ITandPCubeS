@@ -13,6 +13,8 @@ class ReductionVar;
 class Scope;
 class Type;
 class ParamReplacementConfig;
+class TaskGlobalReferences;
+class VariableAccess;
 
 class Stmt : public Node {
   public:
@@ -52,6 +54,15 @@ class Stmt : public Node {
 	virtual void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) = 0;
+
+	// One aspect of semantic analysis is to determine which task global variable been modified where. 
+	// This is needed to ensure that access to variables from specific LPSes are valid. In that regard, 
+	// statement class just facilitate a recursive analysis by invoking the access checking method in all 
+	// nested expressions. The Expr class does the actual heavy lifting.
+        virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs) = 0;
+	// A static utility routine added to help data access analysis done using the above interface method 
+        static void mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
+			Hashtable<VariableAccess*> *second);
 };
 
 class StmtBlock : public Stmt {
@@ -71,6 +82,7 @@ class StmtBlock : public Stmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 };
 
 class ConditionalStmt: public Stmt {
@@ -91,6 +103,7 @@ class ConditionalStmt: public Stmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 };
 
 class IfStmt: public Stmt {
@@ -110,6 +123,7 @@ class IfStmt: public Stmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 };
 
 class IndexRangeCondition: public Node {
@@ -135,6 +149,7 @@ class IndexRangeCondition: public Node {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 };
 
 class LoopStmt: public Stmt {
@@ -165,6 +180,7 @@ class PLoopStmt: public LoopStmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 };
 
 class SLoopAttribute {
@@ -204,6 +220,7 @@ class SLoopStmt: public LoopStmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 };
 
 class WhileStmt: public Stmt {
@@ -224,6 +241,7 @@ class WhileStmt: public Stmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 };
 
 class ReductionStmt: public Stmt {
@@ -252,6 +270,7 @@ class ReductionStmt: public Stmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 
   protected:
 	// The reduction operator can be used not only for inferring the type of the expression being reduced
@@ -286,6 +305,9 @@ class ExternCodeBlock: public Stmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {}
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+                return new Hashtable<VariableAccess*>;
+	}
 };
 
 class ReturnStmt: public Stmt {
@@ -309,6 +331,12 @@ class ReturnStmt: public Stmt {
 	void performStageParamReplacement(
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {}
+	
+	// there is no action for this also as a return statement is only meaningful inside a function which
+	// cannot directly access any task global variable
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
+                return new Hashtable<VariableAccess*>;
+	}
 };
 
 #endif

@@ -8,8 +8,10 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/data_access.h"
 #include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
@@ -159,5 +161,30 @@ void IndexRangeCondition::performStageParamReplacement(
 			dimensionNo = arrayPartConfig->getOrigDimension(dimensionNo);
 		}	
 	} 
+}
+
+Hashtable<VariableAccess*> *IndexRangeCondition::getAccessedGlobalVariables(
+                TaskGlobalReferences *globalReferences) {
+        Hashtable<VariableAccess*> *table = new Hashtable<VariableAccess*>;
+        if (globalReferences->doesReferToGlobal(collection->getName())) {
+                const char *referenceName = collection->getName();
+                const char *globalVar = globalReferences->getGlobalRoot(referenceName)->getName();
+                VariableAccess *accessLog = new VariableAccess(globalVar);
+                accessLog->markMetadataAccess();
+                accessLog->getMetadataAccessFlags()->flagAsRead();
+                table->Enter(globalVar, accessLog, true);
+        }
+        if (restrictions != NULL) {
+                Hashtable<VariableAccess*> *rTable =
+                                restrictions->getAccessedGlobalVariables(globalReferences);
+                Iterator<VariableAccess*> iter = rTable->GetIterator();
+                VariableAccess *accessLog;
+                while ((accessLog = iter.GetNextValue()) != NULL) {
+                        if (table->Lookup(accessLog->getName()) != NULL) {
+                                table->Lookup(accessLog->getName())->mergeAccessInfo(accessLog);
+                        } else table->Enter(accessLog->getName(), accessLog, true);
+                }
+        }
+        return table;
 }
 

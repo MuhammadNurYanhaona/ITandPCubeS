@@ -106,6 +106,9 @@ void LpsTransition::constructComputeFlow(CompositeStage *currCompStage, FlowStag
 	cnstrInfo->setGroupIndex(index);
 	cnstrInfo->enterSpace(currLps);
 
+	// assign the location of the current AST element to the flow-stage for later error checking purpose
+	currStage->assignLocation(GetLocation());
+
 	// add the newly created stage to the parent composite stage	
 	currCompStage->addStageAtEnd(currStage);
 
@@ -157,6 +160,9 @@ void ConditionalFlowBlock::constructComputeFlow(CompositeStage *currCompStage, F
 	currStage->setRepeatIndex(repeatBlock);
 	cnstrInfo->advanceLastStageIndex(); 
 	cnstrInfo->setGroupIndex(index);
+
+	// assign the location of the current AST element to the flow-stage for later error checking purpose
+	currStage->assignLocation(GetLocation());
 	
 	// add the newly created stage to the parent composite stage	
 	currCompStage->addStageAtEnd(currStage);
@@ -184,6 +190,9 @@ void EpochBlock::constructComputeFlow(CompositeStage *currCompStage, FlowStageCo
 	currStage->setRepeatIndex(repeatBlock);
 	cnstrInfo->advanceLastStageIndex(); 
 	cnstrInfo->setGroupIndex(index);
+
+	// assign the location of the current AST element to the flow-stage for later error checking purpose
+	currStage->assignLocation(GetLocation());
 	
 	// add the newly created stage to the parent composite stage	
 	currCompStage->addStageAtEnd(currStage);
@@ -305,6 +314,9 @@ void RepeatCycle::constructComputeFlow(CompositeStage *currCompStage, FlowStageC
 	cnstrInfo->advanceLastStageIndex(); 
 	cnstrInfo->setGroupIndex(index);
 	cnstrInfo->setRepeatBlockIndex(index);	// flagging of the change of the repeat block
+
+	// assign the location of the current AST element to the flow-stage for later error checking purpose
+	currStage->assignLocation(GetLocation());
 	
 	// add the newly created stage to the parent composite stage	
 	currCompStage->addStageAtEnd(currStage);

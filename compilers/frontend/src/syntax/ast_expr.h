@@ -17,6 +17,8 @@ class FieldAccess;
 class Space;
 class Scope;
 class ParamReplacementConfig;
+class VariableAccess;
+class TaskGlobalReferences;
 
 class Expr : public Stmt {
   protected:
@@ -63,6 +65,18 @@ class Expr : public Stmt {
 	virtual void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap) {}
+
+	// This function decides, as its name suggests, the global variables been accessed by the expression.
+        // It can track global arrays' reference assignments to some local variables and then indirect changes 
+	// to the global arrays through these local references. This analysis is required to determine if
+	// accessing a global variable is allowed from a compute stage to be executed on a particular LPS.
+        virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+
+	// This function finds out the root object within which an element been accessed or modified by some
+        // expression. It makes sense only for reduction var, array-access, and field-access type expression. 
+	// The function is however added to the common expression class to simplify any recursive base 
+	// variable identification process in those expression subclasses.
+        virtual const char *getBaseVarName() { return NULL; }
   protected:
 	// The type resolution function that subclasses should implement; this gets called only when the
 	// current expression type is NULL
@@ -187,6 +201,8 @@ class ReductionVar : public Expr {
 	int resolveExprTypes(Scope *scope);
 	int emitSemanticErrors(Scope *scope);
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+        const char *getBaseVarName() { return name; }
 };
 
 class ArithmaticExpr : public Expr {
@@ -211,6 +227,7 @@ class ArithmaticExpr : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };
 
 class LogicalExpr : public Expr {
@@ -237,6 +254,7 @@ class LogicalExpr : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };
 
 class EpochExpr : public Expr {
@@ -261,6 +279,8 @@ class EpochExpr : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+        const char *getBaseVarName() { return root->getBaseVarName(); }
 };
 
 class FieldAccess : public Expr {
@@ -303,6 +323,8 @@ class FieldAccess : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+        const char *getBaseVarName();
 };
 
 class RangeExpr : public Expr {
@@ -331,6 +353,7 @@ class RangeExpr : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };	
 
 class AssignmentExpr : public Expr {
@@ -356,6 +379,7 @@ class AssignmentExpr : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };
 
 class IndexRange : public Expr {
@@ -385,6 +409,7 @@ class IndexRange : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };
 
 class ArrayAccess : public Expr {
@@ -432,6 +457,8 @@ class ArrayAccess : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+        const char *getBaseVarName() { return base->getBaseVarName(); }
 
 	// tells if the current array access expression is the last index access in the chain of array
 	// indexes beginning at the base array
@@ -458,6 +485,7 @@ class FunctionCall : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };
 
 class NamedArgument : public Node {
@@ -544,6 +572,7 @@ class ObjectCreate : public Expr {
 	void performStageParamReplacement(
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
+	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
 };
 
 #endif
