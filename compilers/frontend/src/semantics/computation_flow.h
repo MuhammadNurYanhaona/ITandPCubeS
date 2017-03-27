@@ -15,6 +15,7 @@
 #include <fstream>
 
 class VariableAccess;
+class CompositeStage;
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
@@ -34,13 +35,17 @@ class FlowStage {
         int repeatIndex;
 
 	// an assigned location information for the flow stage to be used for error reporting purpose
-	yyltype *location;	
+	yyltype *location;
+
+	// a map that tracks use of task-global variables in the current flow stage
+	Hashtable<VariableAccess*> *accessMap;	
   public:
 	FlowStage(Space *space);
 	virtual ~FlowStage() {};
 	void setParent(FlowStage *parent) { this->parent = parent; }
 	FlowStage *getParent() { return parent; }
 	Space *getSpace() { return space; }
+	Hashtable<VariableAccess*> *getAccessMap();
 	void assignLocation(yyltype *location) { this->location = location; }
 	virtual void print(int indent) = 0;
 	
@@ -59,7 +64,24 @@ class FlowStage {
 	// global variable done from a flow stage is permitted in the LPS the stage is going to execute
 	// after validation it also produces an access-map from the activation condition and the code in case storing
 	// the access-map might be usefull
-	Hashtable<VariableAccess*> *validateDataAccess(Scope *taskScope, Expr *activationCond, Stmt *code);	
+	Hashtable<VariableAccess*> *validateDataAccess(Scope *taskScope, Expr *activationCond, Stmt *code);
+  public:
+	//------------------------------------------------------------------------ Helper functions for Static Analysis
+	
+	// functions related to sync stage implantation in the compute flow--------------------------------------------
+	// When the partition hierarchy has LPSes having sub-partitions, overlapping data structure partitions, etc.
+	// then the compiler needs to implant sync-stages after execution of stages in such LPSes. This is the first
+	// step of static analysis. This function does the implantation using a recursive process. 
+	virtual void implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList);
+  protected:	
+	// two utility functions needed for augmenting sync-stages in the computation flow
+	Hashtable<VariableAccess*> *getAccessLogsForSpaceInIndexLimit(Space *space, 
+			List<FlowStage*> *stageList, 
+			int startIndex, 
+			int endIndex, bool includeMentionedSpace);
+	Hashtable<VariableAccess*> *getAccessLogsForReturnToSpace(Space *space, 
+			List<FlowStage*> *stageList, int endIndex);
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 
@@ -89,14 +111,35 @@ class CompositeStage : public FlowStage {
   public:
 	CompositeStage(Space *space);
 	virtual ~CompositeStage() {}
-	void addStageAtBeginning(FlowStage *stage);
-	void addStageAtEnd(FlowStage *stage);
-	void insertStageAt(int index, FlowStage *stage);
-	void removeStageAt(int stageIndex);
 	void setStageList(List<FlowStage*> *stageList);
 	List<FlowStage*> *getStageList() { return stageList; }
 	virtual void print(int indent) {}
 	virtual void performDataAccessChecking(Scope *taskScope);
+
+	//------------------------------------------------------------------------ Helper functions for Static Analysis
+
+	void addStageAtBeginning(FlowStage *stage);
+	void addStageAtEnd(FlowStage *stage);
+	void insertStageAt(int index, FlowStage *stage);
+	void removeStageAt(int stageIndex);
+
+	// functions related to sync stage implantation in the compute flow--------------------------------------------
+	virtual void implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList);
+
+	bool isStageListEmpty();
+
+	// swaps the current flow-stage list with the argument flow-stage list and returns the old list
+	List<FlowStage*> *swapStageList(List<FlowStage*> *argList);
+
+	// thess two functions are needed for incremental re-construction of the flow-stage list of the current 
+	// composite stage 
+	Space *getLastNonSyncStagesSpace();
+	FlowStage *getLastNonSyncStage();
+
+	// these two functions embodies the logic of sync-stage implantation
+	void addSyncStagesBeforeExecution(FlowStage *nextStage, List<FlowStage*> *stageList);
+	void addSyncStagesOnReturn(List<FlowStage*> *stageList);
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A repeat control block is a composite stage being iterated over under the control of a repeat instruction.

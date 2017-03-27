@@ -353,6 +353,11 @@ class TaskDef : public Definition {
 	// the final round of semantic validation of the task is done here
 	void validateScope(Scope *parentScope);
 
+	 //-------------------------------------------------------------------- Helper functions for Static Analysis
+
+	// this function embodies all static analyses relevent to the context of a single task execution
+        void performStaticAnalysis();
+
   public:
 	// a static reference to the current task to facilitate access during different sub-phases of 
 	// semantic and static analyses

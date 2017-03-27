@@ -47,6 +47,7 @@ int main(int argc, const char *argv[]) {
         if (ReportError::NumErrors() > 0) return -1;	//-------------exit after syntax analysis
         ProgramDef::program->performScopeAndTypeChecking();
         if (ReportError::NumErrors() > 0) return -1;	//-----------exit after semantic analysis
+	ProgramDef::program->performStaticAnalysis();
         //***************************************************************************************
 }
 

@@ -89,6 +89,10 @@ class ProgramDef : public Definition {
 	void analyseCustomTypes();
 
 	List<Definition*> *getComponentsByType(DefTypeId typeId);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+	void performStaticAnalysis();
 };
 
 class TupleDef : public Definition {

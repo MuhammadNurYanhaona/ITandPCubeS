@@ -51,7 +51,7 @@ enum ExprTypeId { 	INT_CONST, FLOAT_CONST, DOUBLE_CONST,
                   	ASSIGN_EXPR, INDEX_RANGE, ARRAY_ACC, 
 			FN_CALL, TASK_INVOKE, OBJ_CREATE, LIB_FN_CALL };
 
-/*      Task global variables may be synchronized/retrieved in several cases. The cases are
+/*      Task global variables may be synchronized/retrieved in several cases. The cases are:
         Entrance: moving from a higher to a lower space
         Exit: exiting from a lower to higher space
         Return: returning from a lower to a higher space
@@ -59,7 +59,7 @@ enum ExprTypeId { 	INT_CONST, FLOAT_CONST, DOUBLE_CONST,
 */
 enum SyncStageType { Entrance_Sync, Exit_Sync, Return_Sync, Reappearance_Sync };
 
-/*      Depending on the type of sync stage synchronization need is different. Scenarios are
+/*      synchronization need differs base on the type of a sync-stage. The scenarios are:
         Load: need to read some data structures into a space
         Load_And_Configure: need to read data structures and also to update metadata of those structures
         Ghost_Region_Update: need to do padding region synchronization
@@ -76,12 +76,12 @@ enum RepeatCycleType { Range_Repeat, Condition_Repeat, Subpartition_Repeat };
 
 /*	The types in this enum are needed for polymorphic stage resolution. We update statements and 
 	expressions within a stage instanciation based on the argument expression types.
-	Evaluate_Before: says that the argument should be evaluated at the beginning of the stage and
-		a local variable with a name matching the parameter name should be created.
+	Evaluate_Before: says that the argument should be evaluated at the beginning of the stage and a 
+		local variable with a name matching the parameter name should be created.
 	No_Replacement: says that the argument and parameter names are the same and no change is needed.
 	Change_Name: says that field accesses of the parameter should be renamed to access the argument.
-	Update_Expr: is needed for arrays with sub-range expressions. All array element and metadata
-		accesses must be changed to alternative expressions appropriate for the argument.
+	Update_Expr: is needed for arrays with sub-range expressions. All array element and metadata accesses
+		must be changed to alternative expressions appropriate for the argument.
 */
 enum FieldReplacementType { Evaluate_Before, No_Replacement, Change_Name, Update_Expr };
 

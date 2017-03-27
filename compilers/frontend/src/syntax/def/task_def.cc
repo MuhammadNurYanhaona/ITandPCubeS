@@ -207,3 +207,18 @@ void TaskDef::validateScope(Scope *parentScope) {
 	// check access characteristics of task-global variables in the computation flow
 	computation->performDataAccessChecking(scope);
 } 
+
+// Note that the ordering of the function calls within the whole analysis procedure is important as 
+// there are internal depdendency among these analyses through their input/output data structures. 
+void TaskDef::performStaticAnalysis() {
+
+        Scope *scope = symbol->getNestedScope();
+
+        //------------------------------------------------------------------- Sync Stage Implantation
+	
+	// sync stages are implanted in-between LPS transition and compute stage execution to
+	// facilitate data dependency identification and resolution as the flow of control moves
+	// from stages to stages	
+	List<FlowStage*> *inProgressStageList = new List<FlowStage*>;
+	computation->implantSyncStagesInFlow(NULL, inProgressStageList);
+}

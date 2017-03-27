@@ -156,3 +156,14 @@ List<Definition*> *ProgramDef::getComponentsByType(DefTypeId typeId) {
 	}
 	return filteredList;
 }
+
+// Note that currently the static analysis phase is restricted to analyses of the component tasks.
+// We need to add static analyses of other components and also inter-component interactions when we
+// implement more advanced features, e.g., concurrent task executions, promised by the language. 
+void ProgramDef::performStaticAnalysis() {
+	List<Definition*> *taskDefs = getComponentsByType(TASK_DEF);
+        for (int i = 0; i < taskDefs->NumElements(); i++) {
+                TaskDef *taskDef = (TaskDef*) taskDefs->Nth(i);
+		taskDef->performStaticAnalysis();
+	}	
+}
