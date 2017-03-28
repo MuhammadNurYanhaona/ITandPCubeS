@@ -7,10 +7,13 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/task_space.h"
 #include "../../semantics/data_access.h"
+#include "../../semantics/computation_flow.h"
 #include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
+#include "../../../../common-libs/utils/string_utils.h"
 
 #include <iostream>
 #include <sstream>
@@ -29,6 +32,7 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
 	referenceField = false;
 	arrayField = false;
 	arrayDimensions = -1;
+	epochVersion = 0;
 }
 
 void FieldAccess::PrintChildren(int indentLevel) {
@@ -47,6 +51,7 @@ Node *FieldAccess::clone() {
 		newFieldAcc->flagAsReferenceField();
 	}
 	if (arrayField) newFieldAcc->flagAsArrayField(arrayDimensions);
+	newFieldAcc->setEpochVersion(epochVersion);
 	return newFieldAcc;
 }
 
@@ -221,8 +226,6 @@ int FieldAccess::emitSemanticErrors(Scope *scope) {
 	return errors;
 }
 
-
-
 void FieldAccess::retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList) {
 	if (base != NULL) {
 		base->retrieveTerminalFieldAccesses(fieldList);
@@ -316,5 +319,23 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
 const char *FieldAccess::getBaseVarName() {
         if (base == NULL) return field->getName();
         return base->getBaseVarName();
+}
+
+void FieldAccess::setEpochVersions(Space *space, int epoch) {
+        if (base == NULL) {
+                this->epochVersion = epoch;
+                DataStructure *structure = space->getStructure(field->getName());
+                if (structure != NULL) {
+                        structure->updateVersionCount(epoch);
+                        const char *globalVarName = structure->getName();
+                        if (epoch > 0) {
+                                List<const char*> *stageEpochList
+                                                = FlowStage::CurrentFlowStage->getEpochDependentVarList();
+                                if (!string_utils::contains(stageEpochList, globalVarName)) {
+                                        stageEpochList->Append(globalVarName);
+                                }
+                        }
+                }
+        } else base->setEpochVersions(space, epoch);
 }
 

@@ -222,5 +222,12 @@ void TaskDef::performStaticAnalysis() {
 	List<FlowStage*> *inProgressStageList = new List<FlowStage*>;
 	computation->implantSyncStagesInFlow(NULL, inProgressStageList);
 
+	//------------------------------------------------------------- Detailed Data Access Analyses
+        
+	// transfer variable access information to partition hierarchy to aid memory management
+        computation->calculateLPSUsageStatistics();
+	// determine how many versions of different data structures need to be maintained at runtime
+        computation->performEpochUsageAnalysis();
+
 	computation->print(0);
 }

@@ -198,3 +198,7 @@ Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobal
         mergeAccessedVariables(table, rTable);
         return table;
 }
+
+void ReductionStmt::analyseEpochDependencies(Space *space) {
+        right->analyseEpochDependencies(space);
+}

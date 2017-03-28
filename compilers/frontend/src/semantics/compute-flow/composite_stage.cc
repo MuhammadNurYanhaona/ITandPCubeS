@@ -12,6 +12,7 @@
 #include "../../static-analysis/sync_stage_implantation.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
+#include "../../../../common-libs/utils/string_utils.h"
 
 #include <iostream>
 #include <fstream>
@@ -249,6 +250,22 @@ void CompositeStage::addSyncStagesOnReturn(List<FlowStage*> *stageList) {
                 if (returnSync != NULL) {
                         addStageAtEnd(returnSync);
                 }
+        }
+}
+
+void CompositeStage::calculateLPSUsageStatistics() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->calculateLPSUsageStatistics();
+        }
+}
+
+void CompositeStage::performEpochUsageAnalysis() {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->performEpochUsageAnalysis();
+                List<const char*> *stageEpochList = stage->getEpochDependentVarList();
+                string_utils::combineLists(epochDependentVarList, stageEpochList);
         }
 }
 

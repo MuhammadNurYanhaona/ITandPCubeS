@@ -84,3 +84,8 @@ Hashtable<VariableAccess*> *WhileStmt::getAccessedGlobalVariables(
         mergeAccessedVariables(table, body->getAccessedGlobalVariables(globalReferences));
         return table;
 }
+
+void WhileStmt::analyseEpochDependencies(Space *space) {
+        body->analyseEpochDependencies(space);
+        condition->setEpochVersions(space, 0);
+}

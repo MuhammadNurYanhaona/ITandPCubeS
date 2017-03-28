@@ -127,3 +127,8 @@ Hashtable<VariableAccess*> *IndexRange::getAccessedGlobalVariables(TaskGlobalRef
         return table;
 }
 
+void IndexRange::setEpochVersions(Space *space, int epoch) {
+        if (begin != NULL) begin->setEpochVersions(space, epoch);
+        if (end != NULL) end->setEpochVersions(space, epoch);
+}
+

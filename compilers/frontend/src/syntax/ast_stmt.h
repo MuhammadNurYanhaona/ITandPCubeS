@@ -12,6 +12,7 @@ class Expr;
 class ReductionVar;
 class FieldAccess;
 class Scope;
+class Space;
 class Type;
 class ParamReplacementConfig;
 class TaskGlobalReferences;
@@ -64,6 +65,12 @@ class Stmt : public Node {
 	// A static utility routine added to help data access analysis done using the above interface method 
         static void mergeAccessedVariables(Hashtable<VariableAccess*> *first, 
 			Hashtable<VariableAccess*> *second);
+        
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+	// this interface is used to set up the proper epoch versions to all variables used in expressions 
+	// that are parts of a statement 
+        virtual void analyseEpochDependencies(Space *space) = 0;
 };
 
 class StmtBlock : public Stmt {
@@ -84,6 +91,10 @@ class StmtBlock : public Stmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class ConditionalStmt: public Stmt {
@@ -105,6 +116,10 @@ class ConditionalStmt: public Stmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class IfStmt: public Stmt {
@@ -125,6 +140,10 @@ class IfStmt: public Stmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class IndexRangeCondition: public Node {
@@ -151,6 +170,10 @@ class IndexRangeCondition: public Node {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class LoopStmt: public Stmt {
@@ -182,6 +205,10 @@ class PLoopStmt: public LoopStmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class SLoopAttribute {
@@ -222,6 +249,10 @@ class SLoopStmt: public LoopStmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class WhileStmt: public Stmt {
@@ -243,6 +274,10 @@ class WhileStmt: public Stmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class ReductionStmt: public Stmt {
@@ -278,6 +313,11 @@ class ReductionStmt: public Stmt {
 	// but also sometimes for inferring the type type of the result variable. This function embodies the
 	// logic of inferring a result variable type given the reduced expression type as an argument.
 	Type *inferResultTypeFromOpAndExprType(Type *exprType);
+
+  public:	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 class ExternCodeBlock: public Stmt {
@@ -309,6 +349,12 @@ class ExternCodeBlock: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
                 return new Hashtable<VariableAccess*>;
 	}
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+	// there is no meaningful implementation for any of these functions as an external code block is
+	// taken as a whole and applied in the generated code without any analysis from the IT compiler
+        void analyseEpochDependencies(Space *space) {}
 };
 
 class ReturnStmt: public Stmt {
@@ -338,6 +384,10 @@ class ReturnStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences) {
                 return new Hashtable<VariableAccess*>;
 	}
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+        void analyseEpochDependencies(Space *space);
 };
 
 #endif

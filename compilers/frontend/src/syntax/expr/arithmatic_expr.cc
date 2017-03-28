@@ -171,3 +171,8 @@ Hashtable<VariableAccess*> *ArithmaticExpr::getAccessedGlobalVariables(TaskGloba
         }
         return table;
 }
+
+void ArithmaticExpr::setEpochVersions(Space *space, int epoch) {
+        left->setEpochVersions(space, epoch);
+        right->setEpochVersions(space, epoch);
+}

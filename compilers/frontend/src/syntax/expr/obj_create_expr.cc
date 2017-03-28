@@ -215,3 +215,11 @@ Hashtable<VariableAccess*> *ObjectCreate::getAccessedGlobalVariables(TaskGlobalR
         }
         return table;
 }
+
+void ObjectCreate::setEpochVersions(Space *space, int epoch) {
+	for (int i = 0; i < initArgs->NumElements(); i++) {
+                NamedArgument *currentArg = initArgs->Nth(i);
+                Expr *argValue = currentArg->getValue();
+		argValue->setEpochVersions(space, 0);
+	}
+}

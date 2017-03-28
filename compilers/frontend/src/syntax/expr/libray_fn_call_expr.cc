@@ -135,6 +135,13 @@ Hashtable<VariableAccess*> *LibraryFunction::getAccessedGlobalVariables(TaskGlob
         return table;
 }
 
+void LibraryFunction::setEpochVersions(Space *space, int epoch) {
+        for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *expr = arguments->Nth(i);
+                expr->setEpochVersions(space, 0);
+        }
+}
+
 //-------------------------------------------------------------- Root -----------------------------------------------------------/
 
 int Root::resolveExprTypes(Scope *scope) {

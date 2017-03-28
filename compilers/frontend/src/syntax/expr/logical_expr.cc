@@ -171,3 +171,7 @@ Hashtable<VariableAccess*> *LogicalExpr::getAccessedGlobalVariables(TaskGlobalRe
         return table;
 }
 
+void LogicalExpr::setEpochVersions(Space *space, int epoch) {
+        if (left != NULL) left->setEpochVersions(space, epoch);
+        right->setEpochVersions(space, epoch);
+}

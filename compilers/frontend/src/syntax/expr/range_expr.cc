@@ -176,3 +176,9 @@ Hashtable<VariableAccess*> *RangeExpr::getAccessedGlobalVariables(TaskGlobalRefe
         return table;
 }
 
+void RangeExpr::setEpochVersions(Space *space, int epoch) {
+        range->setEpochVersions(space, epoch);
+        if (step != NULL) step->setEpochVersions(space, epoch);
+}
+
+

@@ -44,3 +44,7 @@ void StageInstanciation::populateAccessMapForSpaceLimit(Hashtable<VariableAccess
 	}
 }
 
+void StageInstanciation::performEpochUsageAnalysis() {
+        FlowStage::CurrentFlowStage = this;
+        code->analyseEpochDependencies(space);
+}

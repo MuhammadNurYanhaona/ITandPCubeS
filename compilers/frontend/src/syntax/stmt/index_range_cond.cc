@@ -188,3 +188,8 @@ Hashtable<VariableAccess*> *IndexRangeCondition::getAccessedGlobalVariables(
         return table;
 }
 
+void IndexRangeCondition::analyseEpochDependencies(Space *space) {
+        if (restrictions != NULL) {
+                restrictions->setEpochVersions(space, 0);
+        }
+}

@@ -62,3 +62,7 @@ int ReturnStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) 
 int ReturnStmt::emitScopeAndTypeErrors(Scope *scope) {
 	return expr->emitScopeAndTypeErrors(scope);
 }
+
+void ReturnStmt::analyseEpochDependencies(Space *space) {
+	expr->setEpochVersions(space, 0);	
+}

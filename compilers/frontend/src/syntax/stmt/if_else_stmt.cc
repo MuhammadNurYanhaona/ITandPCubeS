@@ -83,3 +83,11 @@ Hashtable<VariableAccess*> *IfStmt::getAccessedGlobalVariables(TaskGlobalReferen
         }
         return table;
 }
+
+void IfStmt::analyseEpochDependencies(Space *space) {
+        for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+                stmt->analyseEpochDependencies(space);
+        }
+}
+

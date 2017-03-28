@@ -91,3 +91,10 @@ Hashtable<VariableAccess*> *ConditionalStmt::getAccessedGlobalVariables(
         return table;
 }
 
+void ConditionalStmt::analyseEpochDependencies(Space *space) {
+        if (condition != NULL) {
+                condition->setEpochVersions(space, 0);
+        }
+        stmt->analyseEpochDependencies(space);
+}
+

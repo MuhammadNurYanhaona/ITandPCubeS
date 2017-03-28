@@ -83,3 +83,10 @@ Hashtable<VariableAccess*> *StmtBlock::getAccessedGlobalVariables(TaskGlobalRefe
         }
         return table;
 }
+
+void StmtBlock::analyseEpochDependencies(Space *space) {
+        for (int i = 0; i < stmts->NumElements(); i++) {
+                Stmt *stmt = stmts->Nth(i);
+                stmt->analyseEpochDependencies(space);
+        }
+}

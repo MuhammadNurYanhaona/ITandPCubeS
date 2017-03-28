@@ -30,6 +30,7 @@ class SyncStage : public FlowStage {
 	void performDataAccessChecking(Scope *taskScope) {}
 	void populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress,
                         Space *lps, bool includeLimiterLps) {}
+	void calculateLPSUsageStatistics() {}
 };
 
 /*      This is a utility class to keep track of the last point of entry to a space as flow of control moves from

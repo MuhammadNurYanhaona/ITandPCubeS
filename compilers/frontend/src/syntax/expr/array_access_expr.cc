@@ -195,3 +195,8 @@ bool ArrayAccess::isFinalIndexAccess() {
 	return (parentArrayAcc != NULL);
 }
 
+void ArrayAccess::setEpochVersions(Space *space, int epoch) {
+        base->setEpochVersions(space, epoch);
+        index->setEpochVersions(space, 0);
+}
+

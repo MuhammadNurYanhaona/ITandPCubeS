@@ -38,7 +38,12 @@ class FlowStage {
 	yyltype *location;
 
 	// a map that tracks use of task-global variables in the current flow stage
-	Hashtable<VariableAccess*> *accessMap;	
+	Hashtable<VariableAccess*> *accessMap;
+
+	// This list stores data structures used in epoch expressions inside the subflow/computation represented by 
+        // this flow stage. This information is later used to advance appropriate data structures' epoch version after
+        // the execution of the flow stage.
+        List<const char*> *epochDependentVarList;	
   public:
 	FlowStage(Space *space);
 	virtual ~FlowStage() {};
@@ -89,6 +94,26 @@ class FlowStage {
 			List<FlowStage*> *stageList, int endIndex);
 	
 	//-------------------------------------------------------------------------------------------------------------
+
+  public:
+	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
+	
+	// This routine mainly serves the purpose of annotating a task with information about different data structure 
+	// usage in different LPSes. This knowledge is important regarding data structure generation and memory 
+	// allocation for variables in any backend; 
+        virtual void calculateLPSUsageStatistics();
+
+	// A recursive process to determine how many versions of different data structures need to be maintained for
+        // epoch dependent calculations happening within the flow stages.
+        virtual void performEpochUsageAnalysis() {}
+
+	// a static reference to the current flow stage to be accessible from statements and expressions for any 
+	// recursive analysis of code the flow stage contains
+	static FlowStage *CurrentFlowStage;
+
+	List<const char*> *getEpochDependentVarList() { return epochDependentVarList; }
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 
@@ -117,6 +142,12 @@ class StageInstanciation : public FlowStage {
 	void populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress, 
 			Space *lps, bool includeLimiterLps);
 	
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
+        
+	void performEpochUsageAnalysis();
+
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -159,6 +190,13 @@ class CompositeStage : public FlowStage {
 	void addSyncStagesOnReturn(List<FlowStage*> *stageList);
 	
 	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
+        
+	virtual void calculateLPSUsageStatistics();
+        virtual void performEpochUsageAnalysis();
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A repeat control block is a composite stage being iterated over under the control of a repeat instruction.
@@ -171,6 +209,13 @@ class RepeatControlBlock : public CompositeStage {
 	RepeatControlBlock(Space *space, RepeatCycleType type, Expr *executeCond);
 	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
+	
+	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
+        
+	void calculateLPSUsageStatistics();
+        void performEpochUsageAnalysis();
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A conditional execution block represents a composite stage that has the nested sub-flow set to be executed
@@ -183,6 +228,13 @@ class ConditionalExecutionBlock : public CompositeStage {
 	ConditionalExecutionBlock(Space *space, Expr *executeCond);
 	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
+	
+	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
+        
+	void calculateLPSUsageStatistics();
+        void performEpochUsageAnalysis();
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	This represents a transition in the Computation flow of the task from an ancestor LPS to a descendent LPS.

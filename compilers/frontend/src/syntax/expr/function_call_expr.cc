@@ -130,3 +130,10 @@ Hashtable<VariableAccess*> *FunctionCall::getAccessedGlobalVariables(TaskGlobalR
         }        
         return table;
 }
+
+void FunctionCall::setEpochVersions(Space *space, int epoch) {
+        for (int i = 0; i < arguments->NumElements(); i++) {
+                Expr *expr = arguments->Nth(i);
+                expr->setEpochVersions(space, 0);
+        }
+}

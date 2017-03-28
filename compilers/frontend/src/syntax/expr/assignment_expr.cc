@@ -162,3 +162,8 @@ Hashtable<VariableAccess*> *AssignmentExpr::getAccessedGlobalVariables(TaskGloba
         return table;
 }
 
+void AssignmentExpr::setEpochVersions(Space *space, int epoch) {
+        left->setEpochVersions(space, epoch);
+        right->setEpochVersions(space, epoch);
+}
+

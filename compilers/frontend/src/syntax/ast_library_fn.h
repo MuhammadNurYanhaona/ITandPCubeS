@@ -63,6 +63,10 @@ class LibraryFunction : public Expr {
 	// function interface inherited from the statement base-class to be used to validate access of
 	// task-global data structures from different LPSes 
 	virtual Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	        
+	//---------------------------------------------------------------- Helper functions for Static Analysis
+        
+        virtual void setEpochVersions(Space *space, int epoch);
 };
 
 

@@ -122,3 +122,12 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(
         }
         return table;
 }
+
+void PLoopStmt::analyseEpochDependencies(Space *space) {
+        for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *cond = rangeConditions->Nth(i);
+                cond->analyseEpochDependencies(space);
+        }
+	body->analyseEpochDependencies(space);
+}
+

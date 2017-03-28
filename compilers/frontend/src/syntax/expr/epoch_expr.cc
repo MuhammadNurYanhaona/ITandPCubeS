@@ -80,3 +80,7 @@ Hashtable<VariableAccess*> *EpochExpr::getAccessedGlobalVariables(
         return root->getAccessedGlobalVariables(globalRefs);
 }
 
+void EpochExpr::setEpochVersions(Space *space, int oldEpochValue) {
+        root->setEpochVersions(space, lag);
+}
+

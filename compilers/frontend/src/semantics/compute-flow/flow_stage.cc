@@ -9,6 +9,7 @@
 #include "../../syntax/ast_expr.h"
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
+#include "../../static-analysis/usage_statistic.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -17,10 +18,13 @@
 
 //---------------------------------------------------------- Flow Stage ---------------------------------------------------------/
 
+FlowStage *FlowStage::CurrentFlowStage = NULL;
+
 FlowStage::FlowStage(Space *space) {
         this->space = space;
         this->parent = NULL;
 	this->accessMap = new Hashtable<VariableAccess*>;
+	this->epochDependentVarList = new List<const char*>;
 }
 
 Hashtable<VariableAccess*> *FlowStage::getAccessMap() { return accessMap; }
@@ -106,5 +110,24 @@ Hashtable<VariableAccess*> *FlowStage::getAccessLogsForReturnToSpace(Space *spac
 		stage->populateAccessMapForSpaceLimit(accessLogs, space, false);
         }
         return accessLogs;
+}
+
+void FlowStage::calculateLPSUsageStatistics() {
+        
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+        VariableAccess *accessLog;
+        while ((accessLog = iterator.GetNextValue()) != NULL) {
+                if (!accessLog->isContentAccessed()) continue;
+                const char *varName = accessLog->getName();
+                DataStructure *structure = space->getLocalStructure(varName);
+                AccessFlags *accessFlags = accessLog->getContentAccessFlags();
+                LPSVarUsageStat *usageStat = structure->getUsageStat();
+                if (accessFlags->isRead() || accessFlags->isWritten()) {
+                        usageStat->addAccess();
+                }
+                if (accessFlags->isReduced()) {
+                        usageStat->flagReduced();
+                }
+        }
 }
 

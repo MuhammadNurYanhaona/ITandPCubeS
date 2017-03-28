@@ -91,6 +91,16 @@ class Expr : public Stmt {
 
 	// function to print and count any scope, type, and other semantic errors in an expression
 	virtual int emitSemanticErrors(Scope *scope) { return 0; }
+	
+  public:
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+	
+	// Following two functions are used to determine what version number to be used for epoch dependent
+        // variables in any particular expression. They also update the epoch counter in the LPS referene if
+        // an epoch dependent variable is a task-global data structure. Sub-classes should provide override
+	// for the second function as needed.
+        void analyseEpochDependencies(Space *space) { setEpochVersions(space, 0); }
+        virtual void setEpochVersions(Space *space, int epoch) {}
 };
 
 class IntConstant : public Expr {
@@ -228,6 +238,10 @@ class ArithmaticExpr : public Expr {
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 class LogicalExpr : public Expr {
@@ -255,6 +269,10 @@ class LogicalExpr : public Expr {
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 class EpochExpr : public Expr {
@@ -281,6 +299,10 @@ class EpochExpr : public Expr {
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
         const char *getBaseVarName() { return root->getBaseVarName(); }
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 class FieldAccess : public Expr {
@@ -296,6 +318,10 @@ class FieldAccess : public Expr {
 	// of the array
 	bool arrayField;
 	int arrayDimensions; 
+
+	// If the field is epoch dependent then we need to know which particular version of the field to be 
+	// used during generating code for this field access. The default version number is zero. 
+        int epochVersion;
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Field-Access"; }
@@ -325,6 +351,11 @@ class FieldAccess : public Expr {
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
         const char *getBaseVarName();
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
+	void setEpochVersion(int epoch) { this->epochVersion = epoch; }
 };
 
 class RangeExpr : public Expr {
@@ -354,6 +385,10 @@ class RangeExpr : public Expr {
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };	
 
 class AssignmentExpr : public Expr {
@@ -380,6 +415,10 @@ class AssignmentExpr : public Expr {
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 class IndexRange : public Expr {
@@ -410,6 +449,10 @@ class IndexRange : public Expr {
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 class ArrayAccess : public Expr {
@@ -463,6 +506,10 @@ class ArrayAccess : public Expr {
 	// tells if the current array access expression is the last index access in the chain of array
 	// indexes beginning at the base array
 	bool isFinalIndexAccess();
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 class FunctionCall : public Expr {
@@ -486,6 +533,10 @@ class FunctionCall : public Expr {
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 class NamedArgument : public Node {
@@ -573,6 +624,10 @@ class ObjectCreate : public Expr {
                         Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
                         Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+        
+	void setEpochVersions(Space *space, int epoch);
 };
 
 #endif

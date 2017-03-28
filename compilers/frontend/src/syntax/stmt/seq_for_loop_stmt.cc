@@ -193,4 +193,9 @@ Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
         return table;
 }
 
-
+void SLoopStmt::analyseEpochDependencies(Space *space) {
+        rangeExpr->setEpochVersions(space, 0);
+        if (stepExpr != NULL) stepExpr->setEpochVersions(space, 0);
+        if (restriction != NULL) restriction->setEpochVersions(space, 0);
+	body->analyseEpochDependencies(space);
+}

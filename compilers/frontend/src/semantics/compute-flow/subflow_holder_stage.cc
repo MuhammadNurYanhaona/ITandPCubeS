@@ -36,6 +36,39 @@ void RepeatControlBlock::print(int indentLevel) {
 	CompositeStage::print(indentLevel);
 }
 
+void RepeatControlBlock::calculateLPSUsageStatistics() {
+	
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+        VariableAccess *accessLog;
+        
+	while ((accessLog = iterator.GetNextValue()) != NULL) {
+                if (!accessLog->isContentAccessed()) continue;
+                const char *varName = accessLog->getName();
+                DataStructure *structure = space->getLocalStructure(varName);
+                AccessFlags *accessFlags = accessLog->getContentAccessFlags();
+                LPSVarUsageStat *usageStat = structure->getUsageStat();
+
+                // As repeat condition is supposed to be evaluated multiple times, any data structure been used
+                // here should be marked as multiple access. Thus we add access information twice.
+                if (accessFlags->isRead() || accessFlags->isWritten()) {
+                        usageStat->addAccess();
+                        usageStat->addAccess();
+                }
+        }
+
+        // Two calls have been made for evaluating the usage statistics in nested computation stages assuming 
+	// that a repeat cycle will executes at least twice, and two calls are sufficient to flag multiple 
+	// accesses to data structures nested within the repeat block.
+        CompositeStage::calculateLPSUsageStatistics();
+        CompositeStage::calculateLPSUsageStatistics();
+}
+
+void RepeatControlBlock::performEpochUsageAnalysis() {
+        CompositeStage::performEpochUsageAnalysis();
+        FlowStage::CurrentFlowStage = this;
+        condition->setEpochVersions(space, 0);
+}
+
 //-------------------------------------------------- Condititional Execution Block ----------------------------------------------/
 
 ConditionalExecutionBlock::ConditionalExecutionBlock(Space *space, 
@@ -54,6 +87,30 @@ void ConditionalExecutionBlock::print(int indentLevel) {
         std::cout << indent.str() << "Conditional Execution: ";
 	std::cout << "(Space " << space->getName() << ")\n";
         CompositeStage::print(indentLevel);
+}
+
+void ConditionalExecutionBlock::calculateLPSUsageStatistics() {
+	
+	Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+        VariableAccess *accessLog;
+        
+	while ((accessLog = iterator.GetNextValue()) != NULL) {
+                if (!accessLog->isContentAccessed()) continue;
+                const char *varName = accessLog->getName();
+                DataStructure *structure = space->getLocalStructure(varName);
+                AccessFlags *accessFlags = accessLog->getContentAccessFlags();
+                LPSVarUsageStat *usageStat = structure->getUsageStat();
+                if (accessFlags->isRead() || accessFlags->isWritten()) {
+                        usageStat->addAccess();
+                }
+        }
+        CompositeStage::calculateLPSUsageStatistics();
+}
+
+void ConditionalExecutionBlock::performEpochUsageAnalysis() {
+        CompositeStage::performEpochUsageAnalysis();
+        FlowStage::CurrentFlowStage = this;
+        condition->setEpochVersions(space, 0);
 }
 
 //------------------------------------------------------ LPS Transition Block ---------------------------------------------------/
