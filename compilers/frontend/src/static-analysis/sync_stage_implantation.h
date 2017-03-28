@@ -7,6 +7,7 @@
 #include "../semantics/data_access.h"
 #include "../semantics/computation_flow.h"
 #include "../../../common-libs/utils/list.h"
+#include "../../../common-libs/utils/hashtable.h"
 
 /*-------------------------------------------------------------------------------------------------------------------------      
 	Sync stages are automatically added to the user specified computation flow during static analysis. Sync 
@@ -21,12 +22,14 @@ class SyncStage : public FlowStage {
         SyncStageType type;
   public:
         SyncStage(Space *space, SyncMode mode, SyncStageType type);
-	void print(int indent) {}
+	void print(int indent);
         int populateAccessMap(List<VariableAccess*> *accessLogs, 
 		bool filterOutNonReads, bool filterOutNonWritten);
 	void addAccessInfo(VariableAccess *accessLog);
         bool isLoaderSync() { return (mode == Load || mode == Load_And_Configure); }
 	void performDataAccessChecking(Scope *taskScope) {}
+	void populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress,
+                        Space *lps, bool includeLimiterLps) {}
 };
 
 /*      This is a utility class to keep track of the last point of entry to a space as flow of control moves from

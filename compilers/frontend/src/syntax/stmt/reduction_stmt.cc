@@ -159,6 +159,14 @@ Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobal
 		accessLog->markContentAccess();
 		accessLog->getContentAccessFlags()->flagAsReduced();
 		table->Enter(resultName, accessLog, true);
+	} else {
+		const char *fieldName = left->getName();
+		if (globalReferences->doesReferToGlobal(fieldName)) {	
+			VariableAccess *accessLog = new VariableAccess(fieldName);
+			accessLog->markContentAccess();
+			accessLog->getContentAccessFlags()->flagAsWritten();
+			table->Enter(fieldName, accessLog, true);
+		}
 	}
 
         Hashtable<VariableAccess*> *rTable = right->getAccessedGlobalVariables(globalReferences);

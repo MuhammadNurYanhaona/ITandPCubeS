@@ -89,12 +89,7 @@ Hashtable<VariableAccess*> *FlowStage::getAccessLogsForSpaceInIndexLimit(Space *
         Hashtable<VariableAccess*> *accessLogs = new Hashtable<VariableAccess*>;
         for (int i = startIndex; i <= endIndex; i++) {
                 FlowStage *stage = stageList->Nth(i);
-                Space *stageSpace = stage->getSpace();
-                if (stageSpace->isParentSpace(space)) {
-                        Stmt::mergeAccessedVariables(accessLogs, stage->getAccessMap());
-                } else if (stageSpace == space && includeMentionedSpace) {
-                        Stmt::mergeAccessedVariables(accessLogs, stage->getAccessMap());
-                }
+		stage->populateAccessMapForSpaceLimit(accessLogs, space, includeMentionedSpace);	
         }
         return accessLogs;
 }
@@ -108,7 +103,7 @@ Hashtable<VariableAccess*> *FlowStage::getAccessLogsForReturnToSpace(Space *spac
                 FlowStage *stage = stageList->Nth(i);
                 Space *stageSpace = stage->getSpace();
                 if (!stageSpace->isParentSpace(space)) break;
-                Stmt::mergeAccessedVariables(accessLogs, stage->getAccessMap());
+		stage->populateAccessMapForSpaceLimit(accessLogs, space, false);
         }
         return accessLogs;
 }

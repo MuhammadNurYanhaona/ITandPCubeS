@@ -69,10 +69,16 @@ class FlowStage {
 	//------------------------------------------------------------------------ Helper functions for Static Analysis
 	
 	// functions related to sync stage implantation in the compute flow--------------------------------------------
+	
 	// When the partition hierarchy has LPSes having sub-partitions, overlapping data structure partitions, etc.
 	// then the compiler needs to implant sync-stages after execution of stages in such LPSes. This is the first
 	// step of static analysis. This function does the implantation using a recursive process. 
 	virtual void implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList);
+
+	// this function is needed to retrieve information about task-global variable accesses done from a given LPS
+	// or from its descendent LPSes within the current flow-stage
+	virtual void populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress, 
+			Space *lps, bool includeLimiterLps) = 0;
   protected:	
 	// two utility functions needed for augmenting sync-stages in the computation flow
 	Hashtable<VariableAccess*> *getAccessLogsForSpaceInIndexLimit(Space *space, 
@@ -81,6 +87,7 @@ class FlowStage {
 			int endIndex, bool includeMentionedSpace);
 	Hashtable<VariableAccess*> *getAccessLogsForReturnToSpace(Space *space, 
 			List<FlowStage*> *stageList, int endIndex);
+	
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -100,8 +107,17 @@ class StageInstanciation : public FlowStage {
 	void setName(const char *name) { this->name = name; }
 	const char *getName() { return name; }
 	Scope *getScope() { return scope; }
-	void print(int indent) {}
+	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
+	
+	//------------------------------------------------------------------------ Helper functions for Static Analysis
+	
+	// functions related to sync stage implantation in the compute flow--------------------------------------------
+	
+	void populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress, 
+			Space *lps, bool includeLimiterLps);
+	
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A composite stage is a holder of other flow stages and control blocks as a sub-flow. */
@@ -113,7 +129,7 @@ class CompositeStage : public FlowStage {
 	virtual ~CompositeStage() {}
 	void setStageList(List<FlowStage*> *stageList);
 	List<FlowStage*> *getStageList() { return stageList; }
-	virtual void print(int indent) {}
+	virtual void print(int indent);
 	virtual void performDataAccessChecking(Scope *taskScope);
 
 	//------------------------------------------------------------------------ Helper functions for Static Analysis
@@ -124,8 +140,10 @@ class CompositeStage : public FlowStage {
 	void removeStageAt(int stageIndex);
 
 	// functions related to sync stage implantation in the compute flow--------------------------------------------
+	
 	virtual void implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList);
-
+	void populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress, 
+			Space *lps, bool includeLimiterLps);
 	bool isStageListEmpty();
 
 	// swaps the current flow-stage list with the argument flow-stage list and returns the old list
@@ -139,6 +157,7 @@ class CompositeStage : public FlowStage {
 	// these two functions embodies the logic of sync-stage implantation
 	void addSyncStagesBeforeExecution(FlowStage *nextStage, List<FlowStage*> *stageList);
 	void addSyncStagesOnReturn(List<FlowStage*> *stageList);
+	
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -150,7 +169,7 @@ class RepeatControlBlock : public CompositeStage {
 	RepeatCycleType type;
   public:
 	RepeatControlBlock(Space *space, RepeatCycleType type, Expr *executeCond);
-	void print(int indent) {}
+	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
 };
 
@@ -162,7 +181,7 @@ class ConditionalExecutionBlock : public CompositeStage {
 	Expr *condition;
   public:
 	ConditionalExecutionBlock(Space *space, Expr *executeCond);
-	void print(int indent) {}
+	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
 };
 
@@ -173,7 +192,7 @@ class LpsTransitionBlock : public CompositeStage {
 	Space *ancestorSpace;
   public:
 	LpsTransitionBlock(Space *space, Space *ancestorSpace);		
-	void print(int indent) {}
+	void print(int indent);
 };
 
 /*	This represents a sub-flow boundary at the end of which the versions of all multi-version data structures
@@ -182,7 +201,7 @@ class LpsTransitionBlock : public CompositeStage {
 class EpochBoundaryBlock : public CompositeStage {
   public:
 	EpochBoundaryBlock(Space *space);	
-	void print(int indent) {}
+	void print(int indent);
 };
 
 #endif

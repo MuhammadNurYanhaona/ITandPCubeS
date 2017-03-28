@@ -28,6 +28,14 @@ void RepeatControlBlock::performDataAccessChecking(Scope *taskScope) {
 	CompositeStage::performDataAccessChecking(taskScope);
 }
 
+void RepeatControlBlock::print(int indentLevel) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	std::cout << indent.str() << "Repition: ";
+	std::cout << "(Space " << space->getName() << ")\n";
+	CompositeStage::print(indentLevel);
+}
+
 //-------------------------------------------------- Condititional Execution Block ----------------------------------------------/
 
 ConditionalExecutionBlock::ConditionalExecutionBlock(Space *space, 
@@ -40,12 +48,33 @@ void ConditionalExecutionBlock::performDataAccessChecking(Scope *taskScope) {
         CompositeStage::performDataAccessChecking(taskScope);
 }
 
+void ConditionalExecutionBlock::print(int indentLevel) {
+        std::ostringstream indent;
+        for (int i = 0; i < indentLevel; i++) indent << '\t';
+        std::cout << indent.str() << "Conditional Execution: ";
+	std::cout << "(Space " << space->getName() << ")\n";
+        CompositeStage::print(indentLevel);
+}
+
 //------------------------------------------------------ LPS Transition Block ---------------------------------------------------/
 
 LpsTransitionBlock::LpsTransitionBlock(Space *space, Space *ancestorSpace) : CompositeStage(space) {
 	this->ancestorSpace = ancestorSpace;	
 }
 
+void LpsTransitionBlock::print(int indentLevel) {
+        std::ostringstream indent;
+        CompositeStage::print(indentLevel - 1);
+}
+
 //-----------------------------------------------------  Epoch Boundary Block ---------------------------------------------------/
 
 EpochBoundaryBlock::EpochBoundaryBlock(Space *space) : CompositeStage(space) {}
+
+void EpochBoundaryBlock::print(int indentLevel) {
+        std::ostringstream indent;
+        for (int i = 0; i < indentLevel; i++) indent << '\t';
+        std::cout << indent.str() << "Epoch Boundary: ";
+	std::cout << "(Space " << space->getName() << ")\n";
+        CompositeStage::print(indentLevel);
+}

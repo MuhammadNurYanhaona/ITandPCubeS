@@ -221,4 +221,6 @@ void TaskDef::performStaticAnalysis() {
 	// from stages to stages	
 	List<FlowStage*> *inProgressStageList = new List<FlowStage*>;
 	computation->implantSyncStagesInFlow(NULL, inProgressStageList);
+
+	computation->print(0);
 }

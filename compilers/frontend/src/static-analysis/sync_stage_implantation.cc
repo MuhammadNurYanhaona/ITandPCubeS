@@ -17,6 +17,30 @@ SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStag
 	this->type = type;
 }
 
+void SyncStage::print(int indentLevel) {
+        std::ostringstream indent;
+        for (int i = 0; i < indentLevel; i++) indent << '\t';
+        std::cout << indent.str() << "Sync Stage: ";
+        std::cout << "(Space " << space->getName() << ")\n"; 
+        std::cout << indent.str() << "Mode: ";
+	if (mode == Load) {
+		std::cout << "Load";
+	} else if (mode == Load_And_Configure) {
+		std::cout << "Load and Configure";
+	} else if (mode == Ghost_Region_Update) {
+		std::cout << "Update Ghost Region";
+	} else {
+		std::cout << "Restore";
+	}
+	std::cout << "\n"; 
+	Iterator<VariableAccess*> iter = accessMap->GetIterator();
+        VariableAccess* accessLog;
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                accessLog->printAccessDetail(indentLevel + 1);
+        }
+
+}
+
 int SyncStage::populateAccessMap(List<VariableAccess*> *accessLogs,
                 bool filterOutNonReads, bool filterOutNonWritten) {
         int count = 0;

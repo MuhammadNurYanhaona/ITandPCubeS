@@ -10,6 +10,7 @@
 
 class Expr;
 class ReductionVar;
+class FieldAccess;
 class Scope;
 class Type;
 class ParamReplacementConfig;
@@ -250,7 +251,7 @@ class ReductionStmt: public Stmt {
         ReductionOperator op;
         Expr *right;
 
-	// Having a non-null reduction variable associated means this reduction statement's result should
+	// Having a non-NULL reduction variable associated means this reduction statement's result should
 	// be shared among all the LPUs descending from the same ancestor LPU in the LPS indicated by the 
 	// reduction variable. If this is NULL then the reduction statement should evaluate locally in each 
 	// LPU. 

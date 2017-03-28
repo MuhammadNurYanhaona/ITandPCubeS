@@ -22,6 +22,13 @@ CompositeStage::CompositeStage(Space *space) : FlowStage(space) {
 	this->stageList = new List<FlowStage*>;
 }
 
+void CompositeStage::print(int indentLevel) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+		stage->print(indentLevel + 1);
+	}
+}
+
 void CompositeStage::addStageAtBeginning(FlowStage *stage) {
         stageList->InsertAt(stage, 0);
         stage->setParent(this);
@@ -102,6 +109,19 @@ void CompositeStage::implantSyncStagesInFlow(CompositeStage *containerStage, Lis
 	// might be a need for sync-stage implantation before exit; so take care of that
 	addSyncStagesOnReturn(currStageList);	
 }
+
+void CompositeStage::populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress,
+                Space *lps, bool includeLimiterLps) {
+
+        if (space->isParentSpace(lps) || (lps == space && includeLimiterLps)) {
+                Stmt::mergeAccessedVariables(accessMapInProgress, accessMap);
+		for (int i = 0; i < stageList->NumElements(); i++) {
+			FlowStage *stage = stageList->Nth(i);
+			stage->populateAccessMapForSpaceLimit(accessMapInProgress, lps, includeLimiterLps);
+		}	
+        }
+}
+
 
 void CompositeStage::addSyncStagesBeforeExecution(FlowStage *nextStage, List<FlowStage*> *stageList) {
 

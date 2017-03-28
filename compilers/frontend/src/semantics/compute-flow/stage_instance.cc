@@ -25,3 +25,22 @@ void StageInstanciation::performDataAccessChecking(Scope *taskScope) {
 	accessMap = validateDataAccess(taskScope, NULL, code);
 }
 
+void StageInstanciation::print(int indentLevel) {
+	std::ostringstream indent;
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	std::cout << indent.str() << "Stage Invocation: " << name << " "; 
+	std::cout << "(Space " << space->getName() << ")\n";
+        Iterator<VariableAccess*> iter = accessMap->GetIterator();
+        VariableAccess* accessLog;
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                accessLog->printAccessDetail(indentLevel + 1);
+        }
+}
+
+void StageInstanciation::populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress,
+		Space *lps, bool includeLimiterLps) {
+	if (space->isParentSpace(lps) || (lps == space && includeLimiterLps)) {
+		Stmt::mergeAccessedVariables(accessMapInProgress, accessMap);
+	}
+}
+
