@@ -249,11 +249,16 @@ void TaskDef::performStaticAnalysis() {
 	// generate metadata about reduction statements found in the computation 
 	PartitionHierarchy *lpsHierarchy = partition->getPartitionHierarchy();
         computation->populateReductionMetadata(lpsHierarchy);
-	// expand the computation flow to make all LPS transitions explicit; this will simplify
-	// identification of reduction boundary stages
-	computation->makeAllLpsTransitionsExplicit();
-
-	computation->print(0);
+	// insert reduction boundary stages in the computation flow
+	computation->upliftReductionInstrs();
+	// again populate reduction metadata in compute stage instances as the uplifting process
+	// remove the previous metadata
+        computation->populateReductionMetadata(lpsHierarchy);
+	// presumably new stages have been added to the flow; so correct different indexes of the
+	// flow stages
+	computation->assignIndexAndGroupNo(0, -1, -1);
+	// then validate the usage of reduction results
+	computation->validateReductions();
 }
 
 List<VariableAccess*> *TaskDef::getAccessLogOfEnvVariables() {

@@ -9,6 +9,7 @@
 #include "../../syntax/ast_expr.h"
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -34,6 +35,22 @@ void RepeatControlBlock::print(int indentLevel) {
 	std::cout << indent.str() << "Repition: ";
 	std::cout << "(Space " << space->getName() << ")\n";
 	CompositeStage::print(indentLevel);
+}
+
+int RepeatControlBlock::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle) {
+
+        this->index = currentIndex;
+        this->groupNo = currentGroupNo;
+        this->repeatIndex = currentRepeatCycle;
+
+        int nextIndex = currentIndex + 1;
+        int nextRepeatIndex = currentRepeatCycle + 1;
+
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                nextIndex = stage->assignIndexAndGroupNo(nextIndex, this->index, nextRepeatIndex);
+        }
+        return nextIndex;
 }
 
 void RepeatControlBlock::calculateLPSUsageStatistics() {
@@ -84,6 +101,17 @@ void RepeatControlBlock::fillInTaskEnvAccessList(List<VariableAccess*> *envAcces
 void RepeatControlBlock::prepareTaskEnvStat(TaskEnvStat *taskStat) {
         FlowStage::prepareTaskEnvStat(taskStat);
         CompositeStage::prepareTaskEnvStat(taskStat);
+}
+
+List<ReductionMetadata*> *RepeatControlBlock::upliftReductionInstrs() {
+	List<ReductionMetadata*> *upliftedReductions = CompositeStage::upliftReductionInstrs();
+	for (int i = 0; i < upliftedReductions->NumElements(); i++) {
+		ReductionMetadata *metadata = upliftedReductions->Nth(i);
+		const char *variable = metadata->getResultVar();
+		const char *reductionRootLps = metadata->getReductionRootLps()->getName();
+		ReportError::ReductionEscapingRepeatCycle(location, variable, reductionRootLps, false);
+	}
+	return NULL;
 }
 
 //-------------------------------------------------- Condititional Execution Block ----------------------------------------------/
@@ -171,4 +199,37 @@ void EpochBoundaryBlock::print(int indentLevel) {
         std::cout << indent.str() << "Epoch Boundary: ";
 	std::cout << "(Space " << space->getName() << ")\n";
         CompositeStage::print(indentLevel);
+}
+
+//---------------------------------------------------  Reduction Boundary Block -------------------------------------------------/
+
+ReductionBoundaryBlock::ReductionBoundaryBlock(Space *space) : CompositeStage(space) {
+	this->assignedReductions = NULL;
+}
+
+void ReductionBoundaryBlock::print(int indentLevel) {
+        std::ostringstream indent;
+        for (int i = 0; i < indentLevel; i++) indent << '\t';
+        std::cout << indent.str() << "Reduction Boundary { ";
+        std::cout << "(Space " << space->getName() << ")\n";
+        CompositeStage::print(indentLevel);
+	std::cout << indent.str() << "} // end of reduction " << "\n"; 
+}
+
+void ReductionBoundaryBlock::assignReductions(List<ReductionMetadata*> *reductionList) {
+	this->assignedReductions = reductionList;
+}
+
+void ReductionBoundaryBlock::validateReductions() {
+	for (int i = 0; i < assignedReductions->NumElements(); i++) {
+		ReductionMetadata *metadata = assignedReductions->Nth(i);
+		const char *resultVar = metadata->getResultVar();
+		StageInstanciation *executorStage = metadata->getExecutorStage();
+		FlowStage *lastAccessor = getLastAccessorStage(resultVar);
+		if (executorStage != lastAccessor) {
+			ReportError::ReductionVarUsedBeforeReady(lastAccessor->getLocation(), 
+				resultVar, space->getName(), false);
+		}
+	}
+	CompositeStage::validateReductions();
 }

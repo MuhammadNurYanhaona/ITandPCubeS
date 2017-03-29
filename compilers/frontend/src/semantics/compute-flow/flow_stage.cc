@@ -25,9 +25,9 @@ FlowStage *FlowStage::CurrentFlowStage = NULL;
 FlowStage::FlowStage(Space *space) {
         this->space = space;
         this->parent = NULL;
+	this->location = NULL;
 	this->accessMap = new Hashtable<VariableAccess*>;
 	this->epochDependentVarList = new List<const char*>;
-	this->nestedReductions = new List<ReductionMetadata*>;
 }
 
 Hashtable<VariableAccess*> *FlowStage::getAccessMap() { return accessMap; }
@@ -89,6 +89,13 @@ Space *FlowStage::getCommonIntermediateLps(FlowStage *container, FlowStage *cont
 		currentLps = currentLps->getParent();
 	}
 	return nextLevelLps;
+}
+
+int FlowStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle) {
+        this->index = currentIndex;
+        this->groupNo = currentGroupNo;
+        this->repeatIndex = currentRepeatCycle;
+        return currentIndex + 1;
 }
 
 void FlowStage::implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList) {
@@ -203,10 +210,3 @@ void FlowStage::prepareTaskEnvStat(TaskEnvStat *taskStat) {
                 }
         }
 }
-
-void FlowStage::extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {
-        if (nestedReductions != NULL) {
-                reductionInfos->AppendAll(nestedReductions);
-        }
-}
-

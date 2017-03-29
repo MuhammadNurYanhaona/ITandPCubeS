@@ -4,6 +4,7 @@
 #include "../common/location.h"
 #include "../common/constant.h"
 #include "../semantics/task_space.h"
+#include "../semantics/computation_flow.h"
 
 /*      If a Execution-Stage has a reduction operation then some setup and tear down of auxiliary variables need to be
         done by the surrounding Compound-Stage before and after of the former stage. Furthermore, any synchronization
@@ -20,6 +21,9 @@ class ReductionMetadata {
 
         // this attribute is only needed for error reporting on invalid reduction operations
         yyltype *location;
+
+	// this is another attribute needed for reduction validation and error reporting
+	StageInstanciation *executorStage;
   public:
         ReductionMetadata(const char *resultVar,
                         ReductionOperator opCode,
@@ -36,6 +40,8 @@ class ReductionMetadata {
         Space *getReductionRootLps() { return reductionRootLps; }
         Space *getReductionExecutorLps() { return reductionExecutorLps; }
         yyltype *getLocation() { return location; }
+	void setExecutorStage(StageInstanciation *stage) { this->executorStage = stage; }
+	StageInstanciation *getExecutorStage() { return executorStage; }
 
         // A reduction is singleton when there is just a single global result instance of the reduction operation. 
         // Result handling for such a reduction is much easier than that of a normal reduction. In the former case we

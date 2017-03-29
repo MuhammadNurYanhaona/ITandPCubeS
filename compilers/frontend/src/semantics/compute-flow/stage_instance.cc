@@ -9,16 +9,19 @@
 #include "../../syntax/ast_expr.h"
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <fstream>
+#include <cstdlib>
 
 //------------------------------------------------------ Stage Instanciation ----------------------------------------------------/
 
 StageInstanciation::StageInstanciation(Space *space) : FlowStage(space) {
 	this->code = NULL;
+	this->nestedReductions = new List<ReductionMetadata*>;
 }
 
 void StageInstanciation::performDataAccessChecking(Scope *taskScope) {
@@ -55,4 +58,46 @@ void StageInstanciation::setLpsExecutionFlags() {
 
 void StageInstanciation::populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {
         code->extractReductionInfo(nestedReductions, lpsHierarchy, space);
+	for (int i = 0; i < nestedReductions->NumElements(); i++) {
+		ReductionMetadata *metadata = nestedReductions->Nth(i);
+		metadata->setExecutorStage(this);
+	}
+}
+
+void StageInstanciation::extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {
+        if (nestedReductions != NULL) {
+                reductionInfos->AppendAll(nestedReductions);
+        }
+}
+
+List<ReductionMetadata*> *StageInstanciation::upliftReductionInstrs() {
+	return nestedReductions;
+}
+
+void StageInstanciation::filterReductionsAtLps(Space *reductionRootLps, 
+		List<ReductionMetadata*> *filteredList) {
+
+	List<ReductionMetadata*> *updatedList = new List<ReductionMetadata*>;
+	for (int i = 0; i < nestedReductions->NumElements(); i++) {
+		
+		ReductionMetadata *metadata = nestedReductions->Nth(i);
+		Space *currentRootLps = metadata->getReductionRootLps();
+		
+		if (reductionRootLps == currentRootLps) {
+			filteredList->Append(metadata);
+		} else {
+			updatedList->Append(metadata);
+		}
+	}
+	this->nestedReductions = updatedList;
+}
+
+FlowStage *StageInstanciation::getLastAccessorStage(const char *varName) {
+	Iterator<VariableAccess*> iter = accessMap->GetIterator();
+        VariableAccess *accessLog;
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                const char *name = accessLog->getName();
+		if (strcmp(name, varName) == 0) return this;
+	}
+	return NULL;
 }

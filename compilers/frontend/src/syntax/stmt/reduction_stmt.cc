@@ -213,6 +213,13 @@ void ReductionStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
 	char spaceId = reductionVar->getSpaceId();
 	const char *resultVar = reductionVar->getName();
         Space *reductionRootLps = lpsHierarchy->getSpace(spaceId);
+
+	if (executingLps != reductionRootLps && !executingLps->isParentSpace(reductionRootLps)) {
+		ReportError::InvalidReductionRange(GetLocation(), 
+				executingLps->getName(), reductionRootLps->getName(), false);
+		return;
+	}
+
         ReductionMetadata *metadata = new ReductionMetadata(resultVar,
                         op, reductionRootLps, executingLps, GetLocation());
         infoSet->Append(metadata);

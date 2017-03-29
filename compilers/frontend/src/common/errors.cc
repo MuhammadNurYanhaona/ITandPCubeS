@@ -243,17 +243,30 @@ void ReportError::InvalidInitArg(yyltype *loc, const char *object, const char *a
 }
 
 void ReportError::CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure) {
-	OptionalErrorReport(loc, suppressFailure, "Current compiler cannot process other operations alongside a reduction within the same loop");
+	OptionalErrorReport(loc, suppressFailure, 
+			"Current compiler cannot process other operations alongside a reduction within the same loop");
 }
 
 void ReportError::ReductionOutsideForLoop(yyltype *loc, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, "Reduction expression must be within an encompassing loop statement");
 }
 
-void ReportError::ReductionRangeInvalid(yyltype *loc, const char *rdRootLps, const char *rdBoundaryLps, bool suppressFailure) {
+void ReportError::InvalidReductionRange(yyltype *loc, const char *executingLps, const char *rootLps, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, 
-			"The root LPS of the reduction, Space %s, is situated above the encircling LPS, Space %s", 
-			rdRootLps, rdBoundaryLps);
+			"some use of the reduction has an invalid range spanning from Space %s to Space %s", 
+			executingLps, rootLps);
+}
+
+void ReportError::ReductionEscapingRepeatCycle(yyltype *loc, const char *rdVar, const char *rootLps, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure,
+                        "reduction of variable '%s' spans up to Space %s and escaping the repeat cycle",
+                        rdVar, rootLps);
+}
+
+void ReportError::ReductionVarUsedBeforeReady(yyltype *loc, const char *rdVar, const char *rootLps, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure,
+                        "reduction result '%s' can only be accessed after all LPUs of Space %s complete execution",
+                        rdVar, rootLps);
 }
 
 void ReportError::NotAnEnvironment(yyltype *loc, Type *type, bool suppressFailure) {

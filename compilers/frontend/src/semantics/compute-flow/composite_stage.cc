@@ -92,6 +92,69 @@ FlowStage *CompositeStage::getLastNonSyncStage() {
 
 bool CompositeStage::isStageListEmpty() { return getLastNonSyncStage() == NULL; }
 
+int CompositeStage::assignIndexAndGroupNo(int currentIndex, 
+			int currentGroupNo, int currentRepeatCycle) {
+        
+	int nextIndex = FlowStage::assignIndexAndGroupNo(currentIndex, 
+			currentGroupNo, currentRepeatCycle);
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                nextIndex = stage->assignIndexAndGroupNo(nextIndex, this->index, currentRepeatCycle);
+        }
+        return nextIndex;
+}
+
+void CompositeStage::makeAllLpsTransitionsExplicit() {
+	
+	List<FlowStage*> *currentMoverList = NULL;
+	List<FlowStage*> *renewedStageList = new List<FlowStage*>;
+
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		Space *intermediateLps = FlowStage::getCommonIntermediateLps(this, stage);
+		if (intermediateLps == NULL) {
+			if (currentMoverList != NULL) {
+				// create a new LPS transition stage with the mover list
+				Space *commonLps = FlowStage::getCommonIntermediateLps(this,
+						currentMoverList->Nth(0));
+				LpsTransitionBlock *transitionContainer 
+						= new LpsTransitionBlock(commonLps, this->space);
+				transitionContainer->setStageList(currentMoverList);
+
+				// insert the LPS transition container stage in current stage's nenewed list
+				renewedStageList->Append(transitionContainer);
+				
+				// reset the current mover list
+				currentMoverList = NULL;
+			}
+			// insert the current stage in the renewed list  
+			renewedStageList->Append(stage);
+		} else {
+			if (currentMoverList == NULL) {
+				currentMoverList = new List<FlowStage*>;
+			}
+			currentMoverList->Append(stage);
+		}
+		
+		// let the recursive restructuring process move to nested stages
+		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+		if (compositeStage != NULL) {
+			compositeStage->makeAllLpsTransitionsExplicit();
+		}
+	}
+
+	// if the current mover list is not empty then do the processing of the remaining stages
+	if (currentMoverList != NULL) {
+		Space *commonLps = FlowStage::getCommonIntermediateLps(this, currentMoverList->Nth(0));
+		LpsTransitionBlock *transitionContainer = new LpsTransitionBlock(commonLps, this->space);
+		transitionContainer->setStageList(currentMoverList);
+		renewedStageList->Append(transitionContainer);
+	}
+
+	// update the stage list of the current composite stage
+	this->setStageList(renewedStageList);
+}
+
 void CompositeStage::implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList) {
 	
 	// prepare the current stage for sync-stage implantation process by creating a backup of the current
@@ -315,54 +378,97 @@ void CompositeStage::extractAllReductionInfo(List<ReductionMetadata*> *reduction
         }
 }
 
-void CompositeStage::makeAllLpsTransitionsExplicit() {
+List<ReductionMetadata*> *CompositeStage::upliftReductionInstrs() {
 	
-	List<FlowStage*> *currentMoverList = NULL;
-	List<FlowStage*> *renewedStageList = new List<FlowStage*>;
+	List<ReductionMetadata*> *propagateInfoSet = new List<ReductionMetadata*>;
 
-	for (int i = 0; i < stageList->NumElements(); i++) {
+	int nestedStageCount = stageList->NumElements();
+	for (int i = 0; i < nestedStageCount; i++) {
+		
+		// do recursive expansion of the uplifting process
 		FlowStage *stage = stageList->Nth(i);
-		Space *intermediateLps = FlowStage::getCommonIntermediateLps(this, stage);
-		if (intermediateLps == NULL) {
-			if (currentMoverList != NULL) {
-				// create a new LPS transition stage with the mover list
-				Space *commonLps = FlowStage::getCommonIntermediateLps(this,
-						currentMoverList->Nth(0));
-				LpsTransitionBlock *transitionContainer 
-						= new LpsTransitionBlock(commonLps, this->space);
-				transitionContainer->setStageList(currentMoverList);
+		List<ReductionMetadata*> *nestedInfoSet = stage->upliftReductionInstrs();
+		
+		// if the nested stage did not have any reduction or has already processed all nested reductions then
+		// this stage can be skipped
+		if (nestedInfoSet == NULL || nestedInfoSet->NumElements() == 0) continue;
+		
+		// determine what reductions should be sent upward
+		// also determine the topmost LPS for any reduction that should execute within the confinement of this
+		// composite stage
+		Space *topmostReductionRootLps = NULL;
+		for (int j = 0; j < nestedInfoSet->NumElements(); j++) {
+			ReductionMetadata *metadata = nestedInfoSet->Nth(j);
+                        Space *candidateLps = metadata->getReductionRootLps();
+			if (this->space->isParentSpace(candidateLps)) {
+				propagateInfoSet->Append(metadata);
+			} else {
+				if (topmostReductionRootLps == NULL 
+						|| topmostReductionRootLps->isParentSpace(candidateLps)) {
+					topmostReductionRootLps = candidateLps;
+				}	
+			}
+		}
+		// if all nested reductions should move upward then skip processing this stage further
+		if (topmostReductionRootLps == NULL) continue;
 
-				// insert the LPS transition container stage in current stage's nenewed list
-				renewedStageList->Append(transitionContainer);
-				
-				// reset the current mover list
-				currentMoverList = NULL;
-			}
-			// insert the current stage in the renewed list  
-			renewedStageList->Append(stage);
-		} else {
-			if (currentMoverList == NULL) {
-				currentMoverList = new List<FlowStage*>;
-			}
-			currentMoverList->Append(stage);
+		// if there are some reductions left that are not listed for propagating upward then create a reduction
+		// boundary stage here
+		ReductionBoundaryBlock *reductionBoundary = new ReductionBoundaryBlock(topmostReductionRootLps);
+		reductionBoundary->addStageAtEnd(stage);
+
+		// filter out reductions at the selected LPS from the nested stage to the reduction boundary
+		List<ReductionMetadata*> *upliftedReductions = new List<ReductionMetadata*>;
+		stage->filterReductionsAtLps(topmostReductionRootLps, upliftedReductions);
+		reductionBoundary->assignReductions(upliftedReductions);
+
+		// keep the recursive expansion process rolling within the reduction boundary in case the stage under
+		// investigation has more reductions with root at some descendent LPS; note that this is done after we
+		// filter out reductions that are intended for the reduction-boundary
+		reductionBoundary->upliftReductionInstrs();	
+
+		// if the reduction root is in a different LPS than the current LPS then put an LPS transition block 
+		// around it
+		CompositeStage *replacementStage = reductionBoundary;
+		if (topmostReductionRootLps != this->space) {
+			LpsTransitionBlock *transitionBlock 
+					= new LpsTransitionBlock(topmostReductionRootLps, this->space);
+			transitionBlock->addStageAtEnd(reductionBoundary);
+			replacementStage = transitionBlock;
 		}
 		
-		// let the recursive restructuring process move to nested stages
-		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
-		if (compositeStage != NULL) {
-			compositeStage->makeAllLpsTransitionsExplicit();
+		// swap the reduction boundary with the nested stage
+		this->removeStageAt(i);
+                this->insertStageAt(i, replacementStage);
+	}
+
+	// propagate all reductions that have root above the LPS of the current composite stage
+	return propagateInfoSet;
+}
+
+void CompositeStage::filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList) {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->filterReductionsAtLps(reductionRootLps, filteredList);
+	}
+}
+
+FlowStage *CompositeStage::getLastAccessorStage(const char *varName) {
+	FlowStage *lastAccessor = NULL;
+	for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+		FlowStage *accessor = stage->getLastAccessorStage(varName);
+		if (accessor != NULL) {
+			lastAccessor = accessor;
 		}
 	}
+	return lastAccessor;
+}
 
-	// if the current mover list is not empty then do the processing of the remaining stages
-	if (currentMoverList != NULL) {
-		Space *commonLps = FlowStage::getCommonIntermediateLps(this, currentMoverList->Nth(0));
-		LpsTransitionBlock *transitionContainer = new LpsTransitionBlock(commonLps, this->space);
-		transitionContainer->setStageList(currentMoverList);
-		renewedStageList->Append(transitionContainer);
+void CompositeStage::validateReductions() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+		stage->validateReductions();	
 	}
-
-	// update the stage list of the current composite stage
-	this->setStageList(renewedStageList);
 }
 

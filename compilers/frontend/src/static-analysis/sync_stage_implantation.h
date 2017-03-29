@@ -16,6 +16,7 @@
 -------------------------------------------------------------------------------------------------------------------------*/
 
 class TaskEnvStat;
+class ReductionMetadata;
 
 /* 	the definition of a sync stage */
 class SyncStage : public FlowStage {
@@ -39,6 +40,9 @@ class SyncStage : public FlowStage {
 	void calculateLPSUsageStatistics() {}
 	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {}
         void prepareTaskEnvStat(TaskEnvStat *taskStat) {}
+	void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {}
+	List<ReductionMetadata*> *upliftReductionInstrs() { return NULL; }
+	void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList) {}
 };
 
 /*      This is a utility class to keep track of the last point of entry to a space as flow of control moves from

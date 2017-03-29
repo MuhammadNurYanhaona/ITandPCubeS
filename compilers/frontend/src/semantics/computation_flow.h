@@ -45,11 +45,6 @@ class FlowStage {
         // this flow stage. This information is later used to advance appropriate data structures' epoch version after
         // the execution of the flow stage.
         List<const char*> *epochDependentVarList;	
-
-	// This list is useful primarily to Composite-Stages for doing resources setup and tear down for any reduction
-        // found in nested compute stage invocations. Regardless, the list has been placed in the generic Flow-Stage 
-	// class to populate the list by recursively traversing Execution-Stages inside those Composite Stages.
-        List<ReductionMetadata*> *nestedReductions;
   public:
 	FlowStage(Space *space);
 	virtual ~FlowStage() {};
@@ -58,6 +53,7 @@ class FlowStage {
 	Space *getSpace() { return space; }
 	Hashtable<VariableAccess*> *getAccessMap();
 	void assignLocation(yyltype *location) { this->location = location; }
+	yyltype *getLocation() { return location; }
 	virtual void print(int indent) = 0;
 	
 	void setIndex(int index) { this->index = index; }
@@ -85,6 +81,9 @@ class FlowStage {
 	// LPS. This utility is needed to detect LPS crossing transitions in the computation flow. If there is no LPS
 	// crossing among the argument stages then it returns NULL.
 	static Space *getCommonIntermediateLps(FlowStage *container, FlowStage *contained);
+
+	// A recursive process to assign index and group no to flow stages
+        virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
 
 	//-------------------------------------------------------------------------------------------------------------
 	
@@ -158,8 +157,25 @@ class FlowStage {
         // reductions of a task so that proper memory management decisions can be made regarding the reduction result 
         // variables. 
         virtual void populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {}
-        virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);
+        virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) = 0;
 	
+	// The logic of encoding reduction management instructions in the compute flow is that reduction instructions 
+	// are uplifted from nested compute stages to appropriate LPS level. Then reduction boundary flow stages are 
+	// inserted that willtake care of any resource setup/teardown and data exchange needed during the code 
+	// generation step. This function does the uplifting. 
+	virtual List<ReductionMetadata*> *upliftReductionInstrs() = 0;
+
+	// This utility function filters out all those reductions from the flow stage and stages nested within it 
+	// that has the argument LPS as the reduction root. The filtered reductions' metadata is added to the second
+	// argument of the function. 
+	virtual void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList) = 0;
+
+	// Variables holding the result of reduction cannot be used until all LPU computations contributing to the
+	// reductions are done. These two functions are needed to check if there is any incorrect use of a reduction
+	// result before it is ready.  
+	virtual FlowStage *getLastAccessorStage(const char *varName) { return NULL; }
+	virtual void validateReductions() {}
+
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -171,6 +187,9 @@ class StageInstanciation : public FlowStage {
 	Stmt *code;
 	Scope *scope;
 	const char *name;
+
+	// this holds metadata about all reduction statements found within this compute stage instance
+        List<ReductionMetadata*> *nestedReductions;
   public:
 	StageInstanciation(Space *space);
 	void setCode(Stmt *code) { this->code = code; }
@@ -201,6 +220,10 @@ class StageInstanciation : public FlowStage {
 	// functions for flow expansion to incorporate reductions------------------------------------------------------
 	
 	void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
+        void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);
+	List<ReductionMetadata*> *upliftReductionInstrs();
+	void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList);
+	FlowStage *getLastAccessorStage(const char *varName);
 
 	//-------------------------------------------------------------------------------------------------------------
 };
@@ -219,11 +242,23 @@ class CompositeStage : public FlowStage {
 
 	//------------------------------------------------------------------------ Helper functions for Static Analysis
 
+	// utility functions needed for various static analyses--------------------------------------------------------
+	
 	void addStageAtBeginning(FlowStage *stage);
 	void addStageAtEnd(FlowStage *stage);
 	void insertStageAt(int index, FlowStage *stage);
 	void removeStageAt(int stageIndex);
+        virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
+	
+	// This recursive function modifies the internal organization of flow stages inside a composite stage by 
+        // making all LPS transitions from container stages to the contained stages explicit. To give an example, if
+        // LPS hierarchy is like Space C divides B divides A and a composite stage at Space A has a nested stage at
+        // Space C, this adjustment will surround the nested stage within another Space B composite stage. Explicit
+        // LPS transitions like the aforementioned example are important for several code generation reasons.
+        void makeAllLpsTransitionsExplicit();
 
+	//-------------------------------------------------------------------------------------------------------------
+	
 	// functions related to sync stage implantation in the compute flow--------------------------------------------
 	
 	virtual void implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList);
@@ -264,14 +299,10 @@ class CompositeStage : public FlowStage {
 
 	virtual void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
         virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);	
-
-	// This recursive function modifies the internal organization of flow stages inside a composite stage by 
-        // making all LPS transitions from container stages to the contained stages explicit. To give an example, if
-        // LPS hierarchy is like Space C divides B divides A and a composite stage at Space A has a nested stage at
-        // Space C, this adjustment will surround the nested stage within another Space B composite stage. Explicit
-        // LPS transitions like the aforementioned example are important for several code generation reasons. However, 
-	// this is first needed for setting up reduction boundary stages.
-        void makeAllLpsTransitionsExplicit();
+	virtual List<ReductionMetadata*> *upliftReductionInstrs();
+	virtual void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList);
+	virtual FlowStage *getLastAccessorStage(const char *varName);
+	virtual void validateReductions();
 
 	//-------------------------------------------------------------------------------------------------------------
 };
@@ -284,8 +315,16 @@ class RepeatControlBlock : public CompositeStage {
 	RepeatCycleType type;
   public:
 	RepeatControlBlock(Space *space, RepeatCycleType type, Expr *executeCond);
-	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
+	void print(int indent);
+	
+	//------------------------------------------------------------------------ Helper functions for Static Analysis
+	
+	// utility functions needed for various static analyses--------------------------------------------------------
+        
+	int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
+	
+	//-------------------------------------------------------------------------------------------------------------
 	
 	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
         
@@ -301,6 +340,12 @@ class RepeatControlBlock : public CompositeStage {
         virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
 	
 	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for flow expansion to incorporate reductions------------------------------------------------------
+	
+	List<ReductionMetadata*> *upliftReductionInstrs();
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A conditional execution block represents a composite stage that has the nested sub-flow set to be executed
@@ -313,6 +358,8 @@ class ConditionalExecutionBlock : public CompositeStage {
 	ConditionalExecutionBlock(Space *space, Expr *executeCond);
 	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
+	
+	//------------------------------------------------------------------------ Helper functions for Static Analysis
 	
 	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
         
@@ -347,6 +394,27 @@ class EpochBoundaryBlock : public CompositeStage {
   public:
 	EpochBoundaryBlock(Space *space);	
 	void print(int indent);
+};
+
+/*	This represents a compiler generated code-block boundary added for setup and tear down of resources related
+	reductions found in the nested stages.
+*/
+class ReductionBoundaryBlock : public CompositeStage {
+  protected:
+	// this list holds information about all reduction operations this stage is responsible for
+	List<ReductionMetadata*> *assignedReductions;
+  public:
+	ReductionBoundaryBlock(Space *space);
+	void print(int indent);
+	
+	//------------------------------------------------------------------------ Helper functions for Static Analysis
+	
+	// functions for flow expansion to incorporate reductions------------------------------------------------------
+	
+	void assignReductions(List<ReductionMetadata*> *reductionList);
+	void validateReductions();
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 #endif
