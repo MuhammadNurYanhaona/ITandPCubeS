@@ -13,10 +13,12 @@ class ReductionVar;
 class FieldAccess;
 class Scope;
 class Space;
+class PartitionHierarchy;
 class Type;
 class ParamReplacementConfig;
 class TaskGlobalReferences;
 class VariableAccess;
+class ReductionMetadata;
 
 class Stmt : public Node {
   public:
@@ -71,6 +73,11 @@ class Stmt : public Node {
 	// this interface is used to set up the proper epoch versions to all variables used in expressions 
 	// that are parts of a statement 
         virtual void analyseEpochDependencies(Space *space) = 0;
+
+	// this function is used for discovering all reduction statements within a compute stage
+        virtual void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy,
+                        Space *executingLps) {}
 };
 
 class StmtBlock : public Stmt {
@@ -95,6 +102,9 @@ class StmtBlock : public Stmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, 
+			Space *executingLps);
 };
 
 class ConditionalStmt: public Stmt {
@@ -120,6 +130,9 @@ class ConditionalStmt: public Stmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, 
+			Space *executingLps);
 };
 
 class IfStmt: public Stmt {
@@ -144,6 +157,9 @@ class IfStmt: public Stmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                        PartitionHierarchy *lpsHierarchy, 
+			Space *executingLps);
 };
 
 class IndexRangeCondition: public Node {
@@ -185,6 +201,9 @@ class LoopStmt: public Stmt {
   public:
 	LoopStmt();
      	LoopStmt(Stmt *body, yyltype loc);
+	virtual void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+			PartitionHierarchy *lpsHierarchy, 
+			Space *executingLps);
 };
 
 class PLoopStmt: public LoopStmt {
@@ -278,6 +297,9 @@ class WhileStmt: public Stmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+			PartitionHierarchy *lpsHierarchy, 
+			Space *executingLps);
 };
 
 class ReductionStmt: public Stmt {
@@ -318,6 +340,9 @@ class ReductionStmt: public Stmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
+			PartitionHierarchy *lpsHierarchy, 
+			Space *executingLps);
 };
 
 class ExternCodeBlock: public Stmt {

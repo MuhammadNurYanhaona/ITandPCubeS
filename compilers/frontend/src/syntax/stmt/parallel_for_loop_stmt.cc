@@ -9,26 +9,13 @@
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
 #include "../../semantics/data_access.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <sstream>
 #include <cstdlib>
-
-//------------------------------------------------------------ Loop Statement ----------------------------------------------------------/
-
-LoopStmt::LoopStmt() : Stmt() {
-	this->body = NULL;
-	this->scope = NULL;
-}
-
-LoopStmt::LoopStmt(Stmt *body, yyltype loc) : Stmt(loc) {
-	Assert(body != NULL);
-	this->body = body;
-	this->body->SetParent(this);
-	this->scope = NULL;
-}
 
 //------------------------------------------------------------ Parallel Loop ----------------------------------------------------------/
 

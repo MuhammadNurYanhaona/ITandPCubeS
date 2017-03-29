@@ -9,6 +9,7 @@
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
 #include "../../semantics/data_access.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -88,4 +89,10 @@ Hashtable<VariableAccess*> *WhileStmt::getAccessedGlobalVariables(
 void WhileStmt::analyseEpochDependencies(Space *space) {
         body->analyseEpochDependencies(space);
         condition->setEpochVersions(space, 0);
+}
+
+void WhileStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                PartitionHierarchy *lpsHierarchy,
+                Space *executingLps) {
+        body->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
 }

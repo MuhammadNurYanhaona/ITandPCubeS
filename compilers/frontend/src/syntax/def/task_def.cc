@@ -234,7 +234,8 @@ void TaskDef::performStaticAnalysis() {
         computation->setLpsExecutionFlags();
 
 	//------------------------------------------------ Stage Augmentation for LPS Synchronization
-        // generate after execution environment statistics that tells about stale/fresh data items
+        
+	// generate after execution environment statistics that tells about stale/fresh data items
         TaskEnvStat *taskEnvStat = getAfterExecutionEnvStat();
         // create list of sync stages for LPSes that have their copy of some data being stale
         List<FlowStage*> *syncStagesForStaleLpses = taskEnvStat->generateSyncStagesForStaleLpses();
@@ -242,6 +243,15 @@ void TaskDef::performStaticAnalysis() {
         for (int i = 0; i < syncStagesForStaleLpses->NumElements(); i++) {
                 computation->addStageAtEnd(syncStagesForStaleLpses->Nth(i));
         }
+
+	//------------------------------------------------------------- Flow Expansion for Reductions
+        
+	// generate metadata about reduction statements found in the computation 
+	PartitionHierarchy *lpsHierarchy = partition->getPartitionHierarchy();
+        computation->populateReductionMetadata(lpsHierarchy);
+	// expand the computation flow to make all LPS transitions explicit; this will simplify
+	// identification of reduction boundary stages
+	computation->makeAllLpsTransitionsExplicit();
 
 	computation->print(0);
 }

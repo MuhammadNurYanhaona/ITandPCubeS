@@ -9,6 +9,7 @@
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
 #include "../../semantics/data_access.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -96,5 +97,11 @@ void ConditionalStmt::analyseEpochDependencies(Space *space) {
                 condition->setEpochVersions(space, 0);
         }
         stmt->analyseEpochDependencies(space);
+}
+
+void ConditionalStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                PartitionHierarchy *lpsHierarchy,
+                Space *executingLps) {
+        stmt->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
 }
 

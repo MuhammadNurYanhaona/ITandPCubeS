@@ -155,7 +155,10 @@ LpsTransitionBlock::LpsTransitionBlock(Space *space, Space *ancestorSpace) : Com
 
 void LpsTransitionBlock::print(int indentLevel) {
         std::ostringstream indent;
-        CompositeStage::print(indentLevel - 1);
+	for (int i = 0; i < indentLevel; i++) indent << '\t';
+	std::cout << indent.str() << "Transition to Space " << space->getName() << " {\n"; 
+        CompositeStage::print(indentLevel);
+	std::cout << indent.str() << "} // back from Space " << space->getName() << "\n"; 
 }
 
 //-----------------------------------------------------  Epoch Boundary Block ---------------------------------------------------/

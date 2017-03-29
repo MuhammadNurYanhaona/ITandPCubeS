@@ -52,3 +52,7 @@ void StageInstanciation::performEpochUsageAnalysis() {
 void StageInstanciation::setLpsExecutionFlags() {
         space->flagToExecuteCode();
 }
+
+void StageInstanciation::populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {
+        code->extractReductionInfo(nestedReductions, lpsHierarchy, space);
+}

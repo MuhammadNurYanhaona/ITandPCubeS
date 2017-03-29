@@ -11,6 +11,7 @@
 #include "../../syntax/ast_task.h"
 #include "../../static-analysis/usage_statistic.h"
 #include "../../static-analysis/task_env_stat.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -26,6 +27,7 @@ FlowStage::FlowStage(Space *space) {
         this->parent = NULL;
 	this->accessMap = new Hashtable<VariableAccess*>;
 	this->epochDependentVarList = new List<const char*>;
+	this->nestedReductions = new List<ReductionMetadata*>;
 }
 
 Hashtable<VariableAccess*> *FlowStage::getAccessMap() { return accessMap; }
@@ -69,6 +71,24 @@ Hashtable<VariableAccess*> *FlowStage::validateDataAccess(Scope *taskScope, Expr
         }
 
 	return accessMap;
+}
+
+Space *FlowStage::getCommonIntermediateLps(FlowStage *container, FlowStage *contained) {
+	
+	Space *ancestorLps = container->getSpace();
+        Space *descendentLps = contained->getSpace();
+	if (ancestorLps == descendentLps 
+			|| descendentLps->getParent() == ancestorLps) {
+		return NULL;
+	}
+
+	Space *nextLevelLps = NULL;
+	Space *currentLps = descendentLps->getParent();
+	while (currentLps != ancestorLps) {
+		nextLevelLps = currentLps;
+		currentLps = currentLps->getParent();
+	}
+	return nextLevelLps;
 }
 
 void FlowStage::implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList) {
@@ -132,6 +152,8 @@ void FlowStage::calculateLPSUsageStatistics() {
         }
 }
 
+
+
 bool FlowStage::isLpsDependent() {
 	VariableAccess *accessLog;
         Iterator<VariableAccess*> iterator = accessMap->GetIterator();
@@ -179,6 +201,12 @@ void FlowStage::prepareTaskEnvStat(TaskEnvStat *taskStat) {
                 } else {
                         varStat->flagReadOnLps(space);
                 }
+        }
+}
+
+void FlowStage::extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {
+        if (nestedReductions != NULL) {
+                reductionInfos->AppendAll(nestedReductions);
         }
 }
 

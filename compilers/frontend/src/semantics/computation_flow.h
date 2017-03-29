@@ -16,6 +16,7 @@
 
 class VariableAccess;
 class CompositeStage;
+class ReductionMetadata;
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
@@ -44,6 +45,11 @@ class FlowStage {
         // this flow stage. This information is later used to advance appropriate data structures' epoch version after
         // the execution of the flow stage.
         List<const char*> *epochDependentVarList;	
+
+	// This list is useful primarily to Composite-Stages for doing resources setup and tear down for any reduction
+        // found in nested compute stage invocations. Regardless, the list has been placed in the generic Flow-Stage 
+	// class to populate the list by recursively traversing Execution-Stages inside those Composite Stages.
+        List<ReductionMetadata*> *nestedReductions;
   public:
 	FlowStage(Space *space);
 	virtual ~FlowStage() {};
@@ -72,6 +78,15 @@ class FlowStage {
 	Hashtable<VariableAccess*> *validateDataAccess(Scope *taskScope, Expr *activationCond, Stmt *code);
   public:
 	//------------------------------------------------------------------------ Helper functions for Static Analysis
+
+	// utility functions needed for various static analyses--------------------------------------------------------
+
+	// This function returns the top-most LPS that is neither the container stage's LPS nor the contained stage's
+	// LPS. This utility is needed to detect LPS crossing transitions in the computation flow. If there is no LPS
+	// crossing among the argument stages then it returns NULL.
+	static Space *getCommonIntermediateLps(FlowStage *container, FlowStage *contained);
+
+	//-------------------------------------------------------------------------------------------------------------
 	
 	// functions related to sync stage implantation in the compute flow--------------------------------------------
 	
@@ -134,6 +149,18 @@ class FlowStage {
         virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
 
 	//-------------------------------------------------------------------------------------------------------------
+
+	// functions for flow expansion to incorporate reductions------------------------------------------------------
+
+	// These two auxiliary functions are needed to all process parallel reductions found in the computation
+        // flow of a task. The first function 'populateReductionMetadata' investigates the statements of Execution
+        // stages and discover any reductions in them. The second function 'extractAllReductionInfo' lists all 
+        // reductions of a task so that proper memory management decisions can be made regarding the reduction result 
+        // variables. 
+        virtual void populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {}
+        virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);
+	
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 
@@ -168,6 +195,12 @@ class StageInstanciation : public FlowStage {
         
 	void performEpochUsageAnalysis();
 	void setLpsExecutionFlags();
+
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for flow expansion to incorporate reductions------------------------------------------------------
+	
+	void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
 
 	//-------------------------------------------------------------------------------------------------------------
 };
@@ -225,6 +258,21 @@ class CompositeStage : public FlowStage {
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
         virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
 	
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for flow expansion to incorporate reductions------------------------------------------------------
+
+	virtual void populateReductionMetadata(PartitionHierarchy *lpsHierarchy);
+        virtual void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos);	
+
+	// This recursive function modifies the internal organization of flow stages inside a composite stage by 
+        // making all LPS transitions from container stages to the contained stages explicit. To give an example, if
+        // LPS hierarchy is like Space C divides B divides A and a composite stage at Space A has a nested stage at
+        // Space C, this adjustment will surround the nested stage within another Space B composite stage. Explicit
+        // LPS transitions like the aforementioned example are important for several code generation reasons. However, 
+	// this is first needed for setting up reduction boundary stages.
+        void makeAllLpsTransitionsExplicit();
+
 	//-------------------------------------------------------------------------------------------------------------
 };
 

@@ -9,6 +9,7 @@
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
 #include "../../semantics/data_access.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -90,3 +91,13 @@ void StmtBlock::analyseEpochDependencies(Space *space) {
                 stmt->analyseEpochDependencies(space);
         }
 }
+
+void StmtBlock::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                PartitionHierarchy *lpsHierarchy,
+                Space *executingLps) {
+        for (int i = 0; i < stmts->NumElements(); i++) {
+                Stmt *stmt = stmts->Nth(i);
+                stmt->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
+        }
+}
+

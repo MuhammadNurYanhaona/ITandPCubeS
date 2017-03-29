@@ -213,6 +213,10 @@ class ReductionVar : public Expr {
 	void retrieveTerminalFieldAccesses(List<FieldAccess*> *fieldList);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalRefs);
         const char *getBaseVarName() { return name; }
+	
+	//-------------------------------------------------------------------- Helper functions for Static Analysis
+
+	char getSpaceId() { return spaceId; }
 };
 
 class ArithmaticExpr : public Expr {

@@ -9,6 +9,7 @@
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
 #include "../../semantics/data_access.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -201,4 +202,18 @@ Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobal
 
 void ReductionStmt::analyseEpochDependencies(Space *space) {
         right->analyseEpochDependencies(space);
+}
+
+void ReductionStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
+                PartitionHierarchy *lpsHierarchy,
+                Space *executingLps) {
+
+	if (reductionVar == NULL) return;
+
+	char spaceId = reductionVar->getSpaceId();
+	const char *resultVar = reductionVar->getName();
+        Space *reductionRootLps = lpsHierarchy->getSpace(spaceId);
+        ReductionMetadata *metadata = new ReductionMetadata(resultVar,
+                        op, reductionRootLps, executingLps, GetLocation());
+        infoSet->Append(metadata);
 }

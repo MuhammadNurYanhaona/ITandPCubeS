@@ -10,6 +10,7 @@
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
 #include "../../static-analysis/sync_stage_implantation.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 #include "../../../../common-libs/utils/string_utils.h"
@@ -21,6 +22,14 @@
 
 CompositeStage::CompositeStage(Space *space) : FlowStage(space) {
 	this->stageList = new List<FlowStage*>;
+}
+
+void CompositeStage::setStageList(List<FlowStage*> *stageList) {
+	this->stageList = stageList;
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		stage->setParent(this);
+	}
 }
 
 void CompositeStage::print(int indentLevel) {
@@ -288,5 +297,72 @@ void CompositeStage::prepareTaskEnvStat(TaskEnvStat *taskStat) {
                 FlowStage *stage = stageList->Nth(i);
                 stage->prepareTaskEnvStat(taskStat);
         }
+}
+
+void CompositeStage::populateReductionMetadata(PartitionHierarchy *lpsHierarchy) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->populateReductionMetadata(lpsHierarchy);
+        }
+}
+
+// composite stages do not add their own lists of reduction metadata into the argument list 
+// as their own lists have been created by extracting metadata from nested execution stages.
+void CompositeStage::extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->extractAllReductionInfo(reductionInfos);
+        }
+}
+
+void CompositeStage::makeAllLpsTransitionsExplicit() {
+	
+	List<FlowStage*> *currentMoverList = NULL;
+	List<FlowStage*> *renewedStageList = new List<FlowStage*>;
+
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		Space *intermediateLps = FlowStage::getCommonIntermediateLps(this, stage);
+		if (intermediateLps == NULL) {
+			if (currentMoverList != NULL) {
+				// create a new LPS transition stage with the mover list
+				Space *commonLps = FlowStage::getCommonIntermediateLps(this,
+						currentMoverList->Nth(0));
+				LpsTransitionBlock *transitionContainer 
+						= new LpsTransitionBlock(commonLps, this->space);
+				transitionContainer->setStageList(currentMoverList);
+
+				// insert the LPS transition container stage in current stage's nenewed list
+				renewedStageList->Append(transitionContainer);
+				
+				// reset the current mover list
+				currentMoverList = NULL;
+			}
+			// insert the current stage in the renewed list  
+			renewedStageList->Append(stage);
+		} else {
+			if (currentMoverList == NULL) {
+				currentMoverList = new List<FlowStage*>;
+			}
+			currentMoverList->Append(stage);
+		}
+		
+		// let the recursive restructuring process move to nested stages
+		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+		if (compositeStage != NULL) {
+			compositeStage->makeAllLpsTransitionsExplicit();
+		}
+	}
+
+	// if the current mover list is not empty then do the processing of the remaining stages
+	if (currentMoverList != NULL) {
+		Space *commonLps = FlowStage::getCommonIntermediateLps(this, currentMoverList->Nth(0));
+		LpsTransitionBlock *transitionContainer = new LpsTransitionBlock(commonLps, this->space);
+		transitionContainer->setStageList(currentMoverList);
+		renewedStageList->Append(transitionContainer);
+	}
+
+	// update the stage list of the current composite stage
+	this->setStageList(renewedStageList);
 }
 
