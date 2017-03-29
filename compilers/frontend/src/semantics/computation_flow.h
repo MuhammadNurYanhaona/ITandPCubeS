@@ -106,12 +106,32 @@ class FlowStage {
 	// A recursive process to determine how many versions of different data structures need to be maintained for
         // epoch dependent calculations happening within the flow stages.
         virtual void performEpochUsageAnalysis() {}
-
 	// a static reference to the current flow stage to be accessible from statements and expressions for any 
 	// recursive analysis of code the flow stage contains
 	static FlowStage *CurrentFlowStage;
-
 	List<const char*> *getEpochDependentVarList() { return epochDependentVarList; }
+
+	// an analysis to flag LPSes to indicate some computation occurs within it; this is needed to determine whether 
+	// or not to generate LPUs for an LPS
+        virtual void setLpsExecutionFlags() {}
+	// this function tells if any runtime logic related to the current flow stage requires accessing LPU data
+	bool isLpsDependent();
+
+	//-------------------------------------------------------------------------------------------------------------
+
+	// functions for task environment processing and analysis------------------------------------------------------
+	
+	// We need to determine what environmental variables are read-only and what are read-write within a task
+        // to determine what impact a task's execution should have on the overall program environment. This method
+        // recursively fills a list of empty environmental variable access objects with actual access information
+        // to aid in the program environment management process.
+        virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+
+        // The functionality of this method overlaps with the previous fillInTaskEnvAccessList() method. It tracks
+        // the usage of environmental variables within the task. It also tracks the states different memory allocations 
+	// for a single data structure at the end of the execution of the computation flow in a task environment
+        // statistic variable. For the first part, it uses the result of the previous function.  
+        virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
 
 	//-------------------------------------------------------------------------------------------------------------
 };
@@ -147,6 +167,7 @@ class StageInstanciation : public FlowStage {
 	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
         
 	void performEpochUsageAnalysis();
+	void setLpsExecutionFlags();
 
 	//-------------------------------------------------------------------------------------------------------------
 };
@@ -195,7 +216,15 @@ class CompositeStage : public FlowStage {
         
 	virtual void calculateLPSUsageStatistics();
         virtual void performEpochUsageAnalysis();
+	virtual void setLpsExecutionFlags();
 
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for task environment processing and analysis------------------------------------------------------
+        
+	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+        virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
+	
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -214,7 +243,15 @@ class RepeatControlBlock : public CompositeStage {
         
 	void calculateLPSUsageStatistics();
         void performEpochUsageAnalysis();
+	void setLpsExecutionFlags();
 
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for task environment processing and analysis------------------------------------------------------
+        
+	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+        virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
+	
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -233,7 +270,15 @@ class ConditionalExecutionBlock : public CompositeStage {
         
 	void calculateLPSUsageStatistics();
         void performEpochUsageAnalysis();
+	void setLpsExecutionFlags();
 
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for task environment processing and analysis------------------------------------------------------
+        
+	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+        virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
+	
 	//-------------------------------------------------------------------------------------------------------------
 };
 

@@ -15,12 +15,16 @@
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(space) {
 	this->mode = mode;
 	this->type = type;
+	this->name = NULL;
 }
 
 void SyncStage::print(int indentLevel) {
         std::ostringstream indent;
         for (int i = 0; i < indentLevel; i++) indent << '\t';
         std::cout << indent.str() << "Sync Stage: ";
+	if (name != NULL) {
+		std::cout << name << " ";
+	}
         std::cout << "(Space " << space->getName() << ")\n"; 
         std::cout << indent.str() << "Mode: ";
 	if (mode == Load) {

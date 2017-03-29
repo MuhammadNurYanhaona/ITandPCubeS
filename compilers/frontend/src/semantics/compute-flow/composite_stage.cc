@@ -269,3 +269,24 @@ void CompositeStage::performEpochUsageAnalysis() {
         }
 }
 
+void CompositeStage::setLpsExecutionFlags() {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->setLpsExecutionFlags();
+        }
+}
+
+void CompositeStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->fillInTaskEnvAccessList(envAccessList);
+        }
+}
+
+void CompositeStage::prepareTaskEnvStat(TaskEnvStat *taskStat) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->prepareTaskEnvStat(taskStat);
+        }
+}
+

@@ -48,3 +48,7 @@ void StageInstanciation::performEpochUsageAnalysis() {
         FlowStage::CurrentFlowStage = this;
         code->analyseEpochDependencies(space);
 }
+
+void StageInstanciation::setLpsExecutionFlags() {
+        space->flagToExecuteCode();
+}

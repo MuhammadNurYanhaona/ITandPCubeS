@@ -12,6 +12,8 @@
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
 #include "../../semantics/computation_flow.h"
+#include "../../semantics/data_access.h"
+#include "../../static-analysis/task_env_stat.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 #include "../../../../common-libs/utils/string_utils.h"
@@ -228,6 +230,38 @@ void TaskDef::performStaticAnalysis() {
         computation->calculateLPSUsageStatistics();
 	// determine how many versions of different data structures need to be maintained at runtime
         computation->performEpochUsageAnalysis();
+	// flag those LPSes that have computation stages in them to decide about LPU generation
+        computation->setLpsExecutionFlags();
+
+	//------------------------------------------------ Stage Augmentation for LPS Synchronization
+        // generate after execution environment statistics that tells about stale/fresh data items
+        TaskEnvStat *taskEnvStat = getAfterExecutionEnvStat();
+        // create list of sync stages for LPSes that have their copy of some data being stale
+        List<FlowStage*> *syncStagesForStaleLpses = taskEnvStat->generateSyncStagesForStaleLpses();
+        // append the sync stages to the computation flow
+        for (int i = 0; i < syncStagesForStaleLpses->NumElements(); i++) {
+                computation->addStageAtEnd(syncStagesForStaleLpses->Nth(i));
+        }
 
 	computation->print(0);
+}
+
+List<VariableAccess*> *TaskDef::getAccessLogOfEnvVariables() {
+        List<VariableAccess*> *accessList = new List<VariableAccess*>;
+        List<EnvironmentLink*> *links = environment->getLinks();
+        for (int i = 0; i < links->NumElements(); i++) {
+                EnvironmentLink *link = links->Nth(i);
+                const char *varName = link->getVariable()->getName();
+                accessList->Append(new VariableAccess(varName));
+        }
+        computation->fillInTaskEnvAccessList(accessList);
+        return accessList;
+}
+
+TaskEnvStat *TaskDef::getAfterExecutionEnvStat() {
+        List<VariableAccess*> *envAccessList = getAccessLogOfEnvVariables();
+        Space *rootLps = partition->getPartitionHierarchy()->getRootSpace();
+        TaskEnvStat *taskStat = new TaskEnvStat(envAccessList, rootLps);
+        computation->prepareTaskEnvStat(taskStat);
+        return taskStat;
 }

@@ -69,6 +69,23 @@ void RepeatControlBlock::performEpochUsageAnalysis() {
         condition->setEpochVersions(space, 0);
 }
 
+void RepeatControlBlock::setLpsExecutionFlags() {
+        CompositeStage::setLpsExecutionFlags();
+        if (this->isLpsDependent()) {
+                space->flagToExecuteCode();
+        }
+}
+
+void RepeatControlBlock::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
+        FlowStage::fillInTaskEnvAccessList(envAccessList);
+        CompositeStage::fillInTaskEnvAccessList(envAccessList);
+}
+
+void RepeatControlBlock::prepareTaskEnvStat(TaskEnvStat *taskStat) {
+        FlowStage::prepareTaskEnvStat(taskStat);
+        CompositeStage::prepareTaskEnvStat(taskStat);
+}
+
 //-------------------------------------------------- Condititional Execution Block ----------------------------------------------/
 
 ConditionalExecutionBlock::ConditionalExecutionBlock(Space *space, 
@@ -111,6 +128,23 @@ void ConditionalExecutionBlock::performEpochUsageAnalysis() {
         CompositeStage::performEpochUsageAnalysis();
         FlowStage::CurrentFlowStage = this;
         condition->setEpochVersions(space, 0);
+}
+
+void ConditionalExecutionBlock::setLpsExecutionFlags() {
+        CompositeStage::setLpsExecutionFlags();
+        if (this->isLpsDependent()) {
+                space->flagToExecuteCode();
+        }
+}
+
+void ConditionalExecutionBlock::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
+        FlowStage::fillInTaskEnvAccessList(envAccessList);
+        CompositeStage::fillInTaskEnvAccessList(envAccessList);
+}
+
+void ConditionalExecutionBlock::prepareTaskEnvStat(TaskEnvStat *taskStat) {
+        FlowStage::prepareTaskEnvStat(taskStat);
+        CompositeStage::prepareTaskEnvStat(taskStat);
 }
 
 //------------------------------------------------------ LPS Transition Block ---------------------------------------------------/

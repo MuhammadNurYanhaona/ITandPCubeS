@@ -15,13 +15,19 @@
 	header file contains all the classes associated with sync-stage implantations within the computation flow. 
 -------------------------------------------------------------------------------------------------------------------------*/
 
+class TaskEnvStat;
+
 /* 	the definition of a sync stage */
 class SyncStage : public FlowStage {
   protected:
         SyncMode mode;
         SyncStageType type;
+	
+	// descriptive name for the sync stage for printing purpose
+	const char *name;
   public:
         SyncStage(Space *space, SyncMode mode, SyncStageType type);
+	void setName(const char *name) { this->name = name; }
 	void print(int indent);
         int populateAccessMap(List<VariableAccess*> *accessLogs, 
 		bool filterOutNonReads, bool filterOutNonWritten);
@@ -31,6 +37,8 @@ class SyncStage : public FlowStage {
 	void populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress,
                         Space *lps, bool includeLimiterLps) {}
 	void calculateLPSUsageStatistics() {}
+	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {}
+        void prepareTaskEnvStat(TaskEnvStat *taskStat) {}
 };
 
 /*      This is a utility class to keep track of the last point of entry to a space as flow of control moves from

@@ -10,6 +10,7 @@
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
 #include "../../static-analysis/usage_statistic.h"
+#include "../../static-analysis/task_env_stat.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -127,6 +128,56 @@ void FlowStage::calculateLPSUsageStatistics() {
                 }
                 if (accessFlags->isReduced()) {
                         usageStat->flagReduced();
+                }
+        }
+}
+
+bool FlowStage::isLpsDependent() {
+	VariableAccess *accessLog;
+        Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+        while ((accessLog = iterator.GetNextValue()) != NULL) {
+                if (!(accessLog->isContentAccessed()
+                        || (accessLog->isMetadataAccessed()
+                                && accessLog->isLocalAccess()))) continue;
+                const char *varName = accessLog->getName();
+                DataStructure *structure = space->getStructure(varName);
+                ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+                if (array != NULL) return true;
+        }
+        return false;
+}
+
+void FlowStage::fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList) {
+        for (int i = 0; i < envAccessList->NumElements(); i++) {
+                VariableAccess *envAccessLog = envAccessList->Nth(i);
+                const char *varName = envAccessLog->getName();
+                VariableAccess *stageAccessLog = accessMap->Lookup(varName);
+                if (stageAccessLog != NULL) {
+                        envAccessLog->mergeAccessInfo(stageAccessLog);
+                }
+        }
+}
+
+void FlowStage::prepareTaskEnvStat(TaskEnvStat *taskStat) {
+
+        Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+        VariableAccess *accessLog;
+        while ((accessLog = iterator.GetNextValue()) != NULL) {
+
+                // if only the metadata of the object has been accessed then there is no need to track it
+                if (!(accessLog->isRead() || accessLog->isModified())) continue;
+
+                const char *varName = accessLog->getName();
+                EnvVarStat *varStat = taskStat->getVariableStat(varName);
+
+                // if there is no stat object for the variable access in the environment then the variable is not an 
+		// environmental data structure
+                if (varStat == NULL) continue;
+
+                if (accessLog->isModified()) {
+                        varStat->flagWriteOnLps(space);
+                } else {
+                        varStat->flagReadOnLps(space);
                 }
         }
 }
