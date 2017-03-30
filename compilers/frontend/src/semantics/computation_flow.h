@@ -18,6 +18,8 @@ class VariableAccess;
 class CompositeStage;
 class ReductionMetadata;
 class DataDependencies;
+class StageSyncReqs;
+class StageSyncDependencies;
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
@@ -49,7 +51,9 @@ class FlowStage {
 
 	// data structures that track all data dependencies and consequent communication and synchronization needs of 
 	// a flow stage
-        DataDependencies *dataDependencies;	
+        DataDependencies *dataDependencies;
+	StageSyncReqs *synchronizationReqs;
+        StageSyncDependencies *syncDependencies;
   public:
 	FlowStage(Space *space);
 	virtual ~FlowStage() {};
@@ -198,6 +202,25 @@ class FlowStage {
 	// read-write dependencies on shared data. This is the interface for dependency arcs generation.
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 
+	// This function determines the closest ancestor flow stage of the current stage and the argument stage. It
+        // is used to determine what dependency links are redundant.
+        FlowStage *getNearestCommonAncestor(FlowStage *other);
+
+	StageSyncReqs *getAllSyncRequirements();
+        StageSyncDependencies *getAllSyncDependencies();
+
+	// This function examines the dependency arcs associated with this flow stage and determines what should be
+        // encoded as a synchronization requirement and what should result in a mere ordering of flow stages during
+        // code execution. 
+        virtual void analyzeSynchronizationNeeds();
+
+	// This function determines what reader of a data modified by the current stage should notify it about 
+	// completion of read so that this stage can execute again if needed.
+        virtual void setReactivatorFlagsForSyncReqs();
+
+	// a printing function for debugging purposes
+	virtual void printSyncRequirements(int indentLevel);
+
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -284,6 +307,10 @@ class CompositeStage : public FlowStage {
         // LPS transitions like the aforementioned example are important for several code generation reasons.
         void makeAllLpsTransitionsExplicit();
 
+	// this recursively goes down within the composite stage and returns the highest index of any stage nested
+        // in it
+        int getHighestNestedStageIndex();
+
 	//-------------------------------------------------------------------------------------------------------------
 	
 	// functions related to sync stage implantation in the compute flow--------------------------------------------
@@ -336,6 +363,28 @@ class CompositeStage : public FlowStage {
 	// functions for identifying and characterizing data dependencies ---------------------------------------------
 
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	virtual void analyzeSynchronizationNeeds();
+
+	// Synchronization dependencies from flow-stages outside of a composite stage into stages within it are
+	// assigned to the composite stage to avoid repeated waiting for one-time update. This uplifting cannot
+	// be done during the analyze-synchronization-needs routine as all synchronization dependencies of nested 
+	// stages are not resolved and available when the control of recursion is on the composite stages. (All 
+	// dependencies are resolved only after the entire process ends.) So this additional recursion is done
+        // for composite stages after previous analysis.
+        void upliftSynchronizationDependencies();
+
+        // A composite stage by itself does not create any synchronization need. Rather it derives such needs
+        // from stages embedded within it. Here the logic is that if the update within a nested stage creates a
+        // dependency on some stage outside the composite stage boundary then it should be assigned to the 
+        // composite stage. Recursive application of this logic ensures that all synchronization needs fall in the
+        // composite stage nesting in such a way that the updater and the receiver of that update are always 
+        // within the same composite stage. Before this recursive procedure is done, we need to ensure that all
+        // synchronization needs of nested stages along with their synchronization dependencies are set properly.
+        // So this is the last method to envoke in the process of resolving synchronization.
+        void upliftSynchronizationNeeds();
+
+	void setReactivatorFlagsForSyncReqs();
+	void printSyncRequirements(int indentLevel);
 	
 	//-------------------------------------------------------------------------------------------------------------
 };
@@ -369,8 +418,8 @@ class RepeatControlBlock : public CompositeStage {
 	
 	// functions for task environment processing and analysis------------------------------------------------------
         
-	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
-        virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
+	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+        void prepareTaskEnvStat(TaskEnvStat *taskStat);
 	
 	//-------------------------------------------------------------------------------------------------------------
 	
@@ -383,6 +432,7 @@ class RepeatControlBlock : public CompositeStage {
 	// functions for identifying and characterizing data dependencies ---------------------------------------------
 
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	void analyzeSynchronizationNeeds();
 	
 	//-------------------------------------------------------------------------------------------------------------
 };
@@ -410,14 +460,15 @@ class ConditionalExecutionBlock : public CompositeStage {
 	
 	// functions for task environment processing and analysis------------------------------------------------------
         
-	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
-        virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
+	void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
+        void prepareTaskEnvStat(TaskEnvStat *taskStat);
 	
 	//-------------------------------------------------------------------------------------------------------------
 	
 	// functions for identifying and characterizing data dependencies ---------------------------------------------
 
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	void analyzeSynchronizationNeeds();
 	
 	//-------------------------------------------------------------------------------------------------------------
 };

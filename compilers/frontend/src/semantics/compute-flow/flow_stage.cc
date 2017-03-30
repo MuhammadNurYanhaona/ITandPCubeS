@@ -9,6 +9,7 @@
 #include "../../syntax/ast_expr.h"
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
+#include "../../static-analysis/sync_stat.h"
 #include "../../static-analysis/usage_statistic.h"
 #include "../../static-analysis/task_env_stat.h"
 #include "../../static-analysis/reduction_info.h"
@@ -32,6 +33,8 @@ FlowStage::FlowStage(Space *space) {
 	this->accessMap = new Hashtable<VariableAccess*>;
 	this->epochDependentVarList = new List<const char*>;
 	this->dataDependencies = new DataDependencies();
+	this->synchronizationReqs = NULL;
+        this->syncDependencies = new StageSyncDependencies(this);
 }
 
 Hashtable<VariableAccess*> *FlowStage::getAccessMap() { return accessMap; }
@@ -253,4 +256,147 @@ void FlowStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
                         modifierPanel->setLastModifierOfVar(this, accessLog->getName());
                 }
         }
+}
+
+FlowStage *FlowStage::getNearestCommonAncestor(FlowStage *other) {
+        FlowStage *first = this;
+        FlowStage *second = other;
+        while (first->index != second->index) {
+                if (first->index > second->index) {
+                        first = first->parent;
+                } else if (second->index > first->index) {
+                        second = second->parent;
+                }
+        }
+        return first;
+}
+
+StageSyncReqs *FlowStage::getAllSyncRequirements() { return synchronizationReqs; }
+
+StageSyncDependencies *FlowStage::getAllSyncDependencies() { return syncDependencies; }
+
+void FlowStage::analyzeSynchronizationNeeds() {
+
+        List<DependencyArc*> *outgoingArcList = dataDependencies->getOutgoingArcs();
+        synchronizationReqs = new StageSyncReqs(this);
+        for (int i = 0; i < outgoingArcList->NumElements(); i++) {
+                DependencyArc *arc = outgoingArcList->Nth(i);
+                const char *varName = arc->getVarName();
+                FlowStage *destination = arc->getDestination();
+                Space *destLps = destination->getSpace();
+
+                // If the destination and current flow stage's LPSes are the same then two scenarios are there
+                // for us to consider: either the variable is replicated or it has overlapping partitions among
+                // adjacent LPUs. The former case is handled here. The latter is taken care of by the sync
+                // stage's overriding implementation; therefore we ignore it. 
+                if (destLps == space) {
+                        if (space->isReplicatedInCurrentSpace(varName)) {
+                                ReplicationSync *replication = new ReplicationSync();
+                                replication->setVariableName(varName);
+                                replication->setDependentLps(destLps);
+                                replication->setWaitingComputation(destination);
+                                replication->setDependencyArc(arc);
+                                synchronizationReqs->addVariableSyncReq(varName, replication, true);
+                        }
+                // If the destination and current flow stage's LPSes are not the same then there is definitely
+                // a synchronization need. The specific type of synchronization needed depends on the relative
+                // position of these two LPSes in the partition hierarchy.
+                } else {
+                        SyncRequirement *syncReq = NULL;
+                        if (space->isParentSpace(destLps)) {
+                                syncReq = new UpPropagationSync();
+                        } else if (destLps->isParentSpace(space)) {
+                                syncReq = new DownPropagationSync();
+                        } else {
+                                syncReq = new CrossPropagationSync();
+                        }
+                        syncReq->setVariableName(varName);
+                        syncReq->setDependentLps(destLps);
+                        syncReq->setWaitingComputation(destination);
+                        syncReq->setDependencyArc(arc);
+                        synchronizationReqs->addVariableSyncReq(varName, syncReq, true);
+                }
+        }
+        synchronizationReqs->removeRedundencies();
+}
+
+void FlowStage::setReactivatorFlagsForSyncReqs() {
+
+        List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
+        List<SyncRequirement*> *filteredList = new List<SyncRequirement*>;
+        if (syncList != NULL && syncList->NumElements() > 0) {
+                for (int i = 0; i < syncList->NumElements(); i++) {
+                        SyncRequirement *sync = syncList->Nth(i);
+                        DependencyArc *arc = sync->getDependencyArc();
+
+                        // if this is not the signal source then we can skip this arc as the signal source will
+                        // take care of the reactivation flag processing
+                        if (this != arc->getSignalSrc()) continue;
+
+                        filteredList->Append(sync);
+                }
+        }
+        // if the filtered list is not empty then there is some need for reactivation signaling
+        if (filteredList->NumElements() > 0) {
+
+                // reactivation signals should be received from PPUs of all LPSes that have computations dependent
+                // on changes made by the current stage. So we need to partition the list into separate lists for 
+		// individual LPSes
+                Hashtable<List<SyncRequirement*>*> *syncMap = new Hashtable<List<SyncRequirement*>*>;
+                for (int i = 0; i < filteredList->NumElements(); i++) {
+                        SyncRequirement *sync = filteredList->Nth(i);
+                        Space *dependentLps = sync->getDependentLps();
+                        List<SyncRequirement*> *lpsSyncList = syncMap->Lookup(dependentLps->getName());
+                        if (lpsSyncList == NULL) {
+                                lpsSyncList = new List<SyncRequirement*>;
+                        }
+                        lpsSyncList->Append(sync);
+                        syncMap->Enter(dependentLps->getName(), lpsSyncList, true);
+                }
+
+		// iterate over the sync list correspond to each LPS and select a reactivating sync for that LPS 
+                Iterator<List<SyncRequirement*>*> iterator = syncMap->GetIterator();
+                List<SyncRequirement*> *lpsSyncList;
+                while ((lpsSyncList = iterator.GetNextValue()) != NULL) {
+
+                        DependencyArc *closestPreArc = NULL;
+                        DependencyArc *furthestSuccArc = NULL;
+
+                        for (int i = 0; i < lpsSyncList->NumElements(); i++) {
+                                SyncRequirement *sync = lpsSyncList->Nth(i);
+                                DependencyArc *arc = sync->getDependencyArc();
+
+                                FlowStage *syncStage = arc->getSignalSink();
+                                int syncIndex = syncStage->getIndex();
+                                if (syncIndex < this->index
+                                                && (closestPreArc == NULL
+                                                || syncIndex > closestPreArc->getSignalSink()->getIndex())) {
+                                        closestPreArc = arc;
+                                } else if (syncIndex >= this->index
+                                                && (furthestSuccArc == NULL
+                                                || syncIndex > furthestSuccArc->getSignalSink()->getIndex())) {
+                                        furthestSuccArc = arc;
+                                }
+                        }
+
+                        // The reactivator should be the last stage that will read changes made by this stage 
+                        // before this stage can execute again. That will be the closest predecessor, if exists, 
+                        // or the furthest successor.
+                        if (closestPreArc != NULL) {
+                                closestPreArc->setReactivator(true);
+                        } else if (furthestSuccArc != NULL) {
+                                furthestSuccArc->setReactivator(true);
+                        } else {
+                                std::cout << "This is strange!!! No reactivator is found for stage: ";
+                                std::cout << this->getName() << std::endl;
+                                std::exit(EXIT_FAILURE);
+                        }
+                }
+        }
+}
+
+void FlowStage::printSyncRequirements(int indentLevel) {
+        for (int i = 0; i < indentLevel; i++) std::cout << '\t';
+        std::cout << "Stage: " << getName() << "\n";
+        synchronizationReqs->print(indentLevel + 1);
 }

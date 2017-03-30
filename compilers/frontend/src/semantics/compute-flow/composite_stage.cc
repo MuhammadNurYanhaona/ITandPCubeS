@@ -9,6 +9,7 @@
 #include "../../syntax/ast_expr.h"
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
+#include "../../static-analysis/sync_stat.h"
 #include "../../static-analysis/sync_stage_implantation.h"
 #include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
@@ -153,6 +154,17 @@ void CompositeStage::makeAllLpsTransitionsExplicit() {
 
 	// update the stage list of the current composite stage
 	this->setStageList(renewedStageList);
+}
+
+int CompositeStage::getHighestNestedStageIndex() {
+        int stageCount = stageList->NumElements();
+        FlowStage *lastStage = stageList->Nth(stageCount - 1);
+        CompositeStage *nestedCompositeStage = dynamic_cast<CompositeStage*>(lastStage);
+        if (nestedCompositeStage == NULL) {
+                return lastStage->getIndex();
+        } else {
+                return nestedCompositeStage->getHighestNestedStageIndex();
+        }
 }
 
 void CompositeStage::implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList) {
@@ -477,3 +489,117 @@ void CompositeStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
                 stageList->Nth(i)->performDependencyAnalysis(hierarchy);
         }
 }
+
+void CompositeStage::analyzeSynchronizationNeeds() {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->analyzeSynchronizationNeeds();
+        }
+}
+
+void CompositeStage::upliftSynchronizationDependencies() {
+
+        // perform dependency uplifting in the nested composite stages
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+                if (compositeStage != NULL) {
+                        compositeStage->upliftSynchronizationDependencies();
+                }
+        }
+
+        // get the first and last flow index within the nested subflow to know the boundary of the current stage
+        int beginIndex = stageList->Nth(0)->getIndex();
+        int endIndex = getHighestNestedStageIndex();
+
+        // then check stages and drag out any synchronization dependencies they have due to changes made in some
+        // stages outside this composite stage as the dependencies of the current composite stage itself.
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                StageSyncDependencies *nestedDependencies = stage->getAllSyncDependencies();
+                List<SyncRequirement*> *dependencyList = nestedDependencies->getDependencyList();
+                for (int j = 0; j < dependencyList->NumElements(); j++) {
+                        SyncRequirement *sync = dependencyList->Nth(j);
+                        FlowStage *syncSource = sync->getDependencyArc()->getSignalSrc();
+                        // if the source's index is within the nesting boundary then the dependency is internal
+                        // otherwise, it is external and we have to pull it out
+                        int syncIndex = syncSource->getIndex();
+                        if (syncIndex < beginIndex || syncIndex > endIndex) {
+                                this->syncDependencies->addDependency(sync);
+                                // a pulled out dependency's arc should be updated to reflect that the current
+                                // composite stage is its sink
+                                sync->getDependencyArc()->setSignalSink(this);
+                        }
+                }
+        }
+}
+
+void CompositeStage::upliftSynchronizationNeeds() {
+
+        // perform synchronization uplifting in the nested composite stages
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+                if (compositeStage != NULL) {
+                        compositeStage->upliftSynchronizationNeeds();
+                }
+        }
+
+        // get the first and last flow index within the nested subflow to know the boundary of the current stage
+        int beginIndex = stageList->Nth(0)->getIndex();
+        int endIndex = getHighestNestedStageIndex();
+
+        // start extracting boundary crossing synchronizations out
+	if (synchronizationReqs == NULL) {
+        	synchronizationReqs = new StageSyncReqs(this);
+	}
+
+        // iterate over the nested stages and extract any boundary crossing synchronization found within and assign 
+        // that to current composite stage
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i); 
+                StageSyncReqs *nestedSyncs = stage->getAllSyncRequirements();
+                List<VariableSyncReqs*> *varSyncList = nestedSyncs->getVarSyncList();
+                for (int j = 0; j < varSyncList->NumElements(); j++) {
+                        VariableSyncReqs *varSyncs = varSyncList->Nth(j);
+                        List<SyncRequirement*> *syncReqList = varSyncs->getSyncList();
+                        for (int k =  0; k < syncReqList->NumElements(); k++) {
+                                SyncRequirement *syncReq = syncReqList->Nth(k);
+                                FlowStage *waitingStage = syncReq->getDependencyArc()->getSignalSink();
+                                int sinkIndex = waitingStage->getIndex();
+                                if (sinkIndex < beginIndex || sinkIndex > endIndex) {
+                                        synchronizationReqs->addVariableSyncReq(varSyncs->getVarName(),
+                                                        syncReq, false);
+                                        // update the nesting index of the dependency arc so that it can be found 
+					// later by its nesting index
+                                        syncReq->getDependencyArc()->setNestingIndex(this->repeatIndex);
+                                        // then update the signal source for the arc to indicate that it has been
+                                        // lifted up
+                                        syncReq->getDependencyArc()->setSignalSrc(this);
+                                }
+                        }
+                }
+        }
+}
+
+void CompositeStage::setReactivatorFlagsForSyncReqs() {
+
+        // set reactivator flags for all sync primitives operating on this composite stage level
+        FlowStage::setReactivatorFlagsForSyncReqs();
+
+        // then set reactivator flags for nested computations 
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->setReactivatorFlagsForSyncReqs();
+        }
+}
+
+void CompositeStage::printSyncRequirements(int indentLevel) {
+	FlowStage::printSyncRequirements(indentLevel);
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->printSyncRequirements(indentLevel + 1);
+        }
+}
+
+

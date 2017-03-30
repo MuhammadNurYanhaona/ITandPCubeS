@@ -1,4 +1,5 @@
 #include "sync_stage_implantation.h"
+#include "sync_stat.h"
 #include "data_dependency.h"
 #include "../common/constant.h"
 #include "../syntax/ast.h"
@@ -113,6 +114,52 @@ void SyncStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
 
         // then call the superclass's dependency analysis function
         FlowStage::performDependencyAnalysis(hierarchy);
+}
+
+void SyncStage::analyzeSynchronizationNeeds() {
+
+        // the general logic for setting up synchronization requirements works for all sync stages except the
+        // ghost region sync stages
+        if (mode != Ghost_Region_Update) {
+                FlowStage::analyzeSynchronizationNeeds();
+        } else {
+                List<DependencyArc*> *outgoingArcList = dataDependencies->getOutgoingArcs();
+                synchronizationReqs = new StageSyncReqs(this);
+                for (int i = 0; i < outgoingArcList->NumElements(); i++) {
+                         
+                        DependencyArc *arc = outgoingArcList->Nth(i);
+                        const char *varName = arc->getVarName();
+                        FlowStage *destination = arc->getDestination();
+
+                        // if the destination is another ghost region sync stage then we ignore this dependency
+                        // as the communication model ensures that such dependencies resolves automatically
+                        SyncStage *destSync = dynamic_cast<SyncStage*>(destination);
+                        if (destSync != NULL && destSync->mode == Ghost_Region_Update) continue;
+
+                        Space *destLps = destination->getSpace();
+                        DataStructure *structure = space->getLocalStructure(varName);
+                        ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+                        if (array == NULL) continue;
+                        if (!array->hasOverlappingsAmongPartitions()) continue;
+                        List<int> *overlappingDims = array->getOverlappingPartitionDims();
+                        GhostRegionSync *ghostRegion = new GhostRegionSync();
+                        ghostRegion->setVariableName(varName);
+                        ghostRegion->setDependentLps(destLps);
+                        ghostRegion->setWaitingComputation(destination);
+                        ghostRegion->setDependencyArc(arc);
+                        ghostRegion->setOverlappingDirections(overlappingDims);
+                        synchronizationReqs->addVariableSyncReq(varName, ghostRegion, true);
+                }
+        }
+
+        // indicate that the synchronization requirements registered by the stage do not need any execution 
+        // counter to be activated -- data resolution must be done here regardless of the execution of any stage
+        if (synchronizationReqs != NULL) {
+                List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
+                for (int i = 0; i < syncList->NumElements(); i++) {
+                        syncList->Nth(i)->setCounterRequirement(false);
+                }       
+        }
 }
 
 //-------------------------------------------------- Space Entry Checkpoint ------------------------------------------------/

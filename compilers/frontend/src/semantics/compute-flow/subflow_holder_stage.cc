@@ -33,7 +33,8 @@ void RepeatControlBlock::print(int indentLevel) {
 	std::ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
 	std::cout << indent.str() << "Repition: ";
-	std::cout << "(Space " << space->getName() << ")\n";
+	std::cout << "(Space " << space->getName() << ") ";
+	std::cout << "[" << index << "," << groupNo << "," << repeatIndex << "]\n";
 	CompositeStage::print(indentLevel);
 }
 
@@ -131,6 +132,11 @@ void RepeatControlBlock::performDependencyAnalysis(PartitionHierarchy *hierarchy
 	CompositeStage::performDependencyAnalysis(hierarchy);
 }
 
+void RepeatControlBlock::analyzeSynchronizationNeeds() {
+	FlowStage::analyzeSynchronizationNeeds();
+	CompositeStage::analyzeSynchronizationNeeds();
+}
+
 //-------------------------------------------------- Condititional Execution Block ----------------------------------------------/
 
 ConditionalExecutionBlock::ConditionalExecutionBlock(Space *space, 
@@ -147,7 +153,8 @@ void ConditionalExecutionBlock::print(int indentLevel) {
         std::ostringstream indent;
         for (int i = 0; i < indentLevel; i++) indent << '\t';
         std::cout << indent.str() << "Conditional Execution: ";
-	std::cout << "(Space " << space->getName() << ")\n";
+	std::cout << "(Space " << space->getName() << ") ";
+	std::cout << "[" << index << "," << groupNo << "," << repeatIndex << "]\n";
         CompositeStage::print(indentLevel);
 }
 
@@ -197,6 +204,11 @@ void ConditionalExecutionBlock::performDependencyAnalysis(PartitionHierarchy *hi
         CompositeStage::performDependencyAnalysis(hierarchy);
 }
 
+void ConditionalExecutionBlock::analyzeSynchronizationNeeds() {
+	FlowStage::analyzeSynchronizationNeeds();
+	CompositeStage::analyzeSynchronizationNeeds();
+}
+
 //------------------------------------------------------ LPS Transition Block ---------------------------------------------------/
 
 LpsTransitionBlock::LpsTransitionBlock(Space *space, Space *ancestorSpace) : CompositeStage(space) {
@@ -206,7 +218,8 @@ LpsTransitionBlock::LpsTransitionBlock(Space *space, Space *ancestorSpace) : Com
 void LpsTransitionBlock::print(int indentLevel) {
         std::ostringstream indent;
 	for (int i = 0; i < indentLevel; i++) indent << '\t';
-	std::cout << indent.str() << "Transition to Space " << space->getName() << " {\n"; 
+	std::cout << indent.str() << "Transition to Space " << space->getName() << " { "; 
+	std::cout << "[" << index << "," << groupNo << "," << repeatIndex << "]\n";
         CompositeStage::print(indentLevel);
 	std::cout << indent.str() << "} // back from Space " << space->getName() << "\n"; 
 }
@@ -219,7 +232,8 @@ void EpochBoundaryBlock::print(int indentLevel) {
         std::ostringstream indent;
         for (int i = 0; i < indentLevel; i++) indent << '\t';
         std::cout << indent.str() << "Epoch Boundary: ";
-	std::cout << "(Space " << space->getName() << ")\n";
+	std::cout << "(Space " << space->getName() << ") ";
+	std::cout << "[" << index << "," << groupNo << "," << repeatIndex << "]\n";
         CompositeStage::print(indentLevel);
 }
 
@@ -233,7 +247,8 @@ void ReductionBoundaryBlock::print(int indentLevel) {
         std::ostringstream indent;
         for (int i = 0; i < indentLevel; i++) indent << '\t';
         std::cout << indent.str() << "Reduction Boundary { ";
-        std::cout << "(Space " << space->getName() << ")\n";
+        std::cout << "(Space " << space->getName() << ") ";
+	std::cout << "[" << index << "," << groupNo << "," << repeatIndex << "]\n";
         CompositeStage::print(indentLevel);
 	std::cout << indent.str() << "} // end of reduction " << "\n"; 
 }

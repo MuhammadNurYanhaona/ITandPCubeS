@@ -51,6 +51,7 @@ class SyncStage : public FlowStage {
 	List<ReductionMetadata*> *upliftReductionInstrs() { return NULL; }
 	void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList) {}
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	void analyzeSynchronizationNeeds();
 };
 
 /*      This is a utility class to keep track of the last point of entry to a space as flow of control moves from

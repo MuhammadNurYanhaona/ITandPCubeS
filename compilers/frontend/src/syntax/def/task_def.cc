@@ -264,8 +264,16 @@ void TaskDef::performStaticAnalysis() {
 
 	// determine the read-write dependencies that occur as flow of computation moves along stages   
         computation->performDependencyAnalysis(lpsHierarchy);
-
-	computation->print(0);
+	// determine what dependency relationships should be translated into synchronization require-
+        // ments and recursively mark the sources of these synchronization signals      
+        computation->analyzeSynchronizationNeeds();
+	// uplift the destinations of composite-stage boundary crossing synchronization dependencies
+        computation->upliftSynchronizationDependencies();
+        // then uplift the sources of the composite-stage boundary crossing dependencies
+        computation->upliftSynchronizationNeeds();
+	// finally determine which sync stage for a synchronization will reset the sync primitive so 
+	// that it can be reused (e.g., for latter iterations)
+        computation->setReactivatorFlagsForSyncReqs();
 }
 
 List<VariableAccess*> *TaskDef::getAccessLogOfEnvVariables() {
