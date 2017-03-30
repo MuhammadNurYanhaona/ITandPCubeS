@@ -472,3 +472,8 @@ void CompositeStage::validateReductions() {
 	}
 }
 
+void CompositeStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                stageList->Nth(i)->performDependencyAnalysis(hierarchy);
+        }
+}

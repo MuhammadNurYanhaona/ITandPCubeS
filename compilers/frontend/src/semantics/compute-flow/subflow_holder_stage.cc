@@ -114,6 +114,23 @@ List<ReductionMetadata*> *RepeatControlBlock::upliftReductionInstrs() {
 	return NULL;
 }
 
+// Here we do the dependency analysis twice to take care of any new dependencies that may arise due to the return 
+// from the last stage of repeat cycle to the first one. Note that the consequence of this double iteration may 
+// seem to be addition of superfluous dependencies when we have nesting of repeat cycles. However that should not 
+// happen as there is a redundancy checking mechanism in place where we add dependency arcs to flow stages. So
+// unwanted arcs will be dropped off. 
+void RepeatControlBlock::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
+
+	// capture any dependency from outside to the execution of the repeat block itself
+	FlowStage::performDependencyAnalysis(hierarchy);
+	
+	// capture the forward dependencies from earlier stages to later stages within the repeat cycle
+        CompositeStage::performDependencyAnalysis(hierarchy);
+                
+	// capture the reverse dependencies later stages to earlier stages within the repeat cycle
+	CompositeStage::performDependencyAnalysis(hierarchy);
+}
+
 //-------------------------------------------------- Condititional Execution Block ----------------------------------------------/
 
 ConditionalExecutionBlock::ConditionalExecutionBlock(Space *space, 
@@ -173,6 +190,11 @@ void ConditionalExecutionBlock::fillInTaskEnvAccessList(List<VariableAccess*> *e
 void ConditionalExecutionBlock::prepareTaskEnvStat(TaskEnvStat *taskStat) {
         FlowStage::prepareTaskEnvStat(taskStat);
         CompositeStage::prepareTaskEnvStat(taskStat);
+}
+
+void ConditionalExecutionBlock::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
+	FlowStage::performDependencyAnalysis(hierarchy);
+        CompositeStage::performDependencyAnalysis(hierarchy);
 }
 
 //------------------------------------------------------ LPS Transition Block ---------------------------------------------------/

@@ -1,4 +1,5 @@
 #include "sync_stage_implantation.h"
+#include "data_dependency.h"
 #include "../common/constant.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
@@ -15,7 +16,14 @@
 SyncStage::SyncStage(Space *space, SyncMode mode, SyncStageType type) : FlowStage(space) {
 	this->mode = mode;
 	this->type = type;
-	this->name = NULL;
+	if (mode == Load || mode == Load_And_Configure) {
+                this->name = "\"Data Loader Sync\"";
+        } else if (mode == Ghost_Region_Update) {
+                this->name = "\"Ghost Region Updater Sync\"";
+        } else {
+                this->name = "\"Data Restorer Sync\"";
+        }
+	this->prevDataModifiers = new Hashtable<FlowStage*>;
 }
 
 void SyncStage::print(int indentLevel) {
@@ -26,23 +34,25 @@ void SyncStage::print(int indentLevel) {
 		std::cout << name << " ";
 	}
         std::cout << "(Space " << space->getName() << ")\n"; 
-        std::cout << indent.str() << "Mode: ";
-	if (mode == Load) {
-		std::cout << "Load";
-	} else if (mode == Load_And_Configure) {
-		std::cout << "Load and Configure";
-	} else if (mode == Ghost_Region_Update) {
-		std::cout << "Update Ghost Region";
-	} else {
-		std::cout << "Restore";
+	if (name == NULL) {
+		std::cout << indent.str() << "Mode: ";
+		if (mode == Load) {
+			std::cout << "Load";
+		} else if (mode == Load_And_Configure) {
+			std::cout << "Load and Configure";
+		} else if (mode == Ghost_Region_Update) {
+			std::cout << "Update Ghost Region";
+		} else {
+			std::cout << "Restore";
+		}
+		std::cout << "\n"; 
 	}
-	std::cout << "\n"; 
 	Iterator<VariableAccess*> iter = accessMap->GetIterator();
         VariableAccess* accessLog;
         while ((accessLog = iter.GetNextValue()) != NULL) {
                 accessLog->printAccessDetail(indentLevel + 1);
         }
-
+	dataDependencies->print(indentLevel + 1);
 }
 
 int SyncStage::populateAccessMap(List<VariableAccess*> *accessLogs,
@@ -83,6 +93,26 @@ void SyncStage::addAccessInfo(VariableAccess *accessLog) {
         const char *varName = accessLog->getName();
         if (accessMap->Lookup(varName) != NULL) accessMap->Lookup(varName)->mergeAccessInfo(accessLog);
         else accessMap->Enter(varName, accessLog, true);
+}
+
+void SyncStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
+
+        LastModifierPanel *modifierPanel = LastModifierPanel::getPanel();
+        Iterator<VariableAccess*> iter = accessMap->GetIterator();
+        VariableAccess *accessLog;
+
+        // just save a reference to the last modifier of any variable this sync stage is interested in
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                if (accessLog->isRead() || accessLog->isModified()) {
+                        FlowStage *modifier = modifierPanel->getLastModifierOfVar(accessLog->getName());
+                        if (modifier != NULL && modifier != this && isDataModifierRelevant(modifier)) {
+                                prevDataModifiers->Enter(accessLog->getName(), modifier);
+                        }
+                }
+        }
+
+        // then call the superclass's dependency analysis function
+        FlowStage::performDependencyAnalysis(hierarchy);
 }
 
 //-------------------------------------------------- Space Entry Checkpoint ------------------------------------------------/

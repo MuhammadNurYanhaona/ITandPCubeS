@@ -10,6 +10,7 @@
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
 #include "../../static-analysis/reduction_info.h"
+#include "../../static-analysis/data_dependency.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -38,6 +39,7 @@ void StageInstanciation::print(int indentLevel) {
         while ((accessLog = iter.GetNextValue()) != NULL) {
                 accessLog->printAccessDetail(indentLevel + 1);
         }
+	dataDependencies->print(indentLevel + 1);
 }
 
 void StageInstanciation::populateAccessMapForSpaceLimit(Hashtable<VariableAccess*> *accessMapInProgress,

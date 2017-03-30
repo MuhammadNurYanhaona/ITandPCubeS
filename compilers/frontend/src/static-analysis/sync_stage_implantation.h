@@ -26,6 +26,13 @@ class SyncStage : public FlowStage {
 	
 	// descriptive name for the sync stage for printing purpose
 	const char *name;
+
+	// A sync stage exists to support data read/write and synchronization for compute stages. Although it has 
+        // an accessed-variables list that we assign to it to draw the data dependency arcs properly. When comes 
+        // the implementation of data load/store/synchronization as dictated by those dependency arcs, we need to
+        // find out the actual execution stages that did the data write. Therefore, a map of previous data modifier 
+        // flow stages is maintained in sync-stages to track down the actual modifiers.  
+        Hashtable<FlowStage*> *prevDataModifiers;
   public:
         SyncStage(Space *space, SyncMode mode, SyncStageType type);
 	void setName(const char *name) { this->name = name; }
@@ -43,6 +50,7 @@ class SyncStage : public FlowStage {
 	void extractAllReductionInfo(List<ReductionMetadata*> *reductionInfos) {}
 	List<ReductionMetadata*> *upliftReductionInstrs() { return NULL; }
 	void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList) {}
+	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 };
 
 /*      This is a utility class to keep track of the last point of entry to a space as flow of control moves from

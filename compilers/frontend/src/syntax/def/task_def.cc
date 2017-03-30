@@ -259,6 +259,13 @@ void TaskDef::performStaticAnalysis() {
 	computation->assignIndexAndGroupNo(0, -1, -1);
 	// then validate the usage of reduction results
 	computation->validateReductions();
+
+	//------------------------------------------------------------------ Data Dependency Analysis
+
+	// determine the read-write dependencies that occur as flow of computation moves along stages   
+        computation->performDependencyAnalysis(lpsHierarchy);
+
+	computation->print(0);
 }
 
 List<VariableAccess*> *TaskDef::getAccessLogOfEnvVariables() {

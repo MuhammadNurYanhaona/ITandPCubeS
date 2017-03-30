@@ -17,6 +17,7 @@
 class VariableAccess;
 class CompositeStage;
 class ReductionMetadata;
+class DataDependencies;
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
@@ -44,7 +45,11 @@ class FlowStage {
 	// This list stores data structures used in epoch expressions inside the subflow/computation represented by 
         // this flow stage. This information is later used to advance appropriate data structures' epoch version after
         // the execution of the flow stage.
-        List<const char*> *epochDependentVarList;	
+        List<const char*> *epochDependentVarList;
+
+	// data structures that track all data dependencies and consequent communication and synchronization needs of 
+	// a flow stage
+        DataDependencies *dataDependencies;	
   public:
 	FlowStage(Space *space);
 	virtual ~FlowStage() {};
@@ -84,6 +89,9 @@ class FlowStage {
 
 	// A recursive process to assign index and group no to flow stages
         virtual int assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int currentRepeatCycle);
+
+	// This returns a descriptive name for the flow stage. This is primarily needed for debugging purpose
+	virtual const char *getName();
 
 	//-------------------------------------------------------------------------------------------------------------
 	
@@ -177,6 +185,20 @@ class FlowStage {
 	virtual void validateReductions() {}
 
 	//-------------------------------------------------------------------------------------------------------------
+
+	// functions for identifying and characterizing data dependencies ---------------------------------------------
+
+	DataDependencies *getDataDependencies();
+
+	// an utility function that tells if the current stage should consider/ignore an earlier stage that modified
+	// a common data structure
+	bool isDataModifierRelevant(FlowStage *modifier);
+
+	// The first step of data dependency analysis is to draw dependeny arcs in-between flow-stages based on their
+	// read-write dependencies on shared data. This is the interface for dependency arcs generation.
+	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 
@@ -196,12 +218,17 @@ class StageInstanciation : public FlowStage {
 	void setCode(List<Stmt*> *stmtList);
 	void setScope(Scope *scope) { this->scope = scope; }
 	void setName(const char *name) { this->name = name; }
-	const char *getName() { return name; }
 	Scope *getScope() { return scope; }
 	void print(int indent);
 	void performDataAccessChecking(Scope *taskScope);
 	
 	//------------------------------------------------------------------------ Helper functions for Static Analysis
+
+	// utility functions needed for various static analyses--------------------------------------------------------
+	
+	const char *getName() { return name; }
+	
+	//-------------------------------------------------------------------------------------------------------------
 	
 	// functions related to sync stage implantation in the compute flow--------------------------------------------
 	
@@ -305,6 +332,12 @@ class CompositeStage : public FlowStage {
 	virtual void validateReductions();
 
 	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for identifying and characterizing data dependencies ---------------------------------------------
+
+	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A repeat control block is a composite stage being iterated over under the control of a repeat instruction.
@@ -346,6 +379,12 @@ class RepeatControlBlock : public CompositeStage {
 	List<ReductionMetadata*> *upliftReductionInstrs();
 
 	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for identifying and characterizing data dependencies ---------------------------------------------
+
+	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
+	
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A conditional execution block represents a composite stage that has the nested sub-flow set to be executed
@@ -373,6 +412,12 @@ class ConditionalExecutionBlock : public CompositeStage {
         
 	virtual void fillInTaskEnvAccessList(List<VariableAccess*> *envAccessList);
         virtual void prepareTaskEnvStat(TaskEnvStat *taskStat);
+	
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for identifying and characterizing data dependencies ---------------------------------------------
+
+	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	
 	//-------------------------------------------------------------------------------------------------------------
 };

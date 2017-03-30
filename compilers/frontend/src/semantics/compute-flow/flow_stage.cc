@@ -12,11 +12,14 @@
 #include "../../static-analysis/usage_statistic.h"
 #include "../../static-analysis/task_env_stat.h"
 #include "../../static-analysis/reduction_info.h"
+#include "../../static-analysis/data_dependency.h"
+#include "../../static-analysis/sync_stage_implantation.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 //---------------------------------------------------------- Flow Stage ---------------------------------------------------------/
 
@@ -28,6 +31,7 @@ FlowStage::FlowStage(Space *space) {
 	this->location = NULL;
 	this->accessMap = new Hashtable<VariableAccess*>;
 	this->epochDependentVarList = new List<const char*>;
+	this->dataDependencies = new DataDependencies();
 }
 
 Hashtable<VariableAccess*> *FlowStage::getAccessMap() { return accessMap; }
@@ -96,6 +100,13 @@ int FlowStage::assignIndexAndGroupNo(int currentIndex, int currentGroupNo, int c
         this->groupNo = currentGroupNo;
         this->repeatIndex = currentRepeatCycle;
         return currentIndex + 1;
+}
+
+const char *FlowStage::getName() {
+	std::ostringstream name;
+	name << "Flow Stage: [" << index;
+	name << ", " << groupNo << ", " << repeatIndex<< "]";
+	return strdup(name.str().c_str());
 }
 
 void FlowStage::implantSyncStagesInFlow(CompositeStage *containerStage, List<FlowStage*> *currStageList) {
@@ -207,6 +218,39 @@ void FlowStage::prepareTaskEnvStat(TaskEnvStat *taskStat) {
                         varStat->flagWriteOnLps(space);
                 } else {
                         varStat->flagReadOnLps(space);
+                }
+        }
+}
+
+DataDependencies *FlowStage::getDataDependencies() { return dataDependencies; }
+
+bool FlowStage::isDataModifierRelevant(FlowStage *modifier) {
+        SyncStage *syncStage = dynamic_cast<SyncStage*>(modifier);
+        if (syncStage == NULL || !syncStage->isLoaderSync()) return true;
+        return (this->space == syncStage->space || this->space->isParentSpace(syncStage->space));
+}
+
+void FlowStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
+
+        LastModifierPanel *modifierPanel = LastModifierPanel::getPanel();
+        Iterator<VariableAccess*> iter = accessMap->GetIterator();
+        VariableAccess *accessLog;
+
+        while ((accessLog = iter.GetNextValue()) != NULL) {
+                if (accessLog->isRead()) {
+                        FlowStage *modifier = modifierPanel->getLastModifierOfVar(accessLog->getName());
+                        if (modifier != NULL && modifier != this && isDataModifierRelevant(modifier)) {
+                                DependencyArc *arc = new DependencyArc(modifier, this, accessLog->getName());
+                                arc->deriveSyncAndCommunicationRoots(hierarchy);
+
+                                // Note that setting up outgoing arc on the source of the dependency happens inside
+                                // the constructor of the DepedencyArc class. So here we consider the destination of 
+				// the arc only.  
+                                dataDependencies->addIncomingArcIfNotExists(arc);
+                        }
+                }
+                if (accessLog->isModified()) {
+                        modifierPanel->setLastModifierOfVar(this, accessLog->getName());
                 }
         }
 }
