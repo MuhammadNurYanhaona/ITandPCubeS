@@ -1,0 +1,51 @@
+Program (args) {
+	
+	// create an environment object for the matrix-matrix multiplication task 
+        mmEnv = new TaskEnvironment(name: "Block Matrix-Matrix Multiply")
+	
+	// specify how external input files are associated with the environmental objects
+        bind_input(mmEnv, "a", args.input_file_1)
+        bind_input(mmEnv, "b", args.input_file_2)
+	
+	// execute the task
+        execute(task: "Block Matrix-Matrix Multiply"; environment: mmEnv; partition: args.k, args.l, args.q)
+        
+	// specify where the output should be written to
+	bind_output(mmEnv, "c", args.output_file)
+}
+
+Task "Block Matrix-Matrix Multiply":
+	Define:
+		a, b, c: 2d Array of Real single-precision
+	Environment:
+		a, b: link
+		c: create
+	Initialize:
+		c.dimension1 = a.dimension1
+		c.dimension2 = b.dimension2
+	Stages:
+		// a single computation stage embodying the logic of the matrix-matrix multiplication 
+		multiplyMatrices (x, y, z) {
+			do { x[i][j] = x[i][j] + y[i][k] * z[k][j]
+			} for i, j in x; k in y
+		}
+	Computation:
+		Space A {
+			// the stage has to be repeated for each sub-partition of Space A to have a block implementation
+			// as opposed to a traditional one
+			Repeat foreach sub-partition { 
+				multiplyMatrices(c, a, b) 
+			}
+		}
+	Partition (k, l, q):
+		// 2D partitioning of space giving a block of c in each partition along with a chunk of rows of a
+		// and a chunk of columns of b
+		Space A <2d> {
+			c: block_size(k, l)
+			a: block_size(k), replicated
+			b: replicated, block_size(l)
+			// block-by-block flow of data inside a PPU is governed by the sub-partition specification 
+			Sub-partition <1d> <unordered> {
+				a<dim2>, b<dim1>: block_size(q)
+			}
+		}

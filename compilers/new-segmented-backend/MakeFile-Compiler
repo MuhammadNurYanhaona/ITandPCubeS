@@ -1,0 +1,118 @@
+.PHONY: clean
+
+# Set the default target. When you make with no arguments, this will be the target built.
+COMPILER = sicc
+PRODUCTS = $(COMPILER) 
+default: $(PRODUCTS)
+
+# The backend C++ compiler should be different for environment; the default is mpicc
+C_COMPILER=mpic++
+
+# directory containing the lex, yacc files
+GRAMMAR_DIR=../frontend
+
+# directories containing source codes
+COMMON_LIBS_DIR=../common-libs
+FRONT_END_SRC_DIR=../frontend/src
+BACK_END_SRC_DIR=src
+
+# Set up the list of common library sources
+COMMON_LIB = $(shell find $(COMMON_LIBS_DIR) ! -name "hashtable.cc" -name "*.cc")
+FRONT_END_SRC = $(shell find $(FRONT_END_SRC_DIR) ! -name "main.cc" -name "*.cc")
+BACK_END_SRC = $(shell find $(BACK_END_SRC_DIR) -name "*.cc")
+
+# object file listing
+OBJS = y.tab.o lex.yy.o 							\
+	$(patsubst %.cc, %.o, $(filter %.cc,$(COMMON_LIB))) 			\
+	$(patsubst %.cc, %.o, $(filter %.cc,$(FRONT_END_SRC))) 			\
+	$(patsubst %.cc, %.o, $(filter %.cc,$(BACK_END_SRC)))
+
+# listing of files to be removed during cleanup
+BACK_END_SRC_JUNK = $(shell find $(BACK_END_SRC_DIR) -name "*.o")
+COMMON_LIB_JUNK = $(COMMON_LIBS_DIR)/*.o $(COMMON_LIBS_DIR)/*/*.o 
+TOOL_JUNK = *.o lex.yy.c dpp.yy.c y.tab.c y.tab.h *.core core y.output
+
+# listing of files to be removed if one wants to recompile the front-end also
+FRONT_END_SRC_JUNK = $(shell find $(FRONT_END_SRC_DIR) -name "*.o")
+FRONT_END_TOOL_JUNK = $(GRAMMAR_DIR)/*.o $(GRAMMAR_DIR)/lex.yy.c 		\
+	$(GRAMMAR_DIR)/dpp.yy.c $(GRAMMAR_DIR)/y.tab.c 				\
+	$(GRAMMAR_DIR)/y.tab.h $(GRAMMAR_DIR)/*.core 				\
+	$(GRAMMAR_DIR)/core $(GRAMMAR_DIR)/y.output
+
+# Define the tools we are going to use
+CC = $(C_COMPILER)
+LD = $(C_COMPILER)
+LEX = flex
+YACC = bison
+
+#--------------------------------------------------------------------------------------------------
+# Set up the necessary flags for the tools
+#--------------------------------------------------------------------------------------------------
+# settings for debug mode code generation
+CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
+# settings for optimized code generation
+#CFLAGS = -O3
+
+# We need flag to enable the POSIX thread library during compiling generated code
+RFLAG = -pthread
+
+# The -d flag tells lex to set up for debugging. Can turn on/off by
+# setting value of global yy_flex_debug inside the scanner itself
+LEXFLAGS = -d
+
+# The -d flag tells yacc to generate header with token types
+# The -v flag writes out a verbose description of the states and conflicts
+# The -t flag turns on debugging capability
+# The -y flag means imitate yacc's output file naming conventions
+YACCFLAGS = -dvty
+#--------------------------------------------------------------------------------------------------
+
+# Link with standard c library, math library, and lex library
+LIBS = -lc -lm -pthread
+
+# Link with POSIX thread library
+BUILD_LIBS = -pthread
+
+#--------------------------------------------------------------------------------------------------
+# Rules for various parts of the target
+#--------------------------------------------------------------------------------------------------
+lex.yy.o: lex.yy.c 
+	$(CC) $(CFLAGS) -c -o $@ $(GRAMMAR_DIR)/lex.yy.c
+
+lex.yy.c: $(GRAMMAR_DIR)/IT.l $(GRAMMAR_DIR)/IT.y $(GRAMMAR_DIR)/y.tab.h 
+	$(LEX) $(LEXFLAGS) $(GRAMMAR_DIR)/IT.l
+	cp lex.yy.c $(GRAMMAR_DIR)
+
+y.tab.o: y.tab.c
+	$(CC) $(CFLAGS) -c -o y.tab.o $(GRAMMAR_DIR)/y.tab.c
+
+y.tab.h y.tab.c: $(GRAMMAR_DIR)/IT.y
+	$(YACC) $(YACCFLAGS) $(GRAMMAR_DIR)/IT.y
+	cp y.tab.h $(GRAMMAR_DIR)
+	cp y.tab.c $(GRAMMAR_DIR)
+
+.cc.o: $*.cc
+	$(CC) $(CFLAGS) $(RFLAG) -c -o $@ $*.cc
+#--------------------------------------------------------------------------------------------------
+
+# rule to build the compiler
+$(COMPILER) : $(OBJS)
+	$(LD) -o $@ $(OBJS) $(LIBS)
+	rm -f $(TOOL_JUNK) 
+
+# rule to clean the back-end compiler
+clean:
+	rm -f $(BACK_END_SRC_JUNK)
+	rm -f $(COMMON_LIB_JUNK) 
+	rm -f $(TOOL_JUNK)
+	rm -f $(PRODUCTS)
+
+# rule to clean the front-end compiler
+clean-front:
+	rm -f $(FRONT_END_SRC_JUNK)
+	rm -f $(FRONT_END_TOOL_JUNK)
+
+
+
+	
+
