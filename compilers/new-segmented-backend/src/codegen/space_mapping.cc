@@ -1,6 +1,6 @@
 #include "space_mapping.h"
-#include "../runtime/structure.h"
 
+#include "../../../common-libs/domain-obj/structure.h"
 #include "../../../common-libs/utils/decorator_utils.h"
 #include "../../../common-libs/utils/string_utils.h"
 #include "../../../common-libs/utils/hashtable.h"

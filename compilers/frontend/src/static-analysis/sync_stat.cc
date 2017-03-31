@@ -53,6 +53,17 @@ void SyncRequirement::writeDescriptiveComment(std::ofstream &stream, bool forDep
 	}
 }
 
+Space *SyncRequirement::getSyncOwner() {
+        if (arc->getSyncRoot() == NULL) return arc->getCommRoot();
+        return arc->getSyncRoot();
+}
+
+const char *SyncRequirement::getReverseSyncName() {
+        std::ostringstream stream;
+        stream << arc->getArcName() << "ReverseSync";
+        return strdup(stream.str().c_str());
+}
+
 //----------------------------------------------------------- Replication Sync -------------------------------------------------------------/
 
 void ReplicationSync::print(int indent) {

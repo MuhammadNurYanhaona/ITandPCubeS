@@ -5,7 +5,7 @@
 #include <fstream>
 #include <stdlib.h>
 
-#include "../../../common-libs/utils/list.h"
+#include "../utils/list.h"
 
 /* default invalid value for any LPU or PPU id */
 #define INVALID_ID -1

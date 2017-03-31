@@ -106,6 +106,14 @@ int main(int argc, const char *argv[]) {
 	//********************************************************************* Back End Compiler
 	// parse PCubeS description of the multicore hardware
         List<PPS_Definition*> *pcubesConfig = parsePCubeSDescription(pcubesFile);
+	// iterate over list of tasks and generate code for each of them in separate files
+	List<Definition*> *taskDefs = ProgramDef::program->getComponentsByType(TASK_DEF);
+        for (int i = 0; i < taskDefs->NumElements(); i++) {
+                TaskDef *taskDef = (TaskDef*) taskDefs->Nth(i);
+                // update the static reference to get to the task definition from anywhere 
+                // during code generation  
+                TaskDef::currentTask = taskDef;
+	}
 	//***************************************************************************************
 }
 

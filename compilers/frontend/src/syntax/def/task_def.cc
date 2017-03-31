@@ -306,3 +306,5 @@ TaskEnvStat *TaskDef::getAfterExecutionEnvStat() {
         computation->prepareTaskEnvStat(taskStat);
         return taskStat;
 }
+
+CompositeStage *TaskDef::getComputation() { return computation; }

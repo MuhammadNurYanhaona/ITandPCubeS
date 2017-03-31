@@ -5,8 +5,9 @@
  */
 
 #include "utility.h"
-#include <stdarg.h>
 #include "list.h"
+
+#include <stdarg.h>
 #include <string.h>
 
 static List<const char*> debugKeys;

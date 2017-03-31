@@ -374,6 +374,10 @@ class TaskDef : public Definition {
 	// a static reference to the current task to facilitate access during different sub-phases of 
 	// semantic and static analyses
 	static TaskDef *currentTask;
+	 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	CompositeStage *getComputation(); 
 };
 
 #endif

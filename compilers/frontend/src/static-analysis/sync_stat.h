@@ -64,6 +64,23 @@ class SyncRequirement {
 	const char *getSyncName();
 	virtual void print(int indent);
 	void writeDescriptiveComment(std::ofstream &stream, bool forDependent);
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	// This decides in which LPS should the sync primitive belong to and returns that LPS to the caller.
+        virtual Space *getSyncOwner();
+
+        // This decides the logical coverage of a sync operation starting from the sync-owner. This is not 
+	// necessarily equals to the dependentLps property and vary with the specific type of synchronization. 
+        virtual Space *getSyncSpan() { return dependentLps; }
+
+        // This corresponds to a makeshift mechanism to protect from multiple updates taking place before all 
+        // readers have finished reading the last update. Current implementation of synchronization
+        // primitives do not have support for signaling back to updater that the underlying data can be 
+	// modified again. Thus, we need another variable for each sync requirement to serve reader-to-updater 
+	// signaling back.
+        const char *getReverseSyncName();
+	
 };
 
 // As the name suggests, this represents a sync requirement among all LPUs within an LPS due to a replicated 

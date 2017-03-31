@@ -103,12 +103,12 @@ $(COMPILER) : $(OBJS)
 # rule to clean the back-end compiler
 clean:
 	rm -f $(BACK_END_SRC_JUNK)
-	rm -f $(COMMON_LIB_JUNK) 
 	rm -f $(TOOL_JUNK)
 	rm -f $(PRODUCTS)
 
 # rule to clean the front-end compiler
 clean-front:
+	rm -f $(COMMON_LIB_JUNK) 
 	rm -f $(FRONT_END_SRC_JUNK)
 	rm -f $(FRONT_END_TOOL_JUNK)
 

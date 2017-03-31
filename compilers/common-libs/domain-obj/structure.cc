@@ -1,7 +1,7 @@
 #include "structure.h"
 
-#include "../../../common-libs/utils/list.h"
-#include "../../../common-libs/utils/utility.h"
+#include "../utils/list.h"
+#include "../utils/utility.h"
 
 #include <iostream>
 #include <fstream>
