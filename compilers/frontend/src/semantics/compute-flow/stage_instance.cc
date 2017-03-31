@@ -50,8 +50,10 @@ void StageInstanciation::populateAccessMapForSpaceLimit(Hashtable<VariableAccess
 }
 
 void StageInstanciation::performEpochUsageAnalysis() {
+	FlowStage *prevStage = FlowStage::CurrentFlowStage;
         FlowStage::CurrentFlowStage = this;
         code->analyseEpochDependencies(space);
+        FlowStage::CurrentFlowStage = prevStage;
 }
 
 void StageInstanciation::setLpsExecutionFlags() {

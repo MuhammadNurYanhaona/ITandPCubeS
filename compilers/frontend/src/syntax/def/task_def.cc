@@ -257,9 +257,20 @@ void TaskDef::performStaticAnalysis() {
 	// presumably new stages have been added to the flow; so correct different indexes of the
 	// flow stages
 	computation->assignIndexAndGroupNo(0, -1, -1);
-	// then validate the usage of reduction results
+	// then validate the usage of reduction results; validation needs correct stage indexing
 	computation->validateReductions();
 
+	//--------------------------------------------------------------- Filling LPS Transition Gaps
+
+	// In some back-ends it is difficult to generate code for implicit LPS transitions. By
+	// implicit transitions we mean a direct transition from an ancestor LPS to a descendent 
+	// LPS skipping any intermediate LPSes. So after all stage augmentations are done, we
+	// make all LPS transitions explicit
+	computation->makeAllLpsTransitionsExplicit();
+	// presumably new stages have been added to the flow; so again assign correct indexes to 
+	// the flow stages
+	computation->assignIndexAndGroupNo(0, -1, -1);
+	
 	//------------------------------------------------------------------ Data Dependency Analysis
 
 	// determine the read-write dependencies that occur as flow of computation moves along stages   

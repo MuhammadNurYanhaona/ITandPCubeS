@@ -95,6 +95,12 @@ void ReportError::ReturnStmtOutsideFn(yyltype *loc, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, "a return statement is only allowed inside a function");
 }
 
+void ReportError::EpochVarUsageOutsideEpochBoundary(yyltype *loc, const char *varName, const char *stageName, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, 
+			"variable '%s' is used in an epoch expression in stage '%s' which is not placed within an epoch boundary block",
+			varName, stageName);
+}
+
 void ReportError::NotReductionType(Identifier *id, bool suppressFailure) {
 	OptionalErrorReport(id->GetLocation(), suppressFailure,
 			"'%s' is not a task-global Reduction variable", id->getName());

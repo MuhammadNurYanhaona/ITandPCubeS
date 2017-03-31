@@ -326,15 +326,31 @@ void FieldAccess::setEpochVersions(Space *space, int epoch) {
                 this->epochVersion = epoch;
                 DataStructure *structure = space->getStructure(field->getName());
                 if (structure != NULL) {
+			
+			// record the need of version maintaining in the LPS
                         structure->updateVersionCount(epoch);
                         const char *globalVarName = structure->getName();
+			FlowStage *holderStage = FlowStage::CurrentFlowStage;
+
+			// record the usage of an epoch dependent variable in the stage holding this expression
                         if (epoch > 0) {
-                                List<const char*> *stageEpochList
-                                                = FlowStage::CurrentFlowStage->getEpochDependentVarList();
+                                List<const char*> *stageEpochList = holderStage->getEpochDependentVarList();
                                 if (!string_utils::contains(stageEpochList, globalVarName)) {
                                         stageEpochList->Append(globalVarName);
                                 }
-                        }
+
+				// validate that the epoch expression is indeed used within an epoch confinement 
+				// and if so then record the usage in the confinement block
+				EpochBoundaryBlock *epochBoundary = EpochBoundaryBlock::CurrentEpochBoundary;
+				if (epochBoundary == NULL) {
+					yyltype *location = holderStage->getLocation();
+					ReportError::EpochVarUsageOutsideEpochBoundary(location, 
+							globalVarName, holderStage->getName(), false);
+				} else {
+					epochBoundary->recordEpochVariableUsage(globalVarName, 
+							holderStage->getSpace()->getName());
+				}
+			}
                 }
         } else base->setEpochVersions(space, epoch);
 }

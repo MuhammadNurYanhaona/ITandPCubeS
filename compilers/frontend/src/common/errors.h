@@ -54,6 +54,8 @@ class ReportError
 	static void NonArrayInIndexedIteration(Identifier *id, Type *type, bool suppressFailure);	
 	static void InvalidInitArg(yyltype *loc, const char *object, const char *arg, bool suppressFailure);	
 	static void ReturnStmtOutsideFn(yyltype *loc, bool suppressFailure);
+	static void EpochVarUsageOutsideEpochBoundary(yyltype *loc, const char *varName, 
+			const char *stageName, bool suppressFailure);
 	
 	//------------------------------------------------------------------------------- Polymorphic Type/stage Resolution Errors
 

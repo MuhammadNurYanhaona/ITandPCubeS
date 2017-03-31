@@ -12,6 +12,7 @@
 #include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
+#include "../../../../common-libs/utils/string_utils.h"
 
 #include <iostream>
 #include <fstream>
@@ -226,7 +227,11 @@ void LpsTransitionBlock::print(int indentLevel) {
 
 //-----------------------------------------------------  Epoch Boundary Block ---------------------------------------------------/
 
-EpochBoundaryBlock::EpochBoundaryBlock(Space *space) : CompositeStage(space) {}
+EpochBoundaryBlock *EpochBoundaryBlock::CurrentEpochBoundary = NULL;
+
+EpochBoundaryBlock::EpochBoundaryBlock(Space *space) : CompositeStage(space) {
+	this->lpsToVarMap = new Hashtable<List<const char*>*>;
+}
 
 void EpochBoundaryBlock::print(int indentLevel) {
         std::ostringstream indent;
@@ -235,6 +240,26 @@ void EpochBoundaryBlock::print(int indentLevel) {
 	std::cout << "(Space " << space->getName() << ") ";
 	std::cout << "[" << index << "," << groupNo << "," << repeatIndex << "]\n";
         CompositeStage::print(indentLevel);
+}
+
+void EpochBoundaryBlock::performEpochUsageAnalysis() {
+	EpochBoundaryBlock *oldBoundary = EpochBoundaryBlock::CurrentEpochBoundary;
+	EpochBoundaryBlock::CurrentEpochBoundary = this;
+	CompositeStage::performEpochUsageAnalysis();
+	EpochBoundaryBlock::CurrentEpochBoundary = oldBoundary;
+}
+
+void EpochBoundaryBlock::recordEpochVariableUsage(const char *varName,  const char *spaceName) {
+	List<const char*> *lpsVarList = lpsToVarMap->Lookup(spaceName);
+	if (lpsVarList == NULL) {
+		lpsVarList = new List<const char*>;
+		lpsVarList->Append(varName);
+		lpsToVarMap->Enter(spaceName, lpsVarList);	
+	} else {
+		if (!string_utils::contains(lpsVarList, varName)) {
+			lpsVarList->Append(varName);
+		}
+	}
 }
 
 //---------------------------------------------------  Reduction Boundary Block -------------------------------------------------/

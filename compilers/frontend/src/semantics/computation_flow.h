@@ -487,9 +487,24 @@ class LpsTransitionBlock : public CompositeStage {
 	used within the sub-flow must be advanced by one step.
 */
 class EpochBoundaryBlock : public CompositeStage {
+  protected:
+	// this map keeps track what multi-versioned variable has been used in what LPS inside the sub-flow nested
+	// within this epoch boundary block 
+	Hashtable<List<const char*>*> *lpsToVarMap;	
   public:
 	EpochBoundaryBlock(Space *space);	
 	void print(int indent);
+	
+	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
+       
+	// a static reference to locate the closest epoch boundary during the epoch-usage-analysis
+	static EpochBoundaryBlock *CurrentEpochBoundary;
+ 
+        void performEpochUsageAnalysis();
+
+	void recordEpochVariableUsage(const char *varName,  const char *spaceName);
+
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	This represents a compiler generated code-block boundary added for setup and tear down of resources related
