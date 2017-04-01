@@ -67,6 +67,16 @@ void CompositeFlowPart::constructComputeFlow(CompositeStage *currCompStage, Flow
 	}
 }
 
+void CompositeFlowPart::retrieveRepeatIndexes(List <const char*> *currentList) {
+	for (int i = 0; i < nestedSubflow->NumElements(); i++) {
+		FlowPart *flowPart = nestedSubflow->Nth(i);
+		CompositeFlowPart *compositePart = dynamic_cast<CompositeFlowPart*>(flowPart);
+		if (compositePart != NULL) {
+			compositePart->retrieveRepeatIndexes(currentList);
+		}
+	}
+}
+
 //--------------------------------------------------------------------------------------------------------------------LPS Transition
 
 LpsTransition::LpsTransition(char lpsId, List<FlowPart*> *nestedSubflow, 
@@ -325,6 +335,18 @@ void RepeatCycle::constructComputeFlow(CompositeStage *currCompStage, FlowStageC
 	CompositeFlowPart::constructComputeFlow(currStage, cnstrInfo);
 }
 
+void RepeatCycle::retrieveRepeatIndexes(List <const char*> *currentList) {
+	CompositeFlowPart::retrieveRepeatIndexes(currentList);
+	ForRepeat *indexedControl = dynamic_cast<ForRepeat*>(control);
+	if (indexedControl != NULL) {
+		RangeExpr *controlCode = (RangeExpr*) indexedControl->getRepeatCondition();
+		FieldAccess *indexField = controlCode->getIndex();
+		if (indexField->isTerminalField()) {
+			currentList->Append(indexField->getField()->getName());
+		}	
+	}
+}
+
 //---------------------------------------------------------------------------------------------------------------Computation Section
 
 ComputationSection::ComputationSection(List<FlowPart*> *cf, yyltype loc) : Node(loc) {
@@ -366,5 +388,16 @@ CompositeStage *ComputationSection::generateComputeFlow(FlowStageConstrInfo *cns
 	}
 
 	return compStage;
+}
+
+void ComputationSection::retrieveRepeatIndexes(List <const char*> *currentList) {
+	
+	for (int i = 0; i < computeFlow->NumElements(); i++) {
+                FlowPart *flowPart = computeFlow->Nth(i);
+		CompositeFlowPart *compositePart = dynamic_cast<CompositeFlowPart*>(flowPart);
+		if (compositePart != NULL) {
+			compositePart->retrieveRepeatIndexes(currentList);
+		}
+	}
 }
 

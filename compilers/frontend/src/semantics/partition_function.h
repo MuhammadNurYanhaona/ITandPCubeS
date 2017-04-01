@@ -39,6 +39,10 @@ class BlockSize : public SingleArgumentPartitionFunction {
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	List<int> *getBlockedDimensions(Type *structureType);
 	bool doesSupportGhostRegion() { return true; }
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	const char *getDimensionConfigClassName() { return "BlockSizeConfig"; }	
 };
 
 class BlockCount : public SingleArgumentPartitionFunction {
@@ -49,6 +53,10 @@ class BlockCount : public SingleArgumentPartitionFunction {
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	List<int> *getBlockedDimensions(Type *structureType);
 	bool doesSupportGhostRegion() { return true; }
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	const char *getDimensionConfigClassName() { return "BlockCountConfig"; }
 };
 
 class StridedBlock : public SingleArgumentPartitionFunction {
@@ -58,6 +66,10 @@ class StridedBlock : public SingleArgumentPartitionFunction {
 	void processArguments(List<PartitionArg*> *dividingArgs, 
 			List<PartitionArg*> *paddingArgs, const char *argumentName);
 	bool doesReorderStoredData() { return true; }
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	const char *getDimensionConfigClassName() { return "BlockStrideConfig"; }
 };
 
 class Strided : public PartitionFunctionConfig {
@@ -66,6 +78,10 @@ class Strided : public PartitionFunctionConfig {
 	Strided(yyltype *location) : PartitionFunctionConfig(location, name) {}
 	void processArguments(List<PartitionArg*> *dividingArgs, List<PartitionArg*> *paddingArgs);
 	bool doesReorderStoredData() { return true; }
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	const char *getDimensionConfigClassName() { return "StrideConfig"; }
 };
 
 #endif

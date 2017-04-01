@@ -80,6 +80,16 @@ class PartitionFunctionConfig {
 	// this function is used to determine if we need to transform/reverse-transform indexes that are generated
 	// by traversing the partitions created by applying this partition function
 	virtual bool doesReorderStoredData() { return false; }
+
+        //------------------------------------------------------------- Common helper functions for Code Generation
+
+	// A dimension configuration object is created for each dimension of a data structure at runtime to decide
+        // about the shape of each data part. The configuration object being instantiated depends on the partition
+        // function being used to divide the dimension of the structure. This function returns the name of the dim-
+        // configuration object class to make this logic works. Note that this implies that each partition function
+        // has a corresponding dimension configuration class. A class with matching name should be present in the
+	// memory management module of the backend compiler.
+        virtual const char *getDimensionConfigClassName() { return NULL; }
 };
 
 class DataStructure {

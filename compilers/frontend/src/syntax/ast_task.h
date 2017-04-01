@@ -63,6 +63,11 @@ class EnvironmentLink : public Node {
         void PrintChildren(int indentLevel);
 	Identifier *getVariable() { return var; }
 	LinkageType getMode() { return mode; }
+	 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	bool isExternal() { return (mode == TypeLink || mode == TypeCreateIfNotLinked); }
+        bool isNullable() { return (mode == TypeCreateIfNotLinked || mode == TypeCreate); }
 };
 
 class EnvironmentSection : public Node {
@@ -162,6 +167,10 @@ class CompositeFlowPart : public FlowPart {
 
 	virtual void constructComputeFlow(CompositeStage *currCompStage, 
 			FlowStageConstrInfo *cnstrInfo);	
+	 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	virtual void retrieveRepeatIndexes(List <const char*> *currentList);
 };
 
 class LpsTransition : public CompositeFlowPart {
@@ -271,6 +280,10 @@ class RepeatCycle : public CompositeFlowPart {
 
 	void constructComputeFlow(CompositeStage *currCompStage, 
 			FlowStageConstrInfo *cnstrInfo);	
+	 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	void retrieveRepeatIndexes(List <const char*> *currentList);
 };
 
 class ComputationSection : public Node {
@@ -288,6 +301,14 @@ class ComputationSection : public Node {
 	// within the composite stage and used for all subsequent static analysis of the task and also
 	// for back-end specific code generation.
 	CompositeStage *generateComputeFlow(FlowStageConstrInfo *cnstrInfo);
+	 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	// This function retrieves all repeat loop index variables from the computation flow. Repeat
+	// loop indexes can be stored separately in each PPU controller without any synchronization
+	// with the others. This function is needed to identify these indexes to give them a special 
+	// treatment
+	void retrieveRepeatIndexes(List <const char*> *currentList);
 };
 
 class TaskDef : public Definition {
@@ -378,6 +399,9 @@ class TaskDef : public Definition {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
 	CompositeStage *getComputation(); 
+	List<EnvironmentLink*> *getEnvironmentLinks();
+	PartitionHierarchy *getPartitionHierarchy();
+	List<const char*> *getRepeatIndexes();
 };
 
 #endif

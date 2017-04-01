@@ -1,10 +1,10 @@
-#include "partition_function.h"
-#include "task_space.h"
-#include "../common/errors.h"
-#include "../syntax/ast.h"
-#include "../syntax/ast_expr.h"
-#include "../syntax/ast_partition.h"
-#include "../../../common-libs/utils/list.h"
+#include "../partition_function.h"
+#include "../task_space.h"
+#include "../../common/errors.h"
+#include "../../syntax/ast.h"
+#include "../../syntax/ast_expr.h"
+#include "../../syntax/ast_partition.h"
+#include "../../../../common-libs/utils/list.h"
 
 #include <iostream>
 #include <sstream>

@@ -393,6 +393,10 @@ class RangeExpr : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	FieldAccess *getIndex() { return index; }
 };	
 
 class AssignmentExpr : public Expr {

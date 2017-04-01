@@ -308,3 +308,13 @@ TaskEnvStat *TaskDef::getAfterExecutionEnvStat() {
 }
 
 CompositeStage *TaskDef::getComputation() { return computation; }
+
+List<EnvironmentLink*> *TaskDef::getEnvironmentLinks() { return environment->getLinks(); }
+
+PartitionHierarchy *TaskDef::getPartitionHierarchy() { return partition->getPartitionHierarchy(); }
+
+List<const char*> *TaskDef::getRepeatIndexes() {
+	List<const char*> *indexList = new List<const char*>;
+	compute->retrieveRepeatIndexes(indexList);
+	return indexList;
+}
