@@ -17,6 +17,7 @@
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
 
+class CommunicationCharacteristics;
 
 // This is the common super-class to encode the sync requirement of a single computation stage in a single LPS 
 // due to a change of a single variable. Note that the change can happen in the same LPS the dependent 
@@ -44,6 +45,11 @@ class SyncRequirement {
         // is due to some compiler injected sync-stage, however, their is no conditional execution and there
         // is no need for a counter variable either. Following variable distinguishes between these two cases.   
         bool counterRequirement;
+
+	// This index variable is kept with the sync-requirement to facilitate a unique ID generation for any
+	// counter associated with this requirement.
+        int index;
+
   public:
 	SyncRequirement(const char *syncTypeName);
 	virtual ~SyncRequirement() {}
@@ -80,7 +86,15 @@ class SyncRequirement {
 	// modified again. Thus, we need another variable for each sync requirement to serve reader-to-updater 
 	// signaling back.
         const char *getReverseSyncName();
-	
+
+	// This function generates information about the need and nature of communication for the sync
+        // requirement. Its logic depends on the mapping of LPSes to PPSes and memory allocation decisions. 
+        // So it should be called only after those steps have been completed. The argument represents the ID
+	// of the PPS at and above which PPUs have disjoint memories.  
+        virtual CommunicationCharacteristics *getCommunicationInfo(int segmentationPPS);
+
+	void setIndex(int index) { this->index = index; }
+        int getIndex() { return index; }
 };
 
 // As the name suggests, this represents a sync requirement among all LPUs within an LPS due to a replicated 

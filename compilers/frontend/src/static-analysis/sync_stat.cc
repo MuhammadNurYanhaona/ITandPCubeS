@@ -2,6 +2,7 @@
 #include "data_dependency.h"
 #include "../semantics/task_space.h"
 #include "../semantics/computation_flow.h"
+#include "../codegen-helper/communication_stat.h"
 #include "../../../common-libs/utils/list.h"
 #include "../../../common-libs/utils/hashtable.h"
 #include "../../../common-libs/utils/binary_search.h"
@@ -20,8 +21,9 @@ SyncRequirement::SyncRequirement(const char *syncTypeName) {
 	this->dependentLps = NULL;
 	this->waitingComputation = NULL;
 	this->arc = NULL;
-	counterRequirement = true;
-        replacementSync = NULL;
+	this->counterRequirement = true;
+        this->replacementSync = NULL;
+	this->index = -1;
 }
 
 const char *SyncRequirement::getSyncName() {
@@ -62,6 +64,34 @@ const char *SyncRequirement::getReverseSyncName() {
         std::ostringstream stream;
         stream << arc->getArcName() << "ReverseSync";
         return strdup(stream.str().c_str());
+}
+
+CommunicationCharacteristics *SyncRequirement::getCommunicationInfo(int segmentationPPS) {
+
+        CommunicationCharacteristics *commCharacter = new CommunicationCharacteristics(variableName);
+        Space *commRoot = arc->getCommRoot();
+        Space *syncRoot = arc->getSyncRoot();
+        Space *confinementSpace = (syncRoot != NULL) ? syncRoot : commRoot;
+        Space *senderSyncSpace = arc->getSource()->getSpace();
+        Space *receiverSyncSpace = arc->getDestination()->getSpace();
+        DataStructure *senderStruct = senderSyncSpace->getStructure(variableName);
+        DataStructure *receiverStruct = receiverSyncSpace->getStructure(variableName);
+
+        // in the general case, to involve communication, either the confinement of the synchronization must be
+        // above the PPS level where memory segmentation occurs, or there must be two different allocations for 
+        // the data structure in the sender and receiver sides of the synchronization
+        bool communicationNeeded = (confinementSpace->getPpsId() > segmentationPPS)
+                        || (senderStruct->getAllocator() != receiverStruct->getAllocator());
+
+        commCharacter->setCommunicationRequired(communicationNeeded);
+        commCharacter->setConfinementSpace(confinementSpace);
+        commCharacter->setSenderSyncSpace(senderSyncSpace);
+        commCharacter->setReceiverSyncSpace(receiverSyncSpace);
+        commCharacter->setSenderDataAllocatorSpace(senderStruct->getAllocator());
+        commCharacter->setReceiverDataAllocatorSpace(receiverStruct->getAllocator());
+        commCharacter->setSyncRequirement(this);
+
+        return commCharacter;
 }
 
 //----------------------------------------------------------- Replication Sync -------------------------------------------------------------/

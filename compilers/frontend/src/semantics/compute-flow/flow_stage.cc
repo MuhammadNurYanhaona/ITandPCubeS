@@ -15,8 +15,10 @@
 #include "../../static-analysis/reduction_info.h"
 #include "../../static-analysis/data_dependency.h"
 #include "../../static-analysis/sync_stage_implantation.h"
+#include "../../codegen-helper/communication_stat.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
+#include "../../../../common-libs/utils/string_utils.h"
 
 #include <iostream>
 #include <fstream>
@@ -399,4 +401,31 @@ void FlowStage::printSyncRequirements(int indentLevel) {
         for (int i = 0; i < indentLevel; i++) std::cout << '\t';
         std::cout << "Stage: " << getName() << "\n";
         synchronizationReqs->print(indentLevel + 1);
+}
+
+List<const char*> *FlowStage::getVariablesNeedingCommunication(int segmentedPPS) {
+
+        if (synchronizationReqs == NULL) return NULL;
+        List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
+        List<const char*> *varList = new List<const char*>;
+        for (int i = 0; i < syncList->NumElements(); i++) {
+                SyncRequirement *syncReq = syncList->Nth(i);
+                bool commNeeded = syncReq->getCommunicationInfo(segmentedPPS)->isCommunicationRequired();
+                const char *varName = syncReq->getVariableName();
+                if (commNeeded && !string_utils::contains(varList, varName)) {
+                        varList->Append(varName);
+                }
+        }
+        return varList;
+}
+
+List<CommunicationCharacteristics*> *FlowStage::getCommCharacteristicsForSyncReqs(int segmentedPPS) {
+        if (synchronizationReqs == NULL) return NULL;
+        List<SyncRequirement*> *syncList = synchronizationReqs->getAllSyncRequirements();
+        List<CommunicationCharacteristics*> *commCharList = new List<CommunicationCharacteristics*>;
+        for (int i = 0; i < syncList->NumElements(); i++) {
+                SyncRequirement *syncReq = syncList->Nth(i);
+                commCharList->Append(syncReq->getCommunicationInfo(segmentedPPS));
+        }
+        return commCharList;
 }

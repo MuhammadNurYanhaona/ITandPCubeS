@@ -20,6 +20,7 @@ class ReductionMetadata;
 class DataDependencies;
 class StageSyncReqs;
 class StageSyncDependencies;
+class CommunicationCharacteristics;
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
@@ -222,6 +223,20 @@ class FlowStage {
 	virtual void printSyncRequirements(int indentLevel);
 
 	//-------------------------------------------------------------------------------------------------------------
+	
+	//----------------------------------------------------------------- Common helper functions for Code Generation
+
+	// functions for determining communication requirements -------------------------------------------------------
+
+	// This function is used to recursively retrieve all variables used in the task that will be communicated 
+        // across segments or among different allocations within a segment as part of some synchronization process.
+        // Notice that it needs the ID of the physical Space (PPS) where memory segmentation has taken place. Thus
+        // using it is only meaningful after LPS-to-PPS mappings are known  
+        virtual List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
+        // This function uses the same recursive process, but it returns detail communication information 
+        virtual List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
+	
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 
@@ -385,6 +400,15 @@ class CompositeStage : public FlowStage {
 
 	void setReactivatorFlagsForSyncReqs();
 	void printSyncRequirements(int indentLevel);
+	
+	//-------------------------------------------------------------------------------------------------------------
+	
+	//----------------------------------------------------------------- Common helper functions for Code Generation
+
+	// functions for determining communication requirements -------------------------------------------------------
+
+        List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
+        List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
 	
 	//-------------------------------------------------------------------------------------------------------------
 };

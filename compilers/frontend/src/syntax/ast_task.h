@@ -402,6 +402,7 @@ class TaskDef : public Definition {
 	List<EnvironmentLink*> *getEnvironmentLinks();
 	PartitionHierarchy *getPartitionHierarchy();
 	List<const char*> *getRepeatIndexes();
+	const char *getName() { return id->getName(); }
 };
 
 #endif
