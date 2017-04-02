@@ -10,6 +10,7 @@
 #include "../../semantics/helper.h"
 #include "../../semantics/data_access.h"
 #include "../../static-analysis/reduction_info.h"
+#include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -105,3 +106,6 @@ void ConditionalStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
         stmt->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
 }
 
+void ConditionalStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+        stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);
+}

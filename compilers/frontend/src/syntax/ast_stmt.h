@@ -19,6 +19,7 @@ class ParamReplacementConfig;
 class TaskGlobalReferences;
 class VariableAccess;
 class ReductionMetadata;
+class IncludesAndLinksMap;
 
 class Stmt : public Node {
   public:
@@ -78,6 +79,12 @@ class Stmt : public Node {
         virtual void extractReductionInfo(List<ReductionMetadata*> *infoSet,
                         PartitionHierarchy *lpsHierarchy,
                         Space *executingLps) {}
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+	// this function is used to recursively determine all the header file includes and library links 
+	// for different extern code blocks present in an IT task
+        virtual void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {}
 };
 
 class StmtBlock : public Stmt {
@@ -105,6 +112,10 @@ class StmtBlock : public Stmt {
 	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
                         PartitionHierarchy *lpsHierarchy, 
 			Space *executingLps);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+        void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 };
 
 class ConditionalStmt: public Stmt {
@@ -133,6 +144,10 @@ class ConditionalStmt: public Stmt {
 	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
                         PartitionHierarchy *lpsHierarchy, 
 			Space *executingLps);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+        void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 };
 
 class IfStmt: public Stmt {
@@ -160,6 +175,10 @@ class IfStmt: public Stmt {
 	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
                         PartitionHierarchy *lpsHierarchy, 
 			Space *executingLps);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+        void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 };
 
 class IndexRangeCondition: public Node {
@@ -204,6 +223,10 @@ class LoopStmt: public Stmt {
 	virtual void extractReductionInfo(List<ReductionMetadata*> *infoSet,
 			PartitionHierarchy *lpsHierarchy, 
 			Space *executingLps);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+        void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 };
 
 class PLoopStmt: public LoopStmt {
@@ -300,6 +323,10 @@ class WhileStmt: public Stmt {
 	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
 			PartitionHierarchy *lpsHierarchy, 
 			Space *executingLps);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+        void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 };
 
 class ReductionStmt: public Stmt {
@@ -380,6 +407,10 @@ class ExternCodeBlock: public Stmt {
 	// there is no meaningful implementation for any of these functions as an external code block is
 	// taken as a whole and applied in the generated code without any analysis from the IT compiler
         void analyseEpochDependencies(Space *space) {}
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+        void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
 };
 
 class ReturnStmt: public Stmt {

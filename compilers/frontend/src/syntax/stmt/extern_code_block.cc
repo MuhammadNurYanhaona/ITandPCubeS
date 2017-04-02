@@ -7,6 +7,7 @@
 #include "../../common/location.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
+#include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
 
 #include <iostream>
@@ -66,4 +67,9 @@ Node *ExternCodeBlock::clone() {
 	}
 	const char *newCode = strdup(codeBlock);
 	return new ExternCodeBlock(newLng, newIncls, newLibs, newCode, *GetLocation());
+}
+
+void ExternCodeBlock::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+        includesAndLinksMap->addIncludesAndLinksForLanguage(language,
+                        headerIncludes, libraryLinks);
 }

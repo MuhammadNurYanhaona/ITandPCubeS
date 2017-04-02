@@ -11,6 +11,7 @@
 #include "../../syntax/ast_task.h"
 #include "../../static-analysis/reduction_info.h"
 #include "../../static-analysis/data_dependency.h"
+#include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -104,4 +105,8 @@ FlowStage *StageInstanciation::getLastAccessorStage(const char *varName) {
 		if (strcmp(name, varName) == 0) return this;
 	}
 	return NULL;
+}
+
+void StageInstanciation::retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
+	code->retrieveExternHeaderAndLibraries(externConfigMap);
 }

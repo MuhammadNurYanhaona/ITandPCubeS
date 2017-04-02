@@ -10,8 +10,9 @@
 #include "../../syntax/ast_stmt.h"
 #include "../../syntax/ast_task.h"
 #include "../../static-analysis/sync_stat.h"
-#include "../../static-analysis/sync_stage_implantation.h"
 #include "../../static-analysis/reduction_info.h"
+#include "../../static-analysis/sync_stage_implantation.h"
+#include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 #include "../../../../common-libs/utils/string_utils.h"
@@ -632,5 +633,12 @@ List<CommunicationCharacteristics*> *CompositeStage::getCommCharacteristicsForSy
                 delete stageCommList;
         }
         return commCharList;
+}
+
+void CompositeStage::retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
+        for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                stage->retriveExternCodeBlocksConfigs(externConfigMap);
+        }
 }
 

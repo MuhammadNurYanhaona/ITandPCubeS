@@ -7,9 +7,13 @@
 #include <sys/stat.h>
 
 #include "codegen/space_mapping.h"
+#include "codegen/code_generator.h"
+#include "codegen/task_invocation.h"
 
 #include "../../common-libs/utils/list.h"
 #include "../../common-libs/utils/properties.h"
+#include "../../common-libs/domain-obj/constant.h"
+
 #include "../../frontend/src/lex/scanner.h"
 #include "../../frontend/src/yacc/parser.h"
 #include "../../frontend/src/common/errors.h"
@@ -114,6 +118,16 @@ int main(int argc, const char *argv[]) {
                 // during code generation  
                 TaskDef::currentTask = taskDef;
 	}
+	// generate classes for the list of tuples present in the source in a header file
+	List<Definition*> *classDefs = ProgramDef::program->getComponentsByType(CLASS_DEF);
+        generateClassesForTuples(tupleHeader, classDefs);
+        // invoke the library handling task-invocations to generate all routines needed for 
+        // multi-task management and a the main function corresponds to the coordinator 
+        // program definition
+        processCoordinatorProgram(ProgramDef::program, coordHeader, coordProgram);
+        // generate a text file that lists the external libraries to be linked with the 
+        // program for successful compilation and execution of external code blocks
+        generateExternLibraryLinkInfo(linkageListerFile);
 	//***************************************************************************************
 }
 

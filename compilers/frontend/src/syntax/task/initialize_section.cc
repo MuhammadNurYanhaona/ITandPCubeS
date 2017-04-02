@@ -112,4 +112,11 @@ void InitializeSection::performVariableAccessAnalysis(Scope *taskGlobalScope) {
 	Stmt::mergeAccessedVariables(accessMap, table);
 }
 
-
+List<const char*> *InitializeSection::getArguments() {
+        List<const char*> *argNameList = new List<const char*>;
+        for (int i = 0; i < arguments->NumElements(); i++) {
+                Identifier *id = arguments->Nth(i);
+                argNameList->Append(id->getName());
+        }
+        return argNameList;
+}

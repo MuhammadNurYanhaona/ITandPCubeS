@@ -2,10 +2,12 @@
 #include "../ast_type.h"
 #include "../ast_def.h"
 #include "../ast_stmt.h"
+#include "../../common/errors.h"
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
-#include "../../common/errors.h"
+#include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/hashtable.h"
 #include "../../../../common-libs/utils/string_utils.h"
 
 #include <fstream>
@@ -164,6 +166,12 @@ FunctionInstance *FunctionDef::getInstanceForParamTypes(List<Type*> *paramTypes)
 		if (instance->isMatchingArguments(paramTypes)) return instance;
 	}
 	return NULL;	
+}
+
+IncludesAndLinksMap *FunctionDef::getExternBlocksHeadersAndLibraries() {
+	IncludesAndLinksMap *configMap = new IncludesAndLinksMap();
+	code->retrieveExternHeaderAndLibraries(configMap);
+	return configMap;		
 }
 
 //---------------------------------------- Function Instance ------------------------------------------/

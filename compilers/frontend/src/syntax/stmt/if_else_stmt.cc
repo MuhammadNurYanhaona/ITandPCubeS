@@ -10,6 +10,7 @@
 #include "../../semantics/helper.h"
 #include "../../semantics/data_access.h"
 #include "../../static-analysis/reduction_info.h"
+#include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 
@@ -98,5 +99,12 @@ void IfStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
         for (int i = 0; i < ifBlocks->NumElements(); i++) {
                 ConditionalStmt *stmt = ifBlocks->Nth(i);
                 stmt->extractReductionInfo(infoSet, lpsHierarchy, executingLps);
+        }
+}
+
+void IfStmt::retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {
+        for (int i = 0; i < ifBlocks->NumElements(); i++) {
+                ConditionalStmt *stmt = ifBlocks->Nth(i);
+                stmt->retrieveExternHeaderAndLibraries(includesAndLinksMap);
         }
 }

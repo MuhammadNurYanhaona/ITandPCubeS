@@ -19,6 +19,7 @@ class ParamReplacementConfig;
 class FlowStageConstrInfo;
 class VariableAccess;
 class TaskEnvStat;
+class IncludesAndLinksMap;
 
 class DefineSection : public Node {
   protected:
@@ -50,6 +51,10 @@ class InitializeSection : public Node {
 	void performScopeAndTypeChecking(Scope *parentScope);
 	List<Type*> *getArgumentTypes() { return argumentTypes; }
 	void performVariableAccessAnalysis(Scope *taskGlobalScope);	
+	 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	List<const char*> *getArguments();
 };
 
 class EnvironmentLink : public Node {
@@ -399,10 +404,17 @@ class TaskDef : public Definition {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
 	CompositeStage *getComputation(); 
+	InitializeSection *getInitSection() { return initialize; }
 	List<EnvironmentLink*> *getEnvironmentLinks();
 	PartitionHierarchy *getPartitionHierarchy();
 	List<const char*> *getRepeatIndexes();
 	const char *getName() { return id->getName(); }
+	List<Identifier*> *getPartitionArguments();
+
+	// As the name suggests, this function retrieves the header files to be included during compilation
+        // and libraries to be linked during code generation for successful execution of all extern code 
+	// blocks used within an IT task.
+        IncludesAndLinksMap *getExternBlocksHeadersAndLibraries();
 };
 
 #endif

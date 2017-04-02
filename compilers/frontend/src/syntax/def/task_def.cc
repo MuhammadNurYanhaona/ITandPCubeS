@@ -14,6 +14,7 @@
 #include "../../semantics/computation_flow.h"
 #include "../../semantics/data_access.h"
 #include "../../static-analysis/task_env_stat.h"
+#include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 #include "../../../../common-libs/utils/string_utils.h"
@@ -317,4 +318,14 @@ List<const char*> *TaskDef::getRepeatIndexes() {
 	List<const char*> *indexList = new List<const char*>;
 	compute->retrieveRepeatIndexes(indexList);
 	return indexList;
+}
+
+List<Identifier*> *TaskDef::getPartitionArguments() {
+        return partition->getArguments();
+}
+
+IncludesAndLinksMap *TaskDef::getExternBlocksHeadersAndLibraries() {
+        IncludesAndLinksMap *configMap = new IncludesAndLinksMap();
+        computation->retriveExternCodeBlocksConfigs(configMap);
+        return configMap;
 }

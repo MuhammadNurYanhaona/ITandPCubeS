@@ -21,6 +21,7 @@ class DataDependencies;
 class StageSyncReqs;
 class StageSyncDependencies;
 class CommunicationCharacteristics;
+class IncludesAndLinksMap;
 
 /*	Base class for representing a stage in the execution flow of a task. Instead of directly using the compute and 
 	meta-compute stages that we get from the abstract syntax tree, we derive a modified set of flow stages that are 
@@ -237,6 +238,15 @@ class FlowStage {
         virtual List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
 	
 	//-------------------------------------------------------------------------------------------------------------
+
+	// functions for determining extern linking requirements ------------------------------------------------------
+	
+	// This function is used to recursively determine all external header file inclusions and library linkages
+        // for external code blocks present in the class. This header files and library links are applied during
+        // compilation and linkage of the generated code.       
+        virtual void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {}
+	
+	//-------------------------------------------------------------------------------------------------------------
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 
@@ -290,6 +300,16 @@ class StageInstanciation : public FlowStage {
 	void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList);
 	FlowStage *getLastAccessorStage(const char *varName);
 
+	//-------------------------------------------------------------------------------------------------------------
+	
+	//-------------------------------------------------------------------------------------------------------------
+
+	//----------------------------------------------------------------- Common helper functions for Code Generation
+	
+	// functions for determining extern linking requirements ------------------------------------------------------
+	
+        void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap);
+	
 	//-------------------------------------------------------------------------------------------------------------
 };
 
@@ -409,6 +429,12 @@ class CompositeStage : public FlowStage {
 
         List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
         List<CommunicationCharacteristics*> *getCommCharacteristicsForSyncReqs(int segmentedPPS);
+	
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for determining extern linking requirements ------------------------------------------------------
+	
+        void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap);
 	
 	//-------------------------------------------------------------------------------------------------------------
 };

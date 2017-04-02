@@ -120,6 +120,10 @@ class TupleDef : public Definition {
 	void flagAsEnvironment() { environment = true; }
         bool isEnvironment() { return environment; }
 	VariableDef *getComponent(const char *name);
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	List<VariableDef*> *getComponents() { return components; }
 };
 
 class CoordinatorDef : public Definition {
@@ -196,6 +200,15 @@ class FunctionDef : public Definition {
 			Identifier *callerId);
   protected:
 	FunctionInstance *getInstanceForParamTypes(List<Type*> *paramTypes);	
+
+  public:
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	// As the name suggests, this function retrieves the header files to be included during compilation
+        // and libraries to linked during code generation for successful execution of all extern code bloks
+        // used within a function.
+        IncludesAndLinksMap *getExternBlocksHeadersAndLibraries();
 };
 
 // IT functions are type polymorphic. To generate code for a function for a specific call context, we need
