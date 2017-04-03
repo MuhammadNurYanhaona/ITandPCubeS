@@ -101,6 +101,25 @@ class Expr : public Stmt {
 	// for the second function as needed.
         void analyseEpochDependencies(Space *space) { setEpochVersions(space, 0); }
         virtual void setEpochVersions(Space *space, int epoch) {}
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	void setType(Type *type) { this->type = type; }
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space = NULL);
+        virtual void translate(std::ostringstream &stream,
+                        int indentLevel, 
+			int currentLineLength = 0, 
+			Space *space = NULL);
 };
 
 class IntConstant : public Expr {
@@ -118,6 +137,17 @@ class IntConstant : public Expr {
 
         Node *clone() { return new IntConstant(*GetLocation(), value, size); }
 	ExprTypeId getExprTypeId() { return INT_CONST; };
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &s, int i, int c, Space *space);
 };
 
 class FloatConstant : public Expr {
@@ -132,6 +162,17 @@ class FloatConstant : public Expr {
 
         Node *clone() { return new FloatConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return FLOAT_CONST; };
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &s, int i, int c, Space *space);
 };
 
 class DoubleConstant : public Expr {
@@ -146,6 +187,17 @@ class DoubleConstant : public Expr {
 
         Node *clone() { return new DoubleConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return DOUBLE_CONST; };
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &s, int i, int c, Space *space);
 };
 
 class BoolConstant : public Expr {
@@ -160,6 +212,17 @@ class BoolConstant : public Expr {
 
         Node *clone() { return new BoolConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return BOOL_CONST; };
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &s, int i, int c, Space *space);
 };
 
 class StringConstant : public Expr {
@@ -175,6 +238,17 @@ class StringConstant : public Expr {
 
         Node *clone() { return new StringConstant(*GetLocation(), strdup(value)); }
 	ExprTypeId getExprTypeId() { return STRING_CONST; };
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void translate(std::ostringstream &s, int i, int c, Space *space);
 };
 
 class CharConstant : public Expr {
@@ -189,6 +263,17 @@ class CharConstant : public Expr {
 
         Node *clone() { return new CharConstant(*GetLocation(), value); }
 	ExprTypeId getExprTypeId() { return CHAR_CONST; };
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &s, int i, int c, Space *space);
 };
 
 class ReductionVar : public Expr {
@@ -217,6 +302,17 @@ class ReductionVar : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
 	char getSpaceId() { return spaceId; }
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &s, int i, int c, Space *space);
 };
 
 class ArithmaticExpr : public Expr {
@@ -246,6 +342,17 @@ class ArithmaticExpr : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 };
 
 class LogicalExpr : public Expr {
@@ -277,6 +384,28 @@ class LogicalExpr : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+        List<LogicalExpr*> *getANDBreakDown();
+        static List<LogicalExpr*> *getIndexRestrictExpr(List<LogicalExpr*> *exprList,
+                        std::ostringstream &stream,
+                        const char *indexVar, const char *rangeExpr,
+                        int indentLevel, Space *space,
+                        bool xformedArrayRange, const char *arrayName, int dimensionNo);
+        int isLoopRestrictExpr(const char *loopIndex);
+        static bool transformIndexRestriction(std::ostringstream &stream,
+                        const char *varName, const char *arrayName, int dimensionNo,
+                        int indentLevel, Space *space,
+                        bool normalizedToMinOfRange, bool lowerBound);
 };
 
 class EpochExpr : public Expr {
@@ -307,6 +436,17 @@ class EpochExpr : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 };
 
 class FieldAccess : public Expr {
@@ -360,6 +500,26 @@ class FieldAccess : public Expr {
         
 	void setEpochVersions(Space *space, int epoch);
 	void setEpochVersion(int epoch) { this->epochVersion = epoch; }
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	Expr *getBase() { return base; }	
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+        void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+        void translateIndex(std::ostringstream &stream, const char *array, int dimension);
+        bool isEnvArrayDim();
+        void translateEnvArrayDim(std::ostringstream &stream,
+                        int indentLevel,
+                        int currentLineLength, Space *space);
 };
 
 class RangeExpr : public Expr {
@@ -397,6 +557,24 @@ class RangeExpr : public Expr {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
 	FieldAccess *getIndex() { return index; }
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+        const char *getBaseArrayForRange(Space *executionSpace);
+        int getDimensionForRange(Space *executionSpace);
+        void generateLoopForRangeExpr(std::ostringstream &stream,
+                        int indentation, Space *space, const char *loopbounRestrictCond = NULL);
+        void translateArrayRangeExprCheck(std::ostringstream &stream, int indentLevel, Space *space);
+        void generateAssignmentExprForXformedIndex(std::ostringstream &stream,
+                        int indentLevel, Space *space);
 };	
 
 class AssignmentExpr : public Expr {
@@ -427,6 +605,18 @@ class AssignmentExpr : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+        void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class IndexRange : public Expr {
@@ -461,6 +651,22 @@ class IndexRange : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+	
+	Expr *getBegin() { return begin; }
+	Expr *getEnd() { return end; }
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 };
 
 class ArrayAccess : public Expr {
@@ -518,6 +724,22 @@ class ArrayAccess : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+        void generate1DIndexAccess(std::ostringstream &stream, int indentLevel,
+                        const char *array, ArrayType *type, Space *space);
+        void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+        void generateXformedIndex(std::ostringstream &stream, int indentLevel,
+                        const char *indexExpr,
+                        const char *arrayName, int dimensionNo, Space *space);
 };
 
 class FunctionCall : public Expr {
@@ -545,6 +767,18 @@ class FunctionCall : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+        void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class NamedArgument : public Node {
@@ -610,6 +844,18 @@ class TaskInvocation : public Expr {
 
   protected:
 	NamedMultiArgument *retrieveArgByName(const char *argName);
+
+  public:
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+        
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class ObjectCreate : public Expr {
@@ -636,6 +882,19 @@ class ObjectCreate : public Expr {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         
 	void setEpochVersions(Space *space, int epoch);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
+        void generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel);
+        static bool isDynamicArrayCreate(Expr *candidateExpr);
 };
 
 #endif

@@ -456,7 +456,6 @@ void generateTaskExecutor(TaskGenerator *taskGenerator) {
 	programFile.close();
 }
 
-/*
 void generateMain(ProgramDef *programDef, const char *programFile) {
 	
 	std::cout << "Generating main function for the program\n";
@@ -468,7 +467,8 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         }
 	decorator::writeSectionHeader(stream, "main function");
 
-	CoordinatorDef *coordDef = programDef->getProgramController();
+	List<Definition*> *coordDefList = programDef->getComponentsByType(COORD_DEF);
+	CoordinatorDef *coordDef = (CoordinatorDef*) coordDefList->Nth(0);
 
         // write the function signature
         stream << "\nint main(int argc, char *argv[]) {\n\n";
@@ -546,16 +546,15 @@ void generateMain(ProgramDef *programDef, const char *programFile) {
         stream << "}\n";
         stream.close();
 }
-*/
 
-/*
 void processCoordinatorProgram(ProgramDef *programDef, const char *headerFile, const char *programFile) {
         
 	std::cout << "\n-----------------------------------------------------------------\n";
         std::cout << "Handling Task-Invocator/Coordinator-Program";
         std::cout << "\n-----------------------------------------------------------------\n";
 	
-	CoordinatorDef *coordDef = programDef->getProgramController();
+	List<Definition*> *coordDefList = programDef->getComponentsByType(COORD_DEF);
+	CoordinatorDef *coordDef = (CoordinatorDef*) coordDefList->Nth(0);
 
 	// initializing the header and program files with appropriate include directives
 	initiateProgramHeaders(headerFile, programFile, programDef);
@@ -570,4 +569,3 @@ void processCoordinatorProgram(ProgramDef *programDef, const char *headerFile, c
 	header << "\n#endif\n";
 	header.close();
 }
-*/	

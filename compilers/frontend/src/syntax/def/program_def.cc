@@ -167,3 +167,5 @@ void ProgramDef::performStaticAnalysis() {
 		taskDef->performStaticAnalysis();
 	}	
 }
+
+Scope *ProgramDef::getScope() { return symbol->getNestedScope(); }

@@ -17,8 +17,6 @@ class CoordinatorDef;
 class FunctionInstance;
 class Scope;
 
-enum DefTypeId { VAR_DEF, PROG_DEF, FN_DEF, CLASS_DEF, COORD_DEF, TASK_DEF };
-
 class Definition : public Node {	
   public:
 	Definition() : Node() {}
@@ -93,6 +91,10 @@ class ProgramDef : public Definition {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
 	void performStaticAnalysis();
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	Scope *getScope();
 };
 
 class TupleDef : public Definition {
@@ -146,6 +148,18 @@ class CoordinatorDef : public Definition {
 	Node *clone();
 	DefTypeId getDefTypeId() { return COORD_DEF; }
 	void validateScope(Scope *parentScope);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void declareVariablesInScope(std::ostringstream &stream, int indent);
+        void generateCode(std::ostringstream &stream, Scope *scope);
 };
 
 class FunctionArg : public Node {
@@ -209,6 +223,8 @@ class FunctionDef : public Definition {
         // and libraries to linked during code generation for successful execution of all extern code bloks
         // used within a function.
         IncludesAndLinksMap *getExternBlocksHeadersAndLibraries();
+
+	List<FunctionInstance*> *getInstanceList();
 };
 
 // IT functions are type polymorphic. To generate code for a function for a specific call context, we need
@@ -246,6 +262,17 @@ class FunctionInstance {
 
 	// return the function that has been added in the instance stack most recently
 	static FunctionInstance *getMostRecentFunction();
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+        
+	void generateCode(std::ostringstream &stream);
 };
 
 #endif

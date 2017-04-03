@@ -107,6 +107,8 @@ FlowStage *StageInstanciation::getLastAccessorStage(const char *varName) {
 	return NULL;
 }
 
+bool StageInstanciation::hasNestedReductions() { return (nestedReductions->NumElements() > 0); }
+
 void StageInstanciation::retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {
 	code->retrieveExternHeaderAndLibraries(externConfigMap);
 }

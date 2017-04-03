@@ -85,6 +85,17 @@ class Root : public LibraryFunction {
 	int resolveExprTypes(Scope *scope);
 	int inferExprTypes(Scope *scope, Type *assignedType);
 	int emitErrorsInArguments(Scope *scope);
+
+        //-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 class Random : public LibraryFunction {
@@ -95,7 +106,18 @@ class Random : public LibraryFunction {
 		this->type = Type::intType;
 	}
 	int emitErrorsInArguments(Scope *scope) { return 0; }
-	int countTypeErrors();	
+	int countTypeErrors();
+
+        //-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 /*------------------------------------------------------------------------------------------------------------- 
@@ -118,13 +140,35 @@ class LoadArray : public ArrayOperation {
 	static const char *Name;	
 	LoadArray(Identifier *id, List<Expr*> *arguments, 
 			yyltype loc) : ArrayOperation(id, arguments, loc) {}
+
+        //-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 class StoreArray : public ArrayOperation {
   public:
 	static const char *Name;	
 	StoreArray(Identifier *id, List<Expr*> *arguments, 
-			yyltype loc) : ArrayOperation(id, arguments, loc) {}	
+			yyltype loc) : ArrayOperation(id, arguments, loc) {}
+
+        //-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/	
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 /*------------------------------------------------------------------------------------------------------------- 
@@ -146,12 +190,34 @@ class BindInput : public BindOperation {
   public:
 	static const char *Name;
 	BindInput(Identifier *id, List<Expr*> *args, yyltype loc) : BindOperation(id, args, loc) {}
+
+        //-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 class BindOutput : public BindOperation {
   public:
 	static const char *Name;
 	BindOutput(Identifier *id, List<Expr*> *args, yyltype loc) : BindOperation(id, args, loc) {}
+
+        //-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
 };
 
 #endif

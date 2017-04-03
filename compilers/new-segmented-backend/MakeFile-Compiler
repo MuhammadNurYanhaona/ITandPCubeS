@@ -18,7 +18,8 @@ BACK_END_SRC_DIR=src
 
 # Set up the list of common library sources
 COMMON_LIB = $(shell find $(COMMON_LIBS_DIR) ! -name "hashtable.cc" -name "*.cc")
-FRONT_END_SRC = $(shell find $(FRONT_END_SRC_DIR) ! -name "main.cc" -name "*.cc")
+FRONT_END_SRC = $(shell find $(FRONT_END_SRC_DIR) ! -name "main.cc" -name "*.cc" ! -name "*_hack.cc")
+#FRONT_END_SRC = $(shell find $(FRONT_END_SRC_DIR) ! -name "main.cc" -name "*.cc")
 BACK_END_SRC = $(shell find $(BACK_END_SRC_DIR) -name "*.cc")
 
 # object file listing
@@ -79,17 +80,17 @@ BUILD_LIBS = -pthread
 lex.yy.o: lex.yy.c 
 	$(CC) $(CFLAGS) -c -o $@ $(GRAMMAR_DIR)/lex.yy.c
 
-lex.yy.c: $(GRAMMAR_DIR)/IT.l $(GRAMMAR_DIR)/IT.y $(GRAMMAR_DIR)/y.tab.h 
+lex.yy.c: $(GRAMMAR_DIR)/IT.l $(GRAMMAR_DIR)/IT.y y.tab.h y.tab.c 
 	$(LEX) $(LEXFLAGS) $(GRAMMAR_DIR)/IT.l
 	cp lex.yy.c $(GRAMMAR_DIR)
 
 y.tab.o: y.tab.c
+	cp y.tab.h $(GRAMMAR_DIR)
+	cp y.tab.c $(GRAMMAR_DIR)
 	$(CC) $(CFLAGS) -c -o y.tab.o $(GRAMMAR_DIR)/y.tab.c
 
 y.tab.h y.tab.c: $(GRAMMAR_DIR)/IT.y
 	$(YACC) $(YACCFLAGS) $(GRAMMAR_DIR)/IT.y
-	cp y.tab.h $(GRAMMAR_DIR)
-	cp y.tab.c $(GRAMMAR_DIR)
 
 .cc.o: $*.cc
 	$(CC) $(CFLAGS) $(RFLAG) -c -o $@ $*.cc

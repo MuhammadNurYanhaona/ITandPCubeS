@@ -305,12 +305,30 @@ class StageInstanciation : public FlowStage {
 	//-------------------------------------------------------------------------------------------------------------
 
 	//----------------------------------------------------------------- Common helper functions for Code Generation
+
+	// functions for aiding implementing reductions ---------------------------------------------------------------
+
+	bool hasNestedReductions();	
+	
+	//-------------------------------------------------------------------------------------------------------------
 	
 	// functions for determining extern linking requirements ------------------------------------------------------
 	
         void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap);
 	
 	//-------------------------------------------------------------------------------------------------------------
+
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+
+	void translateCode(std::ofstream &stream);
+        void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	A composite stage is a holder of other flow stages and control blocks as a sub-flow. */
@@ -437,6 +455,17 @@ class CompositeStage : public FlowStage {
         void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap);
 	
 	//-------------------------------------------------------------------------------------------------------------
+
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+
+	virtual void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	A repeat control block is a composite stage being iterated over under the control of a repeat instruction.
@@ -485,6 +514,17 @@ class RepeatControlBlock : public CompositeStage {
 	void analyzeSynchronizationNeeds();
 	
 	//-------------------------------------------------------------------------------------------------------------
+	
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	A conditional execution block represents a composite stage that has the nested sub-flow set to be executed
@@ -521,6 +561,17 @@ class ConditionalExecutionBlock : public CompositeStage {
 	void analyzeSynchronizationNeeds();
 	
 	//-------------------------------------------------------------------------------------------------------------
+	
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	This represents a transition in the Computation flow of the task from an ancestor LPS to a descendent LPS.
@@ -531,6 +582,17 @@ class LpsTransitionBlock : public CompositeStage {
   public:
 	LpsTransitionBlock(Space *space, Space *ancestorSpace);		
 	void print(int indent);
+	
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	This represents a sub-flow boundary at the end of which the versions of all multi-version data structures
@@ -555,6 +617,17 @@ class EpochBoundaryBlock : public CompositeStage {
 	void recordEpochVariableUsage(const char *varName,  const char *spaceName);
 
 	//-------------------------------------------------------------------------------------------------------------
+	
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	This represents a compiler generated code-block boundary added for setup and tear down of resources related
@@ -576,6 +649,17 @@ class ReductionBoundaryBlock : public CompositeStage {
 	void validateReductions();
 
 	//-------------------------------------------------------------------------------------------------------------
+	
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+
+	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 #endif

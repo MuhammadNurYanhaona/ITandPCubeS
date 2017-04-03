@@ -29,16 +29,18 @@ class Type : public Node {
 
         virtual Node *clone();
 
-	// These are helper methods for generating the C++ type declaration of an IT variable. Subclasses should 
-	// override these methods to apply appropriate equivalent C++ type.
-        virtual const char *getCType() { return typeName; }
-        virtual const char *getCppDeclaration(const char *varName, bool pointer = false);
-
 	// These two functions are needed for expression type inferrence, and for type validation and matching.
 	virtual bool isAssignableFrom(Type *other);
         virtual bool isEqual(Type *other) { return this == other; }
 
 	static void storeBuiltInTypesInScope(Scope *scope);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation	
+
+	// These are helper methods for generating the C++ type declaration of an IT variable. Subclasses should 
+	// override these methods to apply appropriate equivalent C++ type.
+        virtual const char *getCType() { return typeName; }
+        virtual const char *getCppDeclaration(const char *varName, bool pointer = false);
 };
 
 class NamedType : public Type {
@@ -60,8 +62,6 @@ class NamedType : public Type {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
-	const char *getCType();
-        const char *getCppDeclaration(const char *varName, bool pointer);
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
         bool isEqual(Type *other);
 	
@@ -70,6 +70,11 @@ class NamedType : public Type {
         bool isEnvironmentType() { return environmentType; }
         void setTaskName(const char *taskName) { this->taskName = taskName; }
         const char *getTaskName() { return taskName; }
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation	
+	
+	const char *getCType();
+        const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class ArrayType : public Type {
@@ -87,12 +92,15 @@ class ArrayType : public Type {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         virtual Node *clone();
-	const char *getCType();
-        virtual const char *getCppDeclaration(const char *varName, bool pointer);
 	Type *getTerminalElementType();
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
         bool isEqual(Type *other);
 	virtual Type *reduceADimension();
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation	
+	
+	const char *getCType();
+        virtual const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class StaticArrayType : public ArrayType {
@@ -108,8 +116,11 @@ class StaticArrayType : public ArrayType {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
-        const char *getCppDeclaration(const char *varName, bool pointer);
 	Type *reduceADimension();
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation	
+        
+	const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class ListType : public Type {
@@ -124,11 +135,14 @@ class ListType : public Type {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
-	const char *getCType();
-        const char *getCppDeclaration(const char *varName, bool pointer);
 	Type *getTerminalElementType();
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
         bool isEqual(Type *other);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation	
+	
+	const char *getCType();
+        const char *getCppDeclaration(const char *varName, bool pointer);
 };
 
 class MapType : public Type {
@@ -148,10 +162,13 @@ class MapType : public Type {
 	//------------------------------------------------------------------ Helper functions for Semantic Analysis
 
         Node *clone();
-	const char *getCType() { return strdup("Hashtable<void*>"); }
-        const char *getCppDeclaration(const char *varName, bool pointer);
 	bool isAssignableFrom(Type *other) { return isEqual(other); }
         bool isEqual(Type *other);
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation	
+	
+	const char *getCType() { return strdup("Hashtable<void*>"); }
+        const char *getCppDeclaration(const char *varName, bool pointer);
 };
  
 #endif

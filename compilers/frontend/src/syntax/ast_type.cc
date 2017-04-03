@@ -45,14 +45,6 @@ Node *Type::clone() {
 	return new Type(strdup(typeName));
 }
 
-const char *Type::getCppDeclaration(const char *varName, bool pointer) {
-        std::ostringstream decl;
-        decl << typeName << " ";
-        if (pointer) decl << "*";
-        decl << varName;
-        return strdup(decl.str().c_str());
-}
-
 void Type::storeBuiltInTypesInScope(Scope *scope) {
 
         //----------------------------------------------------store the primitive types
@@ -131,6 +123,14 @@ bool Type::isAssignableFrom(Type *other) {
         } else { return this == other; }
 }
 
+const char *Type::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << typeName << " ";
+        if (pointer) decl << "*";
+        decl << varName;
+        return strdup(decl.str().c_str());
+}
+
 //---------------------------------------------- Tuple Type ------------------------------------------------/
 
 NamedType::NamedType(Identifier *i) : Type(*i->GetLocation()) {
@@ -149,6 +149,12 @@ Node *NamedType::clone() {
 	return new NamedType(newId);
 }
 
+bool NamedType::isEqual(Type *other) {
+        NamedType *otherType = dynamic_cast<NamedType*>(other);
+        if (otherType == NULL) return false;
+        return strcmp(this->getName(), otherType->getName()) == 0;
+}
+
 const char *NamedType::getCType() {
         if (!environmentType) return id->getName();
         std::ostringstream stream;
@@ -164,12 +170,6 @@ const char *NamedType::getCppDeclaration(const char *varName, bool pointer) {
         if (environmentType) decl << "*";
         decl << varName;
         return strdup(decl.str().c_str());
-}
-
-bool NamedType::isEqual(Type *other) {
-        NamedType *otherType = dynamic_cast<NamedType*>(other);
-        if (otherType == NULL) return false;
-        return strcmp(this->getName(), otherType->getName()) == 0;
 }
 
 //---------------------------------------------- Array Type ------------------------------------------------/
@@ -207,18 +207,6 @@ Node *ArrayType::clone() {
 	return new ArrayType(*GetLocation(), newElemType, dimensions);
 }
 
-const char *ArrayType::getCType() {
-        std::ostringstream cName;
-        cName << elemType->getCType() << "*";
-        return strdup(cName.str().c_str());
-}
-
-const char *ArrayType::getCppDeclaration(const char *varName, bool pointer) {
-        std::ostringstream decl;
-        decl << this->getCType() << " " << varName;
-        return strdup(decl.str().c_str());
-}
-
 bool ArrayType::isEqual(Type *other) {
         ArrayType *otherArray = dynamic_cast<ArrayType*>(other);
         if (otherArray == NULL) return false;
@@ -229,6 +217,18 @@ bool ArrayType::isEqual(Type *other) {
 Type *ArrayType::reduceADimension() {
         if (dimensions == 1) return elemType;
         return new ArrayType(*GetLocation(), elemType, dimensions - 1);
+}
+
+const char *ArrayType::getCType() {
+        std::ostringstream cName;
+        cName << elemType->getCType() << "*";
+        return strdup(cName.str().c_str());
+}
+
+const char *ArrayType::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << this->getCType() << " " << varName;
+        return strdup(decl.str().c_str());
 }
 
 //------------------------------------------- Static Array Type --------------------------------------------/
@@ -254,17 +254,6 @@ Node *StaticArrayType::clone() {
 	return newType;	
 }
 
-const char *StaticArrayType::getCppDeclaration(const char *varName, bool pointer) {
-        std::ostringstream decl;
-        decl << elemType->getCType() << " ";
-        if (pointer) decl << "*";
-        decl << varName;
-        for (int i = 0; i < dimensionLengths->NumElements(); i++) {
-                decl << '[' << dimensionLengths->Nth(i) << ']';
-        }
-        return strdup(decl.str().c_str());
-}
-
 Type *ArrayType::getTerminalElementType() {
         ArrayType *elemArray = dynamic_cast<ArrayType*>(elemType);
         if (elemArray != NULL) {
@@ -282,6 +271,17 @@ Type *StaticArrayType::reduceADimension() {
         }
         arrayType->setLengths(dims);
         return arrayType;
+}
+
+const char *StaticArrayType::getCppDeclaration(const char *varName, bool pointer) {
+        std::ostringstream decl;
+        decl << elemType->getCType() << " ";
+        if (pointer) decl << "*";
+        decl << varName;
+        for (int i = 0; i < dimensionLengths->NumElements(); i++) {
+                decl << '[' << dimensionLengths->Nth(i) << ']';
+        }
+        return strdup(decl.str().c_str());
 }
 
 //---------------------------------------------- List Type -------------------------------------------------/
@@ -310,6 +310,20 @@ Node *ListType::clone() {
 	return new ListType(*GetLocation(), newElemType);
 }
 
+bool ListType::isEqual(Type *other) {
+        ListType *otherList = dynamic_cast<ListType*>(other);
+        if (otherList == NULL) return false;
+        return this->elemType->isEqual(otherList->elemType);
+}
+
+Type *ListType::getTerminalElementType() {
+        ArrayType *elemArray = dynamic_cast<ArrayType*>(elemType);
+        if (elemArray != NULL) {
+                return elemArray->getTerminalElementType();
+        }
+        return elemType;
+}
+
 const char *ListType::getCType() {
         std::ostringstream cType;
         cType << "std::vector<" << elemType->getCType() << ">";
@@ -322,20 +336,6 @@ const char *ListType::getCppDeclaration(const char *varName, bool pointer) {
         if (pointer) decl << "*";
         decl << varName;
         return strdup(decl.str().c_str());
-}
-
-Type *ListType::getTerminalElementType() {
-        ArrayType *elemArray = dynamic_cast<ArrayType*>(elemType);
-        if (elemArray != NULL) {
-                return elemArray->getTerminalElementType();
-        }
-        return elemType;
-}
-
-bool ListType::isEqual(Type *other) {
-        ListType *otherList = dynamic_cast<ListType*>(other);
-        if (otherList == NULL) return false;
-        return this->elemType->isEqual(otherList->elemType);
 }
 
 //---------------------------------------------- Map Type --------------------------------------------------/

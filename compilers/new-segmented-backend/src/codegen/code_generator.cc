@@ -992,7 +992,6 @@ void generateClassesForGlobalScalars(const char *filePath, List<TaskGlobalScalar
 	headerFile.close();
 }
 
-/*
 void generateInitializeFunction(const char *headerFileName, const char *programFileName, const char *initials,
                 List<const char*> *envLinkList, TaskDef *taskDef, Space *rootLps) {
 
@@ -1055,7 +1054,7 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
                 }
         }
 
-        InitializeInstr *initSection = taskDef->getInitSection();
+        InitializeSection *initSection = taskDef->getInitSection();
         if (initSection != NULL) {
 
                 // iterate over all initialization parameters and add them as function arguments
@@ -1092,7 +1091,7 @@ void generateInitializeFunction(const char *headerFileName, const char *programF
         headerFile.close();
         programFile.close();
 }
-*/
+
 
 // an auxiliary function to be used by the function immediately following it to group extern library links
 void groupLibrayLinkInfo(Hashtable<List<const char*>*> *languageLibraryMap, 

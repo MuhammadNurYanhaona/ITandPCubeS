@@ -174,6 +174,8 @@ IncludesAndLinksMap *FunctionDef::getExternBlocksHeadersAndLibraries() {
 	return configMap;		
 }
 
+List<FunctionInstance*> *FunctionDef::getInstanceList() { return instanceList; }
+
 //---------------------------------------- Function Instance ------------------------------------------/
 
 List<const char*> *FunctionInstance::fnNameStack = new List<const char*>;

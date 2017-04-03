@@ -9,6 +9,7 @@
 #include <sstream>
 
 class Expr;
+class LogicalExpr;
 class ReductionVar;
 class FieldAccess;
 class Scope;
@@ -85,6 +86,17 @@ class Stmt : public Node {
 	// this function is used to recursively determine all the header file includes and library links 
 	// for different extern code blocks present in an IT task
         virtual void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap) {}
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+        virtual void generateCode(std::ostringstream &stream, int indentLevel, Space *space = NULL);
 };
 
 class StmtBlock : public Stmt {
@@ -116,6 +128,17 @@ class StmtBlock : public Stmt {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 	
         void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class ConditionalStmt: public Stmt {
@@ -148,6 +171,17 @@ class ConditionalStmt: public Stmt {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 	
         void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, bool first, Space *space);
 };
 
 class IfStmt: public Stmt {
@@ -179,6 +213,17 @@ class IfStmt: public Stmt {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 	
         void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class IndexRangeCondition: public Node {
@@ -209,6 +254,17 @@ class IndexRangeCondition: public Node {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	LogicalExpr *getRestrictions();
 };
 
 class LoopStmt: public Stmt {
@@ -227,6 +283,25 @@ class LoopStmt: public Stmt {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 	
         void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+        void declareVariablesInScope(std::ostringstream &stream, int indentLevel);
+        void generateIndexLoops(std::ostringstream &stream, int indentLevel,
+                        Space *space, Stmt *body, List<LogicalExpr*> *indexRestrictions = NULL);
+        List<LogicalExpr*> *getApplicableExprs(Hashtable<const char*> *indexesInvisible,
+                        List<LogicalExpr*> *currentExprList,
+                        List<LogicalExpr*> *remainingExprList);
+        void initializeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
+        void finalizeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
+        void performReduction(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class PLoopStmt: public LoopStmt {
@@ -251,6 +326,18 @@ class PLoopStmt: public LoopStmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
+        List<LogicalExpr*> *getIndexRestrictions();
 };
 
 class SLoopAttribute {
@@ -295,6 +382,17 @@ class SLoopStmt: public LoopStmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class WhileStmt: public Stmt {
@@ -327,6 +425,17 @@ class WhileStmt: public Stmt {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 	
         void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class ReductionStmt: public Stmt {
@@ -370,6 +479,17 @@ class ReductionStmt: public Stmt {
 	void extractReductionInfo(List<ReductionMetadata*> *infoSet,
 			PartitionHierarchy *lpsHierarchy, 
 			Space *executingLps);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class ExternCodeBlock: public Stmt {
@@ -411,6 +531,17 @@ class ExternCodeBlock: public Stmt {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 	
         void retrieveExternHeaderAndLibraries(IncludesAndLinksMap *includesAndLinksMap);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class ReturnStmt: public Stmt {
@@ -444,6 +575,17 @@ class ReturnStmt: public Stmt {
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+	
+	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 #endif

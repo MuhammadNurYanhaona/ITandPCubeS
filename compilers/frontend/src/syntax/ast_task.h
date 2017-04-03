@@ -55,6 +55,17 @@ class InitializeSection : public Node {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
 	List<const char*> *getArguments();
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateCode(std::ostringstream &stream);
 };
 
 class EnvironmentLink : public Node {
