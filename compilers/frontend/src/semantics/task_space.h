@@ -83,6 +83,8 @@ class PartitionFunctionConfig {
 
         //------------------------------------------------------------- Common helper functions for Code Generation
 
+	// functions to aid memory managment of data parts --------------------------------------------------------
+
 	// A dimension configuration object is created for each dimension of a data structure at runtime to decide
         // about the shape of each data part. The configuration object being instantiated depends on the partition
         // function being used to divide the dimension of the structure. This function returns the name of the dim-
@@ -90,6 +92,38 @@ class PartitionFunctionConfig {
         // has a corresponding dimension configuration class. A class with matching name should be present in the
 	// memory management module of the backend compiler.
         virtual const char *getDimensionConfigClassName() { return NULL; }
+
+	//---------------------------------------------------------------------------------------------------------
+
+	// functions to aid array index transformation ------------------------------------------------------------
+
+	// following three functions are used to get index transformation or re-transformation expression and the
+        // specialized index inclusion check expression for functions that reorder the indexes of the dimension they
+        // partition. These expressions are used during code generation. These functions take only the name of the
+        // index to be transformed/reverse-transformed and generate the desired expressions assuming that any part-
+        // ition function parameter used to configure this LPS is available as an attribute of a partition object 
+        // and partition count and index correspond to the LPU where the test is been made is available in a part-
+        // config object. The third argument, copyMode, indicates if data copying or reference reassignment is been
+        // used for the storage of underlying data. This is needed as transformation processes for data-copy and ref-
+        // erence reassignment are different. 
+        virtual const char *getTransformedIndex(int dimensionNo,
+                        const char *origIndexName, bool copyMode) { return NULL; }
+        virtual const char *getOriginalIndex(int dimensionNo,
+                        const char *xformIndexName, bool copyMode) { return NULL; }
+        virtual const char *getInclusionTestExpr(int dimensionNo,
+                        const char *origIndexName, bool copyMode) { return NULL; }
+
+        // this function is used to transform any integer unrelated to an array index of a dimension based on the 
+        // partition function used in that dimension for that array. Here imprecise upper/lower bound is calculated 
+        // as we do not know if the compared integer falls within the LPU boundary, nonetheless we can optimize code 
+        // using an imprecise bound. For example, if the partition function is block-stride then we can use the 
+        // imprecise transformation to skips some of the strides of the current LPU during loop iterations. This 
+        // function, like its three predecessors, is only applicable for data reordering partitioning functions.        
+        virtual const char *getImpreciseBoundOnXformedIndex(int dimensionNo,
+                        const char *origIndexName,
+                        bool lowerBound, bool copyMode, int indent) { return NULL; }
+
+	//---------------------------------------------------------------------------------------------------------
 };
 
 class DataStructure {
@@ -209,6 +243,22 @@ class ArrayDataStructure : public DataStructure {
 	// This is a print function to display how different dimensions of the array are partitioned in this 
 	// LPS under concern. This function is purely for diagnostic purpose and has not been perfected.
 	void print();
+        
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	// functions to aid array index transformation ------------------------------------------------------------
+
+	// These are four functions used during code generation correspond to array dimensions that have been
+        // reordered by underlying partition functions. The transformation codes for reordered data been copied 
+        // into a new memory location for current LPS and for only LPU definition generating reordered indexes 
+        // for unordered data are different.  
+        const char *getIndexXfromExpr(int dimensionNo, const char *indexName);
+        const char *getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName);
+        const char *getReverseXformExpr(int dimensionNo, const char *xformIndex);
+        const char *getImpreciseBoundOnXformedIndex(int dimensionNo,
+                        const char *indexName, bool lowerBound, int indent);
+
+	//---------------------------------------------------------------------------------------------------------
 };
 
 /*	Token, Coordinate, and CoordinateSystem classes implement a mechanism for associating dimensions

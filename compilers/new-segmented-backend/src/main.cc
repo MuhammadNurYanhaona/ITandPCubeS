@@ -6,9 +6,9 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include "codegen/space_mapping.h"
-#include "codegen/code_generator.h"
-#include "codegen/task_invocation.h"
+#include "codegen/utils/space_mapping.h"
+#include "codegen/utils/code_generator.h"
+#include "codegen/utils/task_invocation.h"
 
 #include "../../common-libs/utils/list.h"
 #include "../../common-libs/utils/properties.h"

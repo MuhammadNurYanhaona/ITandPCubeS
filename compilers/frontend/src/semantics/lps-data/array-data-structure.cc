@@ -185,3 +185,33 @@ void ArrayDataStructure::print() {
 	}
 }
 
+const char *ArrayDataStructure::getIndexXfromExpr(int dimensionNo, const char *indexName) {
+        PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+        if (partConfig == NULL) return NULL;
+        bool copiedInLps = usageStat->isAllocated();
+        return partConfig->getTransformedIndex(dimensionNo, indexName, copiedInLps);
+}
+
+const char *ArrayDataStructure::getReorderedInclusionCheckExpr(int dimensionNo, const char *indexName) {
+        PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+        if (partConfig == NULL) return NULL;
+        bool copiedInLps = usageStat->isAllocated();
+        return partConfig->getInclusionTestExpr(dimensionNo, indexName, copiedInLps);
+}
+
+const char *ArrayDataStructure::getReverseXformExpr(int dimensionNo, const char *xformIndex) {
+        PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+        if (partConfig == NULL) return NULL;
+        bool copiedInLps = usageStat->isAllocated();
+        return partConfig->getOriginalIndex(dimensionNo, xformIndex, copiedInLps);
+}
+
+const char *ArrayDataStructure::getImpreciseBoundOnXformedIndex(int dimensionNo,
+                const char *indexName, bool lowerBound, int indent) {
+        PartitionFunctionConfig *partConfig = getPartitionSpecForDimension(dimensionNo);
+        if (partConfig == NULL) return NULL;
+        bool copiedInLps = usageStat->isAllocated();
+        return partConfig->getImpreciseBoundOnXformedIndex(dimensionNo,
+                        indexName, lowerBound, copiedInLps, indent);
+}
+
