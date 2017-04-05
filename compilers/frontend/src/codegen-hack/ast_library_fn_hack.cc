@@ -2,8 +2,9 @@
 #include "../semantics/task_space.h"
 #include <sstream>
 
-void Root::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
-void Random::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
+void Root::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {}
+void Random::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {}
+
 void LoadArray::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 void StoreArray::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 void BindInput::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}

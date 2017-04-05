@@ -95,7 +95,7 @@ class Root : public LibraryFunction {
           relevent backend compilers.   
         **********************************************************************************************************/
 
-	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 };
 
 class Random : public LibraryFunction {
@@ -117,7 +117,7 @@ class Random : public LibraryFunction {
           relevent backend compilers.   
         **********************************************************************************************************/
 
-	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);	
+	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
 };
 
 /*------------------------------------------------------------------------------------------------------------- 

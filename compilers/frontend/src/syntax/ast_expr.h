@@ -466,6 +466,24 @@ class FieldAccess : public Expr {
 	// If the field is epoch dependent then we need to know which particular version of the field to be 
 	// used during generating code for this field access. The default version number is zero. 
         int epochVersion;
+
+	//----------------------------------------------------------------------- Code Generation Helper Properties
+	
+	// Two boolean variables are retained to determine if the field access is corresponding to an
+        // array then whether its data or content is been accessed by the expression which this access
+        // is a part of. When the access is indeed correspond to an array, we in addition need to know 
+        // if local or global version (differ in how indexes are accessed) of the array been used.
+        // These facts are important for the backend compiler to locate appropriate data structure for
+        // the access as metadata and data for an array are kept separate. 
+        bool metadata;
+        bool local;
+
+        // A flag to indicate if this field is an index access on an array where the index is part of 
+        // some loop range traversal. In that case, we can just replace the field name with some other
+        // back-end variable that holds the result of computation of multi to unidirectional index 
+        // transform
+        bool index;
+
   public:
 	FieldAccess(Expr *base, Identifier *field, yyltype loc);	
 	const char *GetPrintNameForNode() { return "Field-Access"; }
@@ -503,7 +521,14 @@ class FieldAccess : public Expr {
 	
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
-	Expr *getBase() { return base; }	
+	Expr *getBase() { return base; }
+        void setMetadata(bool metadata) { this->metadata = metadata; }
+        bool isMetadata() { return metadata; }
+	void markLocal() { local = true; }
+        bool isLocal() { return local; }
+	void markAsIndex() { index = true; }
+        bool isIndex() { return index; }
+	bool isLocalTerminalField();	
 
 	//-------------------------------------------------------------------------- Code Generation Hack Functions
         /**********************************************************************************************************

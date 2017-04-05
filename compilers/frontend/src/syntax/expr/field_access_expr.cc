@@ -33,6 +33,10 @@ FieldAccess::FieldAccess(Expr *b, Identifier *f, yyltype loc) : Expr(loc) {
 	arrayField = false;
 	arrayDimensions = -1;
 	epochVersion = 0;
+
+	metadata = false;
+        local = false;
+        index = false;
 }
 
 void FieldAccess::PrintChildren(int indentLevel) {
@@ -298,6 +302,16 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
                 return table;
         } else {
                 FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+		if (baseField != NULL) { 
+                        ArrayType *array = dynamic_cast<ArrayType*>(baseField->getType());
+                        if (array != NULL) {
+                        	// set some flags in the base expression that will help us during code generation
+                                baseField->setMetadata(true);
+                                if (this->isLocalTerminalField()) {
+                                        baseField->markLocal();
+                                }
+                        }
+                }
 	        Hashtable<VariableAccess*> *table = base->getAccessedGlobalVariables(globalReferences);
                 if (baseField == NULL || !baseField->isTerminalField()) return table;
                 const char *fieldName = baseField->field->getName();
@@ -311,6 +325,7 @@ Hashtable<VariableAccess*> *FieldAccess::getAccessedGlobalVariables(TaskGlobalRe
                         } else {
                                 accessLog->markContentAccess();
                         }
+			if (this->isLocalTerminalField()) accessLog->markLocalAccess();
                 }
                 return table;
         }
@@ -353,5 +368,12 @@ void FieldAccess::setEpochVersions(Space *space, int epoch) {
 			}
                 }
         } else base->setEpochVersions(space, epoch);
+}
+
+bool FieldAccess::isLocalTerminalField() {
+        if (base == NULL) return false;
+        FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+        if (baseField == NULL) return false;
+        return (baseField->isTerminalField() && strcmp(field->getName(), Identifier::LocalId) == 0);
 }
 
