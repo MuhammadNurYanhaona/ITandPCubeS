@@ -582,6 +582,8 @@ class RangeExpr : public Expr {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
 	FieldAccess *getIndex() { return index; }
+	Expr *getRange() { return range; }
+	Expr *getStep() { return step; }
 
 	//-------------------------------------------------------------------------- Code Generation Hack Functions
         /**********************************************************************************************************
@@ -592,6 +594,9 @@ class RangeExpr : public Expr {
           relevent backend compilers.   
         **********************************************************************************************************/
 
+	const char *getIndexExpr();
+        const char *getRangeExpr(Space *space);
+        const char *getStepExpr(Space *space);
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
         const char *getBaseArrayForRange(Space *executionSpace);
         int getDimensionForRange(Space *executionSpace);
@@ -821,6 +826,17 @@ class NamedArgument : public Node {
 
         Node *clone();
 	void retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId);
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	void generateAssignment(Expr *object, std::ostringstream &stream, int indentLevel);
 };
 
 class NamedMultiArgument : public Node {

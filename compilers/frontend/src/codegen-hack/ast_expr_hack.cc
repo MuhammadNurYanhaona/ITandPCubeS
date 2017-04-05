@@ -38,6 +38,9 @@ void FieldAccess::translateEnvArrayDim(std::ostringstream &stream,
 		int indentLevel,
 		int currentLineLength, Space *space) {}
 
+const char *RangeExpr::getIndexExpr() { return NULL; }
+const char *RangeExpr::getRangeExpr(Space *space) { return NULL; }
+const char *RangeExpr::getStepExpr(Space *space) { return NULL; }
 void RangeExpr::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {}
 const char *RangeExpr::getBaseArrayForRange(Space *executionSpace) { return NULL; }
 int RangeExpr::getDimensionForRange(Space *executionSpace) { return -1; }
@@ -63,6 +66,8 @@ void FunctionCall::translate(std::ostringstream &stream, int indentLevel, int cu
 void FunctionCall::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 
 void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
+
+void NamedArgument::generateAssignment(Expr *object, std::ostringstream &stream, int indentLevel);
 
 void ObjectCreate::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {}
 void ObjectCreate::generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel) {}
