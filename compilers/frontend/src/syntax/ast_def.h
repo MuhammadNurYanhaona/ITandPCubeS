@@ -207,12 +207,12 @@ class FunctionDef : public Definition {
 	void annotateArgAccessesByType();
 
 	// This creates a new function instance for a specific parameter types combination that arouse from
-	// a specific call context. this works if the type resolution process on the function body completes 
+	// a specific call context. This works if the type resolution process on the function body completes 
 	// successfully of course. 
-	Type *resolveFnInstanceForParameterTypes(Scope *programScope, 
+	FunctionInstance *resolveFnInstanceForParameterTypes(Scope *programScope, 
 			List<Type*> *paramTypes, 
 			Identifier *callerId);
-  protected:
+	
 	FunctionInstance *getInstanceForParamTypes(List<Type*> *paramTypes);	
 
   public:
@@ -262,6 +262,10 @@ class FunctionInstance {
 
 	// return the function that has been added in the instance stack most recently
 	static FunctionInstance *getMostRecentFunction();
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	const char *getName() { return fnName; }
 
 	//-------------------------------------------------------------------------- Code Generation Hack Functions
         /**********************************************************************************************************

@@ -808,7 +808,6 @@ class FunctionCall : public Expr {
         **********************************************************************************************************/
 	
 	void translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space);
-        void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class NamedArgument : public Node {
@@ -859,7 +858,11 @@ class NamedMultiArgument : public Node {
 
 class TaskInvocation : public Expr {
   protected:
-	List<NamedMultiArgument*> *invocationArgs;	
+	List<NamedMultiArgument*> *invocationArgs;
+
+	// a reference to the task definition generated during scope-and-type checking is retained to aid
+	// code generation
+	TaskDef *taskDef;	
   public:
 	TaskInvocation(List<NamedMultiArgument*> *invocationArgs, yyltype loc);
 	const char *GetPrintNameForNode() { return "Task-Invocation"; }

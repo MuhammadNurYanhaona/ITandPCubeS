@@ -63,7 +63,6 @@ void ArrayAccess::generateXformedIndex(std::ostringstream &stream, int indentLev
 		const char *arrayName, int dimensionNo, Space *space) {}
 
 void FunctionCall::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {}
-void FunctionCall::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 
 void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 

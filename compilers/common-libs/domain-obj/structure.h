@@ -35,6 +35,7 @@ class Range {
         bool isEqual(Range other) {
         	return (this->min == other.min && this->max == other.max);
         }
+	bool contains(int value) { return (min <= value && max >= value); }
 };
 
 class Dimension {	

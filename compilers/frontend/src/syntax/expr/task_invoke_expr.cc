@@ -64,6 +64,7 @@ TaskInvocation::TaskInvocation(List<NamedMultiArgument*> *invocationArgs, yyltyp
 		NamedMultiArgument *arg = invocationArgs->Nth(i);
 		arg->SetParent(this);
 	}
+	this->taskDef = NULL;
 }
 
 void TaskInvocation::PrintChildren(int indentLevel) {
@@ -151,6 +152,7 @@ int TaskInvocation::resolveExprTypes(Scope *scope) {
 	}
 
 	if (fullyResolved) {
+		this->taskDef = taskDef;
 		this->type = Type::voidType;
 		resolvedExprs++;
 	}
