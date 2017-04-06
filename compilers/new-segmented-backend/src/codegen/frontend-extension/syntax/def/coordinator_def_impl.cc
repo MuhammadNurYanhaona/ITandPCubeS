@@ -4,6 +4,8 @@
 #include "../../../../../../frontend/src/semantics/scope.h"
 #include "../../../../../../frontend/src/semantics/data_access.h"
 
+#include <sstream>
+
 void CoordinatorDef::declareVariablesInScope(std::ostringstream &stream, int indent) {
         executionScope->declareVariables(stream, indent);
 }

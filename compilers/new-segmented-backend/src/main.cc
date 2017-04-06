@@ -9,6 +9,7 @@
 #include "codegen/utils/space_mapping.h"
 #include "codegen/utils/code_generator.h"
 #include "codegen/utils/task_invocation.h"
+#include "codegen/utils/fn_generator.h"
 
 #include "../../common-libs/utils/list.h"
 #include "../../common-libs/utils/properties.h"
@@ -75,6 +76,13 @@ int main(int argc, const char *argv[]) {
         std::ostringstream coordProgramStr;
         coordProgramStr << buildDir << buildSubDir << "/coordinator.cc";
         const char *coordProgram = strdup(coordProgramStr.str().c_str());
+	// set the output header and program files for the user defined functions
+        std::ostringstream fnHeaderStr;
+        fnHeaderStr << buildDir << buildSubDir << "/function.h";
+        const char *fnHeader = strdup(fnHeaderStr.str().c_str());
+        std::ostringstream fnProgramStr;
+        fnProgramStr << buildDir << buildSubDir << "/function.cc";
+        const char *fnProgram = strdup(fnProgramStr.str().c_str());
 	// set up the output text file for any external library linking during native code
 	// compilation process
         std::ostringstream linkageListerStr;
@@ -121,6 +129,9 @@ int main(int argc, const char *argv[]) {
 	// generate classes for the list of tuples present in the source in a header file
 	List<Definition*> *classDefs = ProgramDef::program->getComponentsByType(CLASS_DEF);
         generateClassesForTuples(tupleHeader, classDefs);
+	// generate definitions for all user-defined IT functions
+	List<Definition*> *functionDefs = ProgramDef::program->getComponentsByType(FN_DEF);
+	generateFunctions(functionDefs, fnHeader, fnProgram);
         // invoke the library handling task-invocations to generate all routines needed for 
         // multi-task management and a the main function corresponds to the coordinator 
         // program definition

@@ -209,13 +209,11 @@ class FunctionDef : public Definition {
 	// This creates a new function instance for a specific parameter types combination that arouse from
 	// a specific call context. This works if the type resolution process on the function body completes 
 	// successfully of course. 
-	FunctionInstance *resolveFnInstanceForParameterTypes(Scope *programScope, 
+	Type *resolveFnInstanceForParameterTypes(Scope *programScope, 
 			List<Type*> *paramTypes, 
 			Identifier *callerId);
 	
 	FunctionInstance *getInstanceForParamTypes(List<Type*> *paramTypes);	
-
-  public:
 
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
@@ -276,7 +274,7 @@ class FunctionInstance {
           relevent backend compilers.   
         **********************************************************************************************************/
         
-	void generateCode(std::ostringstream &stream);
+	void generateCode(std::ofstream &headerFile, std::ofstream &programFile);
 };
 
 #endif
