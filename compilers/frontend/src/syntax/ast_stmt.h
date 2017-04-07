@@ -18,6 +18,7 @@ class PartitionHierarchy;
 class Type;
 class ParamReplacementConfig;
 class TaskGlobalReferences;
+class IndexScope;
 class VariableAccess;
 class ReductionMetadata;
 class IncludesAndLinksMap;
@@ -251,18 +252,17 @@ class IndexRangeCondition: public Node {
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 	
+	// these two functions are needed for preparation and validation of associations of loop index variables
+	// with dimensions of arrays acccessed using those indexes inside the loop
+	void putIndexesInIndexScope();
+        int validateIndexAssociations(Scope *scope, IndexScope *indexScope);
+	
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
         void analyseEpochDependencies(Space *space);
 
-	//-------------------------------------------------------------------------- Code Generation Hack Functions
-        /**********************************************************************************************************
-          The code generation related function definitions that are placed here are platform specific. So ideally 
-          they should not be included here and the frontend compiler should be oblivious of them. However, as we
-          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
-          decided to keep the union of old function definitions in the frontend and put their implementations in
-          relevent backend compilers.   
-        **********************************************************************************************************/
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
 	
 	LogicalExpr *getRestrictions();
 };
@@ -273,6 +273,10 @@ class LoopStmt: public Stmt {
 	
 	// this scope is needed to declare the index variables that are used to traverse index ranges
 	Scope *scope;
+
+	// an index scope variable tracks associations among loop indices and dimensions of arrays that are
+	// accessed using those indices 
+	IndexScope *indexScope;
   public:
 	LoopStmt();
      	LoopStmt(Stmt *body, yyltype loc);
@@ -299,9 +303,6 @@ class LoopStmt: public Stmt {
         List<LogicalExpr*> *getApplicableExprs(Hashtable<const char*> *indexesInvisible,
                         List<LogicalExpr*> *currentExprList,
                         List<LogicalExpr*> *remainingExprList);
-        void initializeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
-        void finalizeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space);
-        void performReduction(std::ostringstream &stream, int indentLevel, Space *space);
 };
 
 class PLoopStmt: public LoopStmt {
@@ -327,6 +328,12 @@ class PLoopStmt: public LoopStmt {
 
         void analyseEpochDependencies(Space *space);
 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	// this returns all index traversal restrictions associated with the parallel for loop as a list of
+	// logical AND operations	
+        List<LogicalExpr*> *getIndexRestrictions();
+
 	//-------------------------------------------------------------------------- Code Generation Hack Functions
         /**********************************************************************************************************
           The code generation related function definitions that are placed here are platform specific. So ideally 
@@ -337,7 +344,6 @@ class PLoopStmt: public LoopStmt {
         **********************************************************************************************************/
 	
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
-        List<LogicalExpr*> *getIndexRestrictions();
 };
 
 class SLoopAttribute {
@@ -363,6 +369,10 @@ class SLoopStmt: public LoopStmt {
 	Expr *stepExpr;
 	Expr *restriction;
 	SLoopAttribute *attrRef;
+
+	// A sequential for loop index can iterate an array dimension's range or, alternatively, an isolated range
+	// expression. This flag variable indicates the nature of the traversal range. 
+	bool arrayIndexTraversal;
   public:
 	SLoopStmt(Identifier *id, SLoopAttribute *attr, Stmt *body, yyltype loc);	
     	const char *GetPrintNameForNode() { return "Sequential-For-Loop"; }
@@ -378,6 +388,10 @@ class SLoopStmt: public LoopStmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	// this function prepares a loop index to array dimension association scope lest the current sequential
+	// for loop is a traversal of some array dimension
+	void prepareIndexScope(Scope *executionScope);
 	
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
@@ -541,6 +555,7 @@ class ExternCodeBlock: public Stmt {
           relevent backend compilers.   
         **********************************************************************************************************/
 	
+	void declareReplacementVars(std::ostringstream &stream, std::string indents, Space *space);
 	void generateCode(std::ostringstream &stream, int indentLevel, Space *space);
 };
 

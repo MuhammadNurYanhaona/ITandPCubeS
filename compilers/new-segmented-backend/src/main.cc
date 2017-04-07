@@ -126,6 +126,9 @@ int main(int argc, const char *argv[]) {
                 // during code generation  
                 TaskDef::currentTask = taskDef;
 	}
+	// reset the current task reference before handling of user defined functions and 
+	// the program coordinator function
+        TaskDef::currentTask = NULL;
 	// generate classes for the list of tuples present in the source in a header file
 	List<Definition*> *classDefs = ProgramDef::program->getComponentsByType(CLASS_DEF);
         generateClassesForTuples(tupleHeader, classDefs);

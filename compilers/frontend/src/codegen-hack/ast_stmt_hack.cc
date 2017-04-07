@@ -13,17 +13,15 @@ void PLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space 
 void SLoopStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 void WhileStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
+
+void ExternCodeBlock::declareReplacementVars(std::ostringstream &stream, std::string indents, Space *space) {}
 void ExternCodeBlock::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
+
 void ReturnStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 
-LogicalExpr *IndexRangeCondition::getRestrictions() { return NULL; }
 void LoopStmt::declareVariablesInScope(std::ostringstream &stream, int indentLevel) {}
 void LoopStmt::generateIndexLoops(std::ostringstream &stream, int indentLevel,
 		Space *space, Stmt *body, List<LogicalExpr*> *indexRestrictions) {}
 List<LogicalExpr*> *LoopStmt::getApplicableExprs(Hashtable<const char*> *indexesInvisible,
 		List<LogicalExpr*> *currentExprList,
 		List<LogicalExpr*> *remainingExprList) { return NULL; }
-void LoopStmt::initializeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space) {}
-void LoopStmt::finalizeReductionLoop(std::ostringstream &stream, int indentLevel, Space *space) {}
-void LoopStmt::performReduction(std::ostringstream &stream, int indentLevel, Space *space) {}
-List<LogicalExpr*> *PLoopStmt::getIndexRestrictions() { return NULL; }

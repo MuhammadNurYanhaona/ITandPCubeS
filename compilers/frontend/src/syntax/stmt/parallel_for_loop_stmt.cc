@@ -8,6 +8,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/loop_index.h"
 #include "../../semantics/data_access.h"
 #include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
@@ -53,12 +54,23 @@ void PLoopStmt::retrieveExprByType(List<Expr*> *exprList, ExprTypeId typeId) {
 
 int PLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 
-	// create a new scope for the loop and enter it
+	// if needed, create a new scope for the loop and enter it
 	Scope *loopScope = NULL;
 	if (iteration == 0) {
 		loopScope = executionScope->enter_scope(new Scope(StatementBlockScope));
 	} else {
 		loopScope = executionScope->enter_scope(this->scope);
+	}
+
+	// in addition, if applicable, create a new index to array association scope and enter it
+	if (iteration == 0) {
+		IndexScope::currentScope->deriveNewScope();
+		for (int i = 0; i < rangeConditions->NumElements(); i++) {
+			IndexRangeCondition *cond = rangeConditions->Nth(i);
+			cond->putIndexesInIndexScope();
+		}
+	} else {
+		IndexScope::currentScope->enterScope(this->indexScope);
 	}
 
 	int resolvedExprs = 0;
@@ -69,6 +81,10 @@ int PLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	
 	// try to resolve the body after evaluating the iteration expression to maximize type discovery
 	resolvedExprs += body->resolveExprTypesAndScopes(loopScope, iteration);
+
+	// exit the index association scope
+	this->indexScope = IndexScope::currentScope;
+        IndexScope::currentScope->goBackToOldScope();
 
 	// exit the scope
 	loopScope->detach_from_parent();
@@ -83,6 +99,7 @@ int PLoopStmt::emitScopeAndTypeErrors(Scope *executionScope) {
         for (int i = 0; i < rangeConditions->NumElements(); i++) {
                 IndexRangeCondition *condition = rangeConditions->Nth(i);
                 errors += condition->emitScopeAndTypeErrors(loopScope);
+                errors += condition->validateIndexAssociations(loopScope, this->indexScope);
         }
         errors += body->emitScopeAndTypeErrors(loopScope);
 	loopScope->detach_from_parent();
@@ -116,5 +133,19 @@ void PLoopStmt::analyseEpochDependencies(Space *space) {
                 cond->analyseEpochDependencies(space);
         }
 	body->analyseEpochDependencies(space);
+}
+
+List<LogicalExpr*> *PLoopStmt::getIndexRestrictions() {
+        List<LogicalExpr*> *restrictionList = new List<LogicalExpr*>;
+        for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *cond = rangeConditions->Nth(i);
+                LogicalExpr *restriction = cond->getRestrictions();
+                if (restriction != NULL) {
+                        List<LogicalExpr*> *containedExprList = restriction->getANDBreakDown();
+                        for (int j = 0; j < containedExprList->NumElements(); j++)
+                        restrictionList->Append(containedExprList->Nth(j));
+                }
+        }
+        return restrictionList;
 }
 

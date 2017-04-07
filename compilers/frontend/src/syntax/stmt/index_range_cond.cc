@@ -8,6 +8,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/loop_index.h"
 #include "../../semantics/data_access.h"
 #include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
@@ -188,8 +189,64 @@ Hashtable<VariableAccess*> *IndexRangeCondition::getAccessedGlobalVariables(
         return table;
 }
 
+void IndexRangeCondition::putIndexesInIndexScope() {
+
+        IndexScope *indexScope = IndexScope::currentScope;
+        for (int i = 0; i < indexes->NumElements(); i++) {
+                
+		Identifier *index = indexes->Nth(i);
+                const char *indexName = index->getName();
+                const char *arrayName = collection->getName();
+                
+		indexScope->initiateAssociationList(indexName);
+                indexScope->setPreferredArrayForIndex(indexName, arrayName);
+                if (dimensionNo >= 0) {
+                        List<IndexArrayAssociation*> *list = indexScope->getAssociationsForIndex(indexName);
+                        list->Append(new IndexArrayAssociation(indexName, arrayName, dimensionNo));
+                }
+        }
+}
+
+int IndexRangeCondition::validateIndexAssociations(Scope *scope, IndexScope *indexScope) {
+
+	int errors = 0;
+        const char *collectionName = collection->getName();
+        VariableSymbol *symbol = (VariableSymbol*) scope->lookup(collectionName);
+        if (symbol == NULL) return 0;
+        ArrayType *array = dynamic_cast<ArrayType*>(symbol->getType());
+        if (array == NULL) return 0;
+        int dimensions = array->getDimensions();
+        if (dimensions == 1) return 0;
+
+        for (int i = 0; i < indexes->NumElements(); i++) {
+                Identifier *index = indexes->Nth(i);
+                List<IndexArrayAssociation*> *associationList = indexScope->getAssociationsForIndex(index->getName());
+                bool mappingKnown = false;
+                if (associationList != NULL) {
+                        for (int j = 0; j < associationList->NumElements(); j++) {
+                                IndexArrayAssociation *association = associationList->Nth(j);
+                                if (strcmp(association->getArray(), collectionName) == 0) {
+                                        mappingKnown = true;
+                                        int dimensionNo = association->getDimensionNo();
+                                        break;
+                                }
+                        }
+                }
+                if (!mappingKnown) {
+			errors++;
+                        ReportError::UnknownIndexToArrayAssociation(index, collection, false);
+                }
+        }
+	return errors;
+}
+
 void IndexRangeCondition::analyseEpochDependencies(Space *space) {
         if (restrictions != NULL) {
                 restrictions->setEpochVersions(space, 0);
         }
+}
+
+LogicalExpr *IndexRangeCondition::getRestrictions() {
+        if (restrictions == NULL) return NULL;
+        return dynamic_cast<LogicalExpr*>(restrictions); 
 }

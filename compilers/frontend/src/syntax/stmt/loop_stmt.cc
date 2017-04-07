@@ -8,6 +8,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/loop_index.h"
 #include "../../semantics/data_access.h"
 #include "../../static-analysis/reduction_info.h"
 #include "../../codegen-helper/extern_config.h"
@@ -23,6 +24,7 @@
 LoopStmt::LoopStmt() : Stmt() {
 	this->body = NULL;
 	this->scope = NULL;
+	this->indexScope = NULL;
 }
 
 LoopStmt::LoopStmt(Stmt *body, yyltype loc) : Stmt(loc) {

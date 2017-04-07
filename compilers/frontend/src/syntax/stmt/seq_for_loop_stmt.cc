@@ -8,6 +8,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/loop_index.h"
 #include "../../semantics/data_access.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
@@ -94,6 +95,14 @@ int SLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 		loopScope = executionScope->enter_scope(this->scope);
 	}
 
+	// if needed create and enter a loop index to array dimension association scope
+	if (iteration == 0) {
+		prepareIndexScope(executionScope);
+        } else {
+                IndexScope::currentScope->enterScope(this->indexScope);
+        }
+ 
+
 	int resolvedExprs = 0;
 	
 	// Type inference process only makes progress if the type of the expression is currently unknown 
@@ -116,6 +125,10 @@ int SLoopStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteration) {
 	// exit the scope
 	loopScope->detach_from_parent();
         this->scope = loopScope;
+
+	// exit the index to array dimension association scope
+	this->indexScope = IndexScope::currentScope;
+        IndexScope::currentScope->goBackToOldScope();
 
 	return resolvedExprs;
 }
@@ -191,6 +204,69 @@ Hashtable<VariableAccess*> *SLoopStmt::getAccessedGlobalVariables(TaskGlobalRefe
                         accessLog->getMetadataAccessFlags()->flagAsRead();
         }
         return table;
+}
+
+void SLoopStmt::prepareIndexScope(Scope *executionScope) {
+
+	// create an empty index association scope and enter it
+	IndexScope::currentScope->deriveNewScope();
+
+	// Try to find out if the range corresponding to a dimension of some global array. If it is so 
+        // then create an entry in the index scope.
+        const char *potentialArray = rangeExpr->getBaseVarName();
+        Scope *taskScope = executionScope->get_nearest_scope(TaskScope);
+        if (potentialArray != NULL && taskScope != NULL) {
+                Symbol *symbol = taskScope->local_lookup(potentialArray);
+                bool attemptResolve = false;
+                if (symbol != NULL) {
+                        VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
+                        if (variable != NULL) { 
+                                Type *varType = variable->getType();
+                                if (dynamic_cast<ArrayType*>(varType) != NULL &&
+                                                dynamic_cast<StaticArrayType*>(varType) == NULL) {
+                                        attemptResolve = true;
+                                }
+                        }
+                }
+		// It seems finding out if an expression is a dimension access of a task global array is
+                // a messy effort. The expression is expected  to look like array.dimension#No.range. So
+                // there is a need to do a three level unfolding of expression. It would be nice if we 
+                // could generalize this procedure somewhere. TODO may be worth attempting in the future.
+                bool dimensionFound = false;
+                int dimension = 0;
+                if (attemptResolve) {
+                        FieldAccess *rangeField = dynamic_cast<FieldAccess*>(rangeExpr);
+                        if (rangeField != NULL) {
+                                Expr *base = rangeField->getBase();
+                                FieldAccess *baseField = dynamic_cast<FieldAccess*>(base);
+                                if (baseField != NULL) {
+                                        Expr *arrayExpr = baseField->getBase();
+                                        FieldAccess *arrayAccess = dynamic_cast<FieldAccess*>(arrayExpr);
+                                        Identifier *field = baseField->getField();
+                                        DimensionIdentifier *dimensionId =
+                                                        dynamic_cast<DimensionIdentifier*>(field);
+                                        if (arrayAccess != NULL
+                                                        && arrayAccess->isTerminalField()
+                                                        && dimensionId != NULL) {
+                                                dimensionFound = true;
+                                                // this is a coversion between 1 based to 0 based indexing
+                                                dimension = dimensionId->getDimensionNo() - 1;
+                                        }
+                                }
+                        }
+                }
+		if (dimensionFound) {
+                        const char *indexName = id->getName();
+                        IndexScope::currentScope->initiateAssociationList(indexName);
+                        List<IndexArrayAssociation*> *list
+                                        = IndexScope::currentScope->getAssociationsForIndex(indexName);
+                        list->Append(new IndexArrayAssociation(indexName, potentialArray, dimension));
+                        
+			// if an association from the index to an array dimension is found then this loop
+			// should be flagged as an array traversal loop
+			arrayIndexTraversal = true;
+                }
+        }
 }
 
 void SLoopStmt::analyseEpochDependencies(Space *space) {

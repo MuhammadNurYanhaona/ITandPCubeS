@@ -7,6 +7,7 @@
 #include "../../semantics/scope.h"
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
+#include "../../semantics/loop_index.h"
 #include "../../semantics/data_access.h"
 #include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
@@ -80,7 +81,22 @@ int ArrayAccess::resolveExprTypes(Scope *scope) {
 	} else {
 		this->type = arrayType->reduceADimension();
 		resolvedExprs += index->resolveExprTypesAndScopes(scope);
-		resolvedExprs += index->performTypeInference(scope, Type::intType);	
+		resolvedExprs += index->performTypeInference(scope, Type::intType);
+
+		// record the association of the index with any encircling looping range, if applicable
+		int position = getIndexPosition();
+                FieldAccess *indexField = dynamic_cast<FieldAccess*>(index);
+		if (indexField != NULL && indexField->isTerminalField()) {
+			const char *indexName = indexField->getBaseVarName();
+			const char *arrayName = base->getBaseVarName();
+			IndexScope *indexScope = IndexScope::currentScope->getScopeForAssociation(indexName);
+			if (indexScope != NULL) {
+				IndexArrayAssociation *association = new IndexArrayAssociation(indexName,
+						arrayName, position);
+				indexScope->saveAssociation(association);
+				indexField->markAsIndex();
+			}
+		}	
 	}
 	resolvedExprs++;
 	return resolvedExprs;

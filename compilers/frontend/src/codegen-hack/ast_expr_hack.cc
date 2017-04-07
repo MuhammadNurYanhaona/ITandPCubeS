@@ -66,7 +66,7 @@ void FunctionCall::translate(std::ostringstream &stream, int indentLevel, int cu
 
 void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {}
 
-void NamedArgument::generateAssignment(Expr *object, std::ostringstream &stream, int indentLevel);
+void NamedArgument::generateAssignment(Expr *object, std::ostringstream &stream, int indentLevel) {}
 
 void ObjectCreate::translate(std::ostringstream &stream, int indentLevel, int currentLineLength, Space *space) {}
 void ObjectCreate::generateCodeForProperties(Expr *object, std::ostringstream &stream, int indentLevel) {}
