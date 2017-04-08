@@ -55,6 +55,11 @@ Dimension Dimension::getNormalizedDimension() {
 	return normalDimension;	
 }
 
+void Dimension::update(Range newRange) {
+	this->range = range;
+	this->length = abs(range.max - range.min) + 1;
+}
+
 bool Dimension::isEqual(Dimension other) {
 	return (this->range.min == other.range.min) && (this->range.max == other.range.max);
 }

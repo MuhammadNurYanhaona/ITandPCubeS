@@ -51,6 +51,9 @@ class Dimension {
 	Range getPositiveRange();
 	Range adjustPositiveSubRange(Range positiveSubRange);
 	Dimension getNormalizedDimension();
+
+	void update(Range newRange); 	 // this changes the properties of the current dimension object to produce a
+					 // new dimension configuration based on the argument range	
 	bool isEqual(Dimension other);
 	void print(std::ostream &stream);
 };

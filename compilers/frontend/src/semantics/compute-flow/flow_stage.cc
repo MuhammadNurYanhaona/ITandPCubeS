@@ -403,6 +403,25 @@ void FlowStage::printSyncRequirements(int indentLevel) {
         synchronizationReqs->print(indentLevel + 1);
 }
 
+List<const char*> *FlowStage::filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap) {
+        if (accessMap == NULL) {
+                accessMap = this->accessMap;
+        }
+        List<const char*> *arrayList = new List<const char*>;
+        Iterator<VariableAccess*> iterator = accessMap->GetIterator();
+        VariableAccess *accessLog;
+        while ((accessLog = iterator.GetNextValue()) != NULL) {
+                const char *varName = accessLog->getName();
+                DataStructure *structure = space->getLocalStructure(varName);
+                if (structure == NULL) continue;
+                ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+                if (array != NULL) {
+                        arrayList->Append(varName);
+                }
+        }
+        return arrayList;
+}
+
 List<const char*> *FlowStage::getVariablesNeedingCommunication(int segmentedPPS) {
 
         if (synchronizationReqs == NULL) return NULL;

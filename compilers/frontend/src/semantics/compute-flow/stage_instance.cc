@@ -3,6 +3,7 @@
 #include "../symbol.h"
 #include "../task_space.h"
 #include "../data_access.h"
+#include "../array_acc_transfrom.h"
 #include "../../common/errors.h"
 #include "../../common/location.h"
 #include "../../syntax/ast.h"
@@ -24,6 +25,7 @@
 StageInstanciation::StageInstanciation(Space *space) : FlowStage(space) {
 	this->code = NULL;
 	this->nestedReductions = new List<ReductionMetadata*>;
+	this->arrayPartArgConfList = NULL;
 }
 
 void StageInstanciation::performDataAccessChecking(Scope *taskScope) {

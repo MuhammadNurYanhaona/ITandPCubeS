@@ -20,6 +20,7 @@ class FlowStageConstrInfo;
 class VariableAccess;
 class TaskEnvStat;
 class IncludesAndLinksMap;
+class ArrayPartConfig;
 
 class DefineSection : public Node {
   protected:
@@ -170,6 +171,18 @@ class StageInvocation : public FlowPart {
 	// actual code of the compute-stage. This function generates statements for this operation.
 	List<Stmt*> *produceParamGeneratorCode(Scope *stageScope,
 			List<ParamReplacementConfig*> *paramReplConfigList);	
+	 
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	// IT allows a part of an array to be passed as an argument for a compute stage parameter.
+	// Apart from representing a lower sub-dimension of a higher-dimensional array, such a part
+	// can restrict access to individual dimension's index span to a smaller sub-range. For 
+	// example, if m is a matrix then m[r][x..y] as an argument represents the range from x to y
+	// of the r'th row. Such an argument requires special metadata processing during code 
+	// generation in any back-end architecture. This function filters arguments with special 
+	// metadata processing needs.
+	List<ArrayPartConfig*> *getIndexRangeLimitedArrayArgConfigs(
+			List<ParamReplacementConfig*> *paramReplConfigList);
 };
 
 class CompositeFlowPart : public FlowPart {

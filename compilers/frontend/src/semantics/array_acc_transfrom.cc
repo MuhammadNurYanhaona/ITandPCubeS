@@ -80,6 +80,10 @@ bool ArrayPartConfig::isLimitedIndexRange(int dimNo) {
 	return (subrangeMappings->Nth(dimNo) != NULL);
 }
 
+IndexRange *ArrayPartConfig::getAccessibleIndexRange(int dimNo) {
+	return subrangeMappings->Nth(dimNo)->getIndexRange();
+}
+
 int ArrayPartConfig::getOrigDimension(int partDimNo) {
 	return dimMappings->Nth(partDimNo);
 }

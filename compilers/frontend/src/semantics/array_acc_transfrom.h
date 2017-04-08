@@ -50,7 +50,9 @@ class ArrayPartConfig {
 	FieldAccess *getBaseArrayAccess() { return baseArrayAccess; }
 
 	// tells if the dimension indicated by the argument has an associated subrange limiter expression
-	bool isLimitedIndexRange(int dimNo);
+	bool isLimitedIndexRange(int dimNo);	
+	// returns the subrange limiter expression for the argument dimension, when exists
+	IndexRange *getAccessibleIndexRange(int dimNo);
 
 	// returns the dimension number in the base array actually accessed by a dimension access on the
 	// array part

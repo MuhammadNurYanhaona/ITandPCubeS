@@ -3,6 +3,7 @@
 
 #include "scope.h"
 #include "task_space.h"
+#include "array_acc_transfrom.h"
 #include "../common/location.h"
 #include "../syntax/ast.h"
 #include "../syntax/ast_expr.h"
@@ -227,6 +228,12 @@ class FlowStage {
 	
 	//----------------------------------------------------------------- Common helper functions for Code Generation
 
+	// common code generation utility functions -------------------------------------------------------------------
+
+        List<const char*> *filterInArraysFromAccessMap(Hashtable<VariableAccess*> *accessMap = NULL);
+
+	//-------------------------------------------------------------------------------------------------------------
+
 	// functions for determining communication requirements -------------------------------------------------------
 
 	// This function is used to recursively retrieve all variables used in the task that will be communicated 
@@ -260,6 +267,14 @@ class StageInstanciation : public FlowStage {
 
 	// this holds metadata about all reduction statements found within this compute stage instance
         List<ReductionMetadata*> *nestedReductions;
+	
+	// IT allows a part of an array to be passed as an argument for a compute stage parameter. Apart from 
+	// representing a lower sub-dimension of a higher-dimensional array, such a part can restrict access to 
+	// individual dimension's index span to a smaller sub-range. For example, if m is a matrix then m[r][x..y] 
+	// as an argument represents the range from x to y of the r'th row. Such an argument requires special 
+	// metadata processing during code generation in any back-end architecture. This attribute holds a list of
+	// arguments with such special metadata processing need.
+	List<ArrayPartConfig*> *arrayPartArgConfList;
   public:
 	StageInstanciation(Space *space);
 	void setCode(Stmt *code) { this->code = code; }
@@ -302,9 +317,13 @@ class StageInstanciation : public FlowStage {
 
 	//-------------------------------------------------------------------------------------------------------------
 	
-	//-------------------------------------------------------------------------------------------------------------
-
 	//----------------------------------------------------------------- Common helper functions for Code Generation
+
+	// functions for aiding metadata generation for array part arguments ------------------------------------------
+	
+	void setArrayPartArgConfList(List<ArrayPartConfig*> *configList) { arrayPartArgConfList = configList; }
+	
+	//-------------------------------------------------------------------------------------------------------------
 
 	// functions for aiding implementing reductions ---------------------------------------------------------------
 

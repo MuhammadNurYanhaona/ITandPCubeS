@@ -13,6 +13,7 @@
 #include "../../semantics/symbol.h"
 #include "../../semantics/helper.h"
 #include "../../semantics/computation_flow.h"
+#include "../../semantics/array_acc_transfrom.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 #include "../../../../common-libs/utils/string_utils.h"
@@ -187,6 +188,10 @@ void StageInvocation::constructComputeFlow(CompositeStage *currCompStage, FlowSt
 	nameStream << nameOfStage << "_stage_" << index;
 	stageInstance->setName(strdup(nameStream.str().c_str())); 
 
+	// retrieve information about array-part arguments and store that in the stage instance
+	List<ArrayPartConfig*> *arrayPartConfigList = getIndexRangeLimitedArrayArgConfigs(paramReplConfs);
+	stageInstance->setArrayPartArgConfList(arrayPartConfigList);
+
 	// assign the location of the current AST element to the flow-stage for later error checking purpose
 	stageInstance->assignLocation(GetLocation());
 
@@ -294,5 +299,28 @@ List<Stmt*> *StageInvocation::produceParamGeneratorCode(Scope *stageScope,
 		stmtList->Append(assignment);
 	}
 	return stmtList;
+}
+
+List<ArrayPartConfig*> *StageInvocation::getIndexRangeLimitedArrayArgConfigs(
+		List<ParamReplacementConfig*> *paramReplConfigList) {
+
+	List<ArrayPartConfig*> *configList = new List<ArrayPartConfig*>;
+	for (int i = 0; i < paramReplConfigList->NumElements(); i++) {
+		ArrayPartConfig *partConfig = paramReplConfigList->Nth(i)->getArrayPartConfig();
+		if (partConfig == NULL) continue;
+
+		FieldAccess *baseArray = partConfig->getBaseArrayAccess();
+		ArrayType *type = (ArrayType*) baseArray->getType();
+		int dimensions = type->getDimensions();
+		
+		for (int j = 0; j < dimensions; j++) {
+			if (partConfig->isLimitedIndexRange(j)) {
+				configList->Append(partConfig);
+				break;
+			}
+		}		
+	}
+
+	return configList;
 }
 
