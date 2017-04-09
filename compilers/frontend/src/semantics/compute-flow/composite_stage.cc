@@ -603,6 +603,93 @@ void CompositeStage::printSyncRequirements(int indentLevel) {
         }
 }
 
+List<List<FlowStage*>*> *CompositeStage::getConsecutiveNonLPSCrossingStages() {
+
+        List<List<FlowStage*>*> *stageGroups = new List<List<FlowStage*>*>;
+        Space *currentSpace = stageList->Nth(0)->getSpace();
+        List<FlowStage*> *currentGroup = new List<FlowStage*>;
+        currentGroup->Append(stageList->Nth(0));
+
+        for (int i = 1; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                RepeatControlBlock *repeatCycle = dynamic_cast<RepeatControlBlock*>(stage);
+                // repeat cycles are never put into any compiler generated group to keep the semantics of the
+                // program intact
+                if (repeatCycle != NULL) {
+                        // add the so far group into the stage groups list if it is not empty
+                        if (currentGroup->NumElements() > 0) stageGroups->Append(currentGroup);
+                        // create a new, isolated group for repeat and add that in the list too 
+                        List<FlowStage*> *repeatGroup = new List<FlowStage*>;
+                        repeatGroup->Append(repeatCycle);
+                        stageGroups->Append(repeatGroup);
+                        // then reset the current group
+                        currentGroup = new List<FlowStage*>;
+                // if the stage is executing in a different LPS then create a new group
+                }
+                else if (stage->getSpace() != currentSpace) {
+                        currentSpace = stage->getSpace();
+                        if (currentGroup->NumElements() > 0) stageGroups->Append(currentGroup);
+                        currentGroup = new List<FlowStage*>;
+                        currentGroup->Append(stage);
+                // otherwise add the stage in the current group if there is no synchronization dependency from
+                // current stage to any stage already within the group. If there is a dependency then create a
+                // new group. Note that this policy helps us to drag down LPU-LPU synchronization dependencies 
+                // as transition has been made between computation stages into PPU-PPU dependencies.
+		} else {
+                        bool dependencyExists = false;
+                        for (int j = 0; j < currentGroup->NumElements(); j++) {
+                                FlowStage *earlierStage = currentGroup->Nth(j);
+                                if (earlierStage->isDependentStage(stage)
+                                                || stage->isDependentStage(earlierStage)) {
+                                        dependencyExists = true;
+                                        break;
+                                }
+                        }
+                        if (dependencyExists) {
+                                stageGroups->Append(currentGroup);
+                                currentGroup = new List<FlowStage*>;
+                                currentGroup->Append(stage);
+                        } else  currentGroup->Append(stage);
+                }
+        }
+        if (currentGroup->NumElements() > 0) stageGroups->Append(currentGroup);
+        return stageGroups;
+}
+
+List<FlowStage*> *CompositeStage::filterOutSyncStages(List<FlowStage*> *originalList) {
+        List<FlowStage*> *filteredList = new List<FlowStage*>;
+        for (int i = 0; i < originalList->NumElements(); i++) {
+                FlowStage *stage = originalList->Nth(i);
+                SyncStage *sync = dynamic_cast<SyncStage*>(stage);
+                if (sync == NULL) filteredList->Append(stage);
+        }
+        return filteredList;
+}
+
+List<SyncRequirement*> *CompositeStage::getDataDependeciesOfGroup(List<FlowStage*> *group) {
+        List<SyncRequirement*> *syncList = new List<SyncRequirement*>;
+        for (int i = 0; i < group->NumElements(); i++) {
+                FlowStage *stage = group->Nth(i);
+                StageSyncDependencies *sync = stage->getAllSyncDependencies();
+                List<SyncRequirement*> *activeDependencies = sync->getActiveDependencies();
+                syncList->AppendAll(activeDependencies);
+        }
+        return syncList;
+}
+
+List<SyncRequirement*> *CompositeStage::getUpdateSignalsOfGroup(List<FlowStage*> *group) {
+        List<SyncRequirement*> *syncList = new List<SyncRequirement*>;
+        for (int i = 0; i < group->NumElements(); i++) {
+                FlowStage *stage = group->Nth(i);
+                List<SyncRequirement*> *activeStageSignals
+                                = stage->getAllSyncRequirements()->getAllNonSignaledSyncReqs();
+                if (activeStageSignals != NULL) {
+                        syncList->AppendAll(activeStageSignals);
+                }
+        }
+        return syncList;
+}
+
 List<const char*> *CompositeStage::getVariablesNeedingCommunication(int segmentedPPS) {
         List<const char*> *varList = new List<const char*>;
         for (int i = 0; i < stageList->NumElements(); i++) {

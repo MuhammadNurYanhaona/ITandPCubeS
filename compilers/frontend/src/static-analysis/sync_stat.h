@@ -65,6 +65,7 @@ class SyncRequirement {
 	bool isActive() { return arc->isActive(); }
         void deactivate() { arc->deactivate(); }
 	void setReplacementSync(SyncRequirement *other) { replacementSync = other; }
+	SyncRequirement *getReplacementSync() { return replacementSync; }
 	void setCounterRequirement(bool requirement) { this->counterRequirement = requirement; }
         bool getCounterRequirement() { return counterRequirement; }
 	const char *getSyncName();
@@ -95,6 +96,21 @@ class SyncRequirement {
 
 	void setIndex(int index) { this->index = index; }
         int getIndex() { return index; }
+
+	// sorting of sync-requirement is needed during code generation to ensure uniform sequencing of send/
+	// signal and receive/wait across PPU controllers
+	static List<SyncRequirement*> *sortList(List<SyncRequirement*> *reqList);
+
+	// a helper function for sorting sync requirements. It returns 0 if the other sync requirement is 
+        // equivalent to current instace, -1 if the current instance less than the other, and finally 1 if it 
+        // is greater then the other. 
+        int compareTo(SyncRequirement *other);
+
+        // this filters out two kinds of data dependencies from a single list into two separate lists for 
+	// communication not-communication based implementation
+        static void separateCommunicationFromSynchronizations(int segmentedPPS,
+                        List<SyncRequirement*> *sourceList,
+                        List<SyncRequirement*> *commList, List<SyncRequirement*> *syncList);
 };
 
 // As the name suggests, this represents a sync requirement among all LPUs within an LPS due to a replicated 

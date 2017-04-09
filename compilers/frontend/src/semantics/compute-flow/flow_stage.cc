@@ -422,6 +422,11 @@ List<const char*> *FlowStage::filterInArraysFromAccessMap(Hashtable<VariableAcce
         return arrayList;
 }
 
+bool FlowStage::isDependentStage(FlowStage *suspectedDependent) {
+        if (synchronizationReqs == NULL) return false;
+        return synchronizationReqs->isDependentStage(suspectedDependent);
+}
+
 List<const char*> *FlowStage::getVariablesNeedingCommunication(int segmentedPPS) {
 
         if (synchronizationReqs == NULL) return NULL;

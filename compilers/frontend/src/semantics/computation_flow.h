@@ -19,6 +19,7 @@ class VariableAccess;
 class CompositeStage;
 class ReductionMetadata;
 class DataDependencies;
+class SyncRequirement;
 class StageSyncReqs;
 class StageSyncDependencies;
 class CommunicationCharacteristics;
@@ -234,6 +235,14 @@ class FlowStage {
 
 	//-------------------------------------------------------------------------------------------------------------
 
+	// functions for data dependency handling ---------------------------------------------------------------------
+
+	// this function indicates if there is any synchronization requirement between the execution of the current
+        // and the execution of the stage passed as argument
+        bool isDependentStage(FlowStage *suspectedDependent);
+
+	//-------------------------------------------------------------------------------------------------------------
+
 	// functions for determining communication requirements -------------------------------------------------------
 
 	// This function is used to recursively retrieve all variables used in the task that will be communicated 
@@ -254,6 +263,18 @@ class FlowStage {
         virtual void retriveExternCodeBlocksConfigs(IncludesAndLinksMap *externConfigMap) {}
 	
 	//-------------------------------------------------------------------------------------------------------------
+
+	//------------------------------------------------------------------------------ Code Generation Hack Functions
+        /**************************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **************************************************************************************************************/
+	
+	virtual List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
+        void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 
@@ -462,6 +483,26 @@ class CompositeStage : public FlowStage {
 	
 	//----------------------------------------------------------------- Common helper functions for Code Generation
 
+	// Common utility functions -----------------------------------------------------------------------------------
+
+	// A composite stage organizes the stages within into groups based on their LPSes so that iterations over 
+        // LPUs happens in a group basis instead of individual computation basis. This reduces the number of times
+        // we need to invoke the LPU generation library at runtime.
+        List<List<FlowStage*>*> *getConsecutiveNonLPSCrossingStages();
+
+	// Until we incorporate the backend support for dynamic LPSes, there is no need to generate codes for sync 
+        // stages. Therefore, we can filter them out during nested stage grouping.
+        List<FlowStage*> *filterOutSyncStages(List<FlowStage*> *originalList);
+
+	//-------------------------------------------------------------------------------------------------------------
+	
+	// functions for data dependency handling ---------------------------------------------------------------------
+
+	List<SyncRequirement*> *getDataDependeciesOfGroup(List<FlowStage*> *group);
+	List<SyncRequirement*> *getUpdateSignalsOfGroup(List<FlowStage*> *group);		
+
+	//-------------------------------------------------------------------------------------------------------------
+
 	// functions for determining communication requirements -------------------------------------------------------
 
         List<const char*> *getVariablesNeedingCommunication(int segmentedPPS);
@@ -484,6 +525,19 @@ class CompositeStage : public FlowStage {
           relevent backend compilers.   
         **************************************************************************************************************/
 
+	List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
+	void declareSynchronizationCounters(std::ofstream &stream, int indentation, int nestingLevel);
+	void generateDataReceivesForGroup(std::ofstream &stream, 
+			int indentation, 
+			List<SyncRequirement*> *commDependencies);
+	void genSimplifiedWaitingForReactivationCode(std::ofstream &stream, 
+			int indentation,
+                        List<SyncRequirement*> *syncRequirements);
+        void genSimplifiedSignalsForGroupTransitionsCode(std::ofstream &stream, 
+			int indentation,
+                        List<SyncRequirement*> *syncRequirements);
+	void generateDataSendsForGroup(std::ofstream &stream, int indentation,
+                        List<SyncRequirement*> *commRequirements);
 	virtual void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
