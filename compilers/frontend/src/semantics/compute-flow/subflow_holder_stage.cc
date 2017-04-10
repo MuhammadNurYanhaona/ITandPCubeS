@@ -231,6 +231,7 @@ EpochBoundaryBlock *EpochBoundaryBlock::CurrentEpochBoundary = NULL;
 
 EpochBoundaryBlock::EpochBoundaryBlock(Space *space) : CompositeStage(space) {
 	this->lpsToVarMap = new Hashtable<List<const char*>*>;
+	this->lpsList = new List<const char*>;
 }
 
 void EpochBoundaryBlock::print(int indentLevel) {
@@ -254,12 +255,28 @@ void EpochBoundaryBlock::recordEpochVariableUsage(const char *varName,  const ch
 	if (lpsVarList == NULL) {
 		lpsVarList = new List<const char*>;
 		lpsVarList->Append(varName);
-		lpsToVarMap->Enter(spaceName, lpsVarList);	
+		lpsToVarMap->Enter(spaceName, lpsVarList);
+		lpsList->Append(spaceName);	
 	} else {
 		if (!string_utils::contains(lpsVarList, varName)) {
 			lpsVarList->Append(varName);
 		}
 	}
+}
+
+List<const char*> *EpochBoundaryBlock::filterArrayVariables(List<const char*> *origList, List<const char*> *scalarList) {
+	List<const char*> *listOfArrays = new List<const char*>;
+	for (int i = 0; i < origList->NumElements(); i++) {
+		const char *currentVar = origList->Nth(i);
+		DataStructure *structure = space->getStructure(currentVar);
+		ArrayDataStructure *array = dynamic_cast<ArrayDataStructure*>(structure);
+		if (array != NULL) {
+			listOfArrays->Append(currentVar);
+		} else if (!string_utils::contains(scalarList, currentVar)) {
+			scalarList->Append(currentVar);
+		}
+	}
+	return listOfArrays;	
 }
 
 //---------------------------------------------------  Reduction Boundary Block -------------------------------------------------/

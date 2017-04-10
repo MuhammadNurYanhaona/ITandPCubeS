@@ -25,5 +25,16 @@ void CompositeStage::generateDataSendsForGroup(std::ofstream &stream, int indent
 void RepeatControlBlock::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {}
 void ConditionalExecutionBlock::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {}
 void LpsTransitionBlock::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {}
+
+void EpochBoundaryBlock::genCodeForScalarVarEpochUpdates(std::ofstream &stream, 
+		int indentation,
+		List<const char*> *scalarVarList) {}
+void EpochBoundaryBlock::genCodeForArrayVarEpochUpdates(std::ofstream &stream,
+		const char *affectedLpsName,
+		int indentation,
+		List<const char*> *arrayVarList) {}
+void EpochBoundaryBlock::genLpuTraversalLoopBegin(std::ofstream &stream, const char *lpsName, int indentation) {}
+void EpochBoundaryBlock::genLpuTraversalLoopEnd(std::ofstream &stream, const char *lpsName, int indentation) {}
 void EpochBoundaryBlock::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {}
+
 void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {}

@@ -675,10 +675,16 @@ class EpochBoundaryBlock : public CompositeStage {
   protected:
 	// this map keeps track what multi-versioned variable has been used in what LPS inside the sub-flow nested
 	// within this epoch boundary block 
-	Hashtable<List<const char*>*> *lpsToVarMap;	
+	Hashtable<List<const char*>*> *lpsToVarMap;
+
+	// list of LPSes that have LPU computations within this epoch boundary block on structures having multiple
+	// versions
+	List<const char*> *lpsList;	
   public:
 	EpochBoundaryBlock(Space *space);	
 	void print(int indent);
+	
+	//------------------------------------------------------------------------ Helper functions for Static Analysis
 	
 	// functions for annotating LPSes and flow stages about data structure usage statistics------------------------
        
@@ -691,6 +697,12 @@ class EpochBoundaryBlock : public CompositeStage {
 
 	//-------------------------------------------------------------------------------------------------------------
 	
+	//----------------------------------------------------------------- Common helper functions for Code Generation
+
+	// This filters the array variables from the first argument list. The array variables are put in the
+	// returned list and the remaining scalar variables are added in the second argument list.
+	List<const char*> *filterArrayVariables(List<const char*> *origList, List<const char*> *scalarList);
+	
 	//------------------------------------------------------------------------------ Code Generation Hack Functions
         /**************************************************************************************************************
           The code generation related function definitions that are placed here are platform specific. So ideally 
@@ -700,6 +712,15 @@ class EpochBoundaryBlock : public CompositeStage {
           relevent backend compilers.   
         **************************************************************************************************************/
 
+	void genCodeForScalarVarEpochUpdates(std::ofstream &stream, 
+			int indentation, 
+			List<const char*> *scalarVarList);
+	void genCodeForArrayVarEpochUpdates(std::ofstream &stream,
+			const char *affectedLpsName,
+			int indentation,
+			List<const char*> *arrayVarList);
+	void genLpuTraversalLoopBegin(std::ofstream &stream, const char *lpsName, int indentation);
+	void genLpuTraversalLoopEnd(std::ofstream &stream, const char *lpsName, int indentation);
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
