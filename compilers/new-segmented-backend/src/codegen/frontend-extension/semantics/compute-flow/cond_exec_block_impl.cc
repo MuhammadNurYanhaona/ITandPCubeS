@@ -14,18 +14,11 @@ void ConditionalExecutionBlock::generateInvocationCode(std::ofstream &stream,
 	std::ostringstream lpuName;
 	lpuName << "space" << space->getName() << "Lpu->";
 
-	// update the name transformer's LPU accesss prefix for probable array access within the condition
-	ntransform::NameTransformer::transformer->setLpuPrefix(lpuName.str().c_str());
-
 	std::ostringstream indentStream;
 	for (int i = 0; i < indentation; i++) indentStream << indent;
 	std::string indentStr = indentStream.str();
 
-	std::ostringstream conditionStream;
-	condition->translate(conditionStream, 0, 0, space);
-
 	stream << indentStr << "{ // scope entrance for conditional subflow\n";
-	stream << indentStr << "if(" << conditionStream.str() << ") {\n";
 
 	if (isLpsDependent()) {
 		// if the condition involves accessing metadata of some task global array then we need to 
@@ -50,8 +43,17 @@ void ConditionalExecutionBlock::generateInvocationCode(std::ofstream &stream,
 		}
 	}
 	
+	// update the name transformer's LPU accesss prefix for probable array access within the condition
+	ntransform::NameTransformer::transformer->setLpuPrefix(lpuName.str().c_str());
+
+	// generate condition statement
+	std::ostringstream conditionStream;
+	condition->translate(conditionStream, indentation, 0, space);
+	stream << indentStr << "if(" << conditionStream.str() << ") {\n";
+	
 	// generate code for the sub-flow nested within the condition block
 	CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
 
+	stream << indentStr << "} // end of condition checking block\n";
 	stream << indentStr << "} // scope exit for conditional subflow\n";
 }

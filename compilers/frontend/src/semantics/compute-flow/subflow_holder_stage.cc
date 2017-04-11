@@ -13,6 +13,7 @@
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
 #include "../../../../common-libs/utils/string_utils.h"
+#include "../../../../common-libs/domain-obj/constant.h"
 
 #include <iostream>
 #include <fstream>
@@ -134,7 +135,13 @@ void RepeatControlBlock::performDependencyAnalysis(PartitionHierarchy *hierarchy
 }
 
 void RepeatControlBlock::analyzeSynchronizationNeeds() {
-	FlowStage::analyzeSynchronizationNeeds();
+	
+	// a repeat control block iterating an index-range cannot issue any synchronization need as the iteration
+	// marker variable can be safely replicated among LPUs
+	if (type != Range_Repeat) { 
+		FlowStage::analyzeSynchronizationNeeds();
+	}
+
 	CompositeStage::analyzeSynchronizationNeeds();
 }
 

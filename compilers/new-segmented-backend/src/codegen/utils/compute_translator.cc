@@ -199,7 +199,7 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	// if the task involves communications then create communicator counter variables for each data dependency
 	// requiring communication
 	if (communicatorCount > 0) {
-		programFile << "\n\t// create a counter variables for communicators\n";
+		programFile << "\n\t// create counter variables for communicators\n";
 		for (int i = 0; i < communicatorCount; i++) {
 			programFile << "\tint commCounter" << i << " = 0;\n";
 		}

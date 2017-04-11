@@ -91,10 +91,30 @@ int ArrayAccess::resolveExprTypes(Scope *scope) {
 			const char *arrayName = base->getBaseVarName();
 			IndexScope *indexScope = IndexScope::currentScope->getScopeForAssociation(indexName);
 			if (indexScope != NULL) {
-				IndexArrayAssociation *association = new IndexArrayAssociation(indexName,
-						arrayName, position);
-				indexScope->saveAssociation(association);
-				indexField->markAsIndex();
+			
+				// The same index cannot be the iteration variable for two different dimensions of the same 
+				// array. To clarify, an array access such as a[i][i] can enlist i as a loop index variable 
+				// for any encircling loop holding this expression for only one of the two dimensions. We 
+				// prioritize the earlier dimension uniformly in the current implementation.
+				bool associationExists = false;
+				List<IndexArrayAssociation*> *currAssocList 
+						= indexScope->getAssociationsForArray(arrayName);
+				if (currAssocList != NULL && currAssocList->NumElements() > 0) {
+					for (int i = 0; i < currAssocList->NumElements(); i++) {
+						IndexArrayAssociation *association = currAssocList->Nth(i);
+						if (strcmp(association->getIndex(), indexName) == 0) {
+							associationExists = true;
+							break;
+						}
+					}
+				}
+	
+				if (!associationExists) {
+					IndexArrayAssociation *association = new IndexArrayAssociation(indexName,
+							arrayName, position);
+					indexScope->saveAssociation(association);
+					indexField->markAsIndex();
+				}
 			}
 		}	
 	}
