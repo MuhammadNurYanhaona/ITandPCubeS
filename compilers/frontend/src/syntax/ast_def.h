@@ -95,6 +95,7 @@ class ProgramDef : public Definition {
 	//------------------------------------------------------------- Common helper functions for Code Generation
 
 	Scope *getScope();
+	List<TupleDef*> *getAllCustomTypes();
 };
 
 class TupleDef : public Definition {

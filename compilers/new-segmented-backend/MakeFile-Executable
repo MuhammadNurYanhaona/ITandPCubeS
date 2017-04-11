@@ -1,0 +1,62 @@
+.PHONY: clean 
+
+# These properties should be passed to the make file to tailer the output based on current
+# need
+C_COMPILER = mpic++
+BUILD_SUBDIR = tmp
+EXECUTABLE = ./bin/it-program.o
+
+# default compilation flags for development and debugging
+#C_OPT_FLAGS = -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
+# default compilation flgs for optimized executable generation
+C_OPT_FLAGS = -O3
+
+# Set the default target. When you make with no arguments, this will be the target built.
+default: build
+
+# directories containing source codes
+COMMON_LIB_DIR=../common-libs
+RUNTIME_LIB_DIR=src/runtime
+
+# Set up the list of sources to be included as static libraries from the compiler
+COMMON_LIBS = $(shell find $(COMMON_LIB_DIR) ! -name "hashtable.cc" -name "*.cc")
+RUNTIME_LIBS = $(shell find $(RUNTIME_LIB_DIR) -name "*.cc")
+
+# Set up the list of sources generated for the IT program
+BUILD_SRCS = $(shell find build/$(BUILD_SUBDIR) -name "*.cc")
+
+# objects for compiling any generated code for IT program
+OBJS =	$(patsubst %.cc, %.o, $(filter %.cc, $(BUILD_SRCS))) 		\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(RUNTIME_LIBS)))		\
+	$(patsubst %.cc, %.o, $(filter %.cc, $(COMMON_LIBS)))
+
+# Define the backend C++ compiler and linker to be used
+CC = $(C_COMPILER)
+LD = $(C_COMPILER)
+
+# backend code optimization settings
+CFLAGS = $(C_OPT_FLAGS)
+
+# We need flag to enable the POSIX thread library during compiling generated code
+RFLAG = -pthread
+
+# Link with standard c library, math library, and lex library
+LIBS = -lc -lm -pthread
+
+# C++ library links for external code blocks
+EXTERN_LIBS = $(shell grep 'C++ =\|C =' build/$(BUILD_SUBDIR)/external_links.txt  | cut -f2 -d "=" | tr '\n' ' ')
+
+# Rules for various parts of the target
+
+.cc.o: $*.cc
+	$(CC) $(CFLAGS) $(RFLAG) -c -o $@ $*.cc
+
+build: $(OBJS)
+	$(LD) -o $(EXECUTABLE) $(OBJS) $(LIBS) $(EXTERN_LIBS)
+
+clean:
+	rm -rfv  build/$(BUILD_SUBDIR)
+	rm -f bin/it-program.o
+
+	
+

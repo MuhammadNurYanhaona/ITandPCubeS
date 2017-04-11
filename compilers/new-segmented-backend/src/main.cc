@@ -136,7 +136,7 @@ int main(int argc, const char *argv[]) {
 	// the program coordinator function
         TaskDef::currentTask = NULL;
 	// generate classes for the list of tuples present in the source in a header file
-	List<Definition*> *classDefs = ProgramDef::program->getComponentsByType(CLASS_DEF);
+	List<TupleDef*> *classDefs = ProgramDef::program->getAllCustomTypes();
         generateClassesForTuples(tupleHeader, classDefs);
 	// generate definitions for all user-defined IT functions
 	List<Definition*> *functionDefs = ProgramDef::program->getComponentsByType(FN_DEF);

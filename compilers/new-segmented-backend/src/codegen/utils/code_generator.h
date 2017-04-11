@@ -68,7 +68,7 @@ void generatePrintFnForLpuDataStructures(const char *initials,
 		List<ReductionMetadata*> *reductionInfos);
 
 /* function definition to generate classes for all tuple definitions found in the source code */
-void generateClassesForTuples(const char *filePath, List<Definition*> *tupleDefList);
+void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefList);
 
 /* function definition to generate classes for storing task global and thread local variables */
 void generateClassesForGlobalScalars(const char *filePath, 

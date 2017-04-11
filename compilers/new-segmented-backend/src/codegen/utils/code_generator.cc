@@ -852,7 +852,7 @@ void closeNameSpace(const char *headerFile) {
 	programFile.close();
 }
 
-void generateClassesForTuples(const char *filePath, List<Definition*> *tupleDefList) {
+void generateClassesForTuples(const char *filePath, List<TupleDef*> *tupleDefList) {
 	std::ofstream headerFile;
 	headerFile.open(filePath, std::ofstream::out);
 	if (!headerFile.is_open()) {
@@ -869,12 +869,12 @@ void generateClassesForTuples(const char *filePath, List<Definition*> *tupleDefL
 
 	// include the PartDimension class from compiler library to store metadata information for environment
 	// references
-	headerFile << "#include \"../../src/runtime/structure.h\"\n\n"; 
+	headerFile << "#include \"../../../common-libs/domain-obj/structure.h\"\n\n"; 
 	
 	// first have a list of forward declarations for all tuples to avoid having errors during 
 	// compilation of individual classes
 	for (int i = 0; i < tupleDefList->NumElements(); i++) {
-		TupleDef *tupleDef = (TupleDef*) tupleDefList->Nth(i);
+		TupleDef *tupleDef = tupleDefList->Nth(i);
 		headerFile << "class " << tupleDef->getId()->getName() << ";\n";
 	}
 	headerFile << "\n";

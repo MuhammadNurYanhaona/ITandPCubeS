@@ -169,3 +169,28 @@ void ProgramDef::performStaticAnalysis() {
 }
 
 Scope *ProgramDef::getScope() { return symbol->getNestedScope(); }
+
+List<TupleDef*> *ProgramDef::getAllCustomTypes() {
+
+        List<TupleDef*> *tupleList = new List<TupleDef*>;
+
+        for (int i = 0; i < components->NumElements(); i++) {
+                Node *node = components->Nth(i);
+                TaskDef *taskDef = dynamic_cast<TaskDef*>(node);
+                if (taskDef != NULL) {
+                        tupleList->Append(taskDef->getPartitionTuple());
+                        continue;
+                }
+                TupleDef *tupleDef = dynamic_cast<TupleDef*>(node);
+                if (tupleDef != NULL) {
+                        tupleList->Append(tupleDef);
+                        continue;
+                }
+                CoordinatorDef *coordDef = dynamic_cast<CoordinatorDef*>(node);
+                if (coordDef != NULL) {
+                        tupleList->Append(coordDef->getArgumentTuple());
+                }
+        }
+        return tupleList;
+}
+
