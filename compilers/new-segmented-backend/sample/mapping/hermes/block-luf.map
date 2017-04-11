@@ -1,0 +1,8 @@
+// mapping for LU Factorization task
+"Block LU Factorization" {
+	// syntax LPS ':' PPS
+	Space A: 6	// Cluster
+	Space B: 3	// NUMA-node
+	Space C: 1	// Core
+}
+

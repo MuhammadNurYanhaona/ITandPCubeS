@@ -257,7 +257,8 @@ void TaskDef::performStaticAnalysis() {
         computation->populateReductionMetadata(lpsHierarchy);
 	// presumably new stages have been added to the flow; so correct different indexes of the
 	// flow stages
-	computation->assignIndexAndGroupNo(0, -1, -1);
+	computation->assignIndexAndGroupNo(0, 0, 0);
+	computation->setRepeatIndex(-1);
 	// then validate the usage of reduction results; validation needs correct stage indexing
 	computation->validateReductions();
 
@@ -270,7 +271,8 @@ void TaskDef::performStaticAnalysis() {
 	computation->makeAllLpsTransitionsExplicit();
 	// presumably new stages have been added to the flow; so again assign correct indexes to 
 	// the flow stages
-	computation->assignIndexAndGroupNo(0, -1, -1);
+	computation->assignIndexAndGroupNo(0, 0, 0);
+	computation->setRepeatIndex(-1);
 	
 	//------------------------------------------------------------------ Data Dependency Analysis
 
