@@ -131,7 +131,13 @@ MappingNode *parseMappingConfiguration(const char *taskName,
 	std::cout << "Parsing the mapping configuration\n";
 
 	// locate the mapping configuration of the mentioned task and extract it
-	int taskConfigBegin = description.find(taskName);
+	std::ostringstream taskNameStream;
+	taskNameStream << '"' << taskName << '"';
+	int taskConfigBegin = description.find(taskNameStream.str().c_str());
+	if (taskConfigBegin == std::string::npos) {
+		std::cout << "Could not find the mapping configuration for the Task: " << taskName << "\n";
+		std::exit(EXIT_FAILURE);
+	}
 	int mappingStart = description.find('{', taskConfigBegin);
 	int mappingEnd = description.find('}', taskConfigBegin);
 	std::string mapping = description.substr(mappingStart + 1, mappingEnd - mappingStart - 1);

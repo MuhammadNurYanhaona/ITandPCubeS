@@ -274,7 +274,7 @@ class FlowStage {
         **************************************************************************************************************/
 	
 	virtual List<const char*> *getAllOutgoingDependencyNamesAtNestingLevel(int nestingLevel);
-        void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
+        virtual void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 
 /*	A stage instanciation represents an invocation done from the Computation Section of a compute stage defined 

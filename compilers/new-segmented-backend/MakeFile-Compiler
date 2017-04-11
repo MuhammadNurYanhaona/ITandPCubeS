@@ -19,7 +19,6 @@ BACK_END_SRC_DIR=src
 # Set up the list of common library sources
 COMMON_LIB = $(shell find $(COMMON_LIBS_DIR) ! -name "hashtable.cc" -name "*.cc")
 FRONT_END_SRC = $(shell find $(FRONT_END_SRC_DIR) ! -name "main.cc" -name "*.cc" ! -name "*_hack.cc")
-#FRONT_END_SRC = $(shell find $(FRONT_END_SRC_DIR) ! -name "main.cc" -name "*.cc")
 BACK_END_SRC = $(shell find $(BACK_END_SRC_DIR) -name "*.cc")
 
 # object file listing
@@ -50,9 +49,9 @@ YACC = bison
 # Set up the necessary flags for the tools
 #--------------------------------------------------------------------------------------------------
 # settings for debug mode code generation
-CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
+# CFLAGS= -g -Wall -fno-inline -Wno-unused -Wno-sign-compare -O0
 # settings for optimized code generation
-#CFLAGS = -O3
+CFLAGS = -O3
 
 # We need flag to enable the POSIX thread library during compiling generated code
 RFLAG = -pthread

@@ -1,4 +1,4 @@
-"Matrix Multiply" {
+"Block Matrix-Matrix Multiply" {
 	// syntax LPS ':' PPS
 	Space Root: 4	// CPU
 	Space A: 2	// Core Pair

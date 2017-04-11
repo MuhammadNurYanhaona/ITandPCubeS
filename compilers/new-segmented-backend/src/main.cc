@@ -125,6 +125,12 @@ int main(int argc, const char *argv[]) {
                 // update the static reference to get to the task definition from anywhere 
                 // during code generation  
                 TaskDef::currentTask = taskDef;
+		// instanciate a task generator
+		TaskGenerator *generator = new TaskGenerator(taskDef,
+				outputDir, 
+				mappingFile, processorFile);
+		// generate all codes relevent to the current task	
+                generator->generate(pcubesConfig);
 	}
 	// reset the current task reference before handling of user defined functions and 
 	// the program coordinator function
