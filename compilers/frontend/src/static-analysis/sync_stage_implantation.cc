@@ -162,6 +162,14 @@ void SyncStage::analyzeSynchronizationNeeds() {
         }
 }
 
+FlowStage *SyncStage::getUltimateModifier(const char *varName) {
+        FlowStage *lastModifier = prevDataModifiers->Lookup(varName);
+        if (lastModifier == NULL) return NULL;
+        SyncStage *previousSync = dynamic_cast<SyncStage*>(lastModifier);
+        if (previousSync == NULL) return lastModifier;
+        return previousSync->getUltimateModifier(varName);
+}
+
 //-------------------------------------------------- Space Entry Checkpoint ------------------------------------------------/
 
 

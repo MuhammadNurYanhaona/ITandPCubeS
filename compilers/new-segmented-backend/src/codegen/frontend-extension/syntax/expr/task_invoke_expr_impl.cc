@@ -43,6 +43,7 @@ void TaskInvocation::generateCode(std::ostringstream &stream, int indentLevel, S
 	bool initParamsPresent = false;
 	List<Expr*> *initArgs = getInitArguments();
 	if (initArgs != NULL && initArgs->NumElements() > 0) {
+		initParamsPresent = true;
 		for (int i = 0; i < initArgs->NumElements(); i++) {
 			initParams << paramSeparator;
 			Expr *argument = initArgs->Nth(i);

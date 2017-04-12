@@ -1,0 +1,59 @@
+Program (args) {         
+        stencilEnv = new TaskEnvironment(name: "Five Points Stencil")
+        bind_input(stencilEnv, "plate", args.input_file)
+        execute(task: "Five Points Stencil"; environment: stencilEnv; 			\
+			initialize: args.iterations; 					\
+			partition: args.k, args.l, args.m, args.n, args.p1, args.p2)	
+        bind_output(stencilEnv, "plate", args.output_file)
+}
+
+Task "Five Points Stencil":
+	Define:
+		plate: 2d Array of Real single-precision
+		max_iterations: Integer
+		counter_1, counter_2, counter_3: Integer
+	Environment:
+		plate: link
+	Initialize (iterations):
+		max_iterations = iterations
+	Stages:
+		refineEstimates(plate) {
+			localRows = plate.dimension1.range
+			localCols = plate.dimension2.range
+			do { plate[i][j] at (current)					\ 
+				= 1/4 * (plate[i-1][j]					\ 
+				+ plate[i+1][j] 					\
+				+ plate[i][j-1] 					\
+				+ plate[i][j+1]) at (current - 1)
+			} for i, j in plate                                 		\
+			  and (i > localRows.min and i < localRows.max)     		\
+			  and (j > localCols.min and j < localCols.max) 
+		} 
+	Computation:
+		// the whole computation should iterate for max_iterations number of times
+		Repeat for counter_1 in [1...max_iterations] {
+			// after partition.p1 / partition.p2 upper level iterations the flow should exit for upper 
+			// level padding synchronization 
+			Space A {
+				Repeat for counter_2 in [1...partition.p1] step partition.p2 {
+					// after partition.p2 iterations the flow should exit Space B for lower 
+					// level padding synchronization
+					Space B {
+						Repeat for counter_3 in [1...partition.p2] {
+							// epoch needs to be advanced after each refinement step
+							Epoch {
+								refineEstimates(plate)
+							}
+						}
+					}
+				}
+			}
+		}
+	Partition (k, l, m, n, p1, p2):
+		Space A <2d> { 
+			plate: block_count(k, l) padding(p1)
+		}
+		Space B <2d> divides Space A partitions { 
+			plate: block_count(m, n) padding(p2)
+		}
+

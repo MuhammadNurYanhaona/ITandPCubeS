@@ -52,6 +52,11 @@ class SyncStage : public FlowStage {
 	void filterReductionsAtLps(Space *reductionRootLps, List<ReductionMetadata*> *filteredList) {}
 	void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	void analyzeSynchronizationNeeds();
+
+	 //------------------------------------------------------------- Common helper functions for Code Generation
+
+	// returns the stage invocation that actually updated a structure listed as modified my this sync stage
+        FlowStage *getUltimateModifier(const char *varName);
 };
 
 /*      This is a utility class to keep track of the last point of entry to a space as flow of control moves from

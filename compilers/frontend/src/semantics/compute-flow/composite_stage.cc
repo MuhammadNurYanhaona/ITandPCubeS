@@ -112,9 +112,15 @@ void CompositeStage::makeAllLpsTransitionsExplicit() {
 	List<FlowStage*> *renewedStageList = new List<FlowStage*>;
 
 	for (int i = 0; i < stageList->NumElements(); i++) {
+		
 		FlowStage *stage = stageList->Nth(i);
 		Space *intermediateLps = FlowStage::getCommonIntermediateLps(this, stage);
-		if (intermediateLps == NULL) {
+		bool isSyncStage = (dynamic_cast<SyncStage*>(stage) != NULL);
+
+		// sync stages are not pushed into intermediate LPS transition stages as they are compiler 
+		// introduced stages with no code generation requirements
+		if (intermediateLps == NULL || isSyncStage) {
+
 			if (currentMoverList != NULL) {
 				// create a new LPS transition stage with the mover list
 				Space *commonLps = FlowStage::getCommonIntermediateLps(this,

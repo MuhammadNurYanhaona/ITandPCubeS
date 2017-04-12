@@ -750,6 +750,10 @@ class ArrayAccess : public Expr {
 	// tells if the current array access expression is the last index access in the chain of array
 	// indexes beginning at the base array
 	bool isFinalIndexAccess();
+
+	// this checks if an index variable has been used to access the current dimension of the array 
+	// whether or not the same index variable has been used to access any earlier dimension
+	bool earlierIndexAssociationExists(const char *indexName);
 	
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
         

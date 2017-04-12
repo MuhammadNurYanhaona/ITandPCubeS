@@ -135,12 +135,12 @@ void EpochBoundaryBlock::generateInvocationCode(std::ofstream &stream, int inden
 	std::string indentStr = indentStream.str();
 
 	// start a new scope for all epoch advancement
-	stream << indentStr << "{ // scope starts for epoch boundary\n";
+	stream << "\n" << indentStr << "{ // scope starts for epoch boundary\n";
 	
 	// retrieve common properties that will be needed to do data structure version updates and, if needed, LPU
 	// reference refreshing
-	stream << indentStr << indent << "TaskData *taskData = threadState->getTaskData()" << stmtSeparator;
-	stream << indentStr << indent << "Hashtable<DataPartitionConfig*> ";
+	stream << indentStr << "TaskData *taskData = threadState->getTaskData()" << stmtSeparator;
+	stream << indentStr << "Hashtable<DataPartitionConfig*> ";
 	stream << "*partConfigMap = threadState->getPartConfigMap()" << stmtSeparator;
 
 	List<const char*> *scalarVarList = new List<const char*>;
@@ -155,12 +155,12 @@ void EpochBoundaryBlock::generateInvocationCode(std::ofstream &stream, int inden
 			// In this case, the current LPU's data parts' versions must be updated. Afterwards, we
 			// have to recreate the LPU object so that the internal pointers are updated properly.
 			
-			genCodeForArrayVarEpochUpdates(stream, lpsName, indentation + 1, arrayVarList);
+			genCodeForArrayVarEpochUpdates(stream, lpsName, indentation, arrayVarList);
                 
-			stream << indentStr << indent << "generateSpace" << lpsName << "Lpu(";
+			stream << indentStr << "generateSpace" << lpsName << "Lpu(";
 			stream << "threadState" << paramSeparator << "partConfigMap" << paramSeparator;
 			stream << "taskData)" << stmtSeparator;
-			stream << indentStr << indent << "space" << lpsName << "Lpu = (Space";
+			stream << indentStr << "space" << lpsName << "Lpu = (Space";
 			stream << lpsName << "_LPU*) ";
 			stream << "threadState->getCurrentLpu(Space_" << lpsName << ")" << stmtSeparator;
  
@@ -169,21 +169,22 @@ void EpochBoundaryBlock::generateInvocationCode(std::ofstream &stream, int inden
 			// of all LPU data parts must be updated. So we iterate over the LPUs and do the epoch
 			// update on LPUs one by one.
 			
-			genLpuTraversalLoopBegin(stream, lpsName, indentation + 1);
-			genCodeForArrayVarEpochUpdates(stream, lpsName, indentation + 2, arrayVarList);
-			genLpuTraversalLoopEnd(stream, lpsName, indentation + 1);
+			genLpuTraversalLoopBegin(stream, lpsName, indentation);
+			genCodeForArrayVarEpochUpdates(stream, lpsName, indentation + 1, arrayVarList);
+			genLpuTraversalLoopEnd(stream, lpsName, indentation);
 		}
 	}
 
 	// advance scalar variables' versions all at once at the end
 	if (scalarVarList->NumElements() > 0) {
-		genCodeForScalarVarEpochUpdates(stream, indentation + 1, scalarVarList);
+		genCodeForScalarVarEpochUpdates(stream, indentation, scalarVarList);
 	}
 	
 	// invoke the nested subflow
-	CompositeStage::generateInvocationCode(stream, indentation + 1, containerSpace);
+	stream << '\n';
+	CompositeStage::generateInvocationCode(stream, indentation, containerSpace);
 
 	// end the scope
-	stream << indentStr << "} // scope ends for epoch boundary\n";
+	stream << indentStr << "} // scope ends for epoch boundary\n\n";
 }
 

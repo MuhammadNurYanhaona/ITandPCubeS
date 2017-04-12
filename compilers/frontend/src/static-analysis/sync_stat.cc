@@ -1,5 +1,6 @@
 #include "sync_stat.h"
 #include "data_dependency.h"
+#include "sync_stage_implantation.h"
 #include "../semantics/task_space.h"
 #include "../semantics/computation_flow.h"
 #include "../codegen-helper/communication_stat.h"
@@ -175,6 +176,31 @@ void GhostRegionSync::print(int indent) {
 	}
 	std::cout << std::endl;
 	SyncRequirement::print(indent);
+}
+
+CommunicationCharacteristics *GhostRegionSync::getCommunicationInfo(int segmentationPPS) {
+
+        CommunicationCharacteristics *commCharacter = new CommunicationCharacteristics(variableName);
+        SyncStage *updaterSyncStage = dynamic_cast<SyncStage*>(arc->getSource());
+        FlowStage *actualUpdater = updaterSyncStage->getUltimateModifier(variableName);
+        Space *syncSpace = updaterSyncStage->getSpace();
+        Space *confinementSpace = syncSpace->getParent();
+        DataStructure *structure = actualUpdater->getSpace()->getStructure(variableName);
+        Space *allocatorSpace = structure->getAllocator();
+
+        commCharacter->setCommunicationRequired(true);
+        commCharacter->setConfinementSpace(confinementSpace);
+        commCharacter->setSenderSyncSpace(syncSpace);
+        commCharacter->setReceiverSyncSpace(syncSpace);
+        commCharacter->setSenderDataAllocatorSpace(allocatorSpace);
+        commCharacter->setReceiverDataAllocatorSpace(allocatorSpace);
+        commCharacter->setSyncRequirement(this);
+
+        commCharacter->setDifferentWaitSignalerFromSync();
+        commCharacter->setSignalerSpace(syncSpace);
+        commCharacter->setWaitingSpace(arc->getDestination()->getSpace());
+
+        return commCharacter;
 }
 
 //--------------------------------------------------------- Up Propagation Sync ------------------------------------------------------------/

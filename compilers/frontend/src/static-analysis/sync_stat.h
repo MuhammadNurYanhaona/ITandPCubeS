@@ -130,6 +130,10 @@ class GhostRegionSync : public SyncRequirement {
 	GhostRegionSync();
 	void setOverlappingDirections(List<int> *overlappingDirections);	
 	void print(int indent);		
+
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+        CommunicationCharacteristics *getCommunicationInfo(int segmentationPPS);
 };
 
 // This class is to indicate that a change in some variable in a lower LPS by all LPUs of that LPS needs to be 

@@ -96,20 +96,7 @@ int ArrayAccess::resolveExprTypes(Scope *scope) {
 				// array. To clarify, an array access such as a[i][i] can enlist i as a loop index variable 
 				// for any encircling loop holding this expression for only one of the two dimensions. We 
 				// prioritize the earlier dimension uniformly in the current implementation.
-				bool associationExists = false;
-				List<IndexArrayAssociation*> *currAssocList 
-						= indexScope->getAssociationsForArray(arrayName);
-				if (currAssocList != NULL && currAssocList->NumElements() > 0) {
-					for (int i = 0; i < currAssocList->NumElements(); i++) {
-						IndexArrayAssociation *association = currAssocList->Nth(i);
-						if (strcmp(association->getIndex(), indexName) == 0) {
-							associationExists = true;
-							break;
-						}
-					}
-				}
-	
-				if (!associationExists) {
+				if (!earlierIndexAssociationExists(indexName)) {
 					IndexArrayAssociation *association = new IndexArrayAssociation(indexName,
 							arrayName, position);
 					indexScope->saveAssociation(association);
@@ -229,6 +216,21 @@ bool ArrayAccess::isFinalIndexAccess() {
 	if (parent == NULL) return true;
 	ArrayAccess *parentArrayAcc = dynamic_cast<ArrayAccess*>(parent);
 	return (parentArrayAcc != NULL);
+}
+
+bool ArrayAccess::earlierIndexAssociationExists(const char *indexName) {
+	
+	ArrayAccess *earlierAccess = dynamic_cast<ArrayAccess*>(base);
+	if (earlierAccess == NULL) return false;
+
+	Expr *indexExpr = earlierAccess->getIndex();
+	FieldAccess *earlierIndex = dynamic_cast<FieldAccess*>(indexExpr);
+	if (earlierIndex != NULL && earlierIndex->isTerminalField()) {
+		const char *earlierIndexName = earlierIndex->getField()->getName();
+		if (strcmp(earlierIndexName, indexName) == 0) return true;
+	}
+
+	return earlierAccess->earlierIndexAssociationExists(indexName);
 }
 
 void ArrayAccess::setEpochVersions(Space *space, int epoch) {
