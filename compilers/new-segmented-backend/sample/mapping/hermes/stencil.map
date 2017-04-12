@@ -1,5 +1,5 @@
 "Five Points Stencil" {
 	// syntax LPS ':' PPS
-	Space A: 5	// Socket
+	Space A: 5	// Node
 	Space B: 1	// Core
 }

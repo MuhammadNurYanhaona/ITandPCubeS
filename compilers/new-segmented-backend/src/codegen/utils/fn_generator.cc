@@ -68,13 +68,14 @@ void generateLibraryIncludes(List<Definition*> *fnDefList,
 
 	// include the header file for user defined type definition for the output header file
 	decorator::writeSectionHeader(headerFile, "header file for user defined IT types");
-	headerFile << "#include \"tuple.h\"" << std::endl << std::endl;
+	headerFile << std::endl << "#include \"tuple.h\"" << std::endl << std::endl;
 
 	// include the common library header files in the output program file
 	std::ifstream commIncludeFile("config/default-includes.txt");
         if (commIncludeFile.is_open()) {
 		const char *message = "common header files for different purposes";
 		decorator::writeSectionHeader(programFile, message);
+		programFile << std::endl;
 		std::string line;
                 while (std::getline(commIncludeFile, line)) {
                         programFile << line << std::endl;
@@ -113,6 +114,7 @@ void generateLibraryIncludes(List<Definition*> *fnDefList,
 	decorator::writeSectionHeader(headerFile, message);
 	decorator::writeSectionHeader(programFile, message);
 	std::ostringstream includeStream; 
+	includeStream << std::endl;
 	for (int i = 0; i < headerIncludes->NumElements(); i++) {
 		includeStream << "#include ";
 		const char *headerInclude = headerIncludes->Nth(i);
@@ -122,7 +124,7 @@ void generateLibraryIncludes(List<Definition*> *fnDefList,
 			includeStream << '<' << headerInclude << '>' << std::endl;
 		}
 	}
-	includeStream << '\n';
+	includeStream << std::endl;
 	headerFile << includeStream.str();
 	programFile << includeStream.str();
 }

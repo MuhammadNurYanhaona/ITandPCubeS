@@ -1,0 +1,129 @@
+Program (args) { 
+        mcEnv = new TaskEnvironment(name: "Monte Carlo Area Estimation")
+        execute(task: "Monte Carlo Area Estimation"; environment: mcEnv; 			\
+		initialize: args.precision, args.max_rounds, 					\
+				args.cell_length, args.grid_dim, args.points_per_cell; 		\
+		partition: args.b)
+}
+
+Class Rectangle:
+	top, bottom, left, right: Integer
+
+Function init_rand() {
+	@Extern {
+		@Language "C++"
+		@Includes { time.h, cstdlib }
+		${ srand(time(NULL)); }$
+	}
+}
+
+Function perform_sampling(cell, seed, trial_count) {
+	cell_length = cell.right - cell.left + 1
+	internal_points = 0
+	trial = 0
+	do {
+		// generate a point within the cell boundary and calculate its position
+		// relative to the shape
+		@Extern {
+			@Language "C++"
+			@Includes { math.h, cstdlib }
+			${
+				int x = rand_r((unsigned int *) &seed) % cell_length + cell.left;
+				int y = rand_r((unsigned int *) &seed) % cell_length + cell.bottom;
+				
+				// tested polynomial is 10 sin x^2 + 50 cos y^3
+				double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
+				if (result <= 0.0) {
+					internal_points++; 
+				}
+			}$
+		}
+		trial = trial + 1
+	} while (trial < trial_count)
+	return internal_points
+}
+
+Task "Monte Carlo Area Estimation":
+	Define:
+		grid: 2d Array of Rectangle
+		sub_area_estimates: 2d Array of Real double-precision
+		cell_length, points_per_cell, max_rounds: Integer
+		precision_threshold, cell_size: Real double-precision
+		area: Real double-precision Reduction
+	Environment:
+		area: create
+	Initialize(precision_threshold, max_rounds, cell_length, grid_dim, points_per_cell):
+		grid.dimension1.range.min = 0
+		grid.dimension1.range.max = grid_dim - 1
+		grid.dimension2 = grid.dimension1
+		sub_area_estimates.dimension = grid.dimension
+
+		// initialize the random number generator
+		init_rand()
+	Stages:
+		setupGridCells(grid, cell_length) {
+			do { 
+				grid[i][j].left = cell_length * i
+				grid[i][j].right = cell_length * (i + 1) - 1
+				grid[i][j].bottom = cell_length * j
+				grid[i][j].top = cell_length * ( j + 1) - 1
+			} for i, j in grid
+		}
+		estimateSubarea(precision, max_rounds, cell_length, grid, estimates, points_per_cell) {
+			
+			cell_size = cell_length * cell_length
+			do {
+				// retrieve the current grid cell and set the seed for random number generator
+				cell = grid[i][j]
+				seed = lpuId[0]
+
+				// repeat the estimation until the desired precision is reached
+				prev_estimate = 0.000000
+				total_internal_points = 0
+				round = 1
+				do {
+					// undertakes points_per_cell number of point placement trails 
+					internal_points = perform_sampling(cell, seed, points_per_cell)
+					
+					// estimate the part of the polynomial within the grid cell
+					total_internal_points = total_internal_points + internal_points
+					curr_estimate = cell_size * total_internal_points / (round * points_per_cell)
+
+					if (curr_estimate > prev_estimate) {
+						estimate_diff = curr_estimate - prev_estimate
+					} else { 
+						estimate_diff = prev_estimate - curr_estimate 
+					}
+					prev_estimate = curr_estimate
+					round = round + 1
+				} while (estimate_diff > precision && round < max_rounds)
+			
+				// record the final estimate when the desired precision has been reached
+				estimates[i][j] = curr_estimate
+			
+			} for i, j in grid
+		}
+		estimateTotalArea(result, estimates) {
+			do {
+				reduce(result, "sum", estimates[i][j])
+			} for i, j in estimates
+		}
+	Computation:
+		Space A {
+			Space B {
+				// calculate the cell boundaries based on cell dimension length and position in the grid
+				setupGridCells(grid, cell_length)
+				
+				// estimate the sub-area under the polynomial within each grid cell 
+				estimateSubarea(precision_threshold, max_rounds, cell_length, 
+						grid, sub_area_estimates, points_per_cell)
+
+				// reduce the sub-area estimates into a single final result in Space A
+				estimateTotalArea(Space A:area, sub_area_estimates)
+			}
+		}
+	Partition(b):
+		Space A <un-partitioned> { grid }
+		Space B <2d> divides Space A partitions {
+			grid, sub_area_estimates: block_count(b, b)
+		} 

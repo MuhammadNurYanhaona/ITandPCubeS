@@ -82,9 +82,10 @@ int FunctionCall::resolveExprTypes(Scope *scope) {
 			this->type = returnType;
 			resolvedExprs++;
 		}
+	} else {
+		delete argTypeList;
 	}
 
-	delete argTypeList;
 	return resolvedExprs;
 }
 

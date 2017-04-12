@@ -16,6 +16,9 @@
 #include "tuple.h"
 #include <vector>
 
+// for user defined functions found in the source code
+#include "function.h"
+
 // for LPU and PPU management data structures
 #include "../../../common-libs/domain-obj/structure.h"
 #include "../../src/runtime/common/lpu_management.h"

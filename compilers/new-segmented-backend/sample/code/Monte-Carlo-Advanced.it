@@ -1,0 +1,145 @@
+Program (args) { 
+        mcEnv = new TaskEnvironment(name: "Monte Carlo Area Estimation")
+        execute(task: "Monte Carlo Area Estimation"; environment: mcEnv; 			\
+		initialize: args.precision, args.max_rounds, 					\
+				args.cell_length, args.grid_dim, args.points_per_cell; 		\
+		partition: args.b)
+}
+
+Class Rectangle:
+	top, bottom, left, right: Integer
+
+Function init_rand() {
+	@Extern {
+		@Language "C++"
+		@Includes { time.h, cstdlib }
+		${ srand(time(NULL)); }$
+	}
+}
+
+Function perform_sampling(cell, seed, trial_count) {
+	cell_height = cell.top - cell.bottom + 1
+	cell_width = cell.right - cell.left + 1
+	internal_points = 0
+	trial = 0
+	do {
+		// generate a point within the cell boundary and calculate its position
+		// relative to the shape
+		@Extern {
+			@Language "C++"
+			@Includes { math.h, cstdlib }
+			${
+				int x = rand_r((unsigned int *) &seed) % cell_width + cell.left;
+				int y = rand_r((unsigned int *) &seed) % cell_height + cell.bottom;
+				
+				// tested polynomial is 10 sin x^2 + 50 cos y^3
+				double result = 10 * sin(pow(x, 2)) + 50 * cos(pow(y, 3));
+				if (result <= 0.0) {
+					internal_points++; 
+				}
+			}$
+		}
+		trial = trial + 1
+	} while (trial < trial_count)
+	return internal_points
+}
+
+Task "Monte Carlo Area Estimation":
+	Define:
+		grid: 2d Array of Rectangle
+		internal_points: 2d Array of Integer
+		placement_result: Integer Reduction
+		local_estimates, estimate_diffs: 2d Array of Real double-precision
+		round, cell_length, points_per_cell, max_rounds: Integer
+		precision_threshold: Real double-precision
+		area: Real double-precision Reduction
+	Environment:
+		area: create
+	Initialize(precision_threshold, max_rounds, cell_length, grid_dim, points_per_cell):
+		grid.dimension1.range.min = 0
+		grid.dimension1.range.max = grid_dim - 1
+		local_estimates.dimension1 = grid.dimension2 = grid.dimension1
+		internal_points.dimension = grid.dimension
+		local_estimates.dimension2.range.min = 0
+		local_estimates.dimension2.range.max = (grid_dim - 1) / partition.b
+		estimate_diffs.dimension = local_estimates.dimension
+
+		// initialize the random number generator
+		init_rand()
+	Stages:
+		setupGridCells(grid, cell_length, block_count) {
+			do { 
+				cell_height = cell_length
+				cell_width = cell_length / block_count
+				grid[i][j].left = cell_width * i
+				grid[i][j].right = cell_width * (i + 1) - 1
+				grid[i][j].bottom = cell_height * j
+				grid[i][j].top = cell_height * ( j + 1) - 1
+			} for i, j in grid
+		}
+		initializeEstimateDiffs(diffs, threshold) {
+			do {
+				diffs[i][j] = threshold + 1
+			} for i, j in diffs
+		}
+		performSampling(sample_count, grid, points, result) {
+			do {	
+				cell = grid[i][j]
+                        	seed = lpuId[0]
+				points[i][j] = perform_sampling(cell, seed, points_per_cell)	
+			} for i, j in grid
+			do {
+				reduce(result, "sum", points[i][j])
+			} for i, j in points
+		}
+		estimateSubarea(internal_points, sample_count, round, diff, estimates) {
+			row = estimates.dimension1.range.min
+			col = estimates.dimension2.range.min
+			cell_size = cell_length * cell_length
+			curr_estimate =  cell_size * internal_points / sample_count
+			weight = 1.0 / round
+			old_estimate = estimates[row][col]
+			updated_estimate = curr_estimate * weight + old_estimate * (1 - weight)
+			estimates[row][col] = updated_estimate
+			if (updated_estimate > old_estimate) {
+				diff[row][col] = updated_estimate - old_estimate
+			} else {
+				diff[row][col] = old_estimate - updated_estimate
+			}
+		}
+		estimateTotalArea(result, sub_area_estimates) {
+			do {
+				reduce(result, "sum", sub_area_estimates[i][j])
+			} for i, j in sub_area_estimates
+		}
+	Computation:
+		Space A {
+			Space B {
+				Space C {
+					setupGridCells(grid, cell_length, partition.b)
+				}
+				initializeEstimateDiffs(estimate_diffs, precision_threshold)
+				
+				Repeat for round in [1...max_rounds] {
+					If estimate_diffs[lpuId[0]][lpuId[1]] > precision_threshold {
+						Space C {		
+							performSampling(points_per_cell, grid, 
+									internal_points, Space B:placement_result)
+						}
+						estimateSubarea(placement_result, points_per_cell, 
+								round, estimate_diffs, local_estimates)
+					}
+				}
+				
+				estimateTotalArea(Space A:area, local_estimates)
+			}
+		}
+	Partition(b):
+		Space A <un-partitioned> { local_estimates }
+		Space B <2d> divides Space A partitions {
+			local_estimates, estimate_diffs: block_size(1, 1)
+			grid, internal_points: block_size(1, b)
+		}
+		Space C <1d> divides Space B partitions {
+			grid<dim2>, internal_points<dim2>: block_size(1) 
+		} 

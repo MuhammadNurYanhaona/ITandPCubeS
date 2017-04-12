@@ -12,17 +12,17 @@ Task "LU Factorization":
 		a, u, l: 2d Array of Real single-precision
 		p: 1d Array of Integer
 		pivot, k: Integer
-		l_column: 1d Array of Real single-precision
+		l_row: 1d Array of Real single-precision
 	Environment:
 		a: link
 		u, l, p: create
 	Initialize:
 		u.dimension = l.dimension = a.dimension
-		l_column.dimension = l.dimension1
+		l_row.dimension = l.dimension1
 		p.dimension = a.dimension1
 	Stages:
 		prepare(a, u, l) {
-			do { u[i][j] = a[i][j] } for i, j in a
+			do { u[j][i] = a[i][j] } for i, j in a
 			do { l[i][i] = 1 } for i in l
 		}
 		selectPivot(pivot, u, k) {
@@ -40,44 +40,45 @@ Task "LU Factorization":
 			p[k] = pivot 
 		}
 		interchangeRows(u, l, k, pivot) {
-			do { 	pivot_entry = u[k][j]
-				u[k][j] = u[pivot][j]
-				u[pivot][j] = pivot_entry
-			} for j in u and j >= k
-			do { 	pivot_entry = l[k][j]
-				l[k][j] = l[pivot][j]
-				l[pivot][j] = pivot_entry
-			} for j in l and j < k
+			do { 	pivot_entry = u[i][k]
+				u[i][k] = u[i][pivot]
+				u[i][pivot] = pivot_entry
+			} for i in u and i >= k
+			do { 	pivot_entry = l[i][k]
+				l[i][k] = l[i][pivot]
+				l[i][pivot] = pivot_entry
+			} for i in l and i < k
 		}
-		updateLower(u, l, l_column, k) {
+		updateLower(u, l, l_row, k) {
 			do { 
-				l[i][k] = u[i][k] / u[k][k]
-				l_column[i] = l[i][k] 
-			} for i in l and i > k
+				l[k][j] = u[k][j] / u[k][k]
+				u[k][j] = 0
+				l_row[j] = l[k][j] 
+			} for j in l and j > k
 		}
-		updateUpper(u, l_column, k) {
-			do { u[i][j] = u[i][j] - l_column[i] * u[k][j] } for i, j in u and i > k and j >= k
+		updateUpper(u, l_row, k) {
+			do { u[i][j] = u[i][j] - l_row[j] * u[i][k] } for i, j in u and i > k and j > k
 		}
 	Computation:
 		Space A {
 			Space B { prepare(a, u, l) }
 			Repeat for k in a.dimension1.range {
 				Space B {	
-					Where k in u.local.dimension2.range { 
+					Where k in u.local.dimension1.range { 
 						selectPivot(pivot, u, k) 
 					}
 				}
 				storePivot(p, k, pivot)
 				Space B {
 					If k != pivot { interchangeRows(u, l, k, pivot) }
-					Where k in l.local.dimension2.range { updateLower(u, l, l_column, k) }
-					updateUpper(u, l_column, k)	
+					Where k in l.local.dimension1.range { updateLower(u, l, l_row, k) }
+					updateUpper(u, l_row, k)	
 				}
 			}
 		}
 	Partition:
 		Space A <un-partitioned> { p, a }
 		Space B <1d> divides Space A partitions {
-			a<dim2>, u<dim2>, l<dim2>: stride()
-			l_column: replicated
+			a<dim2>, u<dim1>, l<dim1>: stride()
+			l_row: replicated
 		} 
