@@ -42,6 +42,16 @@ Function perform_sampling(cell, seed, trial_count) {
 	return internal_points
 }
 
+Function print_result(result) {
+	@Extern {
+		@Language "C++"
+		@Includes { iostream }
+		${
+			std::cout << "Estimated area under the polynomial is: " << result << "\n";
+		}$
+	}
+}
+
 Task "Monte Carlo Area Estimation":
 	Define:
 		grid: 2d Array of Rectangle
@@ -87,6 +97,9 @@ Task "Monte Carlo Area Estimation":
 				reduce(result, "sum", sub_area_estimates[i][j])
 			} for i, j in sub_area_estimates
 		}
+		displayResult(result) {
+			print_result(result)
+		}
 	Computation:
 		Space A {
 			Space B {
@@ -100,6 +113,9 @@ Task "Monte Carlo Area Estimation":
 				// reduce the sub-area estimates into a single final result in Space A
 				estimateTotalArea(Space A:area, sub_area_estimates)
 			}
+			
+			// display the area estimate on the output terminal
+			displayResult(area)
 		}
 	Partition(b):
 		Space A <un-partitioned> { grid }

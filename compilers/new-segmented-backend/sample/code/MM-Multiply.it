@@ -16,7 +16,7 @@ Program (args) {
 
 Task "Block Matrix-Matrix Multiply":
 	Define:
-		a, b, c: 2d Array of Real single-precision
+		a, b, c: 2d Array of Real double-precision
 	Environment:
 		a, b: link
 		c: create

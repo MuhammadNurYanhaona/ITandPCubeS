@@ -9,7 +9,7 @@ Program (args) {
 
 Task "Five Points Stencil":
 	Define:
-		plate: 2d Array of Real single-precision
+		plate: 2d Array of Real double-precision
 		max_iterations: Integer
 		counter_1, counter_2, counter_3: Integer
 	Environment:
@@ -18,10 +18,10 @@ Task "Five Points Stencil":
 		max_iterations = iterations
 	Stages:
 		refineEstimates(plate) {
-			localRows = plate.dimension1.range
-			localCols = plate.dimension2.range
+			localRows = plate.local.dimension1.range
+			localCols = plate.local.dimension2.range
 			do { plate[i][j] at (current)					\ 
-				= 1/4 * (plate[i-1][j]					\ 
+				= 0.25 * (plate[i-1][j]					\ 
 				+ plate[i+1][j] 					\
 				+ plate[i][j-1] 					\
 				+ plate[i][j+1]) at (current - 1)

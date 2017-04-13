@@ -112,6 +112,15 @@ Task "Monte Carlo Area Estimation":
 				reduce(result, "sum", sub_area_estimates[i][j])
 			} for i, j in sub_area_estimates
 		}
+		displayResult(result) {
+                        @Extern {
+                                @Language "C++"
+                                @Includes { iostream }
+                                ${
+                                        std::cout << "Estimated area under the polynomial is: " << result << "\n";
+                                }$
+                        }
+                }
 	Computation:
 		Space A {
 			Space B {
@@ -133,6 +142,9 @@ Task "Monte Carlo Area Estimation":
 				
 				estimateTotalArea(Space A:area, local_estimates)
 			}
+
+			// display the area estimate on the output terminal
+                        displayResult(area)
 		}
 	Partition(b):
 		Space A <un-partitioned> { local_estimates }

@@ -246,8 +246,16 @@ List<ParamReplacementConfig*> *StageInvocation::generateParamReplacementConfigs(
 			const char *argName = fieldAcc->getField()->getName();
 			if (strcmp(argName, paramName) == 0) {
 				config = new ParamReplacementConfig(param, argument, No_Replacement);
-			// if the names are not the same then any access to the parameter field can be just renamed
-			// to access the argument
+
+			// If the names are not the same and the argument is not an array then any access to the 
+			// paramater field can just be renamed to access the argument. However, there might be some
+			// extern code block inside the stage invocation that is accessing the parameter. Thus, we
+			// configure the argument as Evaluate_Before.
+			} else if (array == NULL) {
+				config = new ParamReplacementConfig(param, argument, Evaluate_Before);
+
+			// If the names are not the same for some array then any access to the parameter field can 
+			// be just renamed to access the argument.
 			} else {
 				config = new ParamReplacementConfig(param, argument, Change_Name);
 			}

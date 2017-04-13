@@ -149,5 +149,7 @@ int main(int argc, const char *argv[]) {
         // program for successful compilation and execution of external code blocks
         generateExternLibraryLinkInfo(linkageListerFile);
 	//***************************************************************************************
+
+	std::cout << "\n\n********************** Compilation Successful!!!\n\n";
 }
 

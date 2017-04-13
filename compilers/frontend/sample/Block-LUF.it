@@ -57,11 +57,13 @@ Task "Block LU Factorization":
 			p[k] = pivot
 		}
 		interchangeRows(pivot, k, u, l) {
-			do {    u[i][k] at (current) = u[i][pivot] at (current - 1)
-				u[i][pivot] at (current) = u[i][k] at (current - 1)
+			do {    pivot_entry = u[i][k]
+				u[i][k] = u[i][pivot]
+				u[i][pivot] = pivot_entry
 			} for i in u and i >= k
-			do {    l[i][k] at (current) = l[i][pivot] at (current - 1)
-				l[i][pivot] at (current) = l[i][k] at (current - 1)
+			do {    pivot_entry = l[i][k]
+				l[i][k] = l[i][pivot]
+				l[i][pivot] = pivot_entry
 			} for i in l and i < k
 		}
 		updateL(l, k, l_row) {
@@ -86,6 +88,11 @@ Task "Block LU Factorization":
 			do {	u[i][k] = u[i][k] - u[i][j] * p_column[j]
 			} for i, j in u and i > row_range.max and j >= row_range.min and j < k
 		}
+		copyUpdatedUBlock(u_block, row_range, u) {
+			do {    column = j - row_range.min
+				u_block[i][column] = u[i][j] 
+			} for i, j in u and i > row_range.max and j >= row_range.min and j <= row_range.max
+                }
 		copyUpdatedLBlock(l_block, row_range, l) {
 			do {	row = i - row_range.min
 				l_block[row][j] = l[i][j] 
@@ -112,9 +119,7 @@ Task "Block LU Factorization":
 					}
 					storePivot(p, k, pivot)
 					Space B {
-						If k != pivot {
-							Epoch { interchangeRows(pivot, k, u, l) }
-						}
+						If k != pivot { interchangeRows(pivot, k, u, l) }
 						Where k in l.local.dimension1.range  { updateL(l, k, l_row) }
 						updateURowsBlock(u, l_row, k, row_range)	
 						collectLColParts(l_column, l, k, row_range)
@@ -125,6 +130,7 @@ Task "Block LU Factorization":
 					}
 				}
 				Space B {
+					copyUpdatedUBlock(u_block, row_range, u)
 					Where r in l.local.dimension1.range { copyUpdatedLBlock(l_block, row_range, l) }	
 					Space C {
 						Repeat foreach sub-partition {
