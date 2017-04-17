@@ -439,6 +439,8 @@ class TaskDef : public Definition {
         // and libraries to be linked during code generation for successful execution of all extern code 
 	// blocks used within an IT task.
         IncludesAndLinksMap *getExternBlocksHeadersAndLibraries();
+
+	void prepareForCodegen();
 };
 
 #endif

@@ -2,6 +2,7 @@
 #include "task_global.h"
 
 #include "../../../../common-libs/utils/list.h"
+#include "../../../../common-libs/utils/string_utils.h"
 
 #include "../../../../frontend/src/syntax/ast_task.h"
 #include "../../../../frontend/src/syntax/ast_def.h"
@@ -25,7 +26,8 @@ void NameTransformer::reset() {
 	threadLocals = new List<const char*>;
 	globalArrays = new List<const char*>;
 	lpuPrefix = "lpu->";
-	localAccessDisabled = false;		
+	localAccessDisabled = false;
+	localScalars = new List<const char*>;		
 }
 
 bool NameTransformer::isTaskGlobal(const char *varName) {
@@ -49,7 +51,18 @@ bool NameTransformer::isGlobalArray(const char *varName) {
 	return false;
 }
 
+void NameTransformer::setLocalScalars(List<const char*> *scalarList) {
+	this->localScalars = scalarList;
+}
+                
+void NameTransformer::resetLocalScalars() {
+	localScalars = new List<const char*>;
+}
+
 const char *NameTransformer::getTransformedName(const char *varName, bool metadata, bool local, Type *type) {
+
+	if (string_utils::contains(localScalars, varName)) return varName;
+
 	std::ostringstream xformedName;
 	if (isTaskGlobal(varName)) {
 		xformedName << "taskGlobals->" << varName;
@@ -71,6 +84,7 @@ const char *NameTransformer::getTransformedName(const char *varName, bool metada
 			return strdup(xformedName.str().c_str());
 		}
 	}
+	
 	//------------------------------------------------------------------------------------ Patch Solution
 	// This portion is a patch for translating elements within tasks' environment references. We 
 	// originally designed the name transformer with only single task in mind. Now because of time 
@@ -85,6 +99,7 @@ const char *NameTransformer::getTransformedName(const char *varName, bool metada
 		}
 	}
 	//---------------------------------------------------------------------------------------------------
+	
 	return varName;
 }
 
@@ -115,5 +130,3 @@ void NameTransformer::setTransformer(TaskDef *taskDef) {
 	// default static array parameter used to indentify which LPU is currently been executed
 	transformer->globalArrays->Append("lpuId");
 }
-
-

@@ -2,6 +2,8 @@
 #include "../../../utils/name_transformer.h"
 #include "../../../../../../frontend/src/syntax/ast_expr.h"
 #include "../../../../../../frontend/src/syntax/ast_stmt.h"
+#include "../../../../../../frontend/src/semantics/scope.h"
+#include "../../../../../../frontend/src/semantics/symbol.h"
 #include "../../../../../../frontend/src/semantics/task_space.h"
 #include "../../../../../../frontend/src/semantics/computation_flow.h"
 #include "../../../../../../frontend/src/semantics/array_acc_transfrom.h"
@@ -100,6 +102,17 @@ void StageInstanciation::translateCode(std::ofstream &stream) {
 		stream << localVars.str();
 	}
 
+	// ensure that local variables of the compute stage do not conflict with some task global array during
+	// name transformation
+	List<const char*> *localVarList = new List<const char*>;
+	Iterator<Symbol*> symbolIterator = scope->get_local_symbols();
+	Symbol *symbol = NULL;
+	while((symbol = symbolIterator.GetNextValue()) != NULL) {
+		VariableSymbol *varSymbol = dynamic_cast<VariableSymbol*>(symbol);
+		localVarList->Append(varSymbol->getName());
+	}
+	ntransform::NameTransformer::transformer->setLocalScalars(localVarList);
+
         // translate statements into C++ code
 	stream <<  computeHd;
 	std::ostringstream codeStream;
@@ -108,7 +121,10 @@ void StageInstanciation::translateCode(std::ofstream &stream) {
 
         // finally return a successfull run indicator
 	stream <<  returnHd;
-	stream << indent << "return SUCCESS_RUN" << stmtSeparator;	
+	stream << indent << "return SUCCESS_RUN" << stmtSeparator;
+
+	// reset the list of local variables that were excluded from name transformation
+	ntransform::NameTransformer::transformer->resetLocalScalars(); 	
 }
 
 void StageInstanciation::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {

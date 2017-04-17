@@ -6,6 +6,7 @@
 #include "../../common/errors.h"
 #include "../../syntax/ast.h"
 #include "../../syntax/ast_def.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../static-analysis/usage_statistic.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
@@ -84,6 +85,8 @@ Space::Space(const char *name, int dimensions, bool dynamic, bool subpartitionSp
 	// a mark of an invalid PPS id as PPS ids are positive integers
 	this->ppsId = 0;
 	this->segmentedPPS = 0;
+
+	this->reductionInfoList = new List<ReductionMetadata*>;
 }
 
 void Space::setStructureList(Hashtable<DataStructure*> *dataStructureList) {
@@ -274,4 +277,33 @@ bool Space::allocateStructure(const char *structureName) {
 	DataStructure *structure = dataStructureList->Lookup(structureName);
 	if (structure == NULL) return false;
 	return structure->getUsageStat()->isAllocated();
+}
+
+bool Space::isSingletonLps() {
+	if (dimensions > 0) return false;
+	if (parent == NULL) return true;
+	return parent->isSingletonLps();
+}
+
+void Space::storeReductionInfo(ReductionMetadata *info) {
+	this->reductionInfoList->Append(info);
+}
+
+bool Space::isRootOfSomeReduction() {
+	return (reductionInfoList->NumElements() > 0);
+}
+
+List<ReductionMetadata*> *Space::getAllReductionConfigs() {
+	return reductionInfoList;
+}
+
+void Space::recordAllReductionMetadataToLpses(List<ReductionMetadata*> *infoSet) {
+	
+	if (infoSet == NULL) return;
+
+	for (int i = 0; i < infoSet->NumElements(); i++) {
+		ReductionMetadata *info = infoSet->Nth(i);
+		Space *ownerLps = info->getReductionRootLps();
+		ownerLps->storeReductionInfo(info);
+	}
 }

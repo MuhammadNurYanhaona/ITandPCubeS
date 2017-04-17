@@ -108,14 +108,16 @@ bool LpsContent::hasValidDataItems() {
 
 TaskData::TaskData() { 
 	lpsContentMap = new Hashtable<LpsContent*>; 
-	Assert(lpsContentMap != NULL);
+	reductionResultMap = new Hashtable<ReductionResultAccessContainer*>;
+	Assert(lpsContentMap != NULL && reductionResultMap != NULL);
 }
 
 TaskData::~TaskData() {
-	Iterator<LpsContent*> iterator = lpsContentMap->GetIterator();
+	
+	Iterator<LpsContent*> lpsIterator = lpsContentMap->GetIterator();
 	LpsContent *lpsContent = NULL;
 	List<LpsContent*> *contentList = new List<LpsContent*>;
-	while ((lpsContent = iterator.GetNextValue()) != NULL) {
+	while ((lpsContent = lpsIterator.GetNextValue()) != NULL) {
 		contentList->Append(lpsContent);
 	}
 	while (contentList->NumElements() > 0) {
@@ -125,7 +127,24 @@ TaskData::~TaskData() {
 	}
 	delete contentList;
 	delete lpsContentMap;
-	lpsContentMap = NULL;	
+	lpsContentMap = NULL;
+
+	Iterator<ReductionResultAccessContainer*> reductionIterator 
+			= reductionResultMap->GetIterator();
+	List<ReductionResultAccessContainer*> *resultList 
+			= new List<ReductionResultAccessContainer*>;
+	ReductionResultAccessContainer *redResContainer;
+	while ((redResContainer = reductionIterator.GetNextValue()) != NULL) {
+		resultList->Append(redResContainer);
+	}
+	while (resultList->NumElements() > 0) {
+		ReductionResultAccessContainer *container = resultList->Nth(0);
+		resultList->RemoveAt(0);
+		delete container;
+	}
+	delete resultList;
+	delete reductionResultMap;
+	reductionResultMap = NULL;		
 }
 
 void TaskData::addLpsContent(const char *lpsId, LpsContent *content) { 
@@ -138,6 +157,15 @@ DataItems *TaskData::getDataItemsOfLps(const char *lpsId, const char *varName) {
 	LpsContent *lpsContent = lpsContentMap->Lookup(lpsId);
 	if (lpsContent == NULL) return NULL;
 	else return lpsContent->getDataItems(varName);
+}
+
+void TaskData::addReductionResultContainer(const char *varName, ReductionResultAccessContainer *container) {
+	reductionResultMap->Enter(varName, container);
+}
+
+reduction::Result *TaskData::getResultVar(const char *varName, List<int*> *lpuId) {
+	ReductionResultAccessContainer *container = reductionResultMap->Lookup(varName);
+	return container->getResultForLpu(lpuId);
 }
 
 Hashtable<PartIterator*> *TaskData::generatePartIteratorMap() {

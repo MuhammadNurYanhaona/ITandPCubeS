@@ -14,9 +14,9 @@ class Type;
    different attributes to different target data structures, we cannot apply the structure names 
    mentioned in the IT source directly in the translated low level C/Fortran output. We have to 
    append prefix/suffix based on the containing data structure for a specific IT variable. This 
-   scheme works because we use a predefined placement strategy that is uniform across tasks and 
-   their computation stages and the argument names of generated function calls for computation stages
-   also follow a consistent naming strategy.
+   scheme works because we use a predefined placement strategy that is uniform across tasks and their 
+   computation stages and the argument names of generated function calls for computation stages also 
+   follow a consistent naming strategy.
 
    According to this strategy the following rule is used:
    
@@ -42,18 +42,25 @@ namespace ntransform {
 		List<const char*> *threadLocals;
 		List<const char*> *globalArrays;
 		std::string lpuPrefix;
-		// this flag is used to indicate that the name transformer is working outside of the
+
+		// Local scalars are either parameters or local variables in compute stages that may
+		// conflict with some task-global array during name transformation. So their names
+		// should be explicitly listed during compute stage code generation process beginning 
+		// and should be cleared when the process ends. 
+		List<const char*> *localScalars;
+
+		// This flag is used to indicate that the name transformer is working outside of the
 		// compute block. This helps to handle name transformation in initialize functions for
 		// a task. TODO in the future, however, we have to come up with a better mechanism to
-		// make the name transformer flexible as we need to handle other contexts such as 
-		// the coordinator program and functions.
+		// make the name transformer flexible as we need to handle other contexts such as the 
+		// coordinator program and functions.
 		bool localAccessDisabled;
+
 		NameTransformer();
 	  public:
 		static NameTransformer *transformer;
-		static void setTransformer(TaskDef *taskDef);
-		const char *getTransformedName(const char *varName, 
-				bool metadata, bool local, Type *type = NULL);	
+		
+		void reset();
 		bool isTaskGlobal(const char *varName);
 		bool isThreadLocal(const char *varName);
 		bool isGlobalArray(const char *varName);
@@ -61,7 +68,18 @@ namespace ntransform {
 		std::string getLpuPrefix() { return lpuPrefix; }
 		void disableLocalAccess() { localAccessDisabled = true; }
 		void enableLocalAccess() { localAccessDisabled = false; }
-		void reset();
+		void setLocalScalars(List<const char*> *scalarList);
+		void resetLocalScalars();
+		
+		// This is the interface the holder of the transformer should invoke to transform a
+		// a variable name found in the intermediate code into a corresponding variable or 
+		// property name in the generated code.
+		const char *getTransformedName(const char *varName, 
+				bool metadata, bool local, Type *type = NULL);
+		
+		// This function should be invoked to instanciate a new name transformer at beginning
+		// of code generation for a task.
+		static void setTransformer(TaskDef *taskDef);
 	};
 }
 

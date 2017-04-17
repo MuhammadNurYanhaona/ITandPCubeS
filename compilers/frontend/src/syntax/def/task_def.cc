@@ -13,6 +13,7 @@
 #include "../../semantics/helper.h"
 #include "../../semantics/computation_flow.h"
 #include "../../semantics/data_access.h"
+#include "../../static-analysis/reduction_info.h"
 #include "../../static-analysis/task_env_stat.h"
 #include "../../codegen-helper/extern_config.h"
 #include "../../../../common-libs/utils/list.h"
@@ -330,4 +331,10 @@ IncludesAndLinksMap *TaskDef::getExternBlocksHeadersAndLibraries() {
         IncludesAndLinksMap *configMap = new IncludesAndLinksMap();
         computation->retriveExternCodeBlocksConfigs(configMap);
         return configMap;
+}
+
+void TaskDef::prepareForCodegen() {
+	List<ReductionMetadata*> *reductionInfos = new List<ReductionMetadata*>;
+        computation->extractAllReductionInfo(reductionInfos);
+	Space::recordAllReductionMetadataToLpses(reductionInfos);
 }

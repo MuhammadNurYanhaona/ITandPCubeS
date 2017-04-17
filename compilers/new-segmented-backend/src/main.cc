@@ -111,6 +111,7 @@ int main(int argc, const char *argv[]) {
         if (ReportError::NumErrors() > 0) return -1;    //-----------exit after semantic analysis
         ProgramDef::program->performStaticAnalysis();
         if (ReportError::NumErrors() > 0) return -1;    //-------------exit after static analysis
+        ProgramDef::program->prepareForCodegen();
 	//***************************************************************************************
 
 

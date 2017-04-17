@@ -29,6 +29,7 @@ List<TaskGlobalScalar*> *TaskGlobalCalculator::calculateTaskGlobals(TaskDef *tas
 	Iterator<Symbol*> iterator = scope->get_local_symbols();
 	Symbol *symbol = NULL;
 	while ((symbol = iterator.GetNextValue()) != NULL) {
+
 		// if the symbol is not a varible then ignore it
 		VariableSymbol *variable = dynamic_cast<VariableSymbol*>(symbol);
 		if (variable == NULL) continue;
@@ -40,22 +41,23 @@ List<TaskGlobalScalar*> *TaskGlobalCalculator::calculateTaskGlobals(TaskDef *tas
 		ArrayType *array = dynamic_cast<ArrayType*>(type);
 		if (!(array == NULL)) continue;
 
-		// if the variable is a result variable for some non task-global reduction then it has per
-		// LPU instances not a single shared instance for all LPUs
+		// If the variable is a result variable for some non task-global reduction then it has per
+		// LPU instances -- not a single shared instance for all LPUs. Nevertheless, We decided to
+		// assign the value of the variable to a PPU-thread-local property for easy access.
+		bool nonGlobalReduction = false;
 		if (variable->isReduction()) {
-			bool singleton = false;
+			bool singleton = true;
 			for (int i = 0; i < reductionInfos->NumElements(); i++) {
 				ReductionMetadata *reduction = reductionInfos->Nth(i);
 				if (strcmp(reduction->getResultVar(), varName) == 0) {
-					singleton = singleton | reduction->isSingleton(); 
+					singleton = singleton && reduction->isSingleton(); 
 				}
 			}
-			if (!singleton) continue;
+			nonGlobalReduction = !singleton;
 		}
 
-
-		// if the variable is used as a repeat loop index then it is a task-global variable with
-		// separate versions for individual PPU controllers
+		// If the variable is used as a repeat loop index then it is a task-global variable with
+		// separate versions for individual PPU controllers.
 		const char *variableName = variable->getName();
 		bool matchFound = false;
 		for (int i = 0; i < repeatIndexList->NumElements(); i++) {
@@ -65,8 +67,12 @@ List<TaskGlobalScalar*> *TaskGlobalCalculator::calculateTaskGlobals(TaskDef *tas
 			}
 		}
 
-		TaskGlobalScalar *scalar = new TaskGlobalScalar(variableName, matchFound, type);
+		// all locally manageable task-globals are properties of a thread-locals object 
+		bool isLocallyManageable = matchFound | nonGlobalReduction;
+
+		TaskGlobalScalar *scalar = new TaskGlobalScalar(variableName, isLocallyManageable, type);
 		globalScalars->Append(scalar);		 
 	}
+
 	return globalScalars;
 }

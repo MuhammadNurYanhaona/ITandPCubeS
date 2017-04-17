@@ -13,6 +13,7 @@
 class PartitionArg;
 class Space;
 class Symbol;
+class ReductionMetadata;
 
 /*	This class stores partition funcion arguments regarding a single dimension of a task global array 
 	within a single space configuration. 
@@ -137,11 +138,10 @@ class DataStructure {
 	// data structure under concern
 	LPSVarUsageStat *usageStat;
 
-	// This variable is only useful for subpartitioned data structures. If it true, it signifies that
-	// the immediate parent space of the subpartition space, i.e., the space some of whose data 
-	// structures are subpartitioned, cannot store the content of this data structure due to space
-	// limitation. Therefore, any update must be moved further up in the partition hierarchy if persistence
-	// is desired.	
+	// This variable is only useful for subpartitioned data structures. If it true, it signifies that the 
+	// immediate parent space of the subpartition space, i.e., the space some of whose data structures are 
+	// subpartitioned, cannot store the content of this data structure due to space limitation. Therefore, any 
+	// update must be moved further up in the partition hierarchy if persistence is desired.	
 	bool nonStorable;
 
 	// The LPS that allocates a data structure is not necessarily always the primary source. Not all LPSes 
@@ -166,6 +166,19 @@ class DataStructure {
 	bool isNonStorable() { return nonStorable; }
 	virtual bool hasOverlappingsAmongPartitions() { return false; }
 	LPSVarUsageStat *getUsageStat() { return usageStat; }
+	
+	// functions for determining epoch dependencies
+	void updateVersionCount(int version);
+	int getLocalVersionCount() { return versionCount; }
+	int getVersionCount();
+
+	// returns the root reference of this data structure
+	DataStructure *getPrimarySource();
+
+        //------------------------------------------------------------- Common helper functions for Code Generation
+
+	// functions to aid memory allocation ---------------------------------------------------------------------
+	
 	void setAllocator(Space *allocator) { this->allocator = allocator; }
 	Space *getAllocator() { return allocator; }
 	
@@ -176,17 +189,11 @@ class DataStructure {
 	// This function is used to determine if configurations of a single data structure in two different LPSes
 	// have been indictated to use the same memory allocation. If the answer is YES then no communication is 
 	// needed to synchronize the LPSes regarding the concerned data structure; otherwise, there need to be a 
-	// data transfer of some form when there is a transition between these two LPSes and in between the structure 
-	// has been updated by some computation stage.
+	// data transfer of some form when there is a transition between these two LPSes and in between the 
+	// structure has been updated by some computation stage.
 	bool useSameAllocation(DataStructure *other);
 	
-	// functions for determining epoch dependencies
-	void updateVersionCount(int version);
-	int getLocalVersionCount() { return versionCount; }
-	int getVersionCount();
-
-	// returns the root reference of this data structure
-	DataStructure *getPrimarySource();
+	//---------------------------------------------------------------------------------------------------------
 };
 
 class ArrayDataStructure : public DataStructure {
@@ -339,6 +346,10 @@ class Space {
 	// a flag indicating if the LPS has some compution stages executing in it; this information is needed to
 	// determine whether or not to generate LPUs for this LPS
 	bool executesCode;
+
+	// This property is needed to quick access of all reduction result variables that belong to the LPUs of
+	// the current LPS.
+	List<ReductionMetadata*> *reductionInfoList;
   public:
 	static const char *RootSpaceName;
 	static const char *SubSpaceSuffix;
@@ -374,18 +385,47 @@ class Space {
 	bool isRoot() { return parent == NULL; }
 	Space *getRoot() { return (parent == NULL) ? this : parent->getRoot(); }
 	Symbol *getLpuIdSymbol();
-	void setPpsId(int ppsId) { this->ppsId = ppsId; }
-	int getPpsId() { return ppsId; }
-	void setSegmentedPPS(int segmentedPPS) { this->segmentedPPS = segmentedPPS; }
-	int getSegmentedPPS() { return segmentedPPS; }
 	void flagToExecuteCode() { executesCode = true; }
 	bool doesExecuteCode() { return executesCode; }
 
-	// a helper routine for code generation that determines if any of the structures listed in the partition
-	// configuration of the LPS referred by this instance needs to be allocated a memory
+        //------------------------------------------------------------- Common helper functions for Code Generation
+
+	// common utility functions -------------------------------------------------------------------------------
+
+	void setPpsId(int ppsId) { this->ppsId = ppsId; }
+	int getPpsId() { return ppsId; }
+	
+	// this two functions are used to determine if the LPS has been mapped over a physical shared memory or
+	// within it
+	void setSegmentedPPS(int segmentedPPS) { this->segmentedPPS = segmentedPPS; }
+	int getSegmentedPPS() { return segmentedPPS; }
+	
+	//---------------------------------------------------------------------------------------------------------	
+	
+	// functions to aid memory allocation ---------------------------------------------------------------------
+	
+	// this determines if any of the structures listed in the partition configuration of the LPS referred by 
+	// this instance needs to be allocated a memory
 	bool allocateStructures();
 	// does the checking above for a specific data structure
 	bool allocateStructure(const char *structureName);
+	
+	//---------------------------------------------------------------------------------------------------------
+	
+	// functions to aid reduction primitives management -------------------------------------------------------
+	
+	// this tells if there are multiple LPUs for the current LPS considering the hierarchy originated at the
+	// root LPS that expanded upto the current LPS 
+	bool isSingletonLps();
+
+	void storeReductionInfo(ReductionMetadata *info);
+	bool isRootOfSomeReduction();
+	List<ReductionMetadata*> *getAllReductionConfigs();
+
+	// this utility function is used to record all reduction metadata to the their owener LPSes
+	static void recordAllReductionMetadataToLpses(List<ReductionMetadata*> *infoSet);
+
+	//---------------------------------------------------------------------------------------------------------	
 };
 
 /*	The entire partition block is seen as a hierarchy of coordinate systems of spaces. The hierarchy is 
@@ -402,12 +442,25 @@ class PartitionHierarchy {
 	Space *getRootSpace();
 	bool addNewSpace(Space *space);
 	Space *getCommonAncestor(Space *space1, Space *space2);	
+
+	//-------------------------------------------------------------------------- Code Generation Hack Functions
+        /**********************************************************************************************************
+          The code generation related function definitions that are placed here are platform specific. So ideally 
+          they should not be included here and the frontend compiler should be oblivious of them. However, as we
+          ran out of time in overhauling the old compilers, instead of redesigning the code generation process, we 
+          decided to keep the union of old function definitions in the frontend and put their implementations in
+          relevent backend compilers.   
+        **********************************************************************************************************/
+
+	// functions to aid memory allocation ---------------------------------------------------------------------
 	
 	// This routine sets up allocator LPS references to all data structures of different LPSes in the 
 	// partition hierarchy so that memory allocations can be done appropriately and also structure references 
 	// can be set accordingly during LPU generations. The analysis done here is dependent on the LPS-to-PPS 
 	// mapping. Therefore, it should be done after ppsIds are set to LPSes properly. 	
 	void performAllocationAnalysis(int segmentedPPS);
+	
+	//---------------------------------------------------------------------------------------------------------
 };
 
 #endif

@@ -665,6 +665,7 @@ class LpsTransitionBlock : public CompositeStage {
           relevent backend compilers.   
         **************************************************************************************************************/
 
+	void genReductionResultPreprocessingCode(std::ofstream &stream, int indentation);
 	void generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace);
 };
 

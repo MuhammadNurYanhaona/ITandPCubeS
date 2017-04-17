@@ -194,3 +194,10 @@ List<TupleDef*> *ProgramDef::getAllCustomTypes() {
         return tupleList;
 }
 
+void ProgramDef::prepareForCodegen() {
+	for (int i = 0; i < components->NumElements(); i++) {
+                Definition *def = (Definition*) components->Nth(i);
+		def->prepareForCodegen();
+	}
+}
+

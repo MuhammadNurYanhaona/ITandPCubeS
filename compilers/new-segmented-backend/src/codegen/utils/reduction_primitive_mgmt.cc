@@ -439,6 +439,10 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 		Space *reductionExecLps = reduction->getReductionExecutorLps();
 		const char *rdExecLpsName = reductionExecLps->getName();
 
+		std::ostringstream commentStream;
+		commentStream << "Primitives for '" << varName << "'";
+		decorator::writeCommentHeader(1, &programFile, commentStream.str().c_str());
+
 		// if the LPS for root of reduction range is mapped above the PPS where memory segmentation takes
 		// place then we need a cross-segment reduction primitive for the result
 		if (reductionPpsId > segmentedPpsId) {

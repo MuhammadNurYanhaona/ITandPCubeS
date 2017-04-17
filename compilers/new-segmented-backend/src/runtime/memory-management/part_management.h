@@ -13,6 +13,8 @@
 #include "allocation.h"
 #include "part_tracking.h"
 #include "part_generation.h"
+#include "../reduction/reduction.h"
+#include "../reduction/reduction_result_tracking.h"
 
 #include "../../../../common-libs/utils/utility.h"
 #include "../../../../common-libs/utils/list.h"
@@ -76,13 +78,21 @@ class LpsContent {
 /* This class holds all data structure informations and references regarding different LPSes of a task */
 class TaskData {
   protected:
+	// a map of array data part contents grouped by LPSes 
 	Hashtable<LpsContent*> *lpsContentMap;
+
+	// a map of non-task-global reduction result variables grouped by their common name
+	Hashtable<ReductionResultAccessContainer*> *reductionResultMap;
   public:
 	TaskData();
 	~TaskData();
 
 	void addLpsContent(const char *lpsId, LpsContent *content);
-	DataItems *getDataItemsOfLps(const char *lpsId, const char *varName);		
+	DataItems *getDataItemsOfLps(const char *lpsId, const char *varName);
+
+	void addReductionResultContainer(const char *varName, 
+			ReductionResultAccessContainer *container);
+	reduction::Result *getResultVar(const char *varName, List<int*> *lpuId);		
 
 	// each PPU-controller (currently a thread) within a segment should get its own set of iterators
 	// that it will use to efficiently identify data-parts for its LPUs and to avoid unnecessary

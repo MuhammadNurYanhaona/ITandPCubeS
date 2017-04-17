@@ -17,9 +17,10 @@ void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int i
         stream << std::endl << indents.str() << "{ // beginning of a reduction boundary\n";
 
 	// initialize partial reduction results holder 
-        stream << std::endl << std::endl;
+        stream << std::endl;
         stream << indents.str() << "// initializing thread-local reduction result variables\n";
         for (int i = 0; i < assignedReductions->NumElements(); i++) {
+
                 ReductionMetadata *reduction = assignedReductions->Nth(i);
                 const char *resultVar = reduction->getResultVar();
                 Space *executingLps = reduction->getReductionExecutorLps();
@@ -44,11 +45,8 @@ void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int i
 	stream << std::endl;
         stream << indents.str() << "// executing the final step of reductions\n";
         for (int i = 0; i < assignedReductions->NumElements(); i++) {
+
                 ReductionMetadata *reduction = assignedReductions->Nth(i);
-                if (!reduction->isSingleton()) {
-                        std::cout << "The current compiler still cannot handle non task-global reductions\n";
-                        std::exit(EXIT_FAILURE);
-                }
                 const char *resultVar = reduction->getResultVar();
                 Space *executingLps = reduction->getReductionExecutorLps();
                 const char *execLpsName = executingLps->getName();
@@ -57,7 +55,11 @@ void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int i
                 stream << "reduction::Result *localResult = reductionResultsMap->";
                 stream << "Lookup(\"" << resultVar << "\")" << stmtSeparator;
                 stream << indents.str() << indent;
-                stream << "void *target = &(taskGlobals->" << resultVar << ")" << stmtSeparator;
+
+		ntransform::NameTransformer *transformer = ntransform::NameTransformer::transformer;
+		const char *propertyName = transformer->getTransformedName(resultVar, false, false);
+                stream << "void *target = &(" << propertyName << ")" << stmtSeparator;
+
                 stream << indents.str() << indent;
                 stream << "ReductionPrimitive *rdPrimitive = rdPrimitiveMap->Lookup(\"";
                 stream << resultVar << "\")" << stmtSeparator;

@@ -36,6 +36,13 @@ class Definition : public Node {
 	// function needed to filter different types of definitions; each subclass should return a
 	// unique type ID
 	virtual DefTypeId getDefTypeId() = 0;
+	
+	//------------------------------------------------------------- Common helper functions for Code Generation
+
+	// This is the interface function to annotate an IT program components with all generic and
+	// useful code generation information (i.e., information that will be useful in all back-end 
+	// compilers) before the front-end compiler terminates.
+	virtual void prepareForCodegen() {}
 };
 
 class VariableDef : public Definition {
@@ -96,6 +103,7 @@ class ProgramDef : public Definition {
 
 	Scope *getScope();
 	List<TupleDef*> *getAllCustomTypes();
+	void prepareForCodegen();
 };
 
 class TupleDef : public Definition {

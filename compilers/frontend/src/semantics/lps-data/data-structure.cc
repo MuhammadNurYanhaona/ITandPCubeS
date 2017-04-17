@@ -60,18 +60,6 @@ Type *DataStructure::getType() {
 	return source->getType();
 }
 
-DataStructure *DataStructure::getClosestAllocation() {
-	if (usageStat->isAllocated()) return this;
-	if (source == NULL) return NULL;
-	return source->getClosestAllocation();
-}
-
-bool DataStructure::useSameAllocation(DataStructure *other) {
-	DataStructure *myAllocation = getClosestAllocation();
-	DataStructure *otherAllocation = other->getClosestAllocation();
-	return myAllocation == otherAllocation;
-}
-
 void DataStructure::updateVersionCount(int version) {
 	
 	int oldVersionCount = versionCount;
@@ -96,3 +84,15 @@ DataStructure *DataStructure::getPrimarySource() {
 	else return source->getPrimarySource();
 }
 
+
+DataStructure *DataStructure::getClosestAllocation() {
+	if (usageStat->isAllocated()) return this;
+	if (source == NULL) return NULL;
+	return source->getClosestAllocation();
+}
+
+bool DataStructure::useSameAllocation(DataStructure *other) {
+	DataStructure *myAllocation = getClosestAllocation();
+	DataStructure *otherAllocation = other->getClosestAllocation();
+	return myAllocation == otherAllocation;
+}
