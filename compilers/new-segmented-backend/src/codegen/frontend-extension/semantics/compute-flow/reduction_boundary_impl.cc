@@ -8,6 +8,7 @@
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
+#include <iostream>
 
 void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int indentation, Space *containerSpace) {
 	
@@ -22,6 +23,8 @@ void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int i
         for (int i = 0; i < assignedReductions->NumElements(); i++) {
 
                 ReductionMetadata *reduction = assignedReductions->Nth(i);
+		std::string classNamePrefix = (reduction->isSingleton()) ? "TaskGlobal" : "NonTaskGlobal";
+
                 const char *resultVar = reduction->getResultVar();
                 Space *executingLps = reduction->getReductionExecutorLps();
                 const char *execLpsName = executingLps->getName();
@@ -30,7 +33,9 @@ void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int i
                 stream << "reduction::Result *" << resultVar << "Local = reductionResultsMap->";
                 stream << "Lookup(\"" << resultVar << "\")" << stmtSeparator;
                 stream << indents.str() << indent;
-                stream << "ReductionPrimitive *rdPrimitive = rdPrimitiveMap->Lookup(\"";
+                stream << classNamePrefix << "ReductionPrimitive *rdPrimitive = ";
+		stream << std::endl << indents.str() << tripleIndent;
+		stream << "(" << classNamePrefix << "ReductionPrimitive *) rdPrimitiveMap->Lookup(\"";
                 stream << resultVar << "\")" << stmtSeparator;
                 stream << indents.str() << indent << "rdPrimitive->resetPartialResult(";
                 stream << resultVar << "Local)" << stmtSeparator;
@@ -60,12 +65,44 @@ void ReductionBoundaryBlock::generateInvocationCode(std::ofstream &stream, int i
 		const char *propertyName = transformer->getTransformedName(resultVar, false, false);
                 stream << "void *target = &(" << propertyName << ")" << stmtSeparator;
 
-                stream << indents.str() << indent;
-                stream << "ReductionPrimitive *rdPrimitive = rdPrimitiveMap->Lookup(\"";
-                stream << resultVar << "\")" << stmtSeparator;
-                stream << indents.str() << indent;
-                stream << "rdPrimitive->reduce(localResult" << paramSeparator << "target)" << stmtSeparator;
-                stream << indents.str() << "}\n";
+		if (reduction->isSingleton()) {
+			// invoke the reduce function on the primitive
+			stream << indents.str() << indent;
+			stream << "TaskGlobalReductionPrimitive *rdPrimitive = ";
+			stream << std::endl << indents.str() << tripleIndent;
+			stream << "(TaskGlobalReductionPrimitive*) rdPrimitiveMap->Lookup(\"";
+			stream << resultVar << "\")" << stmtSeparator;
+			stream << indents.str() << indent;
+			stream << "rdPrimitive->reduce(localResult" << paramSeparator << "target)" << stmtSeparator;
+		} else {
+			// get a hold of the hierarchical LPU ID to locate data parts based on LPU ID
+			stream << indents.str() << indent;
+			stream << "List<int*> *lpuIdChain = threadState->getLpuIdChainWithoutCopy(";
+			stream << "Space_" << space->getName();
+			Space *rootSpace = space->getRoot();
+			stream << paramSeparator << "Space_" << rootSpace->getName() << ")" << stmtSeparator;
+		
+			// retrieve the task data reference     
+        		stream << indents.str() << indent;
+			stream << "TaskData *taskData = threadState->getTaskData()" << stmtSeparator;
+	
+			// retrieve the result variable from task data's reduction result access container using the LPU ID
+			stream << indents.str() << indent << "reduction::Result *" << resultVar << " = ";
+			stream << "taskData->getResultVar(\"" << resultVar << "\"" << paramSeparator;
+			stream << "lpuIdChain)" << stmtSeparator;	
+		
+			// invoke the reduce function on the primitive
+			stream << indents.str() << indent;
+			stream << "NonTaskGlobalReductionPrimitive *rdPrimitive = ";
+			stream << std::endl << indents.str() << tripleIndent;
+			stream << "(NonTaskGlobalReductionPrimitive*) rdPrimitiveMap->Lookup(\"";
+			stream << resultVar << "\")" << stmtSeparator;
+			stream << indents.str() << indent;
+			stream << "rdPrimitive->reduce(localResult" << paramSeparator << "target" << paramSeparator;
+			stream << resultVar << ")" << stmtSeparator;
+
+		}
+		stream << indents.str() << "}\n";
         }
 
         stream << std::endl << indents.str() << "} // ending of a reduction boundary\n";

@@ -214,7 +214,7 @@ void generateThreadRunFunction(TaskDef *taskDef, const char *headerFileName,
 	
 		programFile << "\n\t// retrieving the reduction primitives relevant to the current thread\n";
 		programFile << "\tThreadIds *threadIds = threadState->getThreadIds();\n";
-		programFile << "\tHashtable<ReductionPrimitive*> *rdPrimitiveMap = ";
+		programFile << "\tHashtable<void*> *rdPrimitiveMap = ";
 		programFile << "getReductionPrimitiveMap(threadIds);\n";
 	}
 

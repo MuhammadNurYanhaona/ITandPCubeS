@@ -7,7 +7,7 @@
  * ID based result management.	 
  */
 
-#include "reduction.h"
+#include "reduction_barrier.h"
 #include "../../../../common-libs/utils/list.h"
 
 #include <vector>

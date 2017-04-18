@@ -48,9 +48,7 @@ class ReductionMetadata {
         // can maintain a single task-global scalar property; while in the latter case, results instances need to be
         // dynamically created and maintained for individual LPUs.
         bool isSingleton() {
-		if (reductionRootLps->getDimensionCount() > 0) return false;
-		Space *parentLps = reductionRootLps->getParent();
-		return (parentLps == NULL || parentLps->isRoot());
+		return reductionRootLps->isSingletonLps();	
 	}
 };
 

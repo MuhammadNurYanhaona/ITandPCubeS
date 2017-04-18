@@ -75,7 +75,9 @@
 #include "../../src/runtime/common/sync.h"
 
 // for reductions
-#include "../../src/runtime/reduction/reduction.h"
+#include "../../src/runtime/reduction/reduction_barrier.h"
+#include "../../src/runtime/reduction/task_global_reduction.h"
+#include "../../src/runtime/reduction/non_task_global_reduction.h"
 #include "../../../common-libs/domain-obj/constant.h"
 
 // for minimum and maximum values of numeric types

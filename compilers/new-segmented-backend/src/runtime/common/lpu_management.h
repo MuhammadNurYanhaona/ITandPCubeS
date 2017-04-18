@@ -1,8 +1,8 @@
 #ifndef _H_lpu_management
 #define _H_lpu_management
 
-#include "../reduction/reduction.h"
 #include "../communication/communicator.h"
+#include "../reduction/reduction_barrier.h"
 #include "../memory-management/part_tracking.h"
 #include "../memory-management/part_generation.h"
 #include "../memory-management/part_management.h"

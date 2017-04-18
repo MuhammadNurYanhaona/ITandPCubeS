@@ -1,4 +1,4 @@
-#include "reduction.h"
+#include "reduction_barrier.h"
 #include "reduction_result_tracking.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/binary_search.h"

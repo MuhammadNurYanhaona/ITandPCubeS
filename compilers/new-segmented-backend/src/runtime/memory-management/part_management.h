@@ -13,7 +13,7 @@
 #include "allocation.h"
 #include "part_tracking.h"
 #include "part_generation.h"
-#include "../reduction/reduction.h"
+#include "../reduction/reduction_barrier.h"
 #include "../reduction/reduction_result_tracking.h"
 
 #include "../../../../common-libs/utils/utility.h"

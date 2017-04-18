@@ -158,20 +158,6 @@ void generateUpdateCodeForSum(std::ofstream &programFile, Type *varType) {
 	programFile << stmtSeparator;	
 }
 
-void generateReductionCodeForMax(std::ofstream &programFile, Type *varType) {
-
-	programFile << indent << "MPI_Comm mpiComm = segmentGroup->getCommunicator()" << stmtSeparator;
-	programFile << indent << "int status = MPI_Allreduce(sendBuffer" << paramSeparator;
-	programFile << paramIndent << indent;
-	programFile << "receiveBuffer" << paramSeparator;
-	programFile << paramIndent << indent;
-	programFile << 1 << paramSeparator;
-	programFile << paramIndent << indent;
-	programFile << "DataType" << paramSeparator << "MPI_MAX" << paramSeparator;
-	programFile << paramIndent << indent;
-	programFile << "mpiComm)";
-}
-
 void generateCodeForDataReduction(std::ofstream &programFile, ReductionOperator op, Type *varType) {
 	
 	programFile << indent << "MPI_Comm mpiComm = segmentGroup->getCommunicator()" << stmtSeparator;
@@ -210,8 +196,12 @@ void generateIntraSegmentReductionPrimitive(std::ofstream &headerFile,
 	classNameStr << "ReductionPrimitive_" << resultVar;
 	const char *className = strdup(classNameStr.str().c_str());
 
+	// determine the superclass name the primitive should extend
+	std::string superclassName = (rdMetadata->isSingleton()) 
+			? "TaskGlobalReductionPrimitive" : "NonTaskGlobalReductionPrimitive";
+
 	// generate a subclass of the intra-segment reduction primitive for the variable in the header file
-	headerFile << "class " << className << " : public ReductionPrimitive {\n";
+	headerFile << "class " << className << " : public " << superclassName << " {\n";
 	headerFile << "  public: \n";
 	headerFile << indent << className << "(int localParticipants)" << stmtSeparator;
 	headerFile << indent << "void resetPartialResult(reduction::Result *resultVar)" << stmtSeparator;
@@ -227,7 +217,7 @@ void generateIntraSegmentReductionPrimitive(std::ofstream &headerFile,
 	const char *opStr = getReductionOpString(op);
 	programFile << initials << "::" << className << "::" << className << "(";
 	programFile << "int localParticipants)";
-	programFile << paramIndent << ": ReductionPrimitive(";
+	programFile << paramIndent << ": " << superclassName << "(";
 	programFile << "sizeof(" << varType->getCType() << ")" << paramSeparator;
 	programFile << opStr << paramSeparator << "localParticipants)";
 	programFile << " {}\n"; 
@@ -239,11 +229,14 @@ void generateIntraSegmentReductionPrimitive(std::ofstream &headerFile,
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::updateIntermediateResult(";
 	programFile << paramIndent << "reduction::Result *localPartialResult) {\n";
+
+	// TODO include all reduction operations here
 	if (op == MAX) {
 		generateUpdateCodeForMax(programFile, varType);
 	} else if (op == SUM) {
 		generateUpdateCodeForSum(programFile, varType);
 	}
+
 	programFile << "}\n";
 }
 
@@ -258,9 +251,13 @@ void generateCrossSegmentReductionPrimitive(std::ofstream &headerFile,
 	std::ostringstream classNameStr;
 	classNameStr << "ReductionPrimitive_" << resultVar;
 	const char *className = strdup(classNameStr.str().c_str());
+	
+	// determine the superclass name the primitive should extend
+	std::string superclassName = (rdMetadata->isSingleton()) 
+			? "TaskGlobalMpiReductionPrimitive" : "NonTaskGlobalMpiReductionPrimitive";
 
 	// generate a subclass of the MPI reduction primitive for the variable in the header file
-	headerFile << "class " << className << " : public MpiReductionPrimitive {\n";
+	headerFile << "class " << className << " : public " << superclassName << " {\n";
 	headerFile << "  public: \n";
 	headerFile << indent << className << "(int localParticipants" << paramSeparator;
 	headerFile << "SegmentGroup *segmentGroup)" << stmtSeparator;
@@ -279,7 +276,7 @@ void generateCrossSegmentReductionPrimitive(std::ofstream &headerFile,
 	programFile << initials << "::" << className << "::" << className << "(";
 	programFile << "int localParticipants" << paramSeparator;
 	programFile << paramIndent << "SegmentGroup *segmentGroup)";
-	programFile << paramIndent << ": MpiReductionPrimitive(";
+	programFile << paramIndent << ": " << superclassName << "(";
 	programFile << "sizeof(" << varType->getCType() << ")" << paramSeparator;
 	programFile << opStr << paramSeparator;
 	programFile << paramIndent << doubleIndent;
@@ -384,10 +381,12 @@ void generateReductionPrimitiveDecls(const char *headerFileName, List<ReductionM
 	headerFile << std::endl;
 
 	for (int i = 0; i < reductionInfos->NumElements(); i++) {
+		
 		ReductionMetadata *reduction = reductionInfos->Nth(i);
+		std::string classNamePrefix = (reduction->isSingleton()) ? "TaskGlobal" : "NonTaskGlobal";
 		const char *varName = reduction->getResultVar();
 		Space *reductionRootLps = reduction->getReductionRootLps();
-		headerFile << "static ReductionPrimitive *" << varName << "Reducer[";
+		headerFile << "static " << classNamePrefix << "ReductionPrimitive *" << varName << "Reducer[";
 		headerFile << "Space_" << reductionRootLps->getName() << "_Threads_Per_Segment]";
 		headerFile << stmtSeparator;
 	}
@@ -539,16 +538,17 @@ void generateReductionPrimitiveMapCreateFnForThread(const char *headerFileName,
 	headerFile << std::endl;
 	programFile << std::endl;
 
-	// generate the function signature in both header and the program files
-	headerFile << "Hashtable<ReductionPrimitive*> *";
-	programFile << "Hashtable<ReductionPrimitive*> *";
+	// generate the function signature in both header and the program files; the return type is a map of void
+	// pointers as there are two types of reduction primitives without a common base class
+	headerFile << "Hashtable<void*> *";
+	programFile << "Hashtable<void*> *";
 	programFile << initials << "::";
 	headerFile << "getReductionPrimitiveMap(ThreadIds *threadIds)" << stmtSeparator;
 	programFile << "getReductionPrimitiveMap(ThreadIds *threadIds) {\n\n";
 
 	// instantiate a reduction primitive map
-	programFile << indent << "Hashtable<ReductionPrimitive*> *rdPrimitiveMap = ";
-	programFile << "new Hashtable<ReductionPrimitive*>" << stmtSeparator;
+	programFile << indent << "Hashtable<void*> *rdPrimitiveMap = ";
+	programFile << "new Hashtable<void*>" << stmtSeparator;
 
 	// insert into the map one primitive for each reduction operation the PPU controller thread participate into
 	for (int i = 0; i < reductionInfos->NumElements(); i++) {
