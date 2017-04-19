@@ -1,0 +1,6 @@
+"Max Of Row Sum Calculation" {
+	// syntax LPS ':' PPS
+	Space A: 6	// Cluster
+	Space B: 5	// Node
+	Space C: 2	// Core-pair
+}

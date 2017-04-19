@@ -1,0 +1,63 @@
+Program (args) {
+	mrsEnv = new TaskEnvironment(name: "Max Of Row Sum Calculation")
+        bind_input(mrsEnv, "matrix", args.input_file)
+	execute(task: "Max Of Row Sum Calculation"; environment: mrsEnv; partition: args.p)
+	bind_output(mrsEnv, "sums", args.output_file)
+}
+
+Task "Max Of Row Sum Calculation":
+	Define:
+		matrix: 2d Array of Integer
+		sums: 1d Array of Integer
+		max, row_sum: Integer Reduction 
+	Environment:
+		matrix: link
+		max, sums: create
+	Initialize:
+		sums.dimension = matrix.dimension1
+	Stages:
+		compute_row_sums(matrix, result) {
+			row = matrix.local.dimension1.range.min
+			do {
+				reduce(result, "sum", matrix[row][col])
+			} for col in matrix
+		}
+		store_row_sum(vector, sum) {
+			index = vector.local.dimension1.range.min
+			vector[index] = sum
+		}
+		compute_max_of_sums(sum_vector, result) {
+			do {
+				reduce(result, "max", sum_vector[i])
+			} for i in sum_vector
+		}
+		print_max(result) {
+                        @Extern {
+                                @Language "C++"
+                                @Includes { iostream }
+                                ${
+                                        std::cout << "the maximum of row sums is: " << result << "\n";
+                                }$
+                        }
+                }
+	Computation:
+		Space A {
+			Space B {
+				Space C {
+					compute_row_sums(matrix, Space B: row_sum)		
+				}
+				store_row_sum(sums, row_sum)
+				
+				compute_max_of_sums(sums, Space A: max)
+			}
+			print_max(max)
+		}
+	Partition(p):
+		Space A <un-partitioned> { sums }
+		Space B <1d> divides Space A partitions {
+			matrix<dim1>: block_size(1)
+			sums: block_size(1)
+		}
+		Space C <1d> divides Space B partitions {
+			matrix<dim2>: block_count(p)
+		}
