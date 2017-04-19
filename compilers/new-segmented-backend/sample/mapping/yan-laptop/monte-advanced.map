@@ -1,0 +1,6 @@
+"Monte Carlo Area Estimation" {
+	// syntax LPS ':' PPS
+	Space A: 4	// Cluster
+	Space B: 2	// Core
+	Space C: 1	// Hyperthreads
+}

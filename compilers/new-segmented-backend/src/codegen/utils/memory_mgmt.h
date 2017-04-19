@@ -37,6 +37,13 @@ void genRoutineForLpsContent(std::ofstream &headerFile,
 		List<const char*> *envArrayList,
 		Space *lps, Space *rootLps);
 
+/* generates a routine to create and initialize result access containers for all non-task-global reduction
+   that have their root at a particular LPS
+ */
+void genRoutineForReductionResultStorage(std::ofstream &headerFile,
+                std::ofstream &programFile,
+                const char *initials, Space *lps, Space *rootLps);
+
 /* generates a routine to produce a map object that keep track of all allocations been done for a task's 
    computations. Note that it excludes memory allocation for communication, that will be dealt separately.  
 */

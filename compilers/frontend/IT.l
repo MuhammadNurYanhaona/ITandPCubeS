@@ -109,7 +109,7 @@ Reduction		return Reduction;
 
 [0-9]+d			{
 				int length = strlen(yytext);
-				char *dimensionality = (char *) malloc(length);
+				char *dimensionality = (char *) malloc(length + 1);
 				strncpy(dimensionality, yytext, length - 1);
 				dimensionality[length] = '\0';
 				yylval.intConstant = atoi(dimensionality);

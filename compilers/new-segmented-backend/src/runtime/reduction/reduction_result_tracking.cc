@@ -46,7 +46,7 @@ void InterimReductionResultContainer::initiateResultVarforLpu(List<int*> *lpuId,
 	int index = binsearch::locateKey(idArray, idPart);
 	if (index == KEY_NOT_FOUND) {
 		int nextLpsIndex = getLpsIndexOfNextContainer(lpuIdDimensions);
-		int nextLpuDimIndex = getLpsIndexOfNextContainer(lpuIdDimensions);
+		int nextLpuDimIndex = getlpuDimIndexOfNextContainer(lpuIdDimensions);
 		ReductionResultContainer *nextContainer = NULL;
 		
 		if (remainingPositions > 1) {

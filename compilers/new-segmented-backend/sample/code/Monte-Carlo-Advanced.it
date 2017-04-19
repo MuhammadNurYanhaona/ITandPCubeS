@@ -61,7 +61,7 @@ Task "Monte Carlo Area Estimation":
 		local_estimates.dimension1 = grid.dimension2 = grid.dimension1
 		internal_points.dimension = grid.dimension
 		local_estimates.dimension2.range.min = 0
-		local_estimates.dimension2.range.max = (grid_dim - 1) / partition.b
+		local_estimates.dimension2.range.max = grid_dim / partition.b - 1
 		estimate_diffs.dimension = local_estimates.dimension
 
 		// initialize the random number generator

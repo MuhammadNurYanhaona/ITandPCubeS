@@ -11,6 +11,7 @@
 #include "../../../../frontend/src/syntax/ast.h"
 #include "../../../../frontend/src/syntax/ast_task.h"
 #include "../../../../frontend/src/semantics/task_space.h"
+#include "../../../../frontend/src/static-analysis/reduction_info.h"
 
 #include <fstream>
 #include <sstream>
@@ -442,6 +443,80 @@ void genRoutineForLpsContent(std::ofstream &headerFile, std::ofstream &programFi
 	programFile << "}\n";	
 }
 
+void genRoutineForReductionResultStorage(std::ofstream &headerFile,
+                std::ofstream &programFile,
+                const char *initials, Space *lps, Space *rootLps) {
+
+	std::ostringstream functionHeader;
+	const char *lpsName = lps->getName();
+	functionHeader << "prepareSpace" << lpsName << "ReductionResultContainers(";
+	functionHeader << "List<ThreadState*> *threads" << paramSeparator;
+	functionHeader << "TaskData *taskData)";
+
+	headerFile << "void " << functionHeader.str() << stmtSeparator;
+	programFile << "void " << string_utils::toLower(initials) << "::";
+	programFile << functionHeader.str() << " {\n";
+	
+	// write a checking for non-empty thread list; if the list is empty then return
+	programFile << std::endl << indent;
+	programFile << "if(threads->NumElements() == 0) return" << stmtSeparator << std::endl;
+
+	// create an LPU ID chain's dimension information vector that is needed for searching in the containers
+	programFile << indent << "std::vector<int> lpuIdDimensions" << stmtSeparator;
+	Space *currLps = lps;
+	while (currLps != rootLps) {
+		int currIdDimension = currLps->getDimensionCount();
+
+		// a dimensionless LPS's sole LPU has a default integer ID
+		if (currIdDimension == 0) currIdDimension = 1;
+
+		currLps = currLps->getParent();
+		programFile << indent;
+		programFile << "lpuIdDimensions.insert(lpuIdDimensions.begin()" << paramSeparator;
+		programFile << currIdDimension << ")" << stmtSeparator;
+	}
+	programFile << std::endl;
+
+	// create access containers for different reduction result variables and put the containers in the
+	// task-data object
+	List<ReductionMetadata*> *reductionInfos = lps->getAllReductionConfigs();
+	for (int i = 0; i < reductionInfos->NumElements(); i++) {
+		ReductionMetadata *metadata = reductionInfos->Nth(i);
+		const char *resultVar = metadata->getResultVar();
+		programFile << indent << "ReductionResultAccessContainer *" << resultVar << "Container = ";
+		programFile << std::endl << tripleIndent;
+		programFile << "new ReductionResultAccessContainer(lpuIdDimensions)" << stmtSeparator;
+		programFile << indent << "taskData->addReductionResultContainer(\"";
+		programFile << resultVar << "\"" << paramSeparator;
+		programFile << resultVar << "Container)" << stmtSeparator;		
+	}
+
+	// iterate over different threads then iterate over LPUs of each thread
+        programFile << std::endl << indent << "for (int i = 0; i < threads->NumElements(); i++) {\n";
+        programFile << doubleIndent << "ThreadState *thread = threads->Nth(i)" << stmtSeparator;
+        programFile << doubleIndent << "int lpuId = INVALID_ID" << stmtSeparator;
+        programFile << doubleIndent << "while((lpuId = thread->getNextLpuId(";
+        programFile << "Space_" << lpsName << paramSeparator;
+        programFile << "Space_" << rootLps->getName() << paramSeparator;
+        programFile << "lpuId)) != INVALID_ID) {\n";
+        programFile << tripleIndent << "List<int*> *lpuIdChain = thread->getLpuIdChainWithoutCopy(";
+        programFile << std::endl << tripleIndent << doubleIndent;
+        programFile << "Space_" << lpsName << paramSeparator;
+        programFile << "Space_" << rootLps->getName() << ")" << stmtSeparator;
+
+	// enter entries in individual access containers for the LPU
+	for (int i = 0; i < reductionInfos->NumElements(); i++) {
+                ReductionMetadata *metadata = reductionInfos->Nth(i);
+                const char *resultVar = metadata->getResultVar();
+		programFile << tripleIndent << resultVar << "Container->initiateResultForLpu(lpuIdChain)";
+		programFile << stmtSeparator;
+	}
+
+	programFile << doubleIndent << "}\n"; 	// end of LPU iteration
+	programFile << indent << "}\n";		// end of thread iteration	
+	programFile << "}\n";			// end of the function
+}
+
 void genTaskMemoryConfigRoutine(TaskDef *taskDef,
 		const char *headerFileName,
                 const char *programFileName, const char *initials) {
@@ -528,9 +603,11 @@ void genTaskMemoryConfigRoutine(TaskDef *taskDef,
 		// we skip allocating for the root	 
 		if (lps == root) continue;
 		
+		// generate the routine for the current LPS
 		programFile << std::endl;
 		genRoutineForLpsContent(headerFile, programFile, initials, envArrays, lps, root);
 
+		// include an invocation of the generated routine in the task data preparation function
 		const char *lpsName = lps->getName();
 		functionBody << indent << "LpsContent *space" << lpsName << "Content = ";
 		functionBody << "genSpace" << lpsName << "Content(threads" << paramSeparator;
@@ -560,7 +637,53 @@ void genTaskMemoryConfigRoutine(TaskDef *taskDef,
 	functionBody << '\n' << indent << "// initialize parts lists of environmental variables\n";
 	functionBody << indent << "environment->preprocessProgramEnvForItems()" << stmtSeparator; 
 	functionBody << indent << "environment->setupItemsPartsLists()" << stmtSeparator; 
-	functionBody << indent << "environment->postprocessProgramEnvForItems()" << stmtSeparator; 
+	functionBody << indent << "environment->postprocessProgramEnvForItems()" << stmtSeparator;
+
+	// check if the task involves reduction operations that do not produce a single result for the entire
+	// task; rather they require per LPU results at some intermediate LPS in the partition hierarchy 
+	List<ReductionMetadata*> *reductionInfos = new List<ReductionMetadata*>;
+	taskDef->getComputation()->extractAllReductionInfo(reductionInfos);
+	bool hasNonTaskGlobalReductions = false;
+	for (int i = 0; i < reductionInfos->NumElements(); i++) {
+		ReductionMetadata *metadata = reductionInfos->Nth(i);
+		if (!metadata->isSingleton()) {
+			hasNonTaskGlobalReductions = true;
+			break;
+		}
+	}
+
+	// generate routines for creating and initializing access containers for non-task-global reduction 
+	// result variables
+	if (hasNonTaskGlobalReductions) {
+		const char *header2 = "functions for creating containers of non-task-global reduction results";
+		decorator::writeSectionHeader(headerFile, header2);
+		headerFile << std::endl;
+		decorator::writeSectionHeader(programFile, header2);
+		functionBody << '\n' << indent << "// prepare reduction results access containers\n";
+	}
+	lpsQueue.push_back(root);
+        while (!lpsQueue.empty()) {
+                Space *lps = lpsQueue.front();
+                lpsQueue.pop_front();
+                List<Space*> *children = lps->getChildrenSpaces();
+                for (int i = 0; i < children->NumElements(); i++) {
+                        lpsQueue.push_back(children->Nth(i));
+                }
+                if (lps->getSubpartition() != NULL) lpsQueue.push_back(lps->getSubpartition());
+
+		if (lps->isSingletonLps() || !lps->isRootOfSomeReduction()) continue;
+
+		// generate the routine for the current LPS
+		programFile << std::endl;
+		genRoutineForReductionResultStorage(headerFile, programFile, initials, lps, root);
+		
+		// include an invocation of the generated routine in the task data preparation function
+		const char *lpsName = lps->getName();
+		functionBody << indent;
+		functionBody << "prepareSpace" << lps->getName() << "ReductionResultContainers";
+		functionBody << "(threads" << paramSeparator << "taskData)" << stmtSeparator;
+	}
+	if (hasNonTaskGlobalReductions) functionBody << '\n';
 	
 	// write the task data initializer function in both files
 	const char *message = "Task Data Initializer";
