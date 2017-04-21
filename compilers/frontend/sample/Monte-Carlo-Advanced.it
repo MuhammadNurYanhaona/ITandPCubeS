@@ -56,21 +56,24 @@ Task "Monte Carlo Area Estimation":
 	Environment:
 		area: create
 	Initialize(precision_threshold, max_rounds, cell_length, grid_dim, points_per_cell):
+
 		grid.dimension1.range.min = 0
 		grid.dimension1.range.max = grid_dim - 1
-		local_estimates.dimension1 = grid.dimension2 = grid.dimension1
+		grid.dimension2 = grid.dimension1
 		internal_points.dimension = grid.dimension
-		local_estimates.dimension2.range.min = 0
-		local_estimates.dimension2.range.max = (grid_dim - 1) / partition.b
+
+		local_estimates.dimension1.range.min = 0
+		local_estimates.dimension1.range.max = grid_dim / partition.b - 1
+		local_estimates.dimension2 = local_estimates.dimension1
 		estimate_diffs.dimension = local_estimates.dimension
 
 		// initialize the random number generator
 		init_rand()
 	Stages:
-		setupGridCells(grid, cell_length, block_count) {
+		setupGridCells(grid, cell_length) {
 			do { 
 				cell_height = cell_length
-				cell_width = cell_length / block_count
+				cell_width = cell_length
 				grid[i][j].left = cell_width * i
 				grid[i][j].right = cell_width * (i + 1) - 1
 				grid[i][j].bottom = cell_height * j
@@ -93,8 +96,8 @@ Task "Monte Carlo Area Estimation":
 			} for i, j in points
 		}
 		estimateSubarea(internal_points, sample_count, round, diff, estimates) {
-			row = estimates.dimension1.range.min
-			col = estimates.dimension2.range.min
+			row = estimates.local.dimension1.range.min
+			col = estimates.local.dimension2.range.min
 			cell_size = cell_length * cell_length
 			curr_estimate =  cell_size * internal_points / sample_count
 			weight = 1.0 / round
@@ -125,7 +128,7 @@ Task "Monte Carlo Area Estimation":
 		Space A {
 			Space B {
 				Space C {
-					setupGridCells(grid, cell_length, partition.b)
+					setupGridCells(grid, cell_length)
 				}
 				initializeEstimateDiffs(estimate_diffs, precision_threshold)
 				
@@ -149,9 +152,9 @@ Task "Monte Carlo Area Estimation":
 	Partition(b):
 		Space A <un-partitioned> { local_estimates }
 		Space B <2d> divides Space A partitions {
+			grid, internal_points: block_size(b, b)
 			local_estimates, estimate_diffs: block_size(1, 1)
-			grid, internal_points: block_size(1, b)
 		}
-		Space C <1d> divides Space B partitions {
-			grid<dim2>, internal_points<dim2>: block_size(1) 
+		Space C <2d> divides Space B partitions {
+			grid, internal_points: block_size(1, 1) 
 		} 

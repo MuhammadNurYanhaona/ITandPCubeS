@@ -287,10 +287,10 @@ void FlowStage::analyzeSynchronizationNeeds() {
                 FlowStage *destination = arc->getDestination();
                 Space *destLps = destination->getSpace();
 
-                // If the destination and current flow stage's LPSes are the same then two scenarios are there
-                // for us to consider: either the variable is replicated or it has overlapping partitions among
-                // adjacent LPUs. The former case is handled here. The latter is taken care of by the sync
-                // stage's overriding implementation; therefore we ignore it. 
+                // If the destination and current flow stage's LPSes are the same then two scenarios are there for us to 
+		// consider: either the variable is replicated or it has overlapping partitions among adjacent LPUs. The 
+		// former case is handled here. The latter is taken care of by the sync stage's overriding implementation; 
+		// therefore we ignore it. 
                 if (destLps == space) {
                         if (space->isReplicatedInCurrentSpace(varName)) {
                                 ReplicationSync *replication = new ReplicationSync();
@@ -299,10 +299,26 @@ void FlowStage::analyzeSynchronizationNeeds() {
                                 replication->setWaitingComputation(destination);
                                 replication->setDependencyArc(arc);
                                 synchronizationReqs->addVariableSyncReq(varName, replication, true);
-                        }
-                // If the destination and current flow stage's LPSes are not the same then there is definitely
-                // a synchronization need. The specific type of synchronization needed depends on the relative
-                // position of these two LPSes in the partition hierarchy.
+                        } else {
+				// An additional case is considered for composite stages when they encompasses nested 
+				// stages executing in lower level LPSes than the former are executing in. We cannot be 
+				// sure that there is a need for synchronization in this case. So we conservatively 
+				// impose a synchronization requirement.  	
+				CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(destination);
+				if (compositeStage != NULL 
+						&& compositeStage->hasExecutingCodeInDescendentLPSes()) {
+					Space *lowestLps = compositeStage->getFurthestDescendentLpsWithinNestedFlow();	
+					DownPropagationSync *downSync = new DownPropagationSync();
+					downSync->setVariableName(varName);
+					downSync->setDependentLps(lowestLps);
+					downSync->setWaitingComputation(destination);
+					downSync->setDependencyArc(arc);
+					synchronizationReqs->addVariableSyncReq(varName, downSync, true);
+				}
+			}
+                // If the destination and current flow stage's LPSes are not the same then there is definitely a 
+		// synchronization need. The specific type of synchronization needed depends on the relative position of 
+		// these two LPSes in the partition hierarchy.
                 } else {
                         SyncRequirement *syncReq = NULL;
                         if (space->isParentSpace(destLps)) {

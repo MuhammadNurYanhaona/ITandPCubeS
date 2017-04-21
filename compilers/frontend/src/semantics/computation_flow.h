@@ -455,6 +455,14 @@ class CompositeStage : public FlowStage {
 	
 	// functions for identifying and characterizing data dependencies ---------------------------------------------
 
+	// This tells if the current composite stage has any nested flow-stage that executes in a lower level LPS
+	// than the LPS of the composite stage
+	bool hasExecutingCodeInDescendentLPSes();
+
+	// This returns the furthest descendent LPS of the current composite stage's LPS that has flow stages in
+	// it executing some code.  
+	Space *getFurthestDescendentLpsWithinNestedFlow();
+
 	virtual void performDependencyAnalysis(PartitionHierarchy *hierarchy);
 	virtual void analyzeSynchronizationNeeds();
 

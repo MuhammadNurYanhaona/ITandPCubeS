@@ -491,6 +491,38 @@ void CompositeStage::validateReductions() {
 	}
 }
 
+bool CompositeStage::hasExecutingCodeInDescendentLPSes() {
+	for (int i = 0; i < stageList->NumElements(); i++) {
+		FlowStage *stage = stageList->Nth(i);
+		Space *stagesLps = stage->getSpace();
+		if (stagesLps->isParentSpace(this->space)) return true;
+		CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+		if (compositeStage != NULL) {
+			if (compositeStage->hasExecutingCodeInDescendentLPSes()) return true;
+		}
+	}
+	return false;
+}
+
+Space *CompositeStage::getFurthestDescendentLpsWithinNestedFlow() {
+	Space *lowermostLps = this->space;
+	for (int i = 0; i < stageList->NumElements(); i++) {
+                FlowStage *stage = stageList->Nth(i);
+                Space *stagesLps = stage->getSpace();
+                if (stagesLps->isParentSpace(lowermostLps)) {
+			lowermostLps = stagesLps;
+		}
+                CompositeStage *compositeStage = dynamic_cast<CompositeStage*>(stage);
+                if (compositeStage != NULL) {
+                	Space *nestedLowerLps = compositeStage->getFurthestDescendentLpsWithinNestedFlow();
+			if (nestedLowerLps->isParentSpace(lowermostLps)) {
+				lowermostLps = nestedLowerLps;
+			}
+                }
+        }
+	return lowermostLps;
+}
+
 void CompositeStage::performDependencyAnalysis(PartitionHierarchy *hierarchy) {
         for (int i = 0; i < stageList->NumElements(); i++) {
                 stageList->Nth(i)->performDependencyAnalysis(hierarchy);
