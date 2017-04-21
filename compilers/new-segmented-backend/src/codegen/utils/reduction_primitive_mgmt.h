@@ -37,8 +37,19 @@ void generateResultResetFn(std::ofstream &programFile,
 				Generators for Intermediate Result Update Functions' body
 ***********************************************************************************************************************/
 
-void generateUpdateCodeForMax(std::ofstream &programFile, Type *varType);
-void generateUpdateCodeForSum(std::ofstream &programFile, Type *varType);
+// functions for different specific types of reduction operation
+void generateUpdateCodeForMax(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForMin(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForSum(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForProduct(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForLand(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForLor(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForBand(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForBor(std::ofstream &programFile, std::string propertyName);
+
+// this function picks anyone of the above function, as deemed appropriate, to generate the body
+void generateIntermediateResultUpdateFnBody(std::ofstream &programFile, 
+		Type *varType, ReductionOperator op);
 
 /**********************************************************************************************************************
 				Generators for Perform Cross Segment Reduction Functions' body

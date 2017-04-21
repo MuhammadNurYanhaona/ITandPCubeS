@@ -133,12 +133,7 @@ void generateResultResetFn(std::ofstream &programFile,
 	programFile << "}\n";
 }
 
-void generateUpdateCodeForMax(std::ofstream &programFile, Type *varType) {
-	
-	std::ostringstream propertyNameStr;
-	propertyNameStr << varType->getCType() << "Value";
-	std::string propertyName = propertyNameStr.str();
-
+void generateUpdateCodeForMax(std::ofstream &programFile, std::string propertyName) {
 	programFile << indent << "if (intermediateResult->data." << propertyName << " < ";
 	programFile << "localPartialResult->data." << propertyName << ") {\n";
 	programFile << doubleIndent << "intermediateResult->data." << propertyName;
@@ -147,15 +142,73 @@ void generateUpdateCodeForMax(std::ofstream &programFile, Type *varType) {
 	programFile << indent << "}\n";
 }
 
-void generateUpdateCodeForSum(std::ofstream &programFile, Type *varType) {
-	
-	std::ostringstream propertyNameStr;
-	propertyNameStr << varType->getCType() << "Value";
-	std::string propertyName = propertyNameStr.str();
+void generateUpdateCodeForMin(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "if (intermediateResult->data." << propertyName << " > ";
+	programFile << "localPartialResult->data." << propertyName << ") {\n";
+	programFile << doubleIndent << "intermediateResult->data." << propertyName;
+	programFile << " = localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;	
+	programFile << indent << "}\n";
+}
 
+void generateUpdateCodeForSum(std::ofstream &programFile, std::string propertyName) {
 	programFile << indent << "intermediateResult->data." << propertyName;
 	programFile << " += localPartialResult->data." << propertyName;
 	programFile << stmtSeparator;	
+}
+
+void generateUpdateCodeForProduct(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "intermediateResult->data." << propertyName;
+	programFile << " *= localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;	
+}
+
+void generateUpdateCodeForLand(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "intermediateResult->data." << propertyName;
+	programFile << " = intermediateResult->data." << propertyName;
+	programFile << " && localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;	
+}
+
+void generateUpdateCodeForLor(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "intermediateResult->data." << propertyName;
+	programFile << " = intermediateResult->data." << propertyName;
+	programFile << " || localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;	
+}
+
+void generateUpdateCodeForBand(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "intermediateResult->data." << propertyName;
+	programFile << " = intermediateResult->data." << propertyName;
+	programFile << " & localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;	
+}
+
+void generateUpdateCodeForBor(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "intermediateResult->data." << propertyName;
+	programFile << " = intermediateResult->data." << propertyName;
+	programFile << " | localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;	
+}
+
+void generateIntermediateResultUpdateFnBody(std::ofstream &programFile, Type *varType, ReductionOperator op) {
+
+	std::ostringstream propertyNameStr;
+        propertyNameStr << varType->getCType() << "Value";
+        std::string propertyName = propertyNameStr.str();
+
+	if (op == MAX) 		generateUpdateCodeForMax(programFile, propertyName);
+	else if (op == MIN)	generateUpdateCodeForMin(programFile, propertyName);
+	else if (op == SUM)	generateUpdateCodeForSum(programFile, propertyName);
+	else if (op == PRODUCT)	generateUpdateCodeForProduct(programFile, propertyName);
+	else if (op == LAND)	generateUpdateCodeForLand(programFile, propertyName);
+	else if (op == LOR)	generateUpdateCodeForLor(programFile, propertyName);
+	else if (op == BAND)	generateUpdateCodeForBand(programFile, propertyName);
+	else if (op == BOR)	generateUpdateCodeForBor(programFile, propertyName);
+	else {
+		std::cout << "Average, Max-entry, and Min-entry reductions haven't been implemented yet";
+                std::exit(EXIT_FAILURE);
+	}
 }
 
 void generateCodeForDataReduction(std::ofstream &programFile, ReductionOperator op, Type *varType) {
@@ -229,14 +282,7 @@ void generateIntraSegmentReductionPrimitive(std::ofstream &headerFile,
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::updateIntermediateResult(";
 	programFile << paramIndent << "reduction::Result *localPartialResult) {\n";
-
-	// TODO include all reduction operations here
-	if (op == MAX) {
-		generateUpdateCodeForMax(programFile, varType);
-	} else if (op == SUM) {
-		generateUpdateCodeForSum(programFile, varType);
-	}
-
+	generateIntermediateResultUpdateFnBody(programFile, varType, op);
 	programFile << "}\n";
 }
 
@@ -290,11 +336,7 @@ void generateCrossSegmentReductionPrimitive(std::ofstream &headerFile,
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::updateIntermediateResult(";
 	programFile << paramIndent << "reduction::Result *localPartialResult) {\n";
-	if (op == MAX) {
-		generateUpdateCodeForMax(programFile, varType);
-	} else if (op == SUM) {
-		generateUpdateCodeForSum(programFile, varType);
-	}
+	generateIntermediateResultUpdateFnBody(programFile, varType, op);
 	programFile << "}\n";
 
 	// generate the definition of terminal MPI reduction function in the program file 
