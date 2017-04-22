@@ -56,6 +56,9 @@ class ReportError
 	static void ReturnStmtOutsideFn(yyltype *loc, bool suppressFailure);
 	static void EpochVarUsageOutsideEpochBoundary(yyltype *loc, const char *varName, 
 			const char *stageName, bool suppressFailure);
+	static void CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure);	
+	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);
+	static void IndexReductionOnMultiIndexLoop(yyltype *loc, bool suppressFailure);
 	
 	//------------------------------------------------------------------------------- Polymorphic Type/stage Resolution Errors
 
@@ -71,8 +74,6 @@ class ReportError
 	static void TaskNameRequiredInEnvironmentCreate(yyltype *loc, bool suppressFailure);
 	static void UndefinedTask(yyltype *loc, const char *name, bool suppressFailure);
 	static void UnknownIndexToArrayAssociation(Identifier *index, Identifier *array, bool suppressFailure);	
-	static void CouplingOfReductionWithOtherExpr(yyltype *loc, bool suppressFailure);	
-	static void ReductionOutsideForLoop(yyltype *loc, bool suppressFailure);
 	
 	//-------------------------------------------------------------------------Errors with computation stage to space mappings
 	
@@ -90,7 +91,8 @@ class ReportError
 	static void SubpartitionRepeatNotSupported(yyltype *loc, const char *spaceName);
 	static void RepeatBeginningInvalid(yyltype *loc, const char *allowedFurthestRoot);
 	
-	// partition specific error
+	//-----------------------------------------------------------------------------------------------partition specific error
+
 	static void DuplicateSpaceDefinition(yyltype *loc, char spaceName);
 	static void ParentSpaceNotFound(yyltype *loc, char parentSpace, char spaceName, bool isSubpartition);
 	static void UnpartitionedDataInPartitionedSpace(yyltype *loc, char spaceName, int dimensionality);

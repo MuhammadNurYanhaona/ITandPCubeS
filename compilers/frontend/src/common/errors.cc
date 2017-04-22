@@ -257,6 +257,10 @@ void ReportError::ReductionOutsideForLoop(yyltype *loc, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, "Reduction expression must be within an encompassing loop statement");
 }
 
+void ReportError::IndexReductionOnMultiIndexLoop(yyltype *loc, bool suppressFailure) {
+	OptionalErrorReport(loc, suppressFailure, "Currently multi-dimensional indexes are not supported for index based reductions");
+}
+
 void ReportError::InvalidReductionRange(yyltype *loc, const char *executingLps, const char *rootLps, bool suppressFailure) {
 	OptionalErrorReport(loc, suppressFailure, 
 			"some use of the reduction has an invalid range spanning from Space %s to Space %s", 

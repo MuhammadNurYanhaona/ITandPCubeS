@@ -39,7 +39,9 @@ void generateResultResetFn(std::ofstream &programFile,
 
 // functions for different specific types of reduction operation
 void generateUpdateCodeForMax(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForMaxEntry(std::ofstream &programFile, std::string propertyName);
 void generateUpdateCodeForMin(std::ofstream &programFile, std::string propertyName);
+void generateUpdateCodeForMinEntry(std::ofstream &programFile, std::string propertyName);
 void generateUpdateCodeForSum(std::ofstream &programFile, std::string propertyName);
 void generateUpdateCodeForProduct(std::ofstream &programFile, std::string propertyName);
 void generateUpdateCodeForLand(std::ofstream &programFile, std::string propertyName);

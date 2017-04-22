@@ -29,10 +29,9 @@ ReductionStmt::ReductionStmt(Identifier *l, char *o, Expr *r, yyltype loc) : Stm
         if (strcmp(o, "sum") == 0) op = SUM;
         else if (strcmp(o, "product") == 0) op = PRODUCT;
         else if (strcmp(o, "max") == 0) op = MAX;
-        else if (strcmp(o, "maxEntry") == 0) op = MAX_ENTRY;
+        else if (strcmp(o, "max_entry") == 0) op = MAX_ENTRY;
         else if (strcmp(o, "min") == 0) op = MIN;
-        else if (strcmp(o, "minEntry") == 0) op = MIN_ENTRY;
-        else if (strcmp(o, "avg") == 0) op = AVG;
+        else if (strcmp(o, "min_entry") == 0) op = MIN_ENTRY;
         else if (strcmp(o, "land") == 0) op = LAND;
         else if (strcmp(o, "lor") == 0) op = LOR;
         else if (strcmp(o, "band") == 0) op = BAND;
@@ -45,6 +44,7 @@ ReductionStmt::ReductionStmt(Identifier *l, char *o, Expr *r, yyltype loc) : Stm
         right = r;
         right->SetParent(this);
 	reductionVar = NULL;
+	enclosingLoop = NULL;
 }
 
 ReductionStmt::ReductionStmt(Identifier *l, ReductionOperator o, Expr *r, yyltype loc) : Stmt(loc) {
@@ -54,6 +54,7 @@ ReductionStmt::ReductionStmt(Identifier *l, ReductionOperator o, Expr *r, yyltyp
         right = r;
         right->SetParent(this);
 	reductionVar = NULL;
+	enclosingLoop = NULL;
 }	
 
 void ReductionStmt::PrintChildren(int indentLevel) {
@@ -64,7 +65,6 @@ void ReductionStmt::PrintChildren(int indentLevel) {
                 case PRODUCT: printf("Product"); break;
                 case MAX: printf("Maximum"); break;
                 case MIN: printf("Minimum"); break;
-                case AVG: printf("Average"); break;
                 case MIN_ENTRY: printf("Minimum Entry"); break;
                 case MAX_ENTRY: printf("Maximum Entry"); break;
                 case LOR: printf("Logical OR"); break;
@@ -104,6 +104,8 @@ int ReductionStmt::resolveExprTypesAndScopes(Scope *executionScope, int iteratio
 		}
 	}
 
+	enclosingLoop = getEnclosingLoop();
+
 	return resolvedExprs;
 }
 
@@ -116,7 +118,6 @@ Type *ReductionStmt::inferResultTypeFromOpAndExprType(Type *exprType) {
                 case PRODUCT: return exprType;
                 case MAX: return exprType;
                 case MIN: return exprType;
-                case AVG: return exprType;
                 case MIN_ENTRY: return Type::intType;
                 case MAX_ENTRY: return Type::intType;
                 case LOR: return Type::boolType;
@@ -129,7 +130,19 @@ Type *ReductionStmt::inferResultTypeFromOpAndExprType(Type *exprType) {
 }
 
 int ReductionStmt::emitScopeAndTypeErrors(Scope *scope) {
-	return right->emitScopeAndTypeErrors(scope);
+	int errorCount = 0;
+	if (enclosingLoop == NULL) {
+		ReportError::ReductionOutsideForLoop(GetLocation(), false);
+		errorCount++;
+	} else if (op == MIN_ENTRY || op == MAX_ENTRY) {
+	List<const char*> *indexList = enclosingLoop->getAllIndexNames();
+		if (indexList->NumElements() != 1) {
+			ReportError::IndexReductionOnMultiIndexLoop(GetLocation(), false);	
+			errorCount++;
+		}
+	}
+	errorCount += right->emitScopeAndTypeErrors(scope);
+	return errorCount;
 }
 
 void ReductionStmt::performStageParamReplacement(
@@ -200,6 +213,22 @@ Hashtable<VariableAccess*> *ReductionStmt::getAccessedGlobalVariables(TaskGlobal
         return table;
 }
 
+PLoopStmt *ReductionStmt::getEnclosingLoop() {
+	Node *parent = this->GetParent();
+	while (parent != NULL) {
+		Stmt *parentStmt = dynamic_cast<Stmt*>(parent);
+		if (parentStmt == NULL) break;
+		LoopStmt *enclosingLoop = dynamic_cast<LoopStmt*>(parentStmt);
+		if (enclosingLoop != NULL) {
+			PLoopStmt *parallelLoop = dynamic_cast<PLoopStmt*>(enclosingLoop);
+			if (parallelLoop != NULL) return parallelLoop;
+			else break;
+		}
+		parent = parent->GetParent();
+	}
+	return NULL;
+}
+
 void ReductionStmt::analyseEpochDependencies(Space *space) {
         right->analyseEpochDependencies(space);
 }
@@ -220,7 +249,8 @@ void ReductionStmt::extractReductionInfo(List<ReductionMetadata*> *infoSet,
 		return;
 	}
 
+	Type *exprType = right->getType();
         ReductionMetadata *metadata = new ReductionMetadata(resultVar,
-                        op, reductionRootLps, executingLps, GetLocation());
+                        op, exprType, reductionRootLps, executingLps, GetLocation());
         infoSet->Append(metadata);
 }

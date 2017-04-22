@@ -13,6 +13,7 @@
 #include "../../static-analysis/reduction_info.h"
 #include "../../../../common-libs/utils/list.h"
 #include "../../../../common-libs/utils/hashtable.h"
+#include "../../../../common-libs/utils/string_utils.h"
 
 #include <iostream>
 #include <sstream>
@@ -125,6 +126,25 @@ Hashtable<VariableAccess*> *PLoopStmt::getAccessedGlobalVariables(
                 mergeAccessedVariables(table, cond->getAccessedGlobalVariables(globalReferences));
         }
         return table;
+}
+
+List<const char*> *PLoopStmt::getAllIndexNames() {
+
+	List<const char*> *indexNames = new List<const char*>;
+	
+	for (int i = 0; i < rangeConditions->NumElements(); i++) {
+                IndexRangeCondition *condition = rangeConditions->Nth(i);
+		List<Identifier*> *indexes = condition->getIndexes();
+		
+		for (int j = 0; j < indexes->NumElements(); j++) {
+			Identifier *index = indexes->Nth(j);
+			const char *indexName = index->getName();
+			if (!string_utils::contains(indexNames, indexName)) {
+				indexNames->Append(indexName);
+			}
+		}
+	}
+	return indexNames;
 }
 
 void PLoopStmt::analyseEpochDependencies(Space *space) {

@@ -18,12 +18,24 @@
 #include <string>
 
 const char *getMpiDataTypeStr(Type *type, ReductionOperator op) {
+	if (op == MAX_ENTRY || op == MIN_ENTRY) {
+        	if (type == Type::intType) return strdup("MPI_2INT");
+        	else if (type == Type::floatType) return strdup("MPI_FLOAT_INT");
+        	else if (type == Type::doubleType) return strdup("MPI_DOUBLE_INT");
+		else {
+			std::cout << "Max/Min index reduction is only meaningful for numeric types\n";
+			std::exit(EXIT_FAILURE);
+		}
+	}
 	if (type == Type::charType) return strdup("MPI_CHAR");
-	if (type == Type::intType) return strdup("MPI_INT");
-	if (type == Type::floatType) return strdup("MPI_FLOAT");
-	if (type == Type::doubleType) return strdup("MPI_DOUBLE");
-	if (type == Type::boolType) return strdup("MPI_C_BOOL"); 	// not sure if this is the right type to use
-	return NULL;
+	else if (type == Type::intType) return strdup("MPI_INT");
+	else if (type == Type::floatType) return strdup("MPI_FLOAT");
+	else if (type == Type::doubleType) return strdup("MPI_DOUBLE");
+	else if (type == Type::boolType) return strdup("MPI_C_BOOL"); 	// not sure if this is the right type to use
+	else {
+		std::cout << "Reductions on non-built-in types is still not supported\n";
+		std::exit(EXIT_FAILURE);
+	}
 }
 
 const char *getMpiReductionOp(ReductionOperator op) {
@@ -35,8 +47,8 @@ const char *getMpiReductionOp(ReductionOperator op) {
 	if (op == LOR) return strdup("MPI_LOR");
 	if (op == BAND) return strdup("MPI_BAND");
 	if (op == BOR) return strdup("MPI_BOR");
-	if (op == MAX_ENTRY) return strdup("MAXLOC");
-	if (op == MIN_ENTRY) return strdup("MINLOC");
+	if (op == MAX_ENTRY) return strdup("MPI_MAXLOC");
+	if (op == MIN_ENTRY) return strdup("MPI_MINLOC");
 	return NULL;
 }
 
@@ -45,7 +57,6 @@ const char *getReductionOpString(ReductionOperator op) {
 	if (op == PRODUCT) return strdup("PRODUCT");
 	if (op == MAX) return strdup("MAX");
 	if (op == MIN) return strdup("MIN");
-	if (op == AVG) return strdup("AVG");
 	if (op == MAX_ENTRY) return strdup("MAX_ENTRY");
 	if (op == MIN_ENTRY) return strdup("MIN_ENTRY");
 	if (op == LAND) return strdup("LAND");
@@ -62,7 +73,7 @@ void generateResultResetFn(std::ofstream &programFile,
 
 	programFile << '\n' << "void " << initials << "::" << className << "::";	
 	programFile << "resetPartialResult(reduction::Result *resultVar) {\n";
-	if (op == SUM || op == PRODUCT || op == AVG) {
+	if (op == SUM || op == PRODUCT) {
 		std::string value = std::string("0");
 		if (op == PRODUCT) value = std::string("1");
 		programFile << indent;
@@ -75,24 +86,33 @@ void generateResultResetFn(std::ofstream &programFile,
 		} else if (resultType == Type::doubleType) {
 			programFile << "resultVar->data.doubleValue = " << value << stmtSeparator;
 		} else {
-			std::cout << "Sum/Product/Average reduction is not meaningful for type: ";
+			std::cout << "Sum/Product reduction is not meaningful for type: ";
 			std::cout << resultType->getName() << "\n";
 			std::exit(EXIT_FAILURE);
 		}
-	} else if (op == MAX || op == MAX_ENTRY || op == MIN || op == MIN_ENTRY) {
-		std::string suffix = std::string("_MAX");
-		if (op == MAX || op == MAX_ENTRY) suffix = std::string("_MIN");
+	} else if (op == MAX || op == MAX_ENTRY) {
 		programFile << indent;
-		if (resultType == Type::charType) {
-			programFile << "resultVar->data.charValue = CHAR" << suffix << stmtSeparator;
-		} else if (resultType == Type::intType) {
-			programFile << "resultVar->data.intValue = INT" << suffix << stmtSeparator;
+		if (resultType == Type::intType) {
+			programFile << "resultVar->data.intValue = INT_MIN" << stmtSeparator;
 		} else if (resultType == Type::floatType) {
-			programFile << "resultVar->data.floatValue = FLT" << suffix << stmtSeparator;
+			programFile << "resultVar->data.floatValue = -FLT_MAX" << stmtSeparator;
 		} else if (resultType == Type::doubleType) {
-			programFile << "resultVar->data.doubleValue = DBL" << suffix << stmtSeparator;
+			programFile << "resultVar->data.doubleValue = -DBL_MAX" << stmtSeparator;
 		} else {
-			std::cout << "MIN/MAX or their ENTRY reduction is not meaningful for type: ";
+			std::cout << "MAX/MAX_ENTRY reduction is not meaningful for type: ";
+			std::cout << resultType->getName() << "\n";
+			std::exit(EXIT_FAILURE);
+		}
+	} else if (op == MIN || op == MIN_ENTRY) {
+		programFile << indent;
+		if (resultType == Type::intType) {
+			programFile << "resultVar->data.intValue = INT_MAX" << stmtSeparator;
+		} else if (resultType == Type::floatType) {
+			programFile << "resultVar->data.floatValue = FLT_MAX" << stmtSeparator;
+		} else if (resultType == Type::doubleType) {
+			programFile << "resultVar->data.doubleValue = DBL_MAX" << stmtSeparator;
+		} else {
+			std::cout << "MIN/MIN_ENTRY reduction is not meaningful for type: ";
 			std::cout << resultType->getName() << "\n";
 			std::exit(EXIT_FAILURE);
 		}
@@ -142,12 +162,32 @@ void generateUpdateCodeForMax(std::ofstream &programFile, std::string propertyNa
 	programFile << indent << "}\n";
 }
 
+void generateUpdateCodeForMaxEntry(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "if (intermediateResult->data." << propertyName << " < ";
+	programFile << "localPartialResult->data." << propertyName << ") {\n";
+	programFile << doubleIndent << "intermediateResult->data." << propertyName;
+	programFile << " = localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;
+	programFile << doubleIndent << "intermediateResult->index = localPartialResult->index" << stmtSeparator;	
+	programFile << indent << "}\n";
+}
+
 void generateUpdateCodeForMin(std::ofstream &programFile, std::string propertyName) {
 	programFile << indent << "if (intermediateResult->data." << propertyName << " > ";
 	programFile << "localPartialResult->data." << propertyName << ") {\n";
 	programFile << doubleIndent << "intermediateResult->data." << propertyName;
 	programFile << " = localPartialResult->data." << propertyName;
 	programFile << stmtSeparator;	
+	programFile << indent << "}\n";
+}
+
+void generateUpdateCodeForMinEntry(std::ofstream &programFile, std::string propertyName) {
+	programFile << indent << "if (intermediateResult->data." << propertyName << " > ";
+	programFile << "localPartialResult->data." << propertyName << ") {\n";
+	programFile << doubleIndent << "intermediateResult->data." << propertyName;
+	programFile << " = localPartialResult->data." << propertyName;
+	programFile << stmtSeparator;	
+	programFile << doubleIndent << "intermediateResult->index = localPartialResult->index" << stmtSeparator;	
 	programFile << indent << "}\n";
 }
 
@@ -197,16 +237,18 @@ void generateIntermediateResultUpdateFnBody(std::ofstream &programFile, Type *va
         propertyNameStr << varType->getCType() << "Value";
         std::string propertyName = propertyNameStr.str();
 
-	if (op == MAX) 		generateUpdateCodeForMax(programFile, propertyName);
-	else if (op == MIN)	generateUpdateCodeForMin(programFile, propertyName);
-	else if (op == SUM)	generateUpdateCodeForSum(programFile, propertyName);
-	else if (op == PRODUCT)	generateUpdateCodeForProduct(programFile, propertyName);
-	else if (op == LAND)	generateUpdateCodeForLand(programFile, propertyName);
-	else if (op == LOR)	generateUpdateCodeForLor(programFile, propertyName);
-	else if (op == BAND)	generateUpdateCodeForBand(programFile, propertyName);
-	else if (op == BOR)	generateUpdateCodeForBor(programFile, propertyName);
+	if (op == MAX) 			generateUpdateCodeForMax(programFile, propertyName);
+	else if (op == MAX_ENTRY)	generateUpdateCodeForMaxEntry(programFile, propertyName);
+	else if (op == MIN)		generateUpdateCodeForMin(programFile, propertyName);
+	else if (op == MIN_ENTRY)	generateUpdateCodeForMinEntry(programFile, propertyName);
+	else if (op == SUM)		generateUpdateCodeForSum(programFile, propertyName);
+	else if (op == PRODUCT)		generateUpdateCodeForProduct(programFile, propertyName);
+	else if (op == LAND)		generateUpdateCodeForLand(programFile, propertyName);
+	else if (op == LOR)		generateUpdateCodeForLor(programFile, propertyName);
+	else if (op == BAND)		generateUpdateCodeForBand(programFile, propertyName);
+	else if (op == BOR)		generateUpdateCodeForBor(programFile, propertyName);
 	else {
-		std::cout << "Average, Max-entry, and Min-entry reductions haven't been implemented yet";
+		std::cout << "User defined reductions haven't been implemented yet";
                 std::exit(EXIT_FAILURE);
 	}
 }
@@ -264,25 +306,24 @@ void generateIntraSegmentReductionPrimitive(std::ofstream &headerFile,
 	headerFile << "}" << stmtSeparator << '\n'; 
 
 	// generate the definition of the constructor in the program file
-	DataStructure *var = rootLps->getStructure(resultVar);
-	Type *varType = var->getType();
+	Type *exprType = rdMetadata->getExprType();
 	ReductionOperator op = rdMetadata->getOpCode();
 	const char *opStr = getReductionOpString(op);
 	programFile << initials << "::" << className << "::" << className << "(";
 	programFile << "int localParticipants)";
 	programFile << paramIndent << ": " << superclassName << "(";
-	programFile << "sizeof(" << varType->getCType() << ")" << paramSeparator;
+	programFile << "sizeof(" << exprType->getCType() << ")" << paramSeparator;
 	programFile << opStr << paramSeparator << "localParticipants)";
 	programFile << " {}\n"; 
 	
 	// generate the definition of the result reset function in the program file
-	generateResultResetFn(programFile, initials, className, varType, op);
+	generateResultResetFn(programFile, initials, className, exprType, op);
 
 	// generate the definition of intermediate result update function in the program file
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::updateIntermediateResult(";
 	programFile << paramIndent << "reduction::Result *localPartialResult) {\n";
-	generateIntermediateResultUpdateFnBody(programFile, varType, op);
+	generateIntermediateResultUpdateFnBody(programFile, exprType, op);
 	programFile << "}\n";
 }
 
@@ -315,42 +356,34 @@ void generateCrossSegmentReductionPrimitive(std::ofstream &headerFile,
 	headerFile << "}" << stmtSeparator << '\n'; 
 
 	// generate the definition of the constructor in the program file
-	DataStructure *var = rootLps->getStructure(resultVar);
-	Type *varType = var->getType();
+	Type *exprType = rdMetadata->getExprType();
 	ReductionOperator op = rdMetadata->getOpCode();
 	const char *opStr = getReductionOpString(op);
 	programFile << initials << "::" << className << "::" << className << "(";
 	programFile << "int localParticipants" << paramSeparator;
 	programFile << paramIndent << "SegmentGroup *segmentGroup)";
 	programFile << paramIndent << ": " << superclassName << "(";
-	programFile << "sizeof(" << varType->getCType() << ")" << paramSeparator;
+	programFile << "sizeof(" << exprType->getCType() << ")" << paramSeparator;
 	programFile << opStr << paramSeparator;
 	programFile << paramIndent << doubleIndent;
 	programFile << "localParticipants" << paramSeparator << "segmentGroup)";
 	programFile << " {}\n"; 
 
 	// generate the definition of the result reset function in the program file
-	generateResultResetFn(programFile, initials, className, varType, op);
+	generateResultResetFn(programFile, initials, className, exprType, op);
 
 	// generate the definition of intermediate result update function in the program file
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::updateIntermediateResult(";
 	programFile << paramIndent << "reduction::Result *localPartialResult) {\n";
-	generateIntermediateResultUpdateFnBody(programFile, varType, op);
+	generateIntermediateResultUpdateFnBody(programFile, exprType, op);
 	programFile << "}\n";
 
 	// generate the definition of terminal MPI reduction function in the program file 
 	programFile << std::endl;
 	programFile << "void " << initials << "::" << className << "::performCrossSegmentReduction() {\n";
-	if (op == AVG || op == MIN_ENTRY || op == MAX_ENTRY) {
-		std::cout << "Avg, Min-entry, and Max-entry cross segment reduction functions ";
-		std::cout << "have not been implemented yet\n";
-		std::exit(EXIT_FAILURE);
-	} else {
-		generateCodeForDataReduction(programFile, op, varType);
-	}
+	generateCodeForDataReduction(programFile, op, exprType);
 	programFile << "}\n";
-	
 }
 
 void generateReductionPrimitiveClasses(const char *headerFileName,
@@ -483,6 +516,9 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 		std::ostringstream commentStream;
 		commentStream << "Primitives for '" << varName << "'";
 		decorator::writeCommentHeader(1, &programFile, commentStream.str().c_str());
+		programFile << std::endl;
+
+		programFile << indent << "{ // scope starts\n";
 
 		// if the LPS for root of reduction range is mapped above the PPS where memory segmentation takes
 		// place then we need a cross-segment reduction primitive for the result
@@ -552,6 +588,8 @@ void generateReductionPrimitiveInitFn(const char *headerFileName,
 			programFile << indent << "}\n";
 
 		}
+		
+		programFile << indent << "} // scope ends\n";
 	}
 	
 	programFile << "}\n";

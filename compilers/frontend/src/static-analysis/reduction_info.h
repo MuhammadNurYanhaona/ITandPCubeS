@@ -3,6 +3,7 @@
 
 #include "../common/location.h"
 #include "../common/constant.h"
+#include "../syntax/ast_type.h"
 #include "../semantics/task_space.h"
 #include "../semantics/computation_flow.h"
 
@@ -16,6 +17,7 @@ class ReductionMetadata {
   protected:
         const char *resultVar;
         ReductionOperator opCode;
+	Type *exprType;
         Space *reductionRootLps;
         Space *reductionExecutorLps;
 
@@ -27,16 +29,19 @@ class ReductionMetadata {
   public:
         ReductionMetadata(const char *resultVar,
                         ReductionOperator opCode,
+			Type *exprType,
                         Space *reductionRootLps,
                         Space *reductionExecutorLps, yyltype *location) {
 		this->resultVar = resultVar;
 		this->opCode = opCode;
+		this->exprType = exprType;
 		this->reductionRootLps = reductionRootLps;
 		this->reductionExecutorLps = reductionExecutorLps;
 		this->location = location;
 	}
         const char *getResultVar() { return resultVar; }
         ReductionOperator getOpCode() { return opCode; }
+	Type *getExprType() { return exprType; }
         Space *getReductionRootLps() { return reductionRootLps; }
         Space *getReductionExecutorLps() { return reductionExecutorLps; }
         yyltype *getLocation() { return location; }

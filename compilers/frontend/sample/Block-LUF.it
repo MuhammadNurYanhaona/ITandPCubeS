@@ -13,7 +13,8 @@ Task "Block LU Factorization":
 		p: 1d Array of Integer
 		l_row, l_column, p_column: 1d Array of Real double-precision
 		u_block, l_block: 2d Array of Real double-precision
-		pivot, k, r, block_size: Integer
+		pivot: Integer Reduction
+		k, r, block_size: Integer
 		row_range: Range
 	Environment:
 		a: link
@@ -43,15 +44,7 @@ Task "Block LU Factorization":
 			row_range.max = last_row
 		}
 		selectPivot(pivot, u, k) {
-			maxEntry = k
-			maxValue = u[k][k]
-			do { 
-				if (maxValue < u[k][j]) {
-					maxEntry = j
-					maxValue = u[k][j]
-				}
-			} for j in u and j >= k
-			pivot = maxEntry
+			do { reduce(pivot, "max_entry", u[k][j]) } for j in u and j >= k
 		}
 		storePivot(p, k, pivot) {	
 			p[k] = pivot
@@ -115,7 +108,7 @@ Task "Block LU Factorization":
 				calculateRowRange(a, row_range, block_size)
 				Repeat for k in row_range {
 					Space B {
-						Where k in u.local.dimension1.range { selectPivot(pivot, u, k) }
+						Where k in u.local.dimension1.range { selectPivot(Space A: pivot, u, k) }
 					}
 					storePivot(p, k, pivot)
 					Space B {

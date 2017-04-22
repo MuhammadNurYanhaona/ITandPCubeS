@@ -27,7 +27,7 @@ Task "LU Factorization":
 			do { l[i][i] = 1 } for i in l
 		}
 		selectPivot(pivot, u, k) {
-			do { reduce(pivot, "maxEntry", u[i][k]) } for i in u and i >= k
+			do { reduce(pivot, "max_entry", u[i][k]) } for i in u and i >= k
 		}
 		storePivot(p, k, pivot) { 
 			p[k] = pivot 

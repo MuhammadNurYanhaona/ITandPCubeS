@@ -11,7 +11,8 @@ Task "LU Factorization":
 	Define:
 		a, u, l: 2d Array of Real single-precision
 		p: 1d Array of Integer
-		pivot, k: Integer
+		k: Integer
+		pivot: Integer Reduction
 		l_row: 1d Array of Real single-precision
 	Environment:
 		a: link
@@ -26,15 +27,7 @@ Task "LU Factorization":
 			do { l[i][i] = 1 } for i in l
 		}
 		selectPivot(pivot, u, k) {
-			maxEntry = k
-                        maxValue = u[k][k]
-                        do { 
-                                if (maxValue < u[k][j]) {
-                                        maxEntry = j
-                                        maxValue = u[k][j]
-                                }
-                        } for j in u and j >= k
-                        pivot = maxEntry
+			do { reduce(pivot, "max_entry", u[k][j]) } for j in u and j >= k
 		}
 		storePivot(p, k, pivot) { 
 			p[k] = pivot 
@@ -65,7 +58,7 @@ Task "LU Factorization":
 			Repeat for k in a.dimension1.range {
 				Space B {	
 					Where k in u.local.dimension1.range { 
-						selectPivot(pivot, u, k) 
+						selectPivot(Space A: pivot, u, k) 
 					}
 				}
 				storePivot(p, k, pivot)

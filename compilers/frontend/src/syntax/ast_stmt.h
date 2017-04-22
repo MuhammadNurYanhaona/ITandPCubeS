@@ -261,7 +261,6 @@ class IndexRangeCondition: public Node {
 
         void analyseEpochDependencies(Space *space);
 
-	
 	//------------------------------------------------------------- Common helper functions for Code Generation
 	
 	LogicalExpr *getRestrictions();
@@ -323,6 +322,8 @@ class PLoopStmt: public LoopStmt {
 			Hashtable<ParamReplacementConfig*> *nameAdjustmentInstrMap,
 			Hashtable<ParamReplacementConfig*> *arrayAccXformInstrMap);
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
+	
+	List<const char*> *getAllIndexNames();
 	
 	//-------------------------------------------------------------------- Helper functions for Static Analysis
 
@@ -461,8 +462,12 @@ class ReductionStmt: public Stmt {
 	// Having a non-NULL reduction variable associated means this reduction statement's result should
 	// be shared among all the LPUs descending from the same ancestor LPU in the LPS indicated by the 
 	// reduction variable. If this is NULL then the reduction statement should evaluate locally in each 
-	// LPU. 
+	// LPU.
 	ReductionVar *reductionVar;
+
+	// A reduction statement must be placed inside a parallel for loop to be meaningful. This is the
+	// reference to that loop.
+	PLoopStmt *enclosingLoop;
   public:
         ReductionStmt(Identifier *left, char *opName, Expr *right, yyltype loc);
         const char *GetPrintNameForNode() { return "Reduction-Statement"; }
@@ -481,6 +486,11 @@ class ReductionStmt: public Stmt {
 	Hashtable<VariableAccess*> *getAccessedGlobalVariables(TaskGlobalReferences *globalReferences);
 
   protected:
+	// A reduction statement must be placed inside a parallel for loop to be meaningful. This function
+	// locates the closest parallel for loop encompassing the current reduction statement and returns NULL
+	// if no such loop is found.
+	PLoopStmt *getEnclosingLoop();
+
 	// The reduction operator can be used not only for inferring the type of the expression being reduced
 	// but also sometimes for inferring the type type of the result variable. This function embodies the
 	// logic of inferring a result variable type given the reduced expression type as an argument.

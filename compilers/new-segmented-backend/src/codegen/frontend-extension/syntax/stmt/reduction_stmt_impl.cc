@@ -12,30 +12,37 @@
 
 void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Space *space) {
 
-	const char *outputField;
-	if (reductionVar != NULL) {
-		// the case of a cross-LPU reduction on some task-global data structure 
-		
-		const char *resultName = reductionVar->getName();
-		DataStructure *resultStruct = space->getStructure(resultName);
-		Type *resultType = resultStruct->getType();
+	if (reductionVar == NULL) {
+		std::cout << "Code-generation for Local reduction inside compute stages is not supported yet";
+		std::exit(EXIT_FAILURE);
+	}
 
-		// This naming strategy to find the appropriate property in the union holding reduction result 
-		// is incomplete. Currently this is sufficient as we do not have the unsigned primitive types yet 
-		// that have a space in their C type names. TODO we need to make change in the property naming 
-		// convension when we will add those types in IT.
+	//----------------------------------- the case of a cross-LPU reduction on some task-global data structure 
+	
+	const char *outputField;
+	const char *resultName = reductionVar->getName();
+	DataStructure *resultStruct = space->getStructure(resultName);
+	Type *resultType = resultStruct->getType();
+
+	// This naming strategy to find the appropriate property in the union holding reduction result is 
+	// incomplete. Currently this is sufficient as we do not have the unsigned primitive types yet that have 
+	// a space in their C type names. TODO we need to make change in the property naming convension when we 
+	// will add those types in IT.
+	std::string resultProperty;
+	if (op == MIN_ENTRY || op == MAX_ENTRY) {
+		std::ostringstream resultPropertyStr;
+		Type *exprType = right->getType();
+		resultPropertyStr << "data." << exprType->getCType() << "Value";
+		resultProperty = resultPropertyStr.str();
+	} else {
 		std::ostringstream resultPropertyStr;
 		resultPropertyStr << "data." << resultType->getCType() << "Value";
-		std::string resultProperty = resultPropertyStr.str();
-
-		std::ostringstream outputFieldStream;
-		outputFieldStream << resultName << "->" << resultProperty;
-		outputField = strdup(outputFieldStream.str().c_str());
-	} else {
-		// the case of a local reduction within the stage computation
-
-		outputField = left->getName();
+		resultProperty = resultPropertyStr.str();
 	}
+
+	std::ostringstream outputFieldStream;
+	outputFieldStream << resultName << "->" << resultProperty;
+	outputField = strdup(outputFieldStream.str().c_str());
 
 	std::ostringstream indents;
 	for (int i = 0; i < indentLevel; i++) indents << indent;
@@ -48,7 +55,7 @@ void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Sp
 		stream << indents.str() << outputField << " *= ";
                 right->translate(stream, indentLevel, 0, space);
                 stream << stmtSeparator;
-	} else if (op == MAX) {
+	} else if (op == MAX || op == MAX_ENTRY) {
 		stream << indents.str() << "if (" << outputField;
 		stream << " < ";
                 right->translate(stream, indentLevel, 0, space);
@@ -57,8 +64,13 @@ void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Sp
 		stream << outputField << " = ";
                 right->translate(stream, indentLevel, 0, space);
                 stream << stmtSeparator;
+		if (op == MAX_ENTRY) {
+			List<const char*> *indexFields = enclosingLoop->getAllIndexNames();
+			stream << indents.str() << indent;
+			stream << resultName << "->index = " << indexFields->Nth(0) << stmtSeparator;
+		}
 		stream << indents.str() << "}\n";	
-	} else if (op == MIN) {
+	} else if (op == MIN || op == MIN_ENTRY) {
 		stream << indents.str() << "if (" << outputField;
 		stream << " > ";
                 right->translate(stream, indentLevel, 0, space);
@@ -67,6 +79,11 @@ void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Sp
 		stream << outputField << " = ";
                 right->translate(stream, indentLevel, 0, space);
                 stream << stmtSeparator;
+		if (op == MIN_ENTRY) {
+			List<const char*> *indexFields = enclosingLoop->getAllIndexNames();
+                        stream << indents.str() << indent;
+                        stream << resultName << "->index = " << indexFields->Nth(0) << stmtSeparator;
+		}
 		stream << indents.str() << "}\n";
 	} else if (op == LAND) {
 		stream << indents.str() << outputField << " = ";
@@ -89,7 +106,7 @@ void ReductionStmt::generateCode(std::ostringstream &stream, int indentLevel, Sp
                 right->translate(stream, indentLevel, 0, space);
                 stream << stmtSeparator;
 	} else {
-		std::cout << "Average, Max-entry, and Min-entry reductions haven't been implemented yet";
+		std::cout << "User defined reduction primitives are not being supported yet";
 		std::exit(EXIT_FAILURE);
 	}
 }
