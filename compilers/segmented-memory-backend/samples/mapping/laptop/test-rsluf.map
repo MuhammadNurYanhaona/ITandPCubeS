@@ -1,6 +1,0 @@
-"LU Factorization" {
-	// syntax LPS ':' PPS
-	Space A: 4	// Node
-	Space B: 2	// Core
-	Space A: 1	// Hyperthreads
-}

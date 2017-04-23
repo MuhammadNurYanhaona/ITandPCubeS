@@ -1,9 +1,0 @@
-"Matrix Multiply" {
-	// syntax LPS ':' PPS
-	Space A: 2	// A CPU core
-}
-
-"CSR Matrix Vector Multiplication" {
-	Space A: 2
-}
-

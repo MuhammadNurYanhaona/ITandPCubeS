@@ -1,6 +1,0 @@
-"COO Matrix Vector Multiplication" {
-	// syntax LPS ':' PPS
-	Space A: 2	// A CPU core
-	Space B: 5	// The CPU
-}
-

@@ -1,7 +1,0 @@
-"Five Points Stencil" {
-	// syntax LPS ':' PPS
-	Model: Hybrid-Model	
-	Space Root: 	5	// Node
-	Space A:	4	// CPU
-	Space B:	1	// SM
-}

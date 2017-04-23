@@ -1,4 +1,0 @@
-"Matrix Vector Multiply" {
-	// syntax LPS ':' PPS
-	Space A: 1	// Core
-}

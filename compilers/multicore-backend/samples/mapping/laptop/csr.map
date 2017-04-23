@@ -1,5 +1,0 @@
-"CSR Matrix Vector Multiply" {
-        Space A: 3      // CPU
-	Space B: 1	// Hyperthreads
-	Space C: 1	// Hyperthreads
-}

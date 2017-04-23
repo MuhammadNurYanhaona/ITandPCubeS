@@ -1,7 +1,0 @@
-"Reorder Inclusion Check" {
-	// syntax LPS ':' PPS
-	Space A: 4	// NUMA Node
-	Space B: 3	// CPU Pair
-	Space C: 2	// CPU Core
-}
-

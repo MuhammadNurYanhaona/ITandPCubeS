@@ -1,4 +1,0 @@
-"Partition Test" {
-	// syntax LPS ':' PPS
-	Space A: 1	// A hyperthread
-}

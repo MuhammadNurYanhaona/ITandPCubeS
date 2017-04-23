@@ -1,5 +1,0 @@
-Each test case has a main function.
-The main function is hidden by renaming it into mainXXX.
-This is done so that we can make a build with only a single test case enabled.
-When you want to test a feature, just remove the suffix from the main function then build and run it in eclipse.
-Once you are done, rename the main function again to include the previous suffix.

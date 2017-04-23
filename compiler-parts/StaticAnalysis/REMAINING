@@ -1,6 +1,0 @@
-1. Determine if array dimensions are set properly in the initialize sections
-2. Put dangling arrows from dynamic computation stages to nearest static 
-   spaces if they are last to modify some data structures	
-3. Annotate communication arcs to reflect partitions and replications
-4. Put synchronization markers in place 
-5. Update syntax to support iterating over manually created ranges
