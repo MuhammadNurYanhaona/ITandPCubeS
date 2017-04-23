@@ -44,7 +44,8 @@ void PropertyReader::readPropertiesFile(const char *filePath, const char *groupK
 		cout << "Unable to open properties file: " << filePath << "\n";
 		cout << "Compilation will be done based on default properties\n";
 	} else {
-		while ( getline (propertiesFile,propertyLine) ) {
+		while ( getline (propertiesFile, propertyLine) ) {
+			if (propertyLine[0] == '#') continue;
 			List<string> *tokenList = string_utils::tokenizeString(propertyLine, delimiter);
 			string key = tokenList->Nth(0);
 			string_utils::trim(key);
